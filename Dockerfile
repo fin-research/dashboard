@@ -7,6 +7,11 @@ WORKDIR /app
 # 启用 corepack 并锁定 pnpm 版本（与 package.json 的 packageManager 一致）
 RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
 
+# 前端资源 base path：子路径部署默认 /dashboard/（由 Caddy 剥离前缀后反代），
+# 如需根路径部署可用 --build-arg VITE_BASE=/ 覆盖
+ARG VITE_BASE=/dashboard/
+ENV VITE_BASE=$VITE_BASE
+
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 

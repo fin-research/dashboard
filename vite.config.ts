@@ -11,6 +11,9 @@ const apiProxy = {
 
 export default defineConfig({
   plugins: [tailwindcss(), svelte()],
+  // 资源 base path：本地开发默认 "/"；Docker 构建时通过 VITE_BASE 指定子路径
+  // （如 /dashboard/，见 Dockerfile ARG VITE_BASE），使静态资源引用带上前缀
+  base: process.env.VITE_BASE ?? "/",
   server: {
     host: "127.0.0.1",
     port: 8765,
