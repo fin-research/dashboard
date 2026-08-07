@@ -1,0 +1,103 @@
+function cssColor(name: string, fallback: string): string {
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim() ||
+    fallback
+  );
+}
+
+export const colors = {
+  ink: cssColor("--text-1", cssColor("--ink", "#202622")),
+  muted: cssColor("--text-3", cssColor("--muted", "#667069")),
+  quiet: cssColor("--quiet", "#8d9690"),
+  line: cssColor("--border", cssColor("--line", "#d5dad4")),
+  grid: cssColor("--border", "#e0e4df"),
+  zero: cssColor("--border-strong", "#9da59f"),
+  paper: cssColor("--bg-card", cssColor("--surface", "#ffffff")),
+  brand: cssColor("--color-primary", cssColor("--brand", "#f47a20")),
+  brandSoft: cssColor("--color-primary-soft", cssColor("--brand-soft", "#fff0e5")),
+  red: cssColor("--color-up", cssColor("--red", "#d94d3f")),
+  green: cssColor("--color-down", cssColor("--green", "#188663")),
+  gold: cssColor("--color-accent", cssColor("--gold", "#f47a20")),
+  blue: cssColor("--color-primary", cssColor("--blue", "#3f708c")),
+} as const;
+
+export const fontFamily =
+  getComputedStyle(document.documentElement).getPropertyValue("--font").trim() ||
+  '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+
+export function rem(value: number): number {
+  const rootSize = Number.parseFloat(
+    getComputedStyle(document.documentElement).fontSize,
+  );
+  return value * (Number.isFinite(rootSize) ? rootSize : 16);
+}
+
+const configuredChartTextSize = Number.parseFloat(
+  getComputedStyle(document.documentElement).getPropertyValue(
+    "--chart-font-size",
+  ),
+);
+export const chartTextSize = Number.isFinite(configuredChartTextSize)
+  ? configuredChartTextSize
+  : rem(1);
+
+export const axisLabel = {
+  color: colors.muted,
+  fontFamily,
+  fontSize: chartTextSize,
+  fontWeight: 500,
+};
+
+export const tooltip = {
+  confine: true,
+  backgroundColor: "rgba(27, 33, 30, 0.96)",
+  borderWidth: 0,
+  padding: [10, 12],
+  textStyle: {
+    color: "#fffefa",
+    fontFamily,
+    fontSize: Math.max(chartTextSize, 12),
+    lineHeight: rem(1.4),
+  },
+  extraCssText:
+    "max-width:16.25rem;white-space:normal;overflow-wrap:anywhere;word-break:break-word;box-shadow:0 0.5rem 1.75rem rgba(27,33,30,.18);",
+};
+
+export const gridLine = {
+  color: colors.grid,
+  type: "dashed" as const,
+};
+
+export const zeroLine = {
+  color: colors.zero,
+  width: 1.4,
+  type: "solid" as const,
+};
+
+export function escapeHtml(value: unknown): string {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+export function heatColor(change: number, maxAbs: number): string {
+  if (Math.abs(change) < 0.005) return "#e8edf4";
+  const neutral = [226, 232, 241];
+  const target = change > 0 ? [218, 64, 54] : [23, 148, 105];
+  const ratio = Math.min(1, Math.abs(change) / maxAbs);
+  const strength = 0.2 + ratio ** 0.58 * 0.8;
+  return `rgb(${neutral
+    .map((value, index) =>
+      Math.round(value + ((target[index] ?? value) - value) * strength),
+    )
+    .join(",")})`;
+}
+
+export function heatTextColor(change: number, maxAbs: number): string {
+  const ratio = Math.min(1, Math.abs(change) / maxAbs);
+  const strength = 0.2 + ratio ** 0.58 * 0.8;
+  return strength > 0.52 ? "#ffffff" : colors.ink;
+}
