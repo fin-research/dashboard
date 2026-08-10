@@ -15,7 +15,7 @@ import {
   tooltip,
   zeroLine,
 } from "./common";
-import { setChart, setEmpty } from "./charting";
+import { seriesLineSegments, setChart, setEmpty } from "./charting";
 
 export function renderOmo(host: HTMLElement, points: OmoPoint[]): void {
   if (!points.length) {
@@ -132,7 +132,14 @@ export function renderGovernmentCurve(
     const today = current[index] ?? value;
     return today + (value - today) * separationFactor;
   });
-  const labelLayout = createCurveLabelLayout(host, valid);
+  const labelFontSize = host.clientWidth < 380 ? rem(0.875) : rem(1);
+  const labelLineHeight = labelFontSize * 1.2;
+  const labelLayout = createCurveLabelLayout(
+    host,
+    valid,
+    current,
+    previousVisual,
+  );
   setChart(host, {
     animationDuration: 300,
     aria: { enabled: true, description: "关键期限国债收益率曲线" },
@@ -228,9 +235,9 @@ export function renderGovernmentCurve(
           position: "top",
           color: colors.ink,
           fontFamily,
-          fontSize: rem(1),
+          fontSize: labelFontSize,
           fontWeight: 700,
-          lineHeight: rem(1.2),
+          lineHeight: labelLineHeight,
           formatter: ({
             value,
             data,
@@ -254,30 +261,30 @@ export function renderGovernmentCurve(
             value: {
               color: colors.ink,
               fontFamily,
-              fontSize: rem(1),
+              fontSize: labelFontSize,
               fontWeight: 750,
-              lineHeight: rem(1.2),
+              lineHeight: labelLineHeight,
             },
             up: {
               color: colors.red,
               fontFamily,
-              fontSize: rem(1),
+              fontSize: labelFontSize,
               fontWeight: 700,
-              lineHeight: rem(1.2),
+              lineHeight: labelLineHeight,
             },
             down: {
               color: colors.green,
               fontFamily,
-              fontSize: rem(1),
+              fontSize: labelFontSize,
               fontWeight: 700,
-              lineHeight: rem(1.2),
+              lineHeight: labelLineHeight,
             },
             flat: {
               color: colors.muted,
               fontFamily,
-              fontSize: rem(1),
+              fontSize: labelFontSize,
               fontWeight: 700,
-              lineHeight: rem(1.2),
+              lineHeight: labelLineHeight,
             },
           },
         },
@@ -290,6 +297,8 @@ export function renderGovernmentCurve(
 function createCurveLabelLayout(
   host: HTMLElement,
   metrics: MarketMetric[],
+  current: number[],
+  previous: number[],
 ): (params: {
   dataIndex?: number;
   rect: LabelRect;
@@ -302,9 +311,40 @@ function createCurveLabelLayout(
   hideOverlap: false;
 } {
   const placed: LabelRect[] = [];
+  const seen = new Set<number>();
+  let lineObstacles: ReturnType<typeof curveLineSegments> | null = null;
+
+  function curveLineSegments() {
+    const categories = metrics.map((item) => item.label.replace("国债", ""));
+    return [
+      ...seriesLineSegments(
+        host,
+        0,
+        categories.map(
+          (category, index) =>
+            [category, previous[index]!] as [string | number, number],
+        ),
+      ),
+      ...seriesLineSegments(
+        host,
+        1,
+        categories.map(
+          (category, index) =>
+            [category, current[index]!] as [string | number, number],
+        ),
+      ),
+    ];
+  }
+
   return (params) => {
     const index = params.dataIndex ?? 0;
-    if (index === 0) placed.length = 0;
+    if (seen.has(index)) {
+      seen.clear();
+      placed.length = 0;
+      lineObstacles = null;
+    }
+    seen.add(index);
+    lineObstacles ??= curveLineSegments();
 
     const width = host.clientWidth;
     const height = host.clientHeight;
@@ -358,6 +398,9 @@ function createCurveLabelLayout(
       obstacles: [...reserved, ...placed],
       preferred,
       gap: rem(0.55),
+      collisionPadding: rem(0.3),
+      lineObstacles,
+      linePadding: rem(0.28),
     });
     placed.push(placement);
     return {

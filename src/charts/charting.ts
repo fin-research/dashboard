@@ -13,7 +13,9 @@ import {
   LegendComponent,
   TooltipComponent,
 } from "echarts/components";
+import { LabelLayout } from "echarts/features";
 import { SVGRenderer } from "echarts/renderers";
+import type { LabelLineSegment } from "../label-placement";
 
 echarts.use([
   AriaComponent,
@@ -22,6 +24,7 @@ echarts.use([
   GraphicComponent,
   GridComponent,
   LegendComponent,
+  LabelLayout,
   LineChart,
   ScatterChart,
   TooltipComponent,
@@ -68,6 +71,35 @@ export function setChart(host: HTMLElement, option: ChartOption): void {
     : boundedOption;
   chart.setOption(resolvedOption, { notMerge: true });
   setChartBounds(host, chart);
+}
+
+export function seriesLineSegments(
+  host: HTMLElement,
+  seriesIndex: number,
+  values: Array<[string | number, number]>,
+): LabelLineSegment[] {
+  const chart = instances.get(host);
+  if (!chart || values.length < 2) return [];
+  try {
+    const pixels = values.map((value) => {
+      const pixel = chart.convertToPixel({ seriesIndex }, value) as unknown;
+      return Array.isArray(pixel) &&
+        Number.isFinite(pixel[0]) &&
+        Number.isFinite(pixel[1])
+        ? { x: pixel[0] as number, y: pixel[1] as number }
+        : null;
+    });
+    const segments: LabelLineSegment[] = [];
+    for (let index = 1; index < pixels.length; index += 1) {
+      const start = pixels[index - 1];
+      const end = pixels[index];
+      if (!start || !end) continue;
+      segments.push({ x1: start.x, y1: start.y, x2: end.x, y2: end.y });
+    }
+    return segments;
+  } catch {
+    return [];
+  }
 }
 
 function setChartBounds(host: HTMLElement, chart: ChartInstance): void {

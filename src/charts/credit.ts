@@ -1,4 +1,8 @@
 import { number, signed } from "../formatters";
+import {
+  chooseBestLabelPlacement,
+  type LabelRect,
+} from "../label-placement";
 import type { InventoryPoint } from "../types";
 import {
   axisLabel,
@@ -7,9 +11,10 @@ import {
   escapeHtml,
   fontFamily,
   gridLine,
+  rem,
   tooltip,
 } from "./common";
-import { setChart, setEmpty } from "./charting";
+import { seriesLineSegments, setChart, setEmpty } from "./charting";
 
 export function renderInventory(
   host: HTMLElement,
@@ -25,6 +30,7 @@ export function renderInventory(
   }
   const sorted = [...valid].sort((a, b) => a.tenor_years - b.tenor_years);
   const trades = sorted.filter((point) => Number.isFinite(point.trade_yield));
+  const labelLayout = createInventoryLabelLayout(host, trades, sorted);
 
   setChart(host, {
     animationDuration: 500,
@@ -129,17 +135,109 @@ export function renderInventory(
           position: "top",
           distance: 8,
           color: colors.red,
-          backgroundColor: "rgba(255,255,255,.9)",
-          borderRadius: 3,
-          padding: [2, 4],
           fontFamily,
           fontSize: chartTextSize,
           fontWeight: 650,
           formatter: ({ value }: { value: [number, number] }) =>
             number(value[1], 2),
         },
-        labelLayout: { moveOverlap: "shiftY", hideOverlap: true },
+        labelLayout,
       },
     ],
   });
+}
+
+function createInventoryLabelLayout(
+  host: HTMLElement,
+  trades: InventoryPoint[],
+  curve: InventoryPoint[],
+): (params: {
+  dataIndex?: number;
+  rect: LabelRect;
+  labelRect: LabelRect;
+}) => {
+  x: number;
+  y: number;
+  align: "left";
+  verticalAlign: "top";
+  hideOverlap: false;
+} {
+  const placed: LabelRect[] = [];
+  const seen = new Set<number>();
+  let lineObstacles: ReturnType<typeof inventoryLineSegments> | null = null;
+
+  function inventoryLineSegments() {
+    return seriesLineSegments(
+      host,
+      0,
+      curve.map((point) => [point.tenor_years, point.valuation]),
+    );
+  }
+
+  return (params) => {
+    const index = params.dataIndex ?? 0;
+    if (seen.has(index)) {
+      seen.clear();
+      placed.length = 0;
+      lineObstacles = null;
+    }
+    seen.add(index);
+    lineObstacles ??= inventoryLineSegments();
+
+    const width = host.clientWidth;
+    const height = host.clientHeight;
+    const point = {
+      x: params.rect.x + params.rect.width / 2,
+      y: params.rect.y + params.rect.height / 2,
+    };
+    const bounds = {
+      x: 8,
+      y: 8,
+      width: Math.max(0, width - 16),
+      height: Math.max(0, height - 16),
+    };
+    const legendWidth = Math.min(width, rem(21.5));
+    const reserved: LabelRect[] = [
+      {
+        x: Math.max(0, width - legendWidth),
+        y: 0,
+        width: legendWidth,
+        height: rem(2.5),
+      },
+      {
+        x: 0,
+        y: Math.max(0, height - rem(3.45)),
+        width,
+        height: rem(3.45),
+      },
+      { x: 0, y: 0, width: rem(3.25), height },
+    ];
+    const trade = trades[index];
+    const preferred =
+      trade && (trade.trade_yield as number) >= trade.valuation
+        ? ("top" as const)
+        : ("bottom" as const);
+    const placement = chooseBestLabelPlacement({
+      point,
+      label: {
+        width: params.labelRect.width,
+        height: params.labelRect.height,
+      },
+      bounds,
+      obstacles: [...reserved, ...placed],
+      preferred,
+      gap: 8,
+      collisionPadding: 5,
+      lineObstacles,
+      linePadding: 5,
+    });
+    placed.push(placement);
+    return {
+      x: placement.x,
+      y: placement.y,
+      align: "left",
+      verticalAlign: "top",
+      hideOverlap: false,
+    };
+  };
 }
