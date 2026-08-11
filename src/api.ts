@@ -1,19 +1,44 @@
-import type { ApiConfig, PrimarySummary, ReportData } from "./types";
+import type {
+  ApiConfig,
+  MarketBriefing,
+  PrimarySummary,
+  ReportData,
+} from "./types";
 
 type ReportPayload = Omit<ReportData, "primary_summary"> & {
   primary_summary?: PrimarySummary;
 };
 
-async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+async function getJson<T>(
+  url: string,
+  signal?: AbortSignal,
+  method = "GET",
+): Promise<T> {
   const response = await fetch(url, {
+    method,
     signal,
     headers: { Accept: "application/json" },
   });
-  const payload = (await response.json()) as T & { error?: string };
+  const payload = (await response.json()) as T & {
+    detail?: string;
+    error?: string;
+  };
   if (!response.ok) {
-    throw new Error(payload.error || "上游数据读取失败");
+    throw new Error(payload.detail || payload.error || "上游数据读取失败");
   }
   return payload;
+}
+
+export function generateMarketBriefing(
+  reportDate: string,
+  signal?: AbortSignal,
+): Promise<MarketBriefing> {
+  const query = new URLSearchParams({ date: reportDate });
+  return getJson<MarketBriefing>(
+    `/api/market-briefing?${query}`,
+    signal,
+    "POST",
+  );
 }
 
 export function fetchConfig(signal?: AbortSignal): Promise<ApiConfig> {

@@ -547,6 +547,68 @@ h2 {
   letter-spacing: 0;
 }
 
+.focus-generate-button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, var(--line));
+  border-radius: var(--radius-inner);
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, #fff);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.focus-generate-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-primary) 13%, #fff);
+}
+
+.focus-generate-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.focus-generate-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.focus-generate-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.focus-generate-button.is-loading svg {
+  animation: rotate 1.2s linear infinite;
+}
+
+.focus-generation-error {
+  margin: 0;
+  padding: 5px 10px;
+  border-bottom: 1px solid #f0c7c3;
+  color: #a33a33;
+  background: #fff4f2;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.is-export-capture .focus-generate-button,
+.is-export-capture .focus-generation-error {
+  display: none;
+}
+
 .chart-host {
   width: 100%;
   min-width: 0;

@@ -79,3 +79,9 @@ export interface ReportData {
 export interface ApiConfig {
   defaultDate: string;
 }
+
+export interface MarketBriefing {
+  report_date: string;
+  content: string;
+  news_count: number;
+}

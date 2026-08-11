@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
 
-  import { fetchConfig, fetchReport } from "./api";
+  import { fetchConfig, fetchReport, generateMarketBriefing } from "./api";
   import ChartHost from "./components/ChartHost.svelte";
   import CoreMetrics from "./components/CoreMetrics.svelte";
   import EquityStats from "./components/EquityStats.svelte";
@@ -13,7 +13,7 @@
   import FocusEditor from "./components/FocusEditor.svelte";
   import { exportReportImage } from "./export";
   import { chineseDateParts } from "./formatters";
-  import type { ReportData } from "./types";
+  import type { MarketBriefing, ReportData } from "./types";
   import {
     comparableSummaryItems,
     comparableTenorRows,
@@ -33,6 +33,10 @@
   let exporting = false;
   let exportLabel = "导出图片";
   let activeRequest: AbortController | null = null;
+  let briefingRequest: AbortController | null = null;
+  let generatedBriefing: MarketBriefing | null = null;
+  let briefingLoading = false;
+  let briefingError = "";
   let exportTimer: number | null = null;
 
   $: dateParts = data
@@ -54,12 +58,16 @@
 
   onDestroy(() => {
     activeRequest?.abort();
+    briefingRequest?.abort();
     if (exportTimer !== null) window.clearTimeout(exportTimer);
   });
 
   async function loadReport(refresh: boolean): Promise<void> {
     if (!selectedDate) return;
     activeRequest?.abort();
+    briefingRequest?.abort();
+    briefingLoading = false;
+    briefingError = "";
     activeRequest = new AbortController();
     loading = true;
     errorMessage = "";
@@ -75,6 +83,26 @@
       if (!(error instanceof DOMException && error.name === "AbortError")) {
         showError(error);
       }
+    }
+  }
+
+  async function createMarketBriefing(): Promise<void> {
+    if (!data || briefingLoading) return;
+    briefingRequest?.abort();
+    briefingRequest = new AbortController();
+    briefingLoading = true;
+    briefingError = "";
+    try {
+      generatedBriefing = await generateMarketBriefing(
+        data.report_date,
+        briefingRequest.signal,
+      );
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        briefingError = error instanceof Error ? error.message : String(error);
+      }
+    } finally {
+      briefingLoading = false;
     }
   }
 
@@ -200,8 +228,28 @@
           <header class="panel-heading">
             <span class="panel-index">01</span>
             <h2 id="focus-title">今日聚焦</h2>
+            <button
+              class:is-loading={briefingLoading}
+              class="focus-generate-button"
+              type="button"
+              disabled={briefingLoading}
+              aria-label="根据当天新闻生成今日聚焦"
+              onclick={createMarketBriefing}
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m10 2 1.1 4.2L15 8l-3.9 1.8L10 14l-1.1-4.2L5 8l3.9-1.8L10 2Z" />
+                <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
+              </svg>
+              <span>{briefingLoading ? "生成中" : "生成聚焦"}</span>
+            </button>
           </header>
-          <FocusEditor reportDate={data.report_date} />
+          {#if briefingError}
+            <p class="focus-generation-error" role="alert">{briefingError}</p>
+          {/if}
+          <FocusEditor
+            reportDate={data.report_date}
+            {generatedBriefing}
+          />
         </section>
 
         <section class="dashboard-panel panel--omo" aria-labelledby="omo-title">

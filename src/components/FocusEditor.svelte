@@ -4,8 +4,10 @@
     normalizeFocusText,
     plainTextToFocusHtml,
   } from "../focus-editor";
+  import type { MarketBriefing } from "../types";
 
   export let reportDate: string;
+  export let generatedBriefing: MarketBriefing | null = null;
 
   const STORAGE_PREFIX = "dm-market-report:focus-rich:v1:";
   const LEGACY_STORAGE_PREFIX = "dm-market-report:widescreen-focus:v1:";
@@ -15,6 +17,7 @@
   let loadedDate = "";
   let html = "";
   let empty = true;
+  let appliedBriefing: MarketBriefing | null = null;
 
   $: if (reportDate && reportDate !== loadedDate) {
     loadedDate = reportDate;
@@ -35,6 +38,21 @@
     } catch {
       html = "";
       empty = true;
+    }
+  }
+
+  $: if (
+    generatedBriefing &&
+    generatedBriefing !== appliedBriefing &&
+    generatedBriefing.report_date === reportDate
+  ) {
+    appliedBriefing = generatedBriefing;
+    html = plainTextToFocusHtml(generatedBriefing.content);
+    empty = !visibleText(html);
+    try {
+      window.localStorage.setItem(`${STORAGE_PREFIX}${reportDate}`, html);
+    } catch {
+      // The generated text remains editable if browser storage is unavailable.
     }
   }
 
