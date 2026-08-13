@@ -43,6 +43,8 @@
   let exportTimer: number | null = null;
   let activeView: ReportView = "visual";
   let focusText = "";
+  let navigationOpen = false;
+  let navigationTrigger: HTMLButtonElement;
 
   $: dateParts = data
     ? chineseDateParts(data.report_date)
@@ -117,7 +119,9 @@
     exporting = true;
     exportLabel = "正在导出";
     try {
-      await exportReportImage(reportSurface, data.report_date);
+      await exportReportImage(reportSurface, data.report_date, {
+        captureClass: true,
+      });
       exportLabel = "导出完成";
     } catch (error) {
       console.error("导出图片失败", error);
@@ -137,6 +141,25 @@
 
   function selectView(view: ReportView): void {
     activeView = view;
+    navigationOpen = false;
+  }
+
+  function openNavigation(): void {
+    navigationOpen = true;
+    requestAnimationFrame(() => {
+      document.getElementById(`${activeView}-report-tab`)?.focus();
+    });
+  }
+
+  function closeNavigation(restoreFocus = false): void {
+    navigationOpen = false;
+    if (restoreFocus) requestAnimationFrame(() => navigationTrigger?.focus());
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent): void {
+    if (event.key !== "Escape" || !navigationOpen) return;
+    event.preventDefault();
+    closeNavigation(true);
   }
 
   function handleTabKeydown(event: KeyboardEvent): void {
@@ -152,25 +175,52 @@
     if (nextIndex === null) return;
     event.preventDefault();
     const nextView = views[nextIndex]!;
-    selectView(nextView);
+    activeView = nextView;
     document.getElementById(`${nextView}-report-tab`)?.focus();
   }
 </script>
+
+<svelte:window onkeydown={handleWindowKeydown} />
 
 <svelte:head>
   <meta name="theme-color" content="#f6f8fb" />
 </svelte:head>
 
 <div class="page-shell">
-  <header class="topbar">
-    <div class="report-tabs" aria-label="报告展示方式" role="tablist">
+  <div class:open={navigationOpen} class="navigation-overlay">
+    <button
+      class="navigation-scrim"
+      type="button"
+      aria-label="关闭报告导航"
+      tabindex={navigationOpen ? 0 : -1}
+      onclick={() => closeNavigation(true)}
+    ></button>
+    <nav
+      id="report-navigation"
+      class="navigation-drawer"
+      aria-label="报告导航"
+      aria-hidden={!navigationOpen}
+    >
+      <div class="navigation-drawer__header">
+        <strong>报告展示方式</strong>
+        <button
+          type="button"
+          aria-label="关闭报告导航"
+          onclick={() => closeNavigation(true)}
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m5 5 10 10M15 5 5 15" />
+          </svg>
+        </button>
+      </div>
+      <div class="report-tabs" aria-label="报告展示方式" role="tablist">
       <button
         id="visual-report-tab"
         class:active={activeView === "visual"}
         type="button"
         role="tab"
         aria-selected={activeView === "visual"}
-        tabindex={activeView === "visual" ? 0 : -1}
+        tabindex={navigationOpen && activeView === "visual" ? 0 : -1}
         onclick={() => selectView("visual")}
         onkeydown={handleTabKeydown}
       >
@@ -182,70 +232,84 @@
         type="button"
         role="tab"
         aria-selected={activeView === "text"}
-        tabindex={activeView === "text" ? 0 : -1}
+        tabindex={navigationOpen && activeView === "text" ? 0 : -1}
         onclick={() => selectView("text")}
         onkeydown={handleTabKeydown}
       >
         文字版报告
       </button>
-    </div>
-    <div class="toolbar" aria-label="报告控制">
-      <label class="date-control">
-        <span>报告日</span>
-        <input
-          type="date"
-          aria-label="选择报告日期"
-          bind:value={selectedDate}
-          onchange={() => loadReport(false)}
-        />
-      </label>
-      <button
-        class:is-loading={loading}
-        class="btn btn-sm refresh-button"
-        type="button"
-        disabled={loading}
-        onclick={() => loadReport(true)}
-      >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="M16.4 6.1A7 7 0 1 0 17 11" />
-          <path d="M16.5 2.7v4h-4" />
-        </svg>
-        <span>刷新</span>
-      </button>
-      <button
-        class:is-exporting={exporting}
-        class="btn btn-sm export-button"
-        type="button"
-        disabled={!data || loading || exporting}
-        onclick={exportImage}
-      >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="M10 3v9" />
-          <path d="m6.5 8.7 3.5 3.6 3.5-3.6" />
-          <path d="M4 14.5v2h12v-2" />
-        </svg>
-        <span>{exportLabel}</span>
-      </button>
-    </div>
-  </header>
+      </div>
+    </nav>
+  </div>
 
   <main bind:this={reportSurface} id="report-surface">
     <header class="report-masthead">
       <div class="report-title">
-        <h1 aria-label="资金管理部 • 市场点评">
-          <span class="report-title__department">资金管理部</span>
-          <span class="report-title__dot" aria-hidden="true">•</span>
-          <span class="report-title__subject">市场点评</span>
+        <h1>
+          <button
+            bind:this={navigationTrigger}
+            class="report-navigation-trigger"
+            type="button"
+            aria-label="资金管理部 • 市场点评，展开报告导航"
+            aria-expanded={navigationOpen}
+            aria-controls="report-navigation"
+            onclick={openNavigation}
+          >
+            <span class="report-title__department">资金管理部</span>
+            <span class="report-title__dot" aria-hidden="true">•</span>
+            <span class="report-title__subject">市场点评</span>
+          </button>
         </h1>
       </div>
-      <time
-        class="hero-date"
-        datetime={data?.report_date ?? ""}
-        aria-label={`${dateParts.date} ${dateParts.weekday}`}
-      >
-        <span class="hero-date__value">{dateParts.date}</span>
-        <span class="hero-date__weekday">{dateParts.weekday}</span>
-      </time>
+      <div class="masthead-controls" aria-label="报告控制">
+        <div class="titlebar-actions">
+          <button
+            class:is-loading={loading}
+            class="refresh-button"
+            type="button"
+            disabled={loading}
+            onclick={() => loadReport(true)}
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M16.4 6.1A7 7 0 1 0 17 11" />
+              <path d="M16.5 2.7v4h-4" />
+            </svg>
+            <span>刷新</span>
+          </button>
+          <button
+            class:is-exporting={exporting}
+            class="export-button"
+            type="button"
+            disabled={!data || loading || exporting}
+            onclick={exportImage}
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M10 3v9" />
+              <path d="m6.5 8.7 3.5 3.6 3.5-3.6" />
+              <path d="M4 14.5v2h12v-2" />
+            </svg>
+            <span>{exportLabel}</span>
+          </button>
+        </div>
+        <label class="hero-date">
+          <span class="sr-only">选择报告日期</span>
+          <input
+            class="hero-date__input"
+            type="date"
+            aria-label="选择报告日期"
+            bind:value={selectedDate}
+            onchange={() => loadReport(false)}
+          />
+          <time
+            class="hero-date__display"
+            datetime={data?.report_date ?? ""}
+            aria-hidden="true"
+          >
+            <span class="hero-date__value">{dateParts.date}</span>
+            <span class="hero-date__weekday">{dateParts.weekday}</span>
+          </time>
+        </label>
+      </div>
     </header>
 
     {#if loading}

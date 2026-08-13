@@ -52,15 +52,15 @@ export const tooltip = {
   confine: true,
   backgroundColor: "rgba(27, 33, 30, 0.96)",
   borderWidth: 0,
-  padding: [10, 12],
+  padding: [6, 8],
   textStyle: {
     color: "#fffefa",
     fontFamily,
     fontSize: Math.max(chartTextSize, 12),
-    lineHeight: rem(1.4),
+    lineHeight: rem(1.25),
   },
   extraCssText:
-    "max-width:16.25rem;white-space:normal;overflow-wrap:anywhere;word-break:break-word;box-shadow:0 0.5rem 1.75rem rgba(27,33,30,.18);",
+    "width:max-content;max-width:calc(100% - 1rem);white-space:normal;overflow-wrap:anywhere;word-break:break-word;box-shadow:0 0.5rem 1.75rem rgba(27,33,30,.18);",
 };
 
 export const gridLine = {
