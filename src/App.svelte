@@ -15,6 +15,11 @@
   import { exportReportImage } from "./export";
   import { loadStoredFocusText } from "./focus-editor";
   import { chineseDateParts } from "./formatters";
+  import {
+    pathnameForReportView,
+    reportViewFromPathname,
+    type ReportView,
+  } from "./report-route";
   import type { MarketBriefing, ReportData } from "./types";
   import {
     comparableSummaryItems,
@@ -25,8 +30,6 @@
   } from "./view-model";
 
   type ChartRenderers = typeof import("./charts");
-  type ReportView = "visual" | "text";
-
   let reportSurface: HTMLElement;
   let selectedDate = "";
   let data: ReportData | null = null;
@@ -54,6 +57,7 @@
   }
 
   onMount(async () => {
+    activeView = reportViewFromPathname(window.location.pathname);
     try {
       const config = await fetchConfig();
       selectedDate = config.defaultDate;
@@ -142,6 +146,15 @@
   function selectView(view: ReportView): void {
     activeView = view;
     navigationOpen = false;
+    const pathname = pathnameForReportView(view);
+    if (window.location.pathname !== pathname) {
+      window.history.pushState(null, "", `${pathname}${window.location.search}`);
+    }
+  }
+
+  function handlePopState(): void {
+    activeView = reportViewFromPathname(window.location.pathname);
+    navigationOpen = false;
   }
 
   function openNavigation(): void {
@@ -180,7 +193,10 @@
   }
 </script>
 
-<svelte:window onkeydown={handleWindowKeydown} />
+<svelte:window
+  onkeydown={handleWindowKeydown}
+  onpopstate={handlePopState}
+/>
 
 <svelte:head>
   <meta name="theme-color" content="#f6f8fb" />

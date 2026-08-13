@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "eastmoney-dashboard",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-08-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/dashboard", "/dashboard/*"]
+  },
+  "routes": [
+    {
+      "pattern": "eastmoney.hasbai.xyz/dashboard",
+      "zone_name": "hasbai.xyz"
+    },
+    {
+      "pattern": "eastmoney.hasbai.xyz/dashboard/*",
+      "zone_name": "hasbai.xyz"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "head_sampling_rate": 1
+    }
+  }
+}

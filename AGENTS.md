@@ -22,6 +22,9 @@
 - `pnpm build`：类型检查 + 生产构建（输出到 `dist/`）
 - `pnpm test`：运行单元测试（node --test，`tests/*.test.mjs`）
 - `pnpm typecheck`：svelte-check 类型检查
+- `pnpm worker:dev`：构建后使用 Wrangler 在本地运行 Cloudflare Worker
+- `pnpm worker:deploy`：构建并部署 `eastmoney-dashboard` Worker
+- `pnpm worker:typegen`：根据 `wrangler.jsonc` 更新 Worker 绑定类型
 
 ## 目录结构
 
@@ -37,5 +40,7 @@
 
 - **子路径部署**：`vite.config.ts` 中 `base` 硬编码为 `/dashboard/`，构建产物资源引用为 `/dashboard/assets/*`。生产部署时反向代理（Caddy）剥离 `/dashboard` 前缀后转发给 nginx 按根路径服务；本地开发经 Vite dev server 访问 `http://127.0.0.1:8765/dashboard/`。
 - 生产构建产物（`dist/`）是静态文件，**不含 Vite proxy**；部署时需与 API 服务同源，由 Caddy 转发并剥离 `/api`。对外 Swagger 文档地址为 `/api/docs`。
+- Cloudflare Worker 仅接管 `eastmoney.hasbai.xyz/dashboard` 与 `/dashboard/*`，不反代 `/api`；前端继续通过同源 `/api/*` 访问原 API 服务。
+- Cloudflare 路由入口为 `/dashboard`（可视化报告）和 `/dashboard/text`（文字版报告），静态资源及 SPA 回退由 Worker 处理。原 Dockerfile、nginx 与 Caddy 部署管线保留。
 - 端口约定：前端 8765，API 8766，均绑定 127.0.0.1。
 - 提交前请确保 `pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过。
