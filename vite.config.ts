@@ -6,6 +6,7 @@ const apiProxy = {
   "/api": {
     target: "http://127.0.0.1:8766",
     changeOrigin: false,
+    rewrite: (path: string) => path.replace(/^\/api(?=\/|$)/, ""),
   },
 };
 

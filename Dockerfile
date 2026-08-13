@@ -13,11 +13,8 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
 
-# ---- Runtime stage: nginx 托管静态文件并反向代理 /api ----
+# ---- Runtime stage: nginx 仅托管静态文件；/api 由外层 Caddy 转发 ----
 FROM nginx:1.27-alpine
-
-# 后端 API 地址，可通过运行时 -e API_UPSTREAM=host:port 覆盖
-ENV API_UPSTREAM=api:8766
 
 # nginx 官方镜像会自动渲染 /etc/nginx/templates/*.template 到 /etc/nginx/conf.d/
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template

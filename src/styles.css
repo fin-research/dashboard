@@ -86,10 +86,59 @@ button {
 
 .topbar {
   display: flex;
-  height: 44px;
+  height: 52px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 24px;
   border-bottom: 1px solid var(--line-strong);
+}
+
+.report-tabs {
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.report-tabs button {
+  position: relative;
+  min-width: 124px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 720;
+  transition:
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.report-tabs button::after {
+  position: absolute;
+  right: 16px;
+  bottom: 0;
+  left: 16px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: transparent;
+  content: "";
+}
+
+.report-tabs button:hover {
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand-soft) 52%, transparent);
+}
+
+.report-tabs button.active {
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand-soft) 72%, transparent);
+}
+
+.report-tabs button.active::after {
+  background: var(--brand);
 }
 
 .toolbar,
@@ -186,6 +235,7 @@ button {
 }
 
 .date-control input:focus-visible,
+.report-tabs button:focus-visible,
 .refresh-button:focus-visible,
 .export-button:focus-visible,
 .error-state button:focus-visible {
@@ -195,9 +245,17 @@ button {
 
 #report-surface {
   display: grid;
-  height: calc(100vh - 56px);
-  min-height: 664px;
-  grid-template-rows: 42px 94px minmax(0, 1fr);
+  height: calc(100vh - 64px);
+  min-height: 656px;
+  grid-template-rows: 42px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.visual-report-view {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 94px minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -488,6 +546,97 @@ h1 {
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: minmax(0, 1.12fr) minmax(0, 0.98fr);
   gap: 12px;
+}
+
+.text-report-view {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.text-report {
+  width: min(100%, 1120px);
+  height: 100%;
+  margin: 0 auto;
+  padding: 26px clamp(34px, 5vw, 72px) 52px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  color: var(--text-2);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  font-size: 1rem;
+  line-height: 1.8;
+}
+
+.text-report__header {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-strong);
+  text-align: center;
+}
+
+.text-report__header p {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.text-report__header h2 {
+  color: var(--ink);
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  white-space: normal;
+}
+
+.text-report__body {
+  padding-top: 4px;
+}
+
+.text-report__section {
+  padding-top: 18px;
+}
+
+.text-report__section h3 {
+  margin: 0 0 7px;
+  color: var(--brand-deep);
+  font-size: 1.0625rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.text-report__section p {
+  margin: 4px 0;
+}
+
+.text-report__group + .text-report__group {
+  margin-top: 10px;
+}
+
+.text-report__group-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.text-report__entry {
+  padding-left: 1em;
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.text-report__entry strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.text-report__focus {
+  min-height: 3.6em;
+  padding: 10px 12px;
+  border-left: 3px solid var(--brand);
+  border-radius: 0 var(--radius-inner) var(--radius-inner) 0;
+  background: color-mix(in srgb, var(--brand-soft) 42%, var(--surface));
+  white-space: pre-wrap;
 }
 
 .dashboard-panel {
@@ -1127,7 +1276,12 @@ h2 {
 
 @media (max-height: 900px) {
   #report-surface {
-    grid-template-rows: 40px 90px minmax(0, 1fr);
+    grid-template-rows: 40px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .visual-report-view {
+    grid-template-rows: 90px minmax(0, 1fr);
     gap: 8px;
   }
 
@@ -1170,7 +1324,12 @@ h2 {
 
 @media (max-height: 760px) {
   #report-surface {
-    grid-template-rows: 38px 86px minmax(0, 1fr);
+    grid-template-rows: 38px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .visual-report-view {
+    grid-template-rows: 86px minmax(0, 1fr);
     gap: 6px;
   }
 

@@ -165,12 +165,12 @@ export function primarySummaryItems(
 ): SummaryItemView[] {
   return [
     {
-      label: "近两日发行",
+      label: "当日发行",
       value: `${number(summary.current_amount, 2)} 亿`,
       tone: "flat",
     },
     {
-      label: "较前一窗口",
+      label: "较上一交易日",
       value: signed(summary.change_amount, " 亿", 2),
       tone: tone(summary.change_amount),
     },

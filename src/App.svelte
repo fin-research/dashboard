@@ -11,7 +11,9 @@
   import SecondaryTable from "./components/SecondaryTable.svelte";
   import SummaryStrip from "./components/SummaryStrip.svelte";
   import FocusEditor from "./components/FocusEditor.svelte";
+  import TextReport from "./components/TextReport.svelte";
   import { exportReportImage } from "./export";
+  import { loadStoredFocusText } from "./focus-editor";
   import { chineseDateParts } from "./formatters";
   import type { MarketBriefing, ReportData } from "./types";
   import {
@@ -23,6 +25,7 @@
   } from "./view-model";
 
   type ChartRenderers = typeof import("./charts");
+  type ReportView = "visual" | "text";
 
   let reportSurface: HTMLElement;
   let selectedDate = "";
@@ -38,6 +41,8 @@
   let briefingLoading = false;
   let briefingError = "";
   let exportTimer: number | null = null;
+  let activeView: ReportView = "visual";
+  let focusText = "";
 
   $: dateParts = data
     ? chineseDateParts(data.report_date)
@@ -77,6 +82,7 @@
         import("./charts"),
       ]);
       data = report;
+      focusText = loadStoredFocusText(report.report_date);
       charts = chartModule;
       loading = false;
     } catch (error) {
@@ -128,6 +134,27 @@
     loading = false;
     errorMessage = error instanceof Error ? error.message : String(error);
   }
+
+  function selectView(view: ReportView): void {
+    activeView = view;
+  }
+
+  function handleTabKeydown(event: KeyboardEvent): void {
+    const views: ReportView[] = ["visual", "text"];
+    const currentIndex = views.indexOf(activeView);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % views.length;
+    if (event.key === "ArrowLeft") {
+      nextIndex = (currentIndex - 1 + views.length) % views.length;
+    }
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = views.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextView = views[nextIndex]!;
+    selectView(nextView);
+    document.getElementById(`${nextView}-report-tab`)?.focus();
+  }
 </script>
 
 <svelte:head>
@@ -136,6 +163,32 @@
 
 <div class="page-shell">
   <header class="topbar">
+    <div class="report-tabs" aria-label="报告展示方式" role="tablist">
+      <button
+        id="visual-report-tab"
+        class:active={activeView === "visual"}
+        type="button"
+        role="tab"
+        aria-selected={activeView === "visual"}
+        tabindex={activeView === "visual" ? 0 : -1}
+        onclick={() => selectView("visual")}
+        onkeydown={handleTabKeydown}
+      >
+        可视化报告
+      </button>
+      <button
+        id="text-report-tab"
+        class:active={activeView === "text"}
+        type="button"
+        role="tab"
+        aria-selected={activeView === "text"}
+        tabindex={activeView === "text" ? 0 : -1}
+        onclick={() => selectView("text")}
+        onkeydown={handleTabKeydown}
+      >
+        文字版报告
+      </button>
+    </div>
     <div class="toolbar" aria-label="报告控制">
       <label class="date-control">
         <span>报告日</span>
@@ -195,12 +248,6 @@
       </time>
     </header>
 
-    {#if data}
-      <div class="core-metrics" aria-label="核心市场指标">
-        <CoreMetrics {data} />
-      </div>
-    {/if}
-
     {#if loading}
       <div class="alert loading-state" role="status" aria-live="polite">
         <span class="loading-orbit" aria-hidden="true"></span>
@@ -223,7 +270,17 @@
         >
       </div>
     {:else if data && charts}
-      <div class="report-content">
+      {#if activeView === "visual"}
+        <div
+          id="visual-report-panel"
+          class="visual-report-view"
+          role="tabpanel"
+          aria-labelledby="visual-report-tab"
+        >
+          <div class="core-metrics" aria-label="核心市场指标">
+            <CoreMetrics {data} />
+          </div>
+          <div class="report-content">
         <section class="dashboard-panel panel--focus" aria-labelledby="focus-title">
           <header class="panel-heading">
             <span class="panel-index">01</span>
@@ -249,6 +306,7 @@
           <FocusEditor
             reportDate={data.report_date}
             {generatedBriefing}
+            onTextChange={(value) => (focusText = value)}
           />
         </section>
 
@@ -373,7 +431,18 @@
             <SummaryStrip items={inventorySummaryItems(data.inventory)} />
           </div>
         </section>
-      </div>
+          </div>
+        </div>
+      {:else}
+        <div
+          id="text-report-panel"
+          class="text-report-view"
+          role="tabpanel"
+          aria-labelledby="text-report-tab"
+        >
+          <TextReport {data} {focusText} />
+        </div>
+      {/if}
     {/if}
   </main>
 </div>

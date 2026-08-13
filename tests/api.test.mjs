@@ -55,7 +55,7 @@ test("旧接口缺少同业发行摘要时不会导致页面加载失败", () =>
   });
 });
 
-test("新接口提供的同业发行滚动窗口摘要保持不变", () => {
+test("新接口提供的当日与前一交易日发行摘要保持不变", () => {
   const normalized = normalizeReport({
     ...reportPayload(),
     primary_summary: {

@@ -4,6 +4,10 @@ export type FocusFormatCommand =
   | "underline"
   | "emphasis";
 
+export const FOCUS_STORAGE_PREFIX = "dm-market-report:focus-rich:v1:";
+export const LEGACY_FOCUS_STORAGE_PREFIX =
+  "dm-market-report:widescreen-focus:v1:";
+
 interface FocusShortcut {
   key: string;
   ctrlKey: boolean;
@@ -34,6 +38,36 @@ export function normalizeFocusText(value: string): string {
 
 export function plainTextToFocusHtml(value: string): string {
   return escapeHtml(normalizeFocusText(value)).replace(/\n/g, "<br>");
+}
+
+export function focusHtmlToPlainText(value: string): string {
+  if (!value) return "";
+  const container = document.createElement("div");
+  container.innerHTML = value;
+  for (const lineBreak of container.querySelectorAll("br")) {
+    lineBreak.replaceWith(document.createTextNode("\n"));
+  }
+  for (const block of container.querySelectorAll("div, p, li")) {
+    block.append(document.createTextNode("\n"));
+  }
+  return normalizeFocusText(container.textContent ?? "");
+}
+
+export function loadStoredFocusText(reportDate: string): string {
+  if (!reportDate) return "";
+  try {
+    const saved = window.localStorage.getItem(
+      `${FOCUS_STORAGE_PREFIX}${reportDate}`,
+    );
+    if (saved) return focusHtmlToPlainText(saved);
+    return normalizeFocusText(
+      window.localStorage.getItem(
+        `${LEGACY_FOCUS_STORAGE_PREFIX}${reportDate}`,
+      ) ?? "",
+    );
+  } catch {
+    return "";
+  }
 }
 
 function escapeHtml(value: string): string {

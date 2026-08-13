@@ -6,14 +6,14 @@
 
 ## 数据来源
 
-本项目依赖一个独立的本地数据 API 服务（位于仓库 `api/` 目录，Python 项目，默认监听 `http://127.0.0.1:8766`）。开发时前端通过 Vite proxy 把 `/api` 转发到该服务（见 `vite.config.ts`）。
+本项目依赖一个独立的本地数据 API 服务（位于仓库 `api/` 目录，Python 项目，默认监听 `http://127.0.0.1:8766`）。API 内部路由不带 `/api`；开发时 Vite proxy 转发并剥离 `/api`（见 `vite.config.ts`），生产环境由 Caddy 执行相同操作。
 
 调用端点：
 
 - `GET /api/config`：获取报告配置
 - `GET /api/report?date=YYYY-MM-DD[&refresh=1]`：获取指定日期的报告数据，`refresh=1` 强制刷新
 
-开发前需先在仓库 `api/` 目录启动 API 服务（`uv run data-api`），再在本项目跑 `pnpm dev`。
+开发前需先在仓库 `api/` 目录启动 API 服务（`uv run server`），再在本项目跑 `pnpm dev`。
 
 ## 常用命令
 
@@ -36,6 +36,6 @@
 ## 注意事项
 
 - **子路径部署**：`vite.config.ts` 中 `base` 硬编码为 `/dashboard/`，构建产物资源引用为 `/dashboard/assets/*`。生产部署时反向代理（Caddy）剥离 `/dashboard` 前缀后转发给 nginx 按根路径服务；本地开发经 Vite dev server 访问 `http://127.0.0.1:8765/dashboard/`。
-- 生产构建产物（`dist/`）是静态文件，**不含 Vite proxy**；部署时需与 API 服务同源（反向代理转发 `/api`），或自行在 Web 服务器上配置转发。
+- 生产构建产物（`dist/`）是静态文件，**不含 Vite proxy**；部署时需与 API 服务同源，由 Caddy 转发并剥离 `/api`。对外 Swagger 文档地址为 `/api/docs`。
 - 端口约定：前端 8765，API 8766，均绑定 127.0.0.1。
 - 提交前请确保 `pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过。
