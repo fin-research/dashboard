@@ -43,8 +43,20 @@ export function buildTextReport(
     const tradeText = Number.isFinite(point.trade_yield)
       ? `-成交${reportNumber(point.trade_yield!, 4)}%`
       : "";
+    const quoteText = Number.isFinite(point.trade_yield)
+      ? ""
+      : [
+          Number.isFinite(point.bid_yield)
+            ? `Bid${reportNumber(point.bid_yield!, 4)}%`
+            : "",
+          Number.isFinite(point.ofr_yield)
+            ? `Ofr${reportNumber(point.ofr_yield!, 4)}%`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("-");
     return {
-      text: `${tenorLabel(point.tenor_years)}-${point.bond_name}-估值${reportNumber(point.valuation, 4)}%${tradeText}`,
+      text: `${tenorLabel(point.tenor_years)}-${point.bond_name}-估值${reportNumber(point.valuation, 4)}%${tradeText}${quoteText ? `-${quoteText}` : ""}`,
       strong: Number.isFinite(point.trade_yield),
     };
   });

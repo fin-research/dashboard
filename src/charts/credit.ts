@@ -30,11 +30,16 @@ export function renderInventory(
   }
   const sorted = [...valid].sort((a, b) => a.tenor_years - b.tenor_years);
   const trades = sorted.filter((point) => Number.isFinite(point.trade_yield));
+  const bids = sorted.filter((point) => Number.isFinite(point.bid_yield));
+  const offers = sorted.filter((point) => Number.isFinite(point.ofr_yield));
   const labelLayout = createInventoryLabelLayout(host, trades, sorted);
 
   setChart(host, {
     animationDuration: 500,
-    aria: { enabled: true, description: "东财存量债中债估值期限结构" },
+    aria: {
+      enabled: true,
+      description: "东财存量债中债估值、当日成交及 Bid Ofr 报价期限结构",
+    },
     grid: {
       left: 0,
       right: 0,
@@ -45,7 +50,7 @@ export function renderInventory(
     legend: {
       top: 0,
       right: 0,
-      data: ["中债估值", "当日成交"],
+      data: ["中债估值", "当日成交", "Bid", "Ofr"],
       itemWidth: 18,
       itemHeight: 9,
       textStyle: axisLabel,
@@ -56,18 +61,24 @@ export function renderInventory(
       formatter: (params: unknown) => {
         const item = params as {
           data:
-            | [number, number, string, number | null]
-            | { value: [number, number, string, number | null] };
-          seriesName: string;
+            | InventorySeriesValue
+            | { value: InventorySeriesValue };
         };
         const data = Array.isArray(item.data) ? item.data : item.data.value;
-        const [tenor, value, bondName, tradeYield] = data;
-        const trade =
-          item.seriesName === "中债估值" && Number.isFinite(tradeYield)
-            ? `<br>成交 ${number(tradeYield, 2)}%`
-            : "";
-        const digits = item.seriesName === "当日成交" ? 2 : 4;
-        return `<strong>${escapeHtml(bondName)}</strong><br>剩余期限 ${number(tenor, 2)} 年<br>${escapeHtml(item.seriesName)} ${number(value, digits)}%${trade}`;
+        const [tenor, , bondName, valuation, tradeYield, bidYield, ofrYield] =
+          data;
+        return [
+          `<strong>${escapeHtml(bondName)}</strong>`,
+          `剩余期限 ${number(tenor, 2)} 年`,
+          `中债估值 ${number(valuation, 4)}%`,
+          Number.isFinite(tradeYield)
+            ? `成交 ${number(tradeYield, 2)}%`
+            : "",
+          Number.isFinite(bidYield) ? `Bid ${number(bidYield, 4)}%` : "",
+          Number.isFinite(ofrYield) ? `Ofr ${number(ofrYield, 4)}%` : "",
+        ]
+          .filter(Boolean)
+          .join("<br>");
       },
     },
     xAxis: {
@@ -96,7 +107,10 @@ export function renderInventory(
           point.tenor_years,
           point.valuation,
           point.bond_name,
+          point.valuation,
           point.trade_yield,
+          point.bid_yield,
+          point.ofr_yield,
         ]),
         lineStyle: { color: colors.blue, width: 2.5 },
         itemStyle: {
@@ -114,7 +128,10 @@ export function renderInventory(
             point.tenor_years,
             point.trade_yield,
             point.bond_name,
+            point.valuation,
             point.trade_yield,
+            point.bid_yield,
+            point.ofr_yield,
           ],
           label: {
             position:
@@ -143,9 +160,59 @@ export function renderInventory(
         },
         labelLayout,
       },
+      {
+        name: "Bid",
+        type: "scatter",
+        symbol: "diamond",
+        symbolSize: 9,
+        data: bids.map((point) => [
+          point.tenor_years,
+          point.bid_yield,
+          point.bond_name,
+          point.valuation,
+          point.trade_yield,
+          point.bid_yield,
+          point.ofr_yield,
+        ]),
+        itemStyle: {
+          color: colors.green,
+          borderColor: colors.paper,
+          borderWidth: 1.5,
+        },
+      },
+      {
+        name: "Ofr",
+        type: "scatter",
+        symbol: "triangle",
+        symbolSize: 9,
+        data: offers.map((point) => [
+          point.tenor_years,
+          point.ofr_yield,
+          point.bond_name,
+          point.valuation,
+          point.trade_yield,
+          point.bid_yield,
+          point.ofr_yield,
+        ]),
+        itemStyle: {
+          color: colors.gold,
+          borderColor: colors.paper,
+          borderWidth: 1.5,
+        },
+      },
     ],
   });
 }
+
+type InventorySeriesValue = [
+  number,
+  number,
+  string,
+  number,
+  number | null,
+  number | null | undefined,
+  number | null | undefined,
+];
 
 function createInventoryLabelLayout(
   host: HTMLElement,

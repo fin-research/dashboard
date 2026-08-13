@@ -55,6 +55,8 @@ function reportData() {
         tenor_years: 2.2,
         valuation: 1.8,
         trade_yield: null,
+        bid_yield: 1.81,
+        ofr_yield: 1.79,
       },
     ],
   };
@@ -84,4 +86,5 @@ test("东财债券仅当日有成交的文字条目加粗", () => {
   assert.equal(inventory.entries[0].strong, true);
   assert.equal(inventory.entries[1].strong, false);
   assert.match(inventory.entries[0].text, /成交1\.72%/);
+  assert.match(inventory.entries[1].text, /Bid1\.81%-Ofr1\.79%/);
 });

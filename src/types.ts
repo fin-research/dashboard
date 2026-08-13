@@ -49,6 +49,8 @@ export interface InventoryPoint {
   tenor_years: number;
   valuation: number;
   trade_yield: number | null;
+  bid_yield?: number | null;
+  ofr_yield?: number | null;
 }
 
 export interface MarginSnapshot {
