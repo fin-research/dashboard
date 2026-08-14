@@ -240,28 +240,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 3px 10px 3px 16px;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--line));
-  border-radius: var(--radius-card);
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--color-primary-soft) 72%, var(--surface)) 0%,
-      var(--surface) 44%,
-      color-mix(in srgb, var(--color-primary-soft) 36%, var(--surface)) 100%
-    );
-  box-shadow: 0 2px 8px rgba(31, 55, 93, 0.06);
-}
-
-.report-masthead::before {
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  left: 6px;
-  width: 3px;
-  border-radius: 999px;
-  background: var(--color-primary);
-  content: "";
+  padding: 0 2px;
 }
 
 .report-title {
@@ -711,11 +690,15 @@ h2 {
   flex: 1;
 }
 
-.chart-host > div,
-.chart-host > div > svg,
-.chart-host > div > canvas {
+.chart-host > div:not(.chart-tooltip),
+.chart-host > div:not(.chart-tooltip) > svg,
+.chart-host > div:not(.chart-tooltip) > canvas {
   width: 100% !important;
   height: 100% !important;
+}
+
+.chart-tooltip {
+  pointer-events: none;
 }
 
 .panel--focus {

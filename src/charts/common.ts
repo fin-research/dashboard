@@ -50,6 +50,7 @@ export const axisLabel = {
 
 export const tooltip = {
   confine: true,
+  className: "chart-tooltip",
   backgroundColor: "rgba(27, 33, 30, 0.96)",
   borderWidth: 0,
   padding: [6, 8],
