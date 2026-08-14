@@ -63,8 +63,6 @@
   let exportTimer: number | null = null;
   let activeView: ReportView = "visual";
   let focusText = "";
-  let navigationOpen = false;
-  let navigationTrigger: HTMLButtonElement;
 
   $: derived = data ? deriveReport(data) : EMPTY_DERIVED;
   $: dateParts = data
@@ -163,7 +161,6 @@
 
   function selectView(view: ReportView): void {
     activeView = view;
-    navigationOpen = false;
     const pathname = pathnameForReportView(view);
     if (window.location.pathname !== pathname) {
       window.history.pushState(null, "", `${pathname}${window.location.search}`);
@@ -172,131 +169,47 @@
 
   function handlePopState(): void {
     activeView = reportViewFromPathname(window.location.pathname);
-    navigationOpen = false;
-  }
-
-  function openNavigation(): void {
-    navigationOpen = true;
-    requestAnimationFrame(() => {
-      document.getElementById(`${activeView}-report-tab`)?.focus();
-    });
-  }
-
-  function closeNavigation(restoreFocus = false): void {
-    navigationOpen = false;
-    if (restoreFocus) requestAnimationFrame(() => navigationTrigger?.focus());
-  }
-
-  function handleWindowKeydown(event: KeyboardEvent): void {
-    if (event.key !== "Escape" || !navigationOpen) return;
-    event.preventDefault();
-    closeNavigation(true);
-  }
-
-  function handleTabKeydown(event: KeyboardEvent): void {
-    const views: ReportView[] = ["visual", "text"];
-    const currentIndex = views.indexOf(activeView);
-    let nextIndex: number | null = null;
-    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % views.length;
-    if (event.key === "ArrowLeft") {
-      nextIndex = (currentIndex - 1 + views.length) % views.length;
-    }
-    if (event.key === "Home") nextIndex = 0;
-    if (event.key === "End") nextIndex = views.length - 1;
-    if (nextIndex === null) return;
-    event.preventDefault();
-    const nextView = views[nextIndex]!;
-    activeView = nextView;
-    document.getElementById(`${nextView}-report-tab`)?.focus();
   }
 </script>
 
-<svelte:window
-  onkeydown={handleWindowKeydown}
-  onpopstate={handlePopState}
-/>
+<svelte:window onpopstate={handlePopState} />
 
 <svelte:head>
   <meta name="theme-color" content="#f6f8fb" />
 </svelte:head>
 
 <div class="page-shell">
-  <div class:open={navigationOpen} class="navigation-overlay">
-    <button
-      class="navigation-scrim"
-      type="button"
-      aria-label="关闭报告导航"
-      tabindex={navigationOpen ? 0 : -1}
-      onclick={() => closeNavigation(true)}
-    ></button>
-    <nav
-      id="report-navigation"
-      class="navigation-drawer"
-      aria-label="报告导航"
-      aria-hidden={!navigationOpen}
-    >
-      <div class="navigation-drawer__header">
-        <strong>报告展示方式</strong>
-        <button
-          type="button"
-          aria-label="关闭报告导航"
-          onclick={() => closeNavigation(true)}
-        >
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <path d="m5 5 10 10M15 5 5 15" />
-          </svg>
-        </button>
-      </div>
-      <div class="report-tabs" aria-label="报告展示方式" role="tablist">
-      <button
-        id="visual-report-tab"
-        class:active={activeView === "visual"}
-        type="button"
-        role="tab"
-        aria-selected={activeView === "visual"}
-        tabindex={navigationOpen && activeView === "visual" ? 0 : -1}
-        onclick={() => selectView("visual")}
-        onkeydown={handleTabKeydown}
-      >
-        可视化报告
-      </button>
-      <button
-        id="text-report-tab"
-        class:active={activeView === "text"}
-        type="button"
-        role="tab"
-        aria-selected={activeView === "text"}
-        tabindex={navigationOpen && activeView === "text" ? 0 : -1}
-        onclick={() => selectView("text")}
-        onkeydown={handleTabKeydown}
-      >
-        文字版报告
-      </button>
-      </div>
-    </nav>
-  </div>
-
   <main bind:this={reportSurface} id="report-surface">
     <header class="report-masthead">
       <div class="report-title">
         <h1>
-          <button
-            bind:this={navigationTrigger}
-            class="report-navigation-trigger"
-            type="button"
-            aria-label="资金管理部 • 市场点评，展开报告导航"
-            aria-expanded={navigationOpen}
-            aria-controls="report-navigation"
-            onclick={openNavigation}
-          >
-            <span class="report-title__department">资金管理部</span>
-            <span class="report-title__dot" aria-hidden="true">•</span>
-            <span class="report-title__subject">市场点评</span>
-          </button>
+          <span class="report-title__department">资金管理部</span>
+          <span class="report-title__dot" aria-hidden="true">•</span>
+          <span class="report-title__subject">市场点评</span>
         </h1>
       </div>
       <div class="masthead-controls" aria-label="报告控制">
         <div class="titlebar-actions">
+          <div class="view-toggle" role="group" aria-label="报告展示方式">
+            <button
+              id="visual-report-tab"
+              class:active={activeView === "visual"}
+              type="button"
+              aria-pressed={activeView === "visual"}
+              onclick={() => selectView("visual")}
+            >
+              可视化
+            </button>
+            <button
+              id="text-report-tab"
+              class:active={activeView === "text"}
+              type="button"
+              aria-pressed={activeView === "text"}
+              onclick={() => selectView("text")}
+            >
+              文字版
+            </button>
+          </div>
           <button
             class:is-loading={loading}
             class="refresh-button"

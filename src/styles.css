@@ -95,138 +95,6 @@ button {
   border: 0;
 }
 
-.navigation-overlay {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: visibility 0s linear 220ms;
-}
-
-.navigation-overlay.open {
-  visibility: visible;
-  pointer-events: auto;
-  transition-delay: 0s;
-}
-
-.navigation-scrim {
-  position: absolute;
-  inset: 0;
-  padding: 0;
-  border: 0;
-  background: rgba(23, 32, 51, 0.2);
-  cursor: default;
-  opacity: 0;
-  transition: opacity 180ms ease;
-}
-
-.navigation-overlay.open .navigation-scrim {
-  opacity: 1;
-}
-
-.navigation-drawer {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 268px;
-  padding: 14px 12px;
-  border-right: 1px solid var(--line-strong);
-  background: var(--surface);
-  box-shadow: 12px 0 32px rgba(23, 32, 51, 0.16);
-  transform: translateX(-100%);
-  transition: transform 220ms ease-out;
-}
-
-.navigation-overlay.open .navigation-drawer {
-  transform: translateX(0);
-}
-
-.navigation-drawer__header {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 6px 10px 10px;
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-}
-
-.navigation-drawer__header button {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  place-items: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  background: transparent;
-  cursor: pointer;
-}
-
-.navigation-drawer__header button:hover {
-  border-color: var(--line);
-  background: var(--brand-soft);
-}
-
-.navigation-drawer__header svg {
-  width: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.8;
-}
-
-.report-tabs {
-  display: grid;
-  gap: 6px;
-  padding-top: 12px;
-}
-
-.report-tabs button {
-  position: relative;
-  min-height: 46px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  color: var(--muted);
-  background: transparent;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 720;
-  text-align: left;
-  transition:
-    color 160ms ease,
-    background 160ms ease;
-}
-
-.report-tabs button::after {
-  position: absolute;
-  top: 9px;
-  bottom: 9px;
-  left: 0;
-  width: 3px;
-  border-radius: 0 999px 999px 0;
-  background: transparent;
-  content: "";
-}
-
-.report-tabs button:hover {
-  color: var(--brand-deep);
-  border-color: var(--line);
-  background: color-mix(in srgb, var(--brand-soft) 52%, transparent);
-}
-
-.report-tabs button.active {
-  color: var(--brand-deep);
-  background: color-mix(in srgb, var(--brand-soft) 72%, transparent);
-}
-
-.report-tabs button.active::after {
-  background: var(--brand);
-}
-
 .masthead-controls,
 .titlebar-actions,
 .refresh-button,
@@ -302,10 +170,46 @@ button {
   animation: rotate 1s linear infinite;
 }
 
-.report-navigation-trigger:focus-visible,
+.view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+}
+
+.view-toggle button {
+  min-height: 22px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-control) - 2px);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 680;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.view-toggle button:hover {
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand-soft) 52%, transparent);
+}
+
+.view-toggle button.active {
+  color: var(--brand-deep);
+  border-color: color-mix(in srgb, var(--brand) 38%, var(--line));
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(23, 32, 51, 0.08);
+}
+
 .hero-date:focus-within,
-.report-tabs button:focus-visible,
-.navigation-drawer__header button:focus-visible,
+.view-toggle button:focus-visible,
 .refresh-button:focus-visible,
 .export-button:focus-visible,
 .error-state button:focus-visible {
@@ -363,29 +267,6 @@ button {
 .report-title {
   display: flex;
   align-items: baseline;
-}
-
-.report-navigation-trigger {
-  display: flex;
-  min-height: 32px;
-  align-items: baseline;
-  gap: 9px;
-  padding: 3px 7px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  color: inherit;
-  background: transparent;
-  cursor: pointer;
-  letter-spacing: inherit;
-  transition:
-    border-color 160ms ease,
-    background 160ms ease;
-}
-
-.report-navigation-trigger:hover,
-.report-navigation-trigger[aria-expanded="true"] {
-  border-color: color-mix(in srgb, var(--color-primary) 20%, var(--line));
-  background: color-mix(in srgb, var(--brand-soft) 56%, transparent);
 }
 
 h1,
