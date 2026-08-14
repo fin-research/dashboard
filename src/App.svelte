@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
 
-  import { fetchConfig, fetchReport, generateMarketBriefing } from "./api";
+  import {
+    fetchConfig,
+    fetchReport,
+    fetchTextReportData,
+    generateMarketBriefing,
+  } from "./api";
   import ChartHost from "./components/ChartHost.svelte";
   import CoreMetrics from "./components/CoreMetrics.svelte";
   import EquityStats from "./components/EquityStats.svelte";
@@ -20,7 +25,7 @@
     reportViewFromPathname,
     type ReportView,
   } from "./report-route";
-  import type { MarketBriefing, ReportData } from "./types";
+  import type { MarketBriefing, ReportData, TextReportData } from "./types";
   import {
     comparableSummaryItems,
     comparableTenorRows,
@@ -33,6 +38,7 @@
   let reportSurface: HTMLElement;
   let selectedDate = "";
   let data: ReportData | null = null;
+  let textReportData: TextReportData | null = null;
   let charts: ChartRenderers | null = null;
   let loading = true;
   let errorMessage = "";
@@ -83,11 +89,13 @@
     loading = true;
     errorMessage = "";
     try {
-      const [report, chartModule] = await Promise.all([
+      const [report, reportTextData, chartModule] = await Promise.all([
         fetchReport(selectedDate, refresh, activeRequest.signal),
+        fetchTextReportData(selectedDate, refresh, activeRequest.signal),
         import("./charts"),
       ]);
       data = report;
+      textReportData = reportTextData;
       focusText = loadStoredFocusText(report.report_date);
       charts = chartModule;
       loading = false;
@@ -520,7 +528,7 @@
           role="tabpanel"
           aria-labelledby="text-report-tab"
         >
-          <TextReport {data} {focusText} />
+          {#if textReportData}<TextReport data={textReportData} />{/if}
         </div>
       {/if}
     {/if}

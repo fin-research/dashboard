@@ -3,6 +3,7 @@ import type {
   MarketBriefing,
   PrimarySummary,
   ReportData,
+  TextReportData,
 } from "./types";
 
 type ReportPayload = Omit<ReportData, "primary_summary"> & {
@@ -55,6 +56,16 @@ export function fetchReport(
   return getJson<ReportPayload>(`/api/report?${query}`, signal).then(
     normalizeReport,
   );
+}
+
+export function fetchTextReportData(
+  reportDate: string,
+  refresh: boolean,
+  signal?: AbortSignal,
+): Promise<TextReportData> {
+  const query = new URLSearchParams({ date: reportDate });
+  if (refresh) query.set("refresh", "1");
+  return getJson<TextReportData>(`/api/text-report-data?${query}`, signal);
 }
 
 export function normalizeReport(payload: ReportPayload): ReportData {

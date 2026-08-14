@@ -693,73 +693,13 @@ h1 {
   line-height: 1.8;
 }
 
-.text-report__header {
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--line-strong);
-  text-align: center;
-}
-
-.text-report__header p {
-  margin: 0 0 4px;
-  color: var(--muted);
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-}
-
-.text-report__header h2 {
-  color: var(--ink);
-  font-size: 1.5rem;
-  letter-spacing: 0.02em;
-  white-space: normal;
-}
-
-.text-report__body {
-  padding-top: 4px;
-}
-
-.text-report__section {
-  padding-top: 18px;
-}
-
-.text-report__section h3 {
-  margin: 0 0 7px;
-  color: var(--brand-deep);
-  font-size: 1.0625rem;
-  font-weight: 800;
-  line-height: 1.4;
-}
-
-.text-report__section p {
-  margin: 4px 0;
-}
-
-.text-report__group + .text-report__group {
-  margin-top: 10px;
-}
-
-.text-report__group-label {
-  color: var(--ink);
-  font-weight: 700;
-}
-
-.text-report__entry {
-  padding-left: 1em;
+.text-report pre {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: inherit;
   font-family: var(--font-numeric);
+  font-size: inherit;
   font-variant-numeric: tabular-nums;
-}
-
-.text-report__entry strong {
-  color: var(--ink);
-  font-weight: 800;
-}
-
-.text-report__focus {
-  min-height: 3.6em;
-  padding: 10px 12px;
-  border-left: 3px solid var(--brand);
-  border-radius: 0 var(--radius-inner) var(--radius-inner) 0;
-  background: color-mix(in srgb, var(--brand-soft) 42%, var(--surface));
   white-space: pre-wrap;
 }
 

@@ -42,5 +42,6 @@
 - 生产构建产物（`dist/`）是静态文件，**不含 Vite proxy**；部署时需与 API 服务同源，由 Caddy 转发并剥离 `/api`。对外 Swagger 文档地址为 `/api/docs`。
 - Cloudflare Worker 仅接管 `eastmoney.hasbai.xyz/dashboard` 与 `/dashboard/*`，不反代 `/api`；前端继续通过同源 `/api/*` 访问原 API 服务。
 - Cloudflare 路由入口为 `/dashboard`（可视化报告）和 `/dashboard/text`（文字版报告），静态资源及 SPA 回退由 Worker 处理。原 Dockerfile、nginx 与 Caddy 部署管线保留。
+- 文字版通过 `/api/text-report-data` 读取结构化源数据，由 `src/text-report.ts` 严格复刻 `api/scripts/report_cli.py` 的筛选、排序、条件分支、数字格式与完整文本；不得直接读取 Python 生成的报告文本，也不得自行改写既有格式。
 - 端口约定：前端 8765，API 8766，均绑定 127.0.0.1。
 - 提交前请确保 `pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过。

@@ -87,3 +87,19 @@ export interface MarketBriefing {
   content: string;
   news_count: number;
 }
+
+export interface TextReportData {
+  report_date: string;
+  omo: Array<Record<string, unknown>>;
+  rates: {
+    dr: Array<Record<string, unknown>>;
+    dibo: Array<Record<string, unknown>>;
+    bonds: Array<Record<string, unknown>>;
+    futures: Array<Record<string, unknown>>;
+  };
+  stock_paragraphs: string[];
+  margin: Array<Record<string, unknown>>;
+  primary: Array<Record<string, unknown>>;
+  secondary: Array<Record<string, unknown>>;
+  inventory: Array<Record<string, unknown>>;
+}
