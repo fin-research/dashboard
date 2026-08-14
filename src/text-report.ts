@@ -1,6 +1,15 @@
-import type { TextReportData } from "./types";
-
-type Row = Record<string, unknown>;
+import {
+  hasValue,
+  isPublicBond,
+  normalizeCompany,
+  number,
+  parseTenorDays,
+  secondaryTenorYears,
+  strictNumber,
+  string,
+  type Row,
+} from "./rows.ts";
+import type { ReportData } from "./types";
 
 const PRIMARY_ORDER = ["短融", "公募短债", "小公募", "公募次级债", "私募债"];
 const FUTURES = [
@@ -10,11 +19,11 @@ const FUTURES = [
   ["TS9999", "2年期主力合约", false],
 ] as const;
 
-export function buildTextReport(data: TextReportData): string {
+export function buildTextReport(data: ReportData): string {
   return `${data.report_date.replaceAll("-", "")} 境内市场点评
 
 【央行】
-${briefOmo(data.omo)}
+${briefOmo(data.omo, data.report_date)}
 
 【利率】
 ${bondMarket(data.rates)}
@@ -40,11 +49,14 @@ ${emBonds(data.inventory)}
 `;
 }
 
-export function briefOmo(rows: Row[]): string {
-  const inject = rows
+export function briefOmo(rows: Row[], reportDate: string): string {
+  const dayRows = rows.filter(
+    (row) => string(row.operationDate).slice(0, 10) === reportDate,
+  );
+  const inject = dayRows
     .filter((row) => number(row.operationAmount)! > 0)
     .sort((left, right) => number(left.operationAmount)! - number(right.operationAmount)!);
-  const drain = rows
+  const drain = dayRows
     .filter((row) => number(row.operationAmount)! < 0)
     .sort((left, right) => number(right.operationAmount)! - number(left.operationAmount)!);
   let text = "中国央行今日开展";
@@ -60,14 +72,14 @@ export function briefOmo(rows: Row[]): string {
     if (index > 0) text += "、";
     text += `${string(row.duration).replaceAll("D", "天").replaceAll("M", "月").replaceAll("Y", "年")}期${string(row.operationName)}${compact(Math.abs(number(row.operationAmount)!))}亿元`;
   });
-  const net = rows.reduce((sum, row) => sum + number(row.operationAmount)!, 0);
+  const net = dayRows.reduce((sum, row) => sum + number(row.operationAmount)!, 0);
   if (net > 0) text += `；净投放${compact(net)}亿元。`;
   else if (net < 0) text += `；净回笼${compact(Math.abs(net))}亿元。`;
   else text += "；净投放为零。";
   return text;
 }
 
-function bondMarket(rates: TextReportData["rates"]): string {
+function bondMarket(rates: ReportData["rates"]): string {
   return [capitalBrief(rates.dr, rates.dibo), bondBrief(rates.bonds), futuresBrief(rates.futures)].join("\n\n");
 }
 
@@ -219,20 +231,13 @@ function curvePart(label: string, direction: string): string { return direction 
 function primaryCategory(row: Row): string { if (string(row.publicOffering) === "2" || [row.publicOfferingText, row.offeringType, row.issueWay, row.raisingMode].some((v) => v != null && string(v).includes("私募"))) return "私募债"; if (string(row.bondTypeText).includes("短期融资券")) return "短融"; if (string(row.bondTypeText).includes("次级债")) return "公募次级债"; if (primaryTenorLeOne(row.issueTenor) || /S\d+$/.test(string(row.bondShortName))) return "公募短债"; return "小公募"; }
 function primaryTenorLeOne(value: unknown): boolean { const match = string(value).trim().toUpperCase().match(/^([0-9]+(?:\.[0-9]+)?)([YD]).*$/); return !!match && (match[2] === "Y" ? Number(match[1]) <= 1 : Number(match[1]) <= 365); }
 function primaryIssuer(row: Row): string { for (const key of ["comShortName", "issuerShortName", "issuerShortNameCn"]) { const value = normalizePrimary(normalizeCompany(row[key])); if (value) return value; } return normalizePrimary(row.comFullName || row.issuerName); }
-function normalizeCompany(value: unknown): string { const text = string(value).replace(/\s+/g, ""); return text === "安信证券" ? "国投证券" : text; }
 function normalizePrimary(value: unknown): string { let text = string(value).replace(/\s+/g, ""); if (!text) return ""; if (text === "中国国际金融股份有限公司") return "中金公司"; if (text === "中国中金财富证券有限公司") return "中金财富"; for (const suffix of ["股份有限公司", "有限责任公司", "有限公司"]) if (text.endsWith(suffix)) { text = text.slice(0, -suffix.length); break; } if (text.startsWith("中国中金")) text = text.slice(2); return [...text].slice(0, 4).join(""); }
 function primaryCompare(a: Row, b: Row): number { return compare(primaryIssuer(a), primaryIssuer(b)) || primaryTenorDays(a.issueTenor) - primaryTenorDays(b.issueTenor) || compare(primaryDate(a), primaryDate(b)) || compare(string(a.bondShortName), string(b.bondShortName)); }
 function primaryDate(row: Row): string { const value = row.bidStartDate || row.issueStartDate; if (hasValue(value)) { const text = string(value); return `${text.slice(5, 7)}/${text.slice(8, 10)}`; } const bidding = string(row.biddingTime); return /^\d{2}-\d{2}/.test(bidding) ? bidding.slice(0, 5).replace("-", "/") : "--/--"; }
 function transformPrimaryTenor(value: unknown): string { const text = string(value).trim(); if (text.startsWith("0.") && text.toUpperCase().endsWith("Y")) { const parsed = Number(text.slice(0, -1)); if (Number.isFinite(parsed)) return `${Math.trunc(parsed * 365)}D`; } return text; }
 function primaryTenorDays(value: unknown): number { const match = string(value).trim().toUpperCase().match(/^([0-9]+(?:\.[0-9]+)?)([YD])/); return match ? Number(match[1]) * (match[2] === "D" ? 1 : 365) : Infinity; }
-function secondaryTenorYears(value: unknown): number | null { const match = string(value).trim().toUpperCase().match(/^([0-9]+(?:\.[0-9]+)?)([YD]).*$/); return match ? Number(match[1]) / (match[2] === "D" ? 365 : 1) : null; }
 function formatSecondaryTenor(value: unknown): string { const years = secondaryTenorYears(value); return years === null ? string(value || "--") : years >= 1 ? `${fixed(years, 1)}年` : `${fixed(years * 365, 0)}天`; }
-function isPublicBond(value: string): boolean { const bond = value.trim().split(" ")[0] ?? ""; return !!bond && (bond.includes("G") || !/[A-Za-z]/.test(bond)); }
-function parseTenorDays(value: unknown): number { const match = string(value).trim().toUpperCase().match(/^([0-9]+(?:\.[0-9]+)?)([YD]).*$/); return match ? Number(match[1]) * (match[2] === "D" ? 1 : 365) : 0; }
 function compactDecimal(value: unknown): string { if (!hasValue(value)) return "--"; const parsed = Number(string(value).trim()); return Number.isNaN(parsed) ? string(value).trim() : compact(parsed); }
-function hasValue(value: unknown): boolean { return value != null && !["", "--", "None", "nan"].includes(string(value).trim()); }
-function number(value: unknown): number | null { if (typeof value === "number" && Number.isFinite(value)) return value; if (typeof value !== "string") return null; const cleaned = value.replace(/[^\d.\-]/g, ""); if (!cleaned || ["-", ".", "-."].includes(cleaned)) return null; const parsed = Number(cleaned); return Number.isFinite(parsed) ? parsed : null; }
-function strictNumber(value: unknown): number | null { if (typeof value === "number") return Number.isFinite(value) ? value : null; if (typeof value !== "string" || !value.trim()) return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
 function formatNumber(value: unknown, digits: number): string { const parsed = number(value); return parsed === null ? "--" : fixed(parsed, digits); }
 function fixed(value: number, digits: number): string {
   const fraction = floatFraction(value);
@@ -297,6 +302,5 @@ function divideHalfEven(numerator: bigint, denominator: bigint): bigint {
   if (doubled > denominator || (doubled === denominator && quotient % 2n === 1n)) return quotient + 1n;
   return quotient;
 }
-function string(value: unknown): string { return value == null ? "" : String(value); }
 function sign(value: number): number { return value > 0 ? 1 : value < 0 ? -1 : 0; }
 function compare(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }

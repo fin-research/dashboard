@@ -7,7 +7,6 @@
   import {
     fetchConfig,
     fetchReport,
-    fetchTextReportData,
     generateMarketBriefing,
   } from "./api";
   import ChartHost from "./components/ChartHost.svelte";
@@ -23,12 +22,13 @@
   import { exportReportImage } from "./export";
   import { loadStoredFocusText } from "./focus-editor";
   import { chineseDateParts } from "./formatters";
+  import { deriveReport, type ReportDerived } from "./report-view";
   import {
     pathnameForReportView,
     reportViewFromPathname,
     type ReportView,
   } from "./report-route";
-  import type { MarketBriefing, ReportData, TextReportData } from "./types";
+  import type { MarketBriefing, ReportData } from "./types";
   import {
     comparableSummaryItems,
     comparableTenorRows,
@@ -38,10 +38,18 @@
   } from "./view-model";
 
   type ChartRenderers = typeof import("./charts");
+  const EMPTY_DERIVED: ReportDerived = {
+    omoHistory: [],
+    funds: [],
+    governmentBonds: [],
+    margin: { data_date: null, total: null, total_change: null },
+    primary: [],
+    comparable: [],
+    inventory: [],
+  };
   let reportSurface: HTMLElement;
   let selectedDate = "";
   let data: ReportData | null = null;
-  let textReportData: TextReportData | null = null;
   let charts: ChartRenderers | null = null;
   let loading = true;
   let errorMessage = "";
@@ -58,6 +66,7 @@
   let navigationOpen = false;
   let navigationTrigger: HTMLButtonElement;
 
+  $: derived = data ? deriveReport(data) : EMPTY_DERIVED;
   $: dateParts = data
     ? chineseDateParts(data.report_date)
     : { date: "—", weekday: "—" };
@@ -92,13 +101,11 @@
     loading = true;
     errorMessage = "";
     try {
-      const [report, reportTextData, chartModule] = await Promise.all([
+      const [report, chartModule] = await Promise.all([
         fetchReport(selectedDate, refresh, activeRequest.signal),
-        fetchTextReportData(selectedDate, refresh, activeRequest.signal),
         import("./charts"),
       ]);
       data = report;
-      textReportData = reportTextData;
       focusText = loadStoredFocusText(report.report_date);
       charts = chartModule;
       loading = false;
@@ -369,7 +376,7 @@
           aria-labelledby="visual-report-tab"
         >
           <div class="core-metrics" aria-label="核心市场指标">
-            <CoreMetrics {data} />
+            <CoreMetrics {data} {derived} />
           </div>
           <div class="report-content">
         <section class="dashboard-panel panel--focus" aria-labelledby="focus-title">
@@ -409,12 +416,12 @@
           <ChartHost
             id="omo-chart"
             renderer={charts.renderOmo}
-            args={[data.omo_history]}
+            args={[derived.omoHistory]}
             ariaLabel="近十个操作日公开市场操作柱状图"
           />
           <div class="summary-strip" aria-label="公开市场操作汇总">
             <SummaryStrip
-              items={omoSummaryItems(data.omo_history, data.report_date)}
+              items={omoSummaryItems(derived.omoHistory, data.report_date)}
             />
           </div>
         </section>
@@ -425,12 +432,12 @@
             <h2 id="rates-title">固收市场</h2>
           </header>
           <div class="indicator-grid">
-            <FundMetrics metrics={data.funds} />
+            <FundMetrics metrics={derived.funds} />
           </div>
           <ChartHost
             id="government-chart"
             renderer={charts.renderGovernmentCurve}
-            args={[data.government_bonds]}
+            args={[derived.governmentBonds]}
             ariaLabel="关键期限国债收益率曲线"
           />
         </section>
@@ -453,7 +460,7 @@
               </div>
             </div>
             <div class="stat-grid">
-              <EquityStats {data} />
+              <EquityStats {data} margin={derived.margin} />
             </div>
             <div class="equity-heatmap-stage">
               <span class="equity-heatmap-label">申万一级行业</span>
@@ -474,7 +481,7 @@
             <h2 id="primary-title">一级发行</h2>
           </header>
           <div class="data-list" aria-label="一级发行列表">
-            <PrimaryTable points={data.primary} />
+            <PrimaryTable points={derived.primary} />
           </div>
           <div class="summary-strip" aria-label="一级发行汇总">
             <SummaryStrip items={primarySummaryItems(data.primary_summary)} />
@@ -495,12 +502,12 @@
           >
             <SecondaryTable
               headers={["期限", "债券", "发行人", "成交"]}
-              rows={comparableTenorRows(data.comparable)}
+              rows={comparableTenorRows(derived.comparable)}
               emptyText="今日暂无公募债成交"
             />
           </div>
           <div class="summary-strip" aria-label="二级行情汇总">
-            <SummaryStrip items={comparableSummaryItems(data.comparable)} />
+            <SummaryStrip items={comparableSummaryItems(derived.comparable)} />
           </div>
         </section>
 
@@ -515,11 +522,11 @@
           <ChartHost
             id="inventory-chart"
             renderer={charts.renderInventory}
-            args={[data.inventory]}
+            args={[derived.inventory]}
             ariaLabel="东财存量债估值期限结构"
           />
           <div class="summary-strip" aria-label="东财债券汇总">
-            <SummaryStrip items={inventorySummaryItems(data.inventory)} />
+            <SummaryStrip items={inventorySummaryItems(derived.inventory)} />
           </div>
         </section>
           </div>
@@ -531,7 +538,7 @@
           role="tabpanel"
           aria-labelledby="text-report-tab"
         >
-          {#if textReportData}<TextReport data={textReportData} />{/if}
+          <TextReport data={data} />
         </div>
       {/if}
     {/if}

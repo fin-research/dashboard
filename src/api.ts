@@ -3,8 +3,8 @@ import type {
   MarketBriefing,
   PrimarySummary,
   ReportData,
-  TextReportData,
 } from "./types";
+import { number } from "./rows.ts";
 
 type ReportPayload = Omit<ReportData, "primary_summary"> & {
   primary_summary?: PrimarySummary;
@@ -58,19 +58,9 @@ export function fetchReport(
   );
 }
 
-export function fetchTextReportData(
-  reportDate: string,
-  refresh: boolean,
-  signal?: AbortSignal,
-): Promise<TextReportData> {
-  const query = new URLSearchParams({ date: reportDate });
-  if (refresh) query.set("refresh", "1");
-  return getJson<TextReportData>(`/data/text-report-data?${query}`, signal);
-}
-
 export function normalizeReport(payload: ReportPayload): ReportData {
   const fallbackAmount = payload.primary.reduce(
-    (total, point) => total + point.amount,
+    (total, point) => total + (number(point.amount) ?? 0),
     0,
   );
   return {

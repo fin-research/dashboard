@@ -6,9 +6,9 @@ import { buildTextReport } from "../src/text-report.ts";
 const data = {
   report_date: "2026-08-13",
   omo: [
-    { duration: "7D", operationName: "逆回购", operationAmount: 1185, interestRate: "1.4" },
-    { duration: "14D", operationName: "逆回购", operationAmount: 500, interestRate: "--" },
-    { duration: "7D", operationName: "逆回购", operationAmount: -1385, interestRate: "1.4" },
+    { operationDate: "2026-08-13", duration: "7D", operationName: "逆回购", operationAmount: 1185, interestRate: "1.4" },
+    { operationDate: "2026-08-13", duration: "14D", operationName: "逆回购", operationAmount: 500, interestRate: "--" },
+    { operationDate: "2026-08-13", duration: "7D", operationName: "逆回购", operationAmount: -1385, interestRate: "1.4" },
   ],
   rates: {
     dr: [

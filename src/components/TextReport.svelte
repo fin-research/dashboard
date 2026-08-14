@@ -1,8 +1,8 @@
 <script lang="ts">
   import { buildTextReport } from "../text-report";
-  import type { TextReportData } from "../types";
+  import type { ReportData } from "../types";
 
-  export let data: TextReportData;
+  export let data: ReportData;
 
   $: content = buildTextReport(data);
 </script>

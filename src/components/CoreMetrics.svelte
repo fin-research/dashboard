@@ -1,11 +1,13 @@
 <script lang="ts">
+  import type { ReportDerived } from "../report-view";
   import type { ReportData } from "../types";
   import { coreMetricCards } from "../view-model";
   import MetricIcon from "./MetricIcon.svelte";
 
   export let data: ReportData;
+  export let derived: ReportDerived;
 
-  $: cards = coreMetricCards(data);
+  $: cards = coreMetricCards(data, derived);
 </script>
 
 {#each cards as item (item.label)}

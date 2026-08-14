@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { ReportData } from "../types";
+  import type { MarginSnapshot } from "../types";
   import { equityStatCards } from "../view-model";
   import StatIcon from "./StatIcon.svelte";
 
   export let data: ReportData;
-  $: items = equityStatCards(data);
+  export let margin: MarginSnapshot;
+  $: items = equityStatCards(data, margin);
 </script>
 
 {#each items as item (item.label)}
@@ -19,4 +21,3 @@
     </div>
   </article>
 {/each}
-

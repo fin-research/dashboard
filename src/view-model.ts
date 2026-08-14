@@ -5,9 +5,11 @@ import {
   signed,
   tone,
 } from "./formatters";
+import type { ReportDerived } from "./report-view";
 import type {
   ComparablePoint,
   InventoryPoint,
+  MarginSnapshot,
   OmoPoint,
   PrimaryPoint,
   PrimarySummary,
@@ -53,17 +55,20 @@ export interface TableRowView {
   tagIndex?: number;
 }
 
-export function coreMetricCards(data: ReportData): MetricCardView[] {
+export function coreMetricCards(
+  data: ReportData,
+  derived: ReportDerived,
+): MetricCardView[] {
   const omo =
-    [...data.omo_history]
+    [...derived.omoHistory]
       .reverse()
       .find((point) => point.day === data.report_date)?.net_amount ?? 0;
-  const dr007 = data.funds.find((item) => item.label === "DR007");
-  const government10 = data.government_bonds.find(
+  const dr007 = derived.funds.find((item) => item.label === "DR007");
+  const government10 = derived.governmentBonds.find(
     (item) => item.label === "10Y国债",
   );
   const shanghai = data.equities.find((item) => item.name === "上证指数");
-  const tradePoints = [...data.inventory]
+  const tradePoints = [...derived.inventory]
     .filter((point) => Number.isFinite(point.trade_yield))
     .sort((left, right) => right.tenor_years - left.tenor_years);
   const tradeCard: MetricCardView = {
@@ -114,7 +119,10 @@ export function coreMetricCards(data: ReportData): MetricCardView[] {
   ];
 }
 
-export function equityStatCards(data: ReportData): StatCardView[] {
+export function equityStatCards(
+  data: ReportData,
+  margin: MarginSnapshot,
+): StatCardView[] {
   return [
     {
       label: "沪深京成交额",
@@ -127,11 +135,11 @@ export function equityStatCards(data: ReportData): StatCardView[] {
     },
     {
       label: "融资融券余额",
-      value: compact(data.margin.total, " 亿元"),
-      change: Number.isFinite(data.margin.total_change)
-        ? signed(data.margin.total_change, " 亿元")
+      value: compact(margin.total, " 亿元"),
+      change: Number.isFinite(margin.total_change)
+        ? signed(margin.total_change, " 亿元")
         : "较前日变动暂缺",
-      valueTone: tone(data.margin.total_change),
+      valueTone: tone(margin.total_change),
       icon: "margin",
     },
   ];

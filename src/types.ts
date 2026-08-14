@@ -62,20 +62,25 @@ export interface MarginSnapshot {
 export interface ReportData {
   report_date: string;
   generated_at: string;
-  omo_history: OmoPoint[];
-  funds: MarketMetric[];
-  government_bonds: MarketMetric[];
+  omo: Row[];
+  rates: {
+    dr: Row[];
+    dibo: Row[];
+    bonds: Row[];
+    futures: Row[];
+  };
+  stock_paragraphs: string[];
+  margin: Row[];
   equities: EquityPoint[];
   equity_data_time: string | null;
   turnover_yi: number | null;
   turnover_change_yi: number | null;
-  margin: MarginSnapshot;
   industries: IndustryPoint[];
   industry_data_date: string;
   primary_summary: PrimarySummary;
-  primary: PrimaryPoint[];
-  comparable: ComparablePoint[];
-  inventory: InventoryPoint[];
+  primary: Row[];
+  secondary: Row[];
+  inventory: Row[];
 }
 
 export interface ApiConfig {
@@ -88,18 +93,4 @@ export interface MarketBriefing {
   news_count: number;
 }
 
-export interface TextReportData {
-  report_date: string;
-  omo: Array<Record<string, unknown>>;
-  rates: {
-    dr: Array<Record<string, unknown>>;
-    dibo: Array<Record<string, unknown>>;
-    bonds: Array<Record<string, unknown>>;
-    futures: Array<Record<string, unknown>>;
-  };
-  stock_paragraphs: string[];
-  margin: Array<Record<string, unknown>>;
-  primary: Array<Record<string, unknown>>;
-  secondary: Array<Record<string, unknown>>;
-  inventory: Array<Record<string, unknown>>;
-}
+export type Row = Record<string, unknown>;
