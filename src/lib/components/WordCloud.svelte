@@ -202,17 +202,24 @@
     stroke-width: 1.5px;
     transition:
       filter 160ms ease,
-      opacity 160ms ease;
+      opacity 160ms ease,
+      stroke 160ms ease;
   }
 
-  .cloud-word:hover text,
+  .cloud-word:hover text {
+    filter: brightness(1.28) drop-shadow(0 0 10px rgba(119, 189, 251, 0.85));
+    stroke: rgba(246, 201, 107, 0.95);
+    opacity: 1;
+  }
+
   .cloud-word.selected text {
-    filter: brightness(1.08);
-    opacity: 0.92;
+    filter: brightness(1.2) drop-shadow(0 0 8px rgba(110, 214, 189, 0.6));
+    opacity: 0.95;
   }
 
   .cloud-word:focus-visible text {
-    filter: brightness(1.08);
+    filter: brightness(1.28) drop-shadow(0 0 10px rgba(119, 189, 251, 0.85));
+    stroke: rgba(246, 201, 107, 0.95);
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 6px;

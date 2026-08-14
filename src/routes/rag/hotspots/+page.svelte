@@ -1078,22 +1078,26 @@
   }
 
   .evidence-list li {
-    position: relative;
-    padding: 11px 12px 11px 46px;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    align-items: start;
+    gap: 10px;
+    padding: 11px 12px;
     border-left: 1px solid rgba(119, 189, 251, 0.3);
     background: rgba(255, 255, 255, 0.02);
   }
 
   .evidence-list span {
-    position: absolute;
-    top: 12px;
-    left: 10px;
+    padding-top: 1px;
     color: #6fa5d8;
     font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
     font-size: 0.66rem;
+    line-height: 1.6;
+    white-space: nowrap;
   }
 
   .evidence-list p {
+    min-width: 0;
     color: #b7c7da;
     font-size: 0.77rem;
     line-height: 1.65;

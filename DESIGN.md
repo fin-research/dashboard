@@ -16,10 +16,11 @@ Cloudflare Worker 通过原生 binding 访问 D1 与 Workers AI。日常开发�
 热点聚合只输入第一阶段生成的标题、summary、importance 与 keywords 证据卡片，不再
 输入完整原文。Gemma 4 使用 `temperature=1.0`、`top_p=0.95`、`top_k=64`、
 `repetition_penalty=1.0`、`seed=42` 和 `enable_thinking=true`，不设置
-`max_completion_tokens`；系统提示要求简洁、低深度思考。结果优先通过强制
-function calling 的 JSON Schema 返回，模型偶发直接返回正文 JSON 时仍必须通过同一
-运行时校验。热点按 `来源覆盖度×0.30 + 市场影响×0.25 + 新鲜度×0.20 +
-证据可信度×0.15 + 跨资产关联度×0.10` 计算并排序，只输出固收与权益两条影响。
+`max_completion_tokens`；系统提示要求简洁、低深度思考。结果通过 Cloudflare JSON
+Mode（response_format json_schema）直接返回结构化 JSON，应用只做同一运行时校验。
+heat 由模型直接给出（0-100 分），`来源覆盖度×0.30 + 市场影响×0.25 + 新鲜度×0.20 +
+证据可信度×0.15 + 跨资产关联度×0.10` 权重公式仅作为提示，应用不自行计算；单来源
+热点热度不超过 60。只输出固收与权益两条影响。
 
 页面面向日常桌面研究工作，按宽屏研究终端设计，内容最大宽度为 `2100px` 并居中。
 目标视口为 `1920×1080`，页面以一屏完整展示为首要约束；`1440×900` 保留完整

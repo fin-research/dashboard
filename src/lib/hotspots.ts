@@ -9,14 +9,6 @@ export interface Hotspot {
   keyword: string;
   aliases: string[];
   heat: number;
-  score: {
-    sourceCoverage: number;
-    marketImpact: number;
-    freshness: number;
-    evidenceCredibility: number;
-    crossAssetRelevance: number;
-    total: number;
-  };
   sourceLabel: "单一来源" | "多来源";
   conflicts: string[];
   explanation: string;
@@ -140,10 +132,6 @@ function parseHotspot(
     row.assetImpacts,
     `hotspots[${index}].assetImpacts`,
   );
-  const rawScore = objectValue(
-    row.scoreComponents ?? row.score,
-    `hotspots[${index}].scoreComponents`,
-  );
   const evidenceByArticle = new Map<string, EvidenceReference>();
   for (const item of arrayValue(row.evidence, `hotspots[${index}].evidence`)) {
     const reference = objectValue(item, "evidence reference");
@@ -163,40 +151,14 @@ function parseHotspot(
   }
   const confidence =
     evidence.length === 1 && rawConfidence === "high" ? "medium" : rawConfidence;
-  const sourceCoverage = Math.round(
-    clamp(evidence.length / Math.min(5, validArticleIds.size || 1), 0, 1) * 100,
-  );
-  const score = {
-    sourceCoverage,
-    marketImpact: scoreValue(rawScore.marketImpact, "marketImpact"),
-    freshness: scoreValue(rawScore.freshness, "freshness"),
-    evidenceCredibility: scoreValue(
-      rawScore.evidenceCredibility,
-      "evidenceCredibility",
-    ),
-    crossAssetRelevance: scoreValue(
-      rawScore.crossAssetRelevance,
-      "crossAssetRelevance",
-    ),
-    total: 0,
-  };
-  score.total = Math.round(
-    score.sourceCoverage * 0.3 +
-      score.marketImpact * 0.25 +
-      score.freshness * 0.2 +
-      score.evidenceCredibility * 0.15 +
-      score.crossAssetRelevance * 0.1,
-  );
-  const heat =
-    evidence.length === 1
-      ? Math.min(60, clamp(score.total, 30, 100))
-      : clamp(score.total, 30, 100);
+  // heat 由模型直接给出，应用不自行按权重公式计算；单来源规则只做封顶校验
+  const heat = Math.round(clamp(requiredNumber(row.heat, "heat"), 0, 100));
+  const finalHeat = evidence.length === 1 ? Math.min(60, heat) : heat;
 
   return {
     keyword: requiredString(row.keyword, "keyword", 40),
     aliases: stringArray(row.aliases, "aliases", 8, 40),
-    heat,
-    score,
+    heat: finalHeat,
     sourceLabel: evidence.length === 1 ? "单一来源" : "多来源",
     conflicts: stringArray(row.conflicts, "conflicts", 6, 300),
     explanation: requiredString(row.explanation, "explanation", 1_000),
@@ -264,10 +226,6 @@ function requiredNumber(value: unknown, name: string): number {
     throw new Error(`${name} must be a number`);
   }
   return value;
-}
-
-function scoreValue(value: unknown, name: string): number {
-  return Math.round(clamp(requiredNumber(value, name), 0, 100));
 }
 
 function isConfidence(value: string): value is HotspotConfidence {

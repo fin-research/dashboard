@@ -6,8 +6,7 @@ import {
 } from "$lib/hotspots";
 
 const HOTSPOT_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
-const PROMPT_VERSION = "d1-hotspots-v3";
-const HOTSPOT_OUTPUT_TOOL = "submit_market_hotspots";
+const PROMPT_VERSION = "d1-hotspots-v4";
 const HOTSPOT_GENERATION_CONFIG = {
   temperature: 1.0,
   top_p: 0.95,
@@ -35,6 +34,7 @@ const HOTSPOT_RESPONSE_SCHEMA = {
           explanation: { type: "string" },
           drivers: { type: "array", items: { type: "string" }, maxItems: 8 },
           conflicts: { type: "array", items: { type: "string" }, maxItems: 6 },
+          heat: { type: "number", minimum: 0, maximum: 100 },
           assetImpacts: {
             type: "object",
             additionalProperties: false,
@@ -43,30 +43,6 @@ const HOTSPOT_RESPONSE_SCHEMA = {
               equities: { type: "string" },
             },
             required: ["fixedIncome", "equities"],
-          },
-          scoreComponents: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              marketImpact: { type: "number", minimum: 0, maximum: 100 },
-              freshness: { type: "number", minimum: 0, maximum: 100 },
-              evidenceCredibility: {
-                type: "number",
-                minimum: 0,
-                maximum: 100,
-              },
-              crossAssetRelevance: {
-                type: "number",
-                minimum: 0,
-                maximum: 100,
-              },
-            },
-            required: [
-              "marketImpact",
-              "freshness",
-              "evidenceCredibility",
-              "crossAssetRelevance",
-            ],
           },
           evidence: {
             type: "array",
@@ -91,7 +67,7 @@ const HOTSPOT_RESPONSE_SCHEMA = {
           "drivers",
           "conflicts",
           "assetImpacts",
-          "scoreComponents",
+          "heat",
           "evidence",
           "confidence",
         ],
@@ -164,17 +140,17 @@ const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场首
 
 热点聚类与排序：
 4. 合并同义词、上下位概念和同源观点，不得把同一 articleId 的近义概念拆成多个热点。
-5. 同一事件的不同表述必须合并；过宽词必须细化为具体事件。每条至少引用 1 个 evidence；单一来源观点必须按“单一来源”处理，不得写成跨文档共振；high 至少需要 2 个不同 articleId。
-6. 输出 8-15 个热点。不要直接输出 heat；应用会按以下公式计算并排序：热点得分 = 来源覆盖度 × 0.30 + 市场影响程度 × 0.25 + 信息新鲜度 × 0.20 + 证据可信度 × 0.15 + 跨资产关联度 × 0.10。你只需为后四项给出 0-100 分，来源覆盖度由应用按不同 evidence 数量计算。
-7. keyword 使用 2-8 个汉字或常用市场缩写。禁止“市场、政策、经济、利率、债券、股票、风险”等无辨识度词，也禁止近义关键词重复。
+5. 同一事件的不同表述必须合并；过宽词必须细化为具体事件。每条至少引用 1 个 evidence；单一来源观点必须按"单一来源"处理，不得写成跨文档共振；high 至少需要 2 个不同 articleId。
+6. 输出 8-15 个热点，并为每个热点直接给出 0-100 的整数 heat。评分可参考以下权重公式自行判断，公式仅为提示：热点得分 ≈ 来源覆盖度 × 0.30 + 市场影响程度 × 0.25 + 信息新鲜度 × 0.20 + 证据可信度 × 0.15 + 跨资产关联度 × 0.10。单一来源观点应相应压低 heat。
+7. keyword 使用 2-8 个汉字或常用市场缩写。禁止"市场、政策、经济、利率、债券、股票、风险"等无辨识度词，也禁止近义关键词重复。
 
 解释质量：
 8. explanation 用 80-180 个汉字的自然语言写成一段，不使用模板标签或箭头。说明事实或分歧、传导机制、受影响资产以及验证或失效条件。
 9. assetImpacts 只输出一条 fixedIncome（固收）和一条 equities（权益）；无直接影响时写“证据不足”，不得机械填写“中性”。
 10. relationships 的 source 和 target 必须与最终 keyword 完全一致，且只保留证据支持的传导关系。
-11. evidence.articleId 必须去重。涉及汇率时必须写清货币对方向，避免“汇价走低”与“币值走低”混淆。
+11. evidence.articleId 必须去重。涉及汇率时必须写清货币对方向，避免"汇价走低"与"币值走低"混淆。
 12. 事实冲突时在 conflicts 中逐条保留冲突，不自行选择；没有冲突时输出空数组。解析中不得出现证据卡片以外的新数据。
-13. 必须通过 submit_market_hotspots 工具提交严格满足 JSON Schema 的最终结果，不要输出其他正文、Markdown、代码围栏、注释或思考过程。`;
+13. 最终输出必须是符合给定 JSON Schema 的单个 JSON 对象，不要输出其他正文、Markdown、代码围栏、注释或思考过程。`;
 
 export async function getMarketHotspots(
   env: Env,
@@ -207,27 +183,15 @@ export async function getMarketHotspots(
   const output = await env.AI.run(
     HOTSPOT_MODEL,
     {
-      messages: buildAggregateMessages(date, cards, scope),
+      messages: buildAggregateMessages(cards),
       ...HOTSPOT_GENERATION_CONFIG,
-      parallel_tool_calls: false,
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: HOTSPOT_OUTPUT_TOOL,
-            description: "提交基于给定证据卡片聚合的最终市场热点 JSON",
-            parameters: HOTSPOT_RESPONSE_SCHEMA,
-            strict: true,
-          },
-        },
-      ],
-      tool_choice: {
-        type: "function",
-        function: { name: HOTSPOT_OUTPUT_TOOL },
+      response_format: {
+        type: "json_schema",
+        json_schema: HOTSPOT_RESPONSE_SCHEMA,
       },
     },
     {
-      tags: [`market-hotspots:${date}`, "stage:aggregate-d1-v3"],
+      tags: [`market-hotspots:${date}`, "stage:aggregate-d1-v4"],
       gateway: {
         id: env.AI_GATEWAY_ID || "default",
         skipCache: true,
@@ -236,14 +200,7 @@ export async function getMarketHotspots(
       },
     },
   );
-  const message = output.choices[0]?.message;
-  const toolCall = message?.tool_calls?.[0];
-  const content =
-    toolCall?.type === "function" && toolCall.function.name === HOTSPOT_OUTPUT_TOOL
-      ? toolCall.function.arguments
-      : typeof message?.content === "string"
-        ? message.content
-        : null;
+  const content = output.choices[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
     throw new HotspotError(502, "Workers AI 未返回可解析的热点结果");
   }
@@ -331,28 +288,31 @@ async function loadEvidenceCards(
 }
 
 function buildAggregateMessages(
-  date: string,
   cards: EvidenceCard[],
-  scope: HotspotScope,
 ): Array<{ role: "system" | "user"; content: string }> {
-  const promptCards = cards.map((card) => ({
-    articleId: card.id,
-    title: card.title,
-    publishedAt: card.published_at,
-    summary: card.summary,
-    importance: card.importance,
-    keywords: card.keywords.map(({ topic, fact, interpretation, impact }) => ({
-      topic,
-      fact,
-      interpretation,
-      impact,
-    })),
-  }));
+  const cardBlocks = cards.map((card, index) => {
+    const keywordLines = card.keywords
+      .map(
+        (keyword) =>
+          `- **主题**：${keyword.topic}\n  - 事实：${keyword.fact}\n  - 解读：${keyword.interpretation}\n  - 影响：${keyword.impact}`,
+      )
+      .join("\n");
+    return [
+      `## 证据卡 ${index + 1}`,
+      `- **articleId**：${card.id}`,
+      `- **标题**：${card.title}`,
+      `- **发布时间**：${card.published_at}`,
+      `- **importance**：${card.importance}`,
+      `- **摘要**：${card.summary}`,
+      `- **关键词**：`,
+      keywordLines,
+    ].join("\n");
+  });
   return [
     { role: "system", content: AGGREGATE_SYSTEM },
     {
       role: "user",
-      content: `统计截止日：${date}\n证据范围：${scopeDescription(scope)}\n第一阶段全部文章证据卡：\n${JSON.stringify(promptCards)}\n\n输出 8-15 个热点，禁止为了凑数拆分近义主题。必须调用 submit_market_hotspots 并严格遵循其参数 JSON Schema。marketSummary 为 120-220 字总览。每条 evidence 只引用上面的 articleId；scoreComponents 只填写 marketImpact、freshness、evidenceCredibility、crossAssetRelevance 四项 0-100 分。`,
+      content: `${cardBlocks.join("\n\n")}\n\n请输出 8-15 个热点，禁止为了凑数拆分近义主题。严格按 JSON Schema 输出：marketSummary 为 120-220 字总览；每条 evidence 只引用上面的 articleId；heat 为 0-100 的整数，直接给出综合热度。`,
     },
   ];
 }
@@ -397,12 +357,6 @@ function cacheKey(scope: HotspotRequestScope): string {
   return scope.mode === "rolling"
     ? `rolling:${scope.rollingCount}`
     : `range:${scope.startDate}:${scope.endDate}`;
-}
-
-function scopeDescription(scope: HotspotScope): string {
-  return scope.mode === "rolling"
-    ? `最近 ${scope.rollingCount} 篇已完成特征抽取的文章`
-    : `${scope.startDate} 至 ${scope.endDate}`;
 }
 
 export class HotspotError extends Error {
