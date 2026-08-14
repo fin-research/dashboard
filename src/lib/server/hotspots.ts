@@ -1,0 +1,415 @@
+import {
+  parseHotspotAnalysis,
+  type HotspotAnalysis,
+  type HotspotApiResponse,
+  type HotspotScope,
+} from "$lib/hotspots";
+
+const HOTSPOT_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
+const PROMPT_VERSION = "d1-hotspots-v3";
+const HOTSPOT_OUTPUT_TOOL = "submit_market_hotspots";
+const HOTSPOT_GENERATION_CONFIG = {
+  temperature: 1.0,
+  top_p: 0.95,
+  top_k: 64,
+  repetition_penalty: 1.0,
+  seed: 42,
+  chat_template_kwargs: { enable_thinking: true },
+} as const;
+
+const HOTSPOT_RESPONSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    marketSummary: { type: "string" },
+    hotspots: {
+      type: "array",
+      minItems: 8,
+      maxItems: 15,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          keyword: { type: "string" },
+          aliases: { type: "array", items: { type: "string" }, maxItems: 8 },
+          explanation: { type: "string" },
+          drivers: { type: "array", items: { type: "string" }, maxItems: 8 },
+          conflicts: { type: "array", items: { type: "string" }, maxItems: 6 },
+          assetImpacts: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              fixedIncome: { type: "string" },
+              equities: { type: "string" },
+            },
+            required: ["fixedIncome", "equities"],
+          },
+          scoreComponents: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              marketImpact: { type: "number", minimum: 0, maximum: 100 },
+              freshness: { type: "number", minimum: 0, maximum: 100 },
+              evidenceCredibility: {
+                type: "number",
+                minimum: 0,
+                maximum: 100,
+              },
+              crossAssetRelevance: {
+                type: "number",
+                minimum: 0,
+                maximum: 100,
+              },
+            },
+            required: [
+              "marketImpact",
+              "freshness",
+              "evidenceCredibility",
+              "crossAssetRelevance",
+            ],
+          },
+          evidence: {
+            type: "array",
+            minItems: 1,
+            maxItems: 5,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                articleId: { type: "string" },
+                evidence: { type: "string" },
+              },
+              required: ["articleId", "evidence"],
+            },
+          },
+          confidence: { type: "string", enum: ["high", "medium", "low"] },
+        },
+        required: [
+          "keyword",
+          "aliases",
+          "explanation",
+          "drivers",
+          "conflicts",
+          "assetImpacts",
+          "scoreComponents",
+          "evidence",
+          "confidence",
+        ],
+      },
+    },
+    relationships: {
+      type: "array",
+      maxItems: 24,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          source: { type: "string" },
+          target: { type: "string" },
+          explanation: { type: "string" },
+        },
+        required: ["source", "target", "explanation"],
+      },
+    },
+    watchItems: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: 12,
+    },
+  },
+  required: ["marketSummary", "hotspots", "relationships", "watchItems"],
+} as const;
+
+interface ArticleRow {
+  id: string;
+  title: string;
+  summary: string;
+  importance: number;
+  published_at: string;
+  updated_at: string;
+}
+
+interface KeywordRow {
+  article_id: string;
+  ordinal: number;
+  topic: string;
+  fact: string;
+  interpretation: string;
+  impact: string;
+}
+
+interface EvidenceCard extends ArticleRow {
+  keywords: Array<Omit<KeywordRow, "article_id">>;
+}
+
+interface CacheRow {
+  input_fingerprint: string;
+  generated_at: string;
+  model: string;
+  payload: string;
+}
+
+export type HotspotRequestScope =
+  | { mode: "rolling"; rollingCount: number }
+  | { mode: "range"; startDate: string; endDate: string };
+
+const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场首席研究员。输入是第一阶段产生的全部结构化证据卡片，不包含完整原文。请先按“同一驱动、政策操作、资产定价主题”聚类，再生成供词云与解释面板直接使用的热点。
+
+进行简洁、低深度思考。先在内部完成事件归并、同义词统一、证据交叉验证、重要性排序和市场影响判断，不展开冗长推理。最终只输出结果 JSON。
+
+证据边界：
+1. 只能使用输入的标题、summary、importance 和 keywords 证据，不得补充常识、旧闻或模型知识；明确区分文章观点与跨文档归纳。
+2. 必须逐一阅读全部输入 articleId；coverage 由应用根据实际输入范围生成，无需在模型结果中输出。
+3. 同一主题列出所有直接相关的 evidence，最多 5 篇；不得只挑一篇代表性文章后宣称跨文档共振。
+
+热点聚类与排序：
+4. 合并同义词、上下位概念和同源观点，不得把同一 articleId 的近义概念拆成多个热点。
+5. 同一事件的不同表述必须合并；过宽词必须细化为具体事件。每条至少引用 1 个 evidence；单一来源观点必须按“单一来源”处理，不得写成跨文档共振；high 至少需要 2 个不同 articleId。
+6. 输出 8-15 个热点。不要直接输出 heat；应用会按以下公式计算并排序：热点得分 = 来源覆盖度 × 0.30 + 市场影响程度 × 0.25 + 信息新鲜度 × 0.20 + 证据可信度 × 0.15 + 跨资产关联度 × 0.10。你只需为后四项给出 0-100 分，来源覆盖度由应用按不同 evidence 数量计算。
+7. keyword 使用 2-8 个汉字或常用市场缩写。禁止“市场、政策、经济、利率、债券、股票、风险”等无辨识度词，也禁止近义关键词重复。
+
+解释质量：
+8. explanation 用 80-180 个汉字的自然语言写成一段，不使用模板标签或箭头。说明事实或分歧、传导机制、受影响资产以及验证或失效条件。
+9. assetImpacts 只输出一条 fixedIncome（固收）和一条 equities（权益）；无直接影响时写“证据不足”，不得机械填写“中性”。
+10. relationships 的 source 和 target 必须与最终 keyword 完全一致，且只保留证据支持的传导关系。
+11. evidence.articleId 必须去重。涉及汇率时必须写清货币对方向，避免“汇价走低”与“币值走低”混淆。
+12. 事实冲突时在 conflicts 中逐条保留冲突，不自行选择；没有冲突时输出空数组。解析中不得出现证据卡片以外的新数据。
+13. 必须通过 submit_market_hotspots 工具提交严格满足 JSON Schema 的最终结果，不要输出其他正文、Markdown、代码围栏、注释或思考过程。`;
+
+export async function getMarketHotspots(
+  env: Env,
+  requestScope: HotspotRequestScope,
+  options: { refresh: boolean },
+): Promise<HotspotApiResponse> {
+  const cards = await loadEvidenceCards(env.DB, requestScope);
+  if (cards.length === 0) {
+    throw new HotspotError(404, "所选范围内尚无已完成特征抽取的文章");
+  }
+  const articleIds = cards.map((card) => card.id);
+  const date = cards[0]!.published_at.slice(0, 10);
+  const scope = resolvedScope(requestScope, cards);
+  const scopeKey = cacheKey(requestScope);
+  const fingerprint = await createFingerprint(cards);
+
+  if (!options.refresh) {
+    const cached = await env.DB.prepare(
+      `SELECT input_fingerprint, generated_at, model, payload
+       FROM hotspot_cache WHERE scope_key = ?`,
+    )
+      .bind(scopeKey)
+      .first<CacheRow>();
+    if (cached?.input_fingerprint === fingerprint) {
+      const analysis = parseHotspotAnalysis(cached.payload, { date, articleIds });
+      return withMetadata(analysis, cached.generated_at, cached.model, true, scope);
+    }
+  }
+
+  const output = await env.AI.run(
+    HOTSPOT_MODEL,
+    {
+      messages: buildAggregateMessages(date, cards, scope),
+      ...HOTSPOT_GENERATION_CONFIG,
+      parallel_tool_calls: false,
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: HOTSPOT_OUTPUT_TOOL,
+            description: "提交基于给定证据卡片聚合的最终市场热点 JSON",
+            parameters: HOTSPOT_RESPONSE_SCHEMA,
+            strict: true,
+          },
+        },
+      ],
+      tool_choice: {
+        type: "function",
+        function: { name: HOTSPOT_OUTPUT_TOOL },
+      },
+    },
+    {
+      tags: [`market-hotspots:${date}`, "stage:aggregate-d1-v3"],
+      gateway: {
+        id: env.AI_GATEWAY_ID || "default",
+        skipCache: true,
+        collectLog: true,
+        metadata: { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION },
+      },
+    },
+  );
+  const message = output.choices[0]?.message;
+  const toolCall = message?.tool_calls?.[0];
+  const content =
+    toolCall?.type === "function" && toolCall.function.name === HOTSPOT_OUTPUT_TOOL
+      ? toolCall.function.arguments
+      : typeof message?.content === "string"
+        ? message.content
+        : null;
+  if (typeof content !== "string" || !content.trim()) {
+    throw new HotspotError(502, "Workers AI 未返回可解析的热点结果");
+  }
+  const analysis = parseHotspotAnalysis(content, { date, articleIds });
+  const generatedAt = new Date().toISOString();
+  const payload = JSON.stringify(analysis);
+
+  await env.DB.prepare(
+    `INSERT INTO hotspot_cache (
+       scope_key, input_fingerprint, generated_at, model, payload
+     ) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(scope_key) DO UPDATE SET
+       input_fingerprint = excluded.input_fingerprint,
+       generated_at = excluded.generated_at,
+       model = excluded.model,
+       payload = excluded.payload`,
+  )
+    .bind(scopeKey, fingerprint, generatedAt, HOTSPOT_MODEL, payload)
+    .run();
+
+  return withMetadata(analysis, generatedAt, HOTSPOT_MODEL, false, scope);
+}
+
+async function loadEvidenceCards(
+  database: Env["DB"],
+  scope: HotspotRequestScope,
+): Promise<EvidenceCard[]> {
+  const articleStatement =
+    scope.mode === "rolling"
+      ? database
+          .prepare(
+            `SELECT a.id, a.title, a.summary, a.importance, a.published_at, a.updated_at
+             FROM article a
+             WHERE a.summary IS NOT NULL
+               AND a.importance IS NOT NULL
+               AND EXISTS (SELECT 1 FROM keyword k WHERE k.article_id = a.id)
+             ORDER BY a.published_at DESC, a.id DESC
+             LIMIT ?`,
+          )
+          .bind(scope.rollingCount)
+      : database
+          .prepare(
+            `SELECT a.id, a.title, a.summary, a.importance, a.published_at, a.updated_at
+             FROM article a
+             WHERE substr(a.published_at, 1, 10) BETWEEN ? AND ?
+               AND a.summary IS NOT NULL
+               AND a.importance IS NOT NULL
+               AND EXISTS (SELECT 1 FROM keyword k WHERE k.article_id = a.id)
+             ORDER BY a.published_at DESC, a.id DESC
+             LIMIT 100`,
+          )
+          .bind(scope.startDate, scope.endDate);
+  const articlesResult = await articleStatement.all<ArticleRow>();
+  const articles: ArticleRow[] = articlesResult.results ?? [];
+  if (articles.length === 0) return [];
+  const placeholders = articles.map(() => "?").join(", ");
+  const keywordsResult = await database
+    .prepare(
+      `SELECT article_id, ordinal, topic, fact, interpretation, impact
+       FROM keyword
+       WHERE article_id IN (${placeholders})
+       ORDER BY article_id ASC, ordinal ASC`,
+    )
+    .bind(...articles.map((article) => article.id))
+    .all<KeywordRow>();
+  const keywords: KeywordRow[] = keywordsResult.results ?? [];
+  const keywordsByArticle = new Map<string, EvidenceCard["keywords"]>();
+  for (const keyword of keywords) {
+    const group = keywordsByArticle.get(keyword.article_id) ?? [];
+    group.push({
+      ordinal: keyword.ordinal,
+      topic: keyword.topic,
+      fact: keyword.fact,
+      interpretation: keyword.interpretation,
+      impact: keyword.impact,
+    });
+    keywordsByArticle.set(keyword.article_id, group);
+  }
+  return articles
+    .map((article) => ({
+      ...article,
+      keywords: keywordsByArticle.get(article.id) ?? [],
+    }))
+    .filter((article) => article.keywords.length > 0);
+}
+
+function buildAggregateMessages(
+  date: string,
+  cards: EvidenceCard[],
+  scope: HotspotScope,
+): Array<{ role: "system" | "user"; content: string }> {
+  const promptCards = cards.map((card) => ({
+    articleId: card.id,
+    title: card.title,
+    publishedAt: card.published_at,
+    summary: card.summary,
+    importance: card.importance,
+    keywords: card.keywords.map(({ topic, fact, interpretation, impact }) => ({
+      topic,
+      fact,
+      interpretation,
+      impact,
+    })),
+  }));
+  return [
+    { role: "system", content: AGGREGATE_SYSTEM },
+    {
+      role: "user",
+      content: `统计截止日：${date}\n证据范围：${scopeDescription(scope)}\n第一阶段全部文章证据卡：\n${JSON.stringify(promptCards)}\n\n输出 8-15 个热点，禁止为了凑数拆分近义主题。必须调用 submit_market_hotspots 并严格遵循其参数 JSON Schema。marketSummary 为 120-220 字总览。每条 evidence 只引用上面的 articleId；scoreComponents 只填写 marketImpact、freshness、evidenceCredibility、crossAssetRelevance 四项 0-100 分。`,
+    },
+  ];
+}
+
+async function createFingerprint(cards: EvidenceCard[]): Promise<string> {
+  const source = JSON.stringify({ promptVersion: PROMPT_VERSION, cards });
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(source),
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function withMetadata(
+  analysis: HotspotAnalysis,
+  generatedAt: string,
+  model: string,
+  cached: boolean,
+  scope: HotspotScope,
+): HotspotApiResponse {
+  return { ...analysis, generatedAt, model, cached, scope };
+}
+
+function resolvedScope(
+  requestScope: HotspotRequestScope,
+  cards: EvidenceCard[],
+): HotspotScope {
+  const published = cards.map((card) => card.published_at).sort();
+  const common = {
+    articleCount: cards.length,
+    firstPublishedAt: published[0]!,
+    lastPublishedAt: published.at(-1)!,
+  };
+  return requestScope.mode === "rolling"
+    ? { ...common, mode: "rolling", rollingCount: requestScope.rollingCount }
+    : { ...common, ...requestScope };
+}
+
+function cacheKey(scope: HotspotRequestScope): string {
+  return scope.mode === "rolling"
+    ? `rolling:${scope.rollingCount}`
+    : `range:${scope.startDate}:${scope.endDate}`;
+}
+
+function scopeDescription(scope: HotspotScope): string {
+  return scope.mode === "rolling"
+    ? `最近 ${scope.rollingCount} 篇已完成特征抽取的文章`
+    : `${scope.startDate} 至 ${scope.endDate}`;
+}
+
+export class HotspotError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}

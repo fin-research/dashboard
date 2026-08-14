@@ -1,15 +1,15 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "eastmoney-dashboard",
-  "main": "src/worker.ts",
-  "compatibility_date": "2026-08-13",
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  "compatibility_date": "2026-08-14",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "AI_GATEWAY_ID": "default"
+  },
   "assets": {
     "binding": "ASSETS",
-    "directory": "./dist",
-    "html_handling": "drop-trailing-slash",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/dashboard", "/dashboard/*"]
+    "directory": ".svelte-kit/cloudflare"
   },
   "routes": [
     {
@@ -19,8 +19,32 @@
     {
       "pattern": "eastmoney.hasbai.xyz/dashboard/*",
       "zone_name": "hasbai.xyz"
+    },
+    {
+      "pattern": "eastmoney.hasbai.xyz/rag/*",
+      "zone_name": "hasbai.xyz"
+    },
+    {
+      "pattern": "eastmoney.hasbai.xyz/api/rag/*",
+      "zone_name": "hasbai.xyz"
+    },
+    {
+      "pattern": "eastmoney.hasbai.xyz/_app/*",
+      "zone_name": "hasbai.xyz"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "eastmoney",
+      "database_id": "b80cfbe1-1226-46cc-a22b-3ebbaefe85bf",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
   "observability": {
     "enabled": true,
     "logs": {

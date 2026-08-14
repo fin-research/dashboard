@@ -36,14 +36,14 @@ export function generateMarketBriefing(
 ): Promise<MarketBriefing> {
   const query = new URLSearchParams({ date: reportDate });
   return getJson<MarketBriefing>(
-    `/api/market-briefing?${query}`,
+    `/data/market-briefing?${query}`,
     signal,
     "POST",
   );
 }
 
 export function fetchConfig(signal?: AbortSignal): Promise<ApiConfig> {
-  return getJson<ApiConfig>("/api/config", signal);
+  return getJson<ApiConfig>("/data/config", signal);
 }
 
 export function fetchReport(
@@ -53,7 +53,7 @@ export function fetchReport(
 ): Promise<ReportData> {
   const query = new URLSearchParams({ date: reportDate });
   if (refresh) query.set("refresh", "1");
-  return getJson<ReportPayload>(`/api/report?${query}`, signal).then(
+  return getJson<ReportPayload>(`/data/report?${query}`, signal).then(
     normalizeReport,
   );
 }
@@ -65,7 +65,7 @@ export function fetchTextReportData(
 ): Promise<TextReportData> {
   const query = new URLSearchParams({ date: reportDate });
   if (refresh) query.set("refresh", "1");
-  return getJson<TextReportData>(`/api/text-report-data?${query}`, signal);
+  return getJson<TextReportData>(`/data/text-report-data?${query}`, signal);
 }
 
 export function normalizeReport(payload: ReportPayload): ReportData {

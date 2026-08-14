@@ -2,14 +2,24 @@
 
 ## 目标与运行方式
 
-可视化报告仍由 Python JSON API 与 Vite 前端两个进程组成。前端使用
-Svelte 5 + TypeScript 组织页面状态和组件，使用 Tailwind CSS 4 + daisyUI
-提供基础组件语义与交互状态，ECharts 继续负责定量图表。日常开发统一使用
-`pnpm --dir web dev` 同时启动 `127.0.0.1:8766` 的 API 和
-`127.0.0.1:8765` 的前端，避免只启动 Vite 时出现代理连接失败。需要分别调试时，
-可使用 `uv run dm-report-api` 和 `pnpm --dir web dev:frontend`。页面不自动生成
+应用由 SvelteKit 统一承载浏览器页面和边缘后端。Python JSON API 继续作为数据源，
+浏览器通过同源 `/data/*` 直接访问；本地由 Vite 读取 `.env.dev` 后转发到线上同域
+数据服务并完整保留 `/data` 前缀，线上 Dashboard Worker 不接管 `/data/*`。
+前端使用 Svelte 5 + TypeScript、Tailwind CSS 4 + daisyUI，ECharts 继续负责定量图表；
+Cloudflare Worker 通过原生 binding 访问 D1 与 Workers AI。日常开发直接在
+`dashboard/` 运行 `pnpm dev`；它会先按本地高水位把远程 D1 中新增或更新的
+结构化文章、关键词与热点缓存增量 upsert 到本地开发 D1；空库首次仅建立最近 100 篇
+已完成特征抽取文章的有限基线，不读取全库。页面不自动生成
 或归档图片，但允许用户在浏览器中按需导出 3 倍像素密度的 PNG。
 文字版 `dm-report` 继续独立生成，两条链路互不依赖。
+
+热点聚合只输入第一阶段生成的标题、summary、importance 与 keywords 证据卡片，不再
+输入完整原文。Gemma 4 使用 `temperature=1.0`、`top_p=0.95`、`top_k=64`、
+`repetition_penalty=1.0`、`seed=42` 和 `enable_thinking=true`，不设置
+`max_completion_tokens`；系统提示要求简洁、低深度思考。结果优先通过强制
+function calling 的 JSON Schema 返回，模型偶发直接返回正文 JSON 时仍必须通过同一
+运行时校验。热点按 `来源覆盖度×0.30 + 市场影响×0.25 + 新鲜度×0.20 +
+证据可信度×0.15 + 跨资产关联度×0.10` 计算并排序，只输出固收与权益两条影响。
 
 页面面向日常桌面研究工作，按宽屏研究终端设计，内容最大宽度为 `2100px` 并居中。
 目标视口为 `1920×1080`，页面以一屏完整展示为首要约束；`1440×900` 保留完整
@@ -147,7 +157,7 @@ Svelte 5 + TypeScript 组织页面状态和组件，使用 Tailwind CSS 4 + dais
 
 ## 数据口径
 
-- 页面通过 Vite 代理后的同源 `/api/report?date=YYYY-MM-DD` 获取结构化数据，不接触
+- 页面通过同源 `/data/report?date=YYYY-MM-DD` 获取结构化数据，不接触
   `.env`、Cookie 或 Choice 凭据。
 - 服务端按报告日缓存结果；“刷新数据”通过 `refresh=1` 强制重新取数。
 - 视觉报告直接消费 DM、东方财富与 Choice 接口，不读取文字报告归档。
@@ -182,23 +192,26 @@ Svelte 5 + TypeScript 组织页面状态和组件，使用 Tailwind CSS 4 + dais
 - `api/industry.py`：Choice 指数、成交额、行业查询和完整日期选择。
 - `api/service.py`：一次报告快照的用例编排和客户端生命周期。
 - `api/server.py`：本地 JSON HTTP、缓存和错误边界，不提供静态资源。
-- `web/index.html`：只保留 Svelte 挂载点和页面元信息。
-- `web/src/styles.css`：版式、响应式、颜色语义和动效。
-- `web/src/main.ts`：挂载宽屏 Svelte 根组件。
-- `web/src/App.svelte`：页面状态、加载/错误/导出流程和视图组合。
-- `web/src/components/`：页面使用的 Svelte 指标卡、表格、编辑器、汇总条和
+- `src/app.html`：SvelteKit HTML 外壳和页面元信息。
+- `src/styles.css`：既有报告版式、响应式、颜色语义和动效。
+- `src/App.svelte`：报告页面状态、加载/错误/导出流程和视图组合。
+- `src/routes/`：页面路由和 `/api/rag/*` 应用接口；不实现 `/data/*` 后端代理。
+- `src/lib/server/hotspots.ts`：D1 证据读取、Workers AI 聚合、确定性校验和缓存。
+- `src/lib/components/WordCloud.svelte`：`d3-cloud` 布局与可交互 SVG 词云。
+- `src/components/`：页面使用的 Svelte 指标卡、表格、编辑器、汇总条和
   ECharts 宿主组件。
-- `web/src/view-model.ts`：纯展示计算，不操作 DOM。
-- `web/src/app.css`：Tailwind CSS 与 daisyUI 入口；既有设计 token、布局和图表
+- `src/view-model.ts`：纯展示计算，不操作 DOM。
+- `src/app.css`：Tailwind CSS 与 daisyUI 入口；既有设计 token、布局和图表
   几何仍由 `styles.css` 决定，组件库不得改变视觉契约。
-- `web/src/api.ts`：唯一的前端数据访问边界。
-- `web/src/export.ts`：浏览器端 3 倍像素密度 PNG 导出，不负责数据获取。
-- `web/src/charts/`：按市场域拆分的 ECharts 配置与统一实例生命周期。
-- `web/src/formatters.ts`：统一数值、日期和涨跌格式。
+- `src/api.ts`：报告前端的同源数据访问边界。
+- `src/export.ts`：浏览器端 3 倍像素密度 PNG 导出，不负责数据获取。
+- `src/charts/`：按市场域拆分的 ECharts 配置与统一实例生命周期。
+- `src/formatters.ts`：统一数值、日期和涨跌格式。
 
-后端依赖方向为：`server -> service -> collectors/industry -> models`；
-前端依赖方向为：`main -> Svelte App -> components/view-model/api/charts -> types`。
-两端只通过 JSON 契约通信，
+数据依赖方向为：线上 `browser -> /data -> Python API`，本地
+`browser -> Vite /data proxy -> https://eastmoney.hasbai.xyz/data`；线上热点依赖方向为
+`browser -> /api/rag/hotspots -> D1 structured features -> Workers AI -> hotspot_cache`。
+本地热点在启动时只读增量同步上述 D1 结构化数据，再以相同接口逻辑读取本地副本。
 Python 不读取、打包或提供前端资源，浏览器不导入 Python 实现。
 
 ## 安全与可访问性
@@ -215,11 +228,14 @@ Python 不读取、打包或提供前端资源，浏览器不导入 Python 实�
 
 ## 验收标准
 
-- `pnpm --dir web dev` 可同时启动 API 与前端；`pnpm --dir web dev:frontend`
-  可在 API 已独立运行时只启动前端，代理的 `/api/health` 返回
-  `{"status":"ok"}`。
-- `/` 可加载完整报告，页面不显示版式切换入口。
-- `/api/report` 返回完整 JSON，包含 31 个行业以及行业实际数据日期。
+- `pnpm dev` 从 `.env.dev` 加载远程数据源并启动 SvelteKit 应用；`/data/health`
+  保留前缀转发并返回 `{"status":"ok"}`。
+- `/dashboard` 可加载完整报告，页面不显示版式切换入口。
+- `/data/report` 返回完整 JSON，包含 31 个行业以及行业实际数据日期。
+- `/api/rag/hotspots` 默认滚动读取最近 20 篇文章，也支持开始/结束日期；同一范围与
+  证据指纹复用 D1 缓存，`refresh=1` 才强制重新聚合，结果固定为 8–15 个热点。
+  `/rag/hotspots` 使用全屏词云，右上角弹出面板切换滚动篇数/日期范围，点击或键盘
+  激活关键词以覆盖层查看解释、固收/权益影响和证据，不改变词云宽度与布局。
 - `1920×1080` 桌面视口下无需纵向滚动即可看到六个核心指标和完整 1–8 格；
   第 4、8 格合并为贯穿两行的权益市场，行业热力图位于其下半区。
 - `1440×900` 继续保留四列，正文和表格不低于 `1rem`，无文字重叠或图例裁切；
@@ -233,4 +249,5 @@ Python 不读取、打包或提供前端资源，浏览器不导入 Python 实�
   省略号或只显示其中一行。
 - 切换日期、刷新、加载、错误重试和 3 倍像素密度 PNG 导出均可用；点击导出时
   页面不得发生纵向位移，导出图片不包含顶部工具栏，浏览器控制台无错误。
-- Python 语法检查、Ruff、Svelte/TypeScript 类型检查、Vite 构建和 wheel 构建全部通过。
+- Svelte/TypeScript 类型检查、单元测试、SvelteKit 构建、Wrangler dry-run 与关键
+  接口请求全部通过；本项目不以浏览器或截图视觉检查作为验收步骤。

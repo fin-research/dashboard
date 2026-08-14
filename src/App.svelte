@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
 
+  import "./app.css";
+  import "./styles.css";
+
   import {
     fetchConfig,
     fetchReport,

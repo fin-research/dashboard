@@ -1,53 +1,59 @@
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { Agent as HttpsAgent } from "node:https";
+import { defineConfig, loadEnv } from "vite";
 
-const apiProxy = {
-  "/api": {
-    target: "http://127.0.0.1:8766",
-    changeOrigin: false,
-    rewrite: (path: string) => path.replace(/^\/api(?=\/|$)/, ""),
-  },
-};
+export default defineConfig(({ command, mode }) => {
+  const environment = loadEnv(mode, process.cwd(), "");
+  const dataProxyTarget = environment.DATA_PROXY_TARGET?.trim();
+  if (command === "serve" && mode === "dev" && !dataProxyTarget) {
+    throw new Error("DATA_PROXY_TARGET must be configured in .env.dev");
+  }
+  const dataProxyAgent = dataProxyTarget?.startsWith("https:")
+    ? new HttpsAgent({ keepAlive: false, proxyEnv: process.env })
+    : undefined;
 
-export default defineConfig({
-  plugins: [tailwindcss(), svelte()],
-  // 子路径部署：静态资源统一挂在 /dashboard/ 下（部署时由反向代理剥离前缀）。
-  // 本地开发与构建产物均带此前缀，访问入口为 http://127.0.0.1:8765/dashboard/
-  base: "/dashboard/",
-  server: {
-    host: "127.0.0.1",
-    port: 8765,
-    strictPort: true,
-    proxy: apiProxy,
-  },
-  preview: {
-    host: "127.0.0.1",
-    port: 8765,
-    strictPort: true,
-    proxy: apiProxy,
-  },
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-    chunkSizeWarningLimit: 650,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (
-            id.includes("/node_modules/echarts/") ||
-            id.includes("/node_modules/zrender/")
-          ) {
-            return "charts-vendor";
+  return {
+    plugins: [tailwindcss(), sveltekit()],
+    server: {
+      host: "127.0.0.1",
+      port: 8765,
+      strictPort: true,
+      proxy: dataProxyTarget
+        ? {
+            "/data": {
+              target: dataProxyTarget,
+              changeOrigin: true,
+              agent: dataProxyAgent,
+            },
           }
-          if (id.includes("/node_modules/html-to-image/")) {
-            return "export-vendor";
-          }
-          if (id.includes("/node_modules/svelte/")) {
-            return "svelte-vendor";
-          }
+        : undefined,
+    },
+    preview: {
+      host: "127.0.0.1",
+      port: 8765,
+      strictPort: true,
+    },
+    build: {
+      chunkSizeWarningLimit: 650,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (
+              id.includes("/node_modules/echarts/") ||
+              id.includes("/node_modules/zrender/")
+            ) {
+              return "charts-vendor";
+            }
+            if (id.includes("/node_modules/html-to-image/")) {
+              return "export-vendor";
+            }
+            if (id.includes("/node_modules/svelte/")) {
+              return "svelte-vendor";
+            }
+          },
         },
       },
     },
-  },
+  };
 });
