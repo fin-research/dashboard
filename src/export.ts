@@ -24,9 +24,9 @@ export async function exportReportImage(
     const shellStyle = shell ? getComputedStyle(shell) : null;
     const paddingLeft = parsePixels(shellStyle?.paddingLeft);
     const paddingRight = parsePixels(shellStyle?.paddingRight);
-    const paddingBottom = parsePixels(shellStyle?.paddingBottom);
     const exportWidth = report.scrollWidth + paddingLeft + paddingRight;
-    const exportHeight = report.scrollHeight + paddingBottom;
+    // 导出图按报告实际内容高度裁剪，不再补 shell 底部留白，避免出现白条。
+    const exportHeight = report.scrollHeight;
 
     const dataUrl = await toPng(report, {
       backgroundColor: "#f7f7f3",
@@ -40,7 +40,7 @@ export async function exportReportImage(
         height: `${exportHeight}px`,
         boxShadow: "none",
         margin: "0",
-        padding: `0 ${paddingRight}px ${paddingBottom}px ${paddingLeft}px`,
+        padding: `0 ${paddingRight}px 0 ${paddingLeft}px`,
       },
     });
 
