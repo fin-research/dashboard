@@ -50,6 +50,11 @@ export function isPublicBond(value: string): boolean {
   return !!bond && (bond.includes("G") || !/[A-Za-z]/.test(bond));
 }
 
+export function isEastmoneyText(value: unknown): boolean {
+  const text = string(value);
+  return text.includes("东财") || text.includes("东方财富");
+}
+
 export function normalizeCompany(value: unknown): string {
   const text = string(value).replace(/\s+/g, "");
   return text === "安信证券" ? "国投证券" : text;

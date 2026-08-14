@@ -4,6 +4,7 @@
 
 import {
   hasValue,
+  isEastmoneyText,
   isPublicBond,
   median,
   normalizeCompany,
@@ -118,7 +119,13 @@ export function marginSnapshot(rows: Row[]): MarginSnapshot {
 export function primaryPoints(rows: Row[]): PrimaryPoint[] {
   const points: PrimaryPoint[] = [];
   for (const row of rows) {
-    if (string(row.bondShortName).includes("东财证券")) continue;
+    if (
+      isEastmoneyText(row.bondShortName) ||
+      isEastmoneyText(row.issuer) ||
+      isEastmoneyText(row.comShortName)
+    ) {
+      continue;
+    }
     if (!hasValue(row.issueCouponRate)) continue;
     const tenor_years = number(row.tenor_years);
     const amount = number(row.amount);
@@ -146,8 +153,8 @@ export function comparablePoints(rows: Row[]): ComparablePoint[] {
     const trade_yield = number(row.tradeYield);
     const tenor_years = secondaryTenorYears(row.remainingTenor);
     if (
-      issuer.includes("东方财富证券") ||
-      bond_name.includes("东方财富证券") ||
+      isEastmoneyText(issuer) ||
+      isEastmoneyText(bond_name) ||
       !isPublicBond(bond_name) ||
       trade_yield === null ||
       tenor_years === null ||

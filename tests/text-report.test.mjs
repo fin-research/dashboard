@@ -108,3 +108,51 @@ A股主要指数集体收涨。全市场成交保持活跃。
 test("前端文字报告逐字符复刻 Python 版输出", () => {
   assert.equal(buildTextReport(data), pythonOutput);
 });
+
+test("一级发行与二级行情统一排除东方财富并回退相近券", () => {
+  const input = structuredClone(data);
+  input.primary.push({
+    bondShortName: "26东财C5",
+    bondTypeText: "公司债",
+    issueTenor: "2Y",
+    issueCouponRate: "1.80",
+    planIssueAmount: "15",
+    bidStartDate: "2026-08-13",
+    comShortName: null,
+    issuer: "东方财富",
+  });
+  input.secondary.push(
+    {
+      bondUniCode: 4,
+      bondShortName: "25东财G9",
+      comShortName: "东方财富证券",
+      remainingTenor: "2.95Y",
+      cbYte: "1.70",
+      tradeYield: "1.71",
+    },
+    {
+      bondUniCode: 5,
+      bondShortName: "25己G1",
+      comShortName: "己证券",
+      remainingTenor: "2.95Y",
+      cbYte: "1.68",
+      tradeYield: "1.69",
+    },
+  );
+
+  const report = buildTextReport(input);
+  const primarySection = report.slice(
+    report.indexOf("【一级发行】"),
+    report.indexOf("【二级行情】"),
+  );
+  const secondarySection = report.slice(
+    report.indexOf("【二级行情】"),
+    report.indexOf("东财存量债券"),
+  );
+
+  assert.ok(!primarySection.includes("东方财富"));
+  assert.ok(!primarySection.includes("26东财C5"));
+  assert.ok(!secondarySection.includes("东方财富"));
+  assert.ok(!secondarySection.includes("25东财G9"));
+  assert.ok(secondarySection.includes("己证券"));
+});

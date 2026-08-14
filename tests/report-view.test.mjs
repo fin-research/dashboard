@@ -129,6 +129,38 @@ test("一级发行点从富化行过滤派生列", () => {
   assert.equal(points[0].category, "公募次级债");
 });
 
+test("一级发行点排除东方财富（含非证券简称）条目", () => {
+  const points = primaryPoints([
+    {
+      bondShortName: "26东财C5",
+      issueCouponRate: "1.80",
+      issue_date: "08/13",
+      issuer: "东方财富",
+      bond_name: "26东财C5",
+      category: "小公募",
+      tenor_years: 2,
+      amount: 15,
+      coupon: 1.8,
+    },
+    {
+      bondShortName: "26东莞03",
+      issueCouponRate: "1.65",
+      issue_date: "08/13",
+      issuer: "东莞证券",
+      bond_name: "26东莞03",
+      category: "小公募",
+      tenor_years: 2,
+      amount: 20,
+      coupon: 1.65,
+    },
+  ]);
+
+  assert.deepEqual(
+    points.map((point) => point.bond_name),
+    ["26东莞03"],
+  );
+});
+
 test("可比债券只保留公募、5 年内、非东财的成交", () => {
   const points = comparablePoints([
     {
@@ -172,6 +204,30 @@ test("可比债券只保留公募、5 年内、非东财的成交", () => {
   assert.deepEqual(
     points.map((point) => point.trade_yield),
     [1.42],
+  );
+});
+
+test("可比债券按发行人口径排除东方财富证券", () => {
+  const points = comparablePoints([
+    {
+      bondUniCode: 1,
+      bondShortName: "24东财05",
+      comShortName: "东方财富",
+      remainingTenor: "1.0Y",
+      tradeYield: 1.47,
+    },
+    {
+      bondUniCode: 2,
+      bondShortName: "25券商01",
+      comShortName: "安信证券",
+      remainingTenor: "1.1Y",
+      tradeYield: 1.42,
+    },
+  ]);
+
+  assert.deepEqual(
+    points.map((point) => point.bond_name),
+    ["25券商01"],
   );
 });
 

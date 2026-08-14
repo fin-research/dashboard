@@ -1,5 +1,6 @@
 import {
   hasValue,
+  isEastmoneyText,
   isPublicBond,
   normalizeCompany,
   number,
@@ -167,7 +168,7 @@ function marginRow(row: Row) { return { date: string(row.DIM_DATE), total: numbe
 function primaryIssue(rows: Row[]): string {
   const groups = new Map(PRIMARY_ORDER.map((category) => [category, [] as Row[]]));
   for (const row of rows) {
-    if (string(row.bondShortName).includes("东财证券") || !hasValue(row.issueCouponRate)) continue;
+    if (isEastmoneyIssue(row) || !hasValue(row.issueCouponRate)) continue;
     groups.get(primaryCategory(row))!.push(row);
   }
   const lines: string[] = [];
@@ -185,7 +186,7 @@ function secondaryMarket(rows: Row[]): string {
   const candidates = rows.flatMap((row) => {
     const bond = string(row.bondShortName).trim().split(" ")[0] ?? "";
     const valuation = number(row.cbYte); const trade = number(row.tradeYield); const tenor = secondaryTenorYears(row.remainingTenor);
-    return isPublicBond(bond) && valuation !== null && trade !== null && tenor !== null ? [{ row, bondShortName: bond, cbYte: valuation, tradeYield: trade, tenorYears: tenor }] : [];
+    return isPublicBond(bond) && !isEastmoneyText(row.comShortName) && !isEastmoneyText(row.bondShortName) && valuation !== null && trade !== null && tenor !== null ? [{ row, bondShortName: bond, cbYte: valuation, tradeYield: trade, tenorYears: tenor }] : [];
   });
   const selected: unknown[] = [];
   for (const target of [3, 2, 1]) {
@@ -234,6 +235,15 @@ function primaryIssuer(row: Row): string { for (const key of ["comShortName", "i
 function normalizePrimary(value: unknown): string { let text = string(value).replace(/\s+/g, ""); if (!text) return ""; if (text === "中国国际金融股份有限公司") return "中金公司"; if (text === "中国中金财富证券有限公司") return "中金财富"; for (const suffix of ["股份有限公司", "有限责任公司", "有限公司"]) if (text.endsWith(suffix)) { text = text.slice(0, -suffix.length); break; } if (text.startsWith("中国中金")) text = text.slice(2); return [...text].slice(0, 4).join(""); }
 function primaryCompare(a: Row, b: Row): number { return compare(primaryIssuer(a), primaryIssuer(b)) || primaryTenorDays(a.issueTenor) - primaryTenorDays(b.issueTenor) || compare(primaryDate(a), primaryDate(b)) || compare(string(a.bondShortName), string(b.bondShortName)); }
 function primaryDate(row: Row): string { const value = row.bidStartDate || row.issueStartDate; if (hasValue(value)) { const text = string(value); return `${text.slice(5, 7)}/${text.slice(8, 10)}`; } const bidding = string(row.biddingTime); return /^\d{2}-\d{2}/.test(bidding) ? bidding.slice(0, 5).replace("-", "/") : "--/--"; }
+function isEastmoneyIssue(row: Row): boolean {
+  return (
+    isEastmoneyText(row.bondShortName) ||
+    isEastmoneyText(row.issuer) ||
+    isEastmoneyText(row.comShortName) ||
+    isEastmoneyText(row.issuerShortName) ||
+    isEastmoneyText(row.issuerShortNameCn)
+  );
+}
 function transformPrimaryTenor(value: unknown): string { const text = string(value).trim(); if (text.startsWith("0.") && text.toUpperCase().endsWith("Y")) { const parsed = Number(text.slice(0, -1)); if (Number.isFinite(parsed)) return `${Math.trunc(parsed * 365)}D`; } return text; }
 function primaryTenorDays(value: unknown): number { const match = string(value).trim().toUpperCase().match(/^([0-9]+(?:\.[0-9]+)?)([YD])/); return match ? Number(match[1]) * (match[2] === "D" ? 1 : 365) : Infinity; }
 function formatSecondaryTenor(value: unknown): string { const years = secondaryTenorYears(value); return years === null ? string(value || "--") : years >= 1 ? `${fixed(years, 1)}年` : `${fixed(years * 365, 0)}天`; }
