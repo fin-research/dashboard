@@ -30,11 +30,7 @@
       "zone_name": "hasbai.xyz"
     },
     {
-      "pattern": "eastmoney.hasbai.xyz/api/market-briefing",
-      "zone_name": "hasbai.xyz"
-    },
-    {
-      "pattern": "eastmoney.hasbai.xyz/api/market-briefing/*",
+      "pattern": "eastmoney.hasbai.xyz/api/market-briefing*",
       "zone_name": "hasbai.xyz"
     },
     {
