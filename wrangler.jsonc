@@ -5,7 +5,8 @@
   "compatibility_date": "2026-08-14",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
-    "AI_GATEWAY_ID": "default"
+    "AI_GATEWAY_ID": "default",
+    "DATA_API_BASE_URL": "https://eastmoney.hasbai.xyz/data"
   },
   "assets": {
     "binding": "ASSETS",
@@ -26,6 +27,14 @@
     },
     {
       "pattern": "eastmoney.hasbai.xyz/api/rag/*",
+      "zone_name": "hasbai.xyz"
+    },
+    {
+      "pattern": "eastmoney.hasbai.xyz/api/market-briefing",
+      "zone_name": "hasbai.xyz"
+    },
+    {
+      "pattern": "eastmoney.hasbai.xyz/api/market-briefing/*",
       "zone_name": "hasbai.xyz"
     },
     {

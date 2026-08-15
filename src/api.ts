@@ -36,7 +36,7 @@ export function generateMarketBriefing(
 ): Promise<MarketBriefing> {
   const query = new URLSearchParams({ date: reportDate });
   return getJson<MarketBriefing>(
-    `/data/market-briefing?${query}`,
+    `/api/market-briefing?${query}`,
     signal,
     "POST",
   );
