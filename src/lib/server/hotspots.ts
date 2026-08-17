@@ -7,10 +7,9 @@ import {
 
 const HOTSPOT_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
 const PROMPT_VERSION = "d1-hotspots-v8";
-const HOTSPOT_OUTPUT_TOOL = "submit_market_hotspots";
 const HOTSPOT_GENERATION_CONFIG = {
   temperature: 0.7,
-  max_completion_tokens: 5_000,
+  max_completion_tokens: 8_000,
   chat_template_kwargs: { enable_thinking: false },
 } as const;
 
@@ -88,6 +87,15 @@ const HOTSPOT_RESPONSE_SCHEMA = {
     watchItems: { type: "array", items: { type: "string" }, maxItems: 12 },
   },
   required: ["marketSummary", "hotspots", "relationships", "watchItems"],
+} as const;
+
+const HOTSPOT_RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "market_hotspots",
+    strict: true,
+    schema: HOTSPOT_RESPONSE_SCHEMA,
+  },
 } as const;
 
 interface ArticleRow {
@@ -181,22 +189,7 @@ export async function getMarketHotspots(
       {
         messages: buildAggregateMessages(cards),
         ...HOTSPOT_GENERATION_CONFIG,
-        parallel_tool_calls: false,
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: HOTSPOT_OUTPUT_TOOL,
-              description: "提交基于给定证据卡片聚合的最终市场热点 JSON",
-              parameters: HOTSPOT_RESPONSE_SCHEMA,
-              strict: true,
-            },
-          },
-        ],
-        tool_choice: {
-          type: "function",
-          function: { name: HOTSPOT_OUTPUT_TOOL },
-        },
+        response_format: HOTSPOT_RESPONSE_FORMAT,
       },
       {
         gateway: {
@@ -253,27 +246,10 @@ export async function getMarketHotspots(
 function extractHotspotContent(output: unknown): string {
   if (!output || typeof output !== "object" || Array.isArray(output)) return "";
   const record = output as {
-    choices?: Array<{
-      message?: {
-        content?: unknown;
-        tool_calls?: Array<{
-          type?: unknown;
-          function?: { name?: unknown; arguments?: unknown };
-        }>;
-      };
-    }>;
+    choices?: Array<{ message?: { content?: unknown } }>;
     response?: unknown;
   };
-  const message = record.choices?.[0]?.message;
-  const toolCall = message?.tool_calls?.[0];
-  if (
-    toolCall?.type === "function" &&
-    toolCall.function?.name === HOTSPOT_OUTPUT_TOOL &&
-    typeof toolCall.function.arguments === "string"
-  ) {
-    return toolCall.function.arguments;
-  }
-  const choiceContent = message?.content;
+  const choiceContent = record.choices?.[0]?.message?.content;
   if (typeof choiceContent === "string" && choiceContent.trim()) return choiceContent;
   if (Array.isArray(choiceContent)) {
     const text = choiceContent
