@@ -265,7 +265,7 @@ function summarizeGatewayOutput(output: unknown): Record<string, unknown> {
   }
   const record = output as Record<string, unknown>;
   const error = record.error;
-  return {
+  const summary: Record<string, unknown> = {
     keys: Object.keys(record),
     error:
       typeof error === "string"
@@ -274,6 +274,11 @@ function summarizeGatewayOutput(output: unknown): Record<string, unknown> {
           ? Object.keys(error as object)
           : undefined,
   };
+  for (const key of ["name", "internalCode", "httpCode", "message", "description", "requestId"]) {
+    const value = record[key];
+    if (typeof value === "string" || typeof value === "number") summary[key] = value;
+  }
+  return summary;
 }
 
 async function loadEvidenceCards(
