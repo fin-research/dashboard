@@ -1,6 +1,6 @@
 import type { MarketBriefing } from "../../types";
 
-const BRIEFING_MODEL = "dynamic/rag" as const;
+const BRIEFING_MODEL = "opencode/deepseek-v4-flash" as const;
 const PROMPT_VERSION = "market-briefing-v3";
 const DATA_TIMEOUT_MS = 60_000;
 

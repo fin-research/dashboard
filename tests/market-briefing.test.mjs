@@ -75,7 +75,7 @@ test("生成流程从后端取数并经 dynamic/rag 路由调用", async () => {
       content: "1、股市结论。\n2、债市结论。",
       news_count: 2,
     });
-    assert.equal(aiCalls[0].model, "dynamic/rag");
+    assert.equal(aiCalls[0].model, "opencode/deepseek-v4-flash");
     assert.equal(aiCalls[0].options.gateway.id, "default");
     assert.equal(aiCalls[0].options.gateway.skipCache, true);
     assert.equal(aiCalls[0].options.gateway.collectLog, true);
