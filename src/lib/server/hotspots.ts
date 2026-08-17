@@ -6,99 +6,15 @@ import {
 } from "$lib/hotspots";
 
 const HOTSPOT_MODEL = "dynamic/rag" as const;
-const PROMPT_VERSION = "d1-hotspots-v7";
+const PROMPT_VERSION = "d1-hotspots-v8";
 const HOTSPOT_GENERATION_CONFIG = {
-  temperature: 1.0,
-  reasoning_effort: "high",
-} as const;
-
-const HOTSPOT_RESPONSE_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    marketSummary: { type: "string" },
-    hotspots: {
-      type: "array",
-      minItems: 8,
-      maxItems: 15,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          keyword: { type: "string" },
-          aliases: { type: "array", items: { type: "string" }, maxItems: 8 },
-          explanation: { type: "string" },
-          drivers: { type: "array", items: { type: "string" }, maxItems: 8 },
-          conflicts: { type: "array", items: { type: "string" }, maxItems: 6 },
-          heat: { type: "number", minimum: 0, maximum: 100 },
-          assetImpacts: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              fixedIncome: { type: "string" },
-              equities: { type: "string" },
-            },
-            required: ["fixedIncome", "equities"],
-          },
-          evidence: {
-            type: "array",
-            minItems: 1,
-            maxItems: 5,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                articleId: { type: "string" },
-                evidence: { type: "string" },
-              },
-              required: ["articleId", "evidence"],
-            },
-          },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-        },
-        required: [
-          "keyword",
-          "aliases",
-          "explanation",
-          "drivers",
-          "conflicts",
-          "assetImpacts",
-          "heat",
-          "evidence",
-          "confidence",
-        ],
-      },
-    },
-    relationships: {
-      type: "array",
-      maxItems: 24,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          source: { type: "string" },
-          target: { type: "string" },
-          explanation: { type: "string" },
-        },
-        required: ["source", "target", "explanation"],
-      },
-    },
-    watchItems: {
-      type: "array",
-      items: { type: "string" },
-      maxItems: 12,
-    },
-  },
-  required: ["marketSummary", "hotspots", "relationships", "watchItems"],
+  temperature: 0.7,
+  max_completion_tokens: 5_000,
+  chat_template_kwargs: { enable_thinking: false },
 } as const;
 
 const HOTSPOT_RESPONSE_FORMAT = {
-  type: "json_schema",
-  json_schema: {
-    name: "market_hotspots",
-    strict: true,
-    schema: HOTSPOT_RESPONSE_SCHEMA,
-  },
+  type: "json_object",
 } as const;
 
 interface ArticleRow {

@@ -1,9 +1,9 @@
 import type { MarketBriefing } from "../../types";
 
 const BRIEFING_MODEL = "dynamic/rag" as const;
-const PROMPT_VERSION = "market-briefing-v4";
+const PROMPT_VERSION = "market-briefing-v5";
 const DATA_TIMEOUT_MS = 60_000;
-const BRIEFING_REASONING_EFFORT = "high" as const;
+const MAX_BRIEFING_NEWS_CHARS = 16_000;
 
 /**
  * market-briefing skill 全文，与后端旧版 Codex 生成时挂载的 SKILL.md 逐字一致。
@@ -171,12 +171,17 @@ export async function generateMarketBriefing(
       },
       query: {
         model: BRIEFING_MODEL,
-        reasoning_effort: BRIEFING_REASONING_EFFORT,
+        temperature: 0.1,
+        max_completion_tokens: 1_200,
+        chat_template_kwargs: { enable_thinking: false },
         messages: [
           { role: "system", content: MARKET_BRIEFING_SYSTEM },
           {
             role: "user",
-            content: buildMarketBriefingPrompt(reportDate, news.news_text),
+            content: buildMarketBriefingPrompt(
+              reportDate,
+              limitBriefingNews(news.news_text),
+            ),
           },
         ],
       },
@@ -198,6 +203,17 @@ export async function generateMarketBriefing(
     throw new MarketBriefingError(502, "模型未返回市场聚焦内容");
   }
   return { report_date: reportDate, content, news_count: news.news_count };
+}
+
+export function limitBriefingNews(newsText: string): string {
+  if (newsText.length <= MAX_BRIEFING_NEWS_CHARS) return newsText;
+  const blocks = newsText.split(/(?=【\d+】)/).filter(Boolean);
+  let limited = "";
+  for (const block of blocks) {
+    if (limited && limited.length + block.length > MAX_BRIEFING_NEWS_CHARS) break;
+    limited += block;
+  }
+  return limited || newsText.slice(0, MAX_BRIEFING_NEWS_CHARS);
 }
 
 function summarizeGatewayOutput(output: unknown): Record<string, unknown> {

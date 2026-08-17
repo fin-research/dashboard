@@ -5,6 +5,7 @@ import {
   buildMarketBriefingPrompt,
   extractBriefingContent,
   generateMarketBriefing,
+  limitBriefingNews,
   MARKET_BRIEFING_SYSTEM,
 } from "../src/lib/server/market-briefing.ts";
 
@@ -24,6 +25,14 @@ test("系统提示完整包含 market-briefing skill 的输出规范", () => {
   );
   assert.match(MARKET_BRIEFING_SYSTEM, /每条以120—200字为宜/);
   assert.match(MARKET_BRIEFING_SYSTEM, /## 输出前自检/);
+});
+
+test("过长新闻按完整文章块限制在动态路由可处理的输入范围内", () => {
+  const news = `【1】第一篇\n${"正文一".repeat(5_300)}\n【2】第二篇\n${"正文二".repeat(100)}\n`;
+  const limited = limitBriefingNews(news);
+  assert.ok(limited.length <= 16_000);
+  assert.match(limited, /^【1】/);
+  assert.doesNotMatch(limited, /【2】/);
 });
 
 test("模型输出兼容 AI Gateway OpenAI 格式与 Workers AI 原生格式", () => {
@@ -84,14 +93,16 @@ test("生成流程从后端取数并经 dynamic/rag 路由调用", async () => {
     assert.equal(aiCalls[0].data.provider, "compat");
     assert.equal(aiCalls[0].data.endpoint, "chat/completions");
     assert.equal(aiCalls[0].data.query.model, "dynamic/rag");
-    assert.equal(aiCalls[0].data.query.reasoning_effort, "high");
+    assert.equal(aiCalls[0].data.query.temperature, 0.1);
+    assert.equal(aiCalls[0].data.query.max_completion_tokens, 1_200);
+    assert.deepEqual(aiCalls[0].data.query.chat_template_kwargs, { enable_thinking: false });
     assert.deepEqual(aiCalls[0].data.headers, {
       "cf-aig-skip-cache": "true",
       "cf-aig-collect-log": "true",
       "cf-aig-request-timeout": "120000",
       "cf-aig-metadata": JSON.stringify({
         report_date: "2026-08-10",
-        prompt_version: "market-briefing-v4",
+        prompt_version: "market-briefing-v5",
       }),
     });
     assert.match(aiCalls[0].data.query.messages[0].content, /^---\nname: market-briefing/);
