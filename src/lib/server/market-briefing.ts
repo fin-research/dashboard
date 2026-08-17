@@ -1,6 +1,6 @@
 import type { MarketBriefing } from "../../types";
 
-const BRIEFING_MODEL = "dynamic/rag" as const;
+const BRIEFING_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
 const PROMPT_VERSION = "market-briefing-v5";
 const DATA_TIMEOUT_MS = 60_000;
 const MAX_BRIEFING_NEWS_CHARS = 16_000;
@@ -157,20 +157,11 @@ export async function generateMarketBriefing(
   reportDate: string,
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
-  const gatewayId = env.AI_GATEWAY_ID || "default";
-  const metadata = { report_date: reportDate, prompt_version: PROMPT_VERSION };
-  const gatewayResponse = await env.AI.gateway(gatewayId).run(
-    {
-      provider: "compat",
-      endpoint: "chat/completions",
-      headers: {
-        "cf-aig-skip-cache": "true",
-        "cf-aig-collect-log": "true",
-        "cf-aig-request-timeout": String(120_000),
-        "cf-aig-metadata": JSON.stringify(metadata),
-      },
-      query: {
-        model: BRIEFING_MODEL,
+  let output: unknown;
+  try {
+    output = await env.AI.run(
+      BRIEFING_MODEL,
+      {
         temperature: 0.1,
         max_completion_tokens: 1_200,
         chat_template_kwargs: { enable_thinking: false },
@@ -185,18 +176,26 @@ export async function generateMarketBriefing(
           },
         ],
       },
-    },
-  );
-  const output = (await gatewayResponse.json()) as unknown;
-  if (!gatewayResponse.ok) {
+      {
+        gateway: {
+          id: env.AI_GATEWAY_ID || "default",
+          skipCache: true,
+          collectLog: true,
+          requestTimeoutMs: 120_000,
+          metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
+        },
+        tags: ["eastmoney", "market-briefing", "model:gemma4"],
+      },
+    );
+  } catch (error) {
     console.error(
       JSON.stringify({
-        event: "market_briefing_gateway_response",
-        status: gatewayResponse.status,
+        event: "market_briefing_ai_error",
         gateway_log_id: env.AI.aiGatewayLogId,
-        output: summarizeGatewayOutput(output),
+        error: error instanceof Error ? error.message : String(error),
       }),
     );
+    throw new MarketBriefingError(502, "模型调用失败，请稍后重试");
   }
   const content = extractBriefingContent(output).trim();
   if (!content) {

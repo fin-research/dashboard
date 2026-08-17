@@ -5,7 +5,7 @@ import {
   type HotspotScope,
 } from "$lib/hotspots";
 
-const HOTSPOT_MODEL = "dynamic/rag" as const;
+const HOTSPOT_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
 const PROMPT_VERSION = "d1-hotspots-v8";
 const HOTSPOT_GENERATION_CONFIG = {
   temperature: 0.7,
@@ -101,33 +101,41 @@ export async function getMarketHotspots(
     }
   }
 
-  const gatewayId = env.AI_GATEWAY_ID || "default";
-  const metadata = { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION };
-  const gatewayResponse = await env.AI.gateway(gatewayId).run(
-    {
-      provider: "compat",
-      endpoint: "chat/completions",
-      headers: {
-        "cf-aig-skip-cache": "true",
-        "cf-aig-collect-log": "true",
-        "cf-aig-request-timeout": String(120_000),
-        "cf-aig-metadata": JSON.stringify(metadata),
-      },
-      query: {
-        model: HOTSPOT_MODEL,
+  let output: unknown;
+  try {
+    output = await env.AI.run(
+      HOTSPOT_MODEL,
+      {
         messages: buildAggregateMessages(cards),
         ...HOTSPOT_GENERATION_CONFIG,
         response_format: HOTSPOT_RESPONSE_FORMAT,
       },
-    },
-  );
-  const output = (await gatewayResponse.json()) as unknown;
-  const content = extractHotspotContent(output);
-  if (!gatewayResponse.ok || !content) {
+      {
+        gateway: {
+          id: env.AI_GATEWAY_ID || "default",
+          skipCache: true,
+          collectLog: true,
+          requestTimeoutMs: 120_000,
+          metadata: { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION },
+        },
+        tags: ["eastmoney", "market-hotspots", "model:gemma4"],
+      },
+    );
+  } catch (error) {
     console.error(
       JSON.stringify({
-        event: "market_hotspots_gateway_response",
-        status: gatewayResponse.status,
+        event: "market_hotspots_ai_error",
+        gateway_log_id: env.AI.aiGatewayLogId,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    throw new HotspotError(502, "模型调用失败，请稍后重试");
+  }
+  const content = extractHotspotContent(output);
+  if (!content) {
+    console.error(
+      JSON.stringify({
+        event: "market_hotspots_ai_response",
         gateway_log_id: env.AI.aiGatewayLogId,
         output: summarizeGatewayOutput(output),
       }),

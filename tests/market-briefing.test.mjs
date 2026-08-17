@@ -52,7 +52,7 @@ test("模型输出兼容 AI Gateway OpenAI 格式与 Workers AI 原生格式", (
   assert.equal(extractBriefingContent({ choices: [] }), "");
 });
 
-test("生成流程从后端取数并经 dynamic/rag 路由调用", async () => {
+test("生成流程从后端取数并经 Workers AI binding 调用 Gemma 4", async () => {
   const originalFetch = globalThis.fetch;
   const aiCalls = [];
   globalThis.fetch = async (url, init) => {
@@ -69,15 +69,11 @@ test("生成流程从后端取数并经 dynamic/rag 路由调用", async () => {
   };
   const env = {
     AI: {
-      gateway: (gatewayId) => ({
-        run: async (data) => {
-          aiCalls.push({ gatewayId, data });
-          return new Response(
-            JSON.stringify({ choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }] }),
-            { status: 200, headers: { "content-type": "application/json" } },
-          );
-        },
-      }),
+      aiGatewayLogId: null,
+      run: async (model, input, options) => {
+        aiCalls.push({ model, input, options });
+        return { choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }] };
+      },
     },
     AI_GATEWAY_ID: "default",
     DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
@@ -89,28 +85,29 @@ test("生成流程从后端取数并经 dynamic/rag 路由调用", async () => {
       content: "1、股市结论。\n2、债市结论。",
       news_count: 2,
     });
-    assert.equal(aiCalls[0].gatewayId, "default");
-    assert.equal(aiCalls[0].data.provider, "compat");
-    assert.equal(aiCalls[0].data.endpoint, "chat/completions");
-    assert.equal(aiCalls[0].data.query.model, "dynamic/rag");
-    assert.equal(aiCalls[0].data.query.temperature, 0.1);
-    assert.equal(aiCalls[0].data.query.max_completion_tokens, 1_200);
-    assert.deepEqual(aiCalls[0].data.query.chat_template_kwargs, { enable_thinking: false });
-    assert.deepEqual(aiCalls[0].data.headers, {
-      "cf-aig-skip-cache": "true",
-      "cf-aig-collect-log": "true",
-      "cf-aig-request-timeout": "120000",
-      "cf-aig-metadata": JSON.stringify({
-        report_date: "2026-08-10",
-        prompt_version: "market-briefing-v5",
-      }),
+    assert.equal(aiCalls[0].model, "@cf/google/gemma-4-26b-a4b-it");
+    assert.equal(aiCalls[0].input.temperature, 0.1);
+    assert.equal(aiCalls[0].input.max_completion_tokens, 1_200);
+    assert.deepEqual(aiCalls[0].input.chat_template_kwargs, { enable_thinking: false });
+    assert.deepEqual(aiCalls[0].options, {
+      gateway: {
+        id: "default",
+        skipCache: true,
+        collectLog: true,
+        requestTimeoutMs: 120_000,
+        metadata: {
+          report_date: "2026-08-10",
+          prompt_version: "market-briefing-v5",
+        },
+      },
+      tags: ["eastmoney", "market-briefing", "model:gemma4"],
     });
-    assert.match(aiCalls[0].data.query.messages[0].content, /^---\nname: market-briefing/);
+    assert.match(aiCalls[0].input.messages[0].content, /^---\nname: market-briefing/);
     assert.match(
-      aiCalls[0].data.query.messages[1].content,
+      aiCalls[0].input.messages[1].content,
       /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
     );
-    assert.match(aiCalls[0].data.query.messages[1].content, /【1】股市收盘正文/);
+    assert.match(aiCalls[0].input.messages[1].content, /【1】股市收盘正文/);
   } finally {
     globalThis.fetch = originalFetch;
   }
