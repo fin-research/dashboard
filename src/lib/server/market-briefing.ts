@@ -156,21 +156,16 @@ export async function generateMarketBriefing(
   reportDate: string,
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
-  const gatewayResponse = await env.AI.gateway(env.AI_GATEWAY_ID || "default").run(
+  const output = await env.AI.run(
+    BRIEFING_MODEL,
     {
-      provider: "compat",
-      endpoint: "chat/completions",
-      headers: {},
-      query: {
-        model: BRIEFING_MODEL,
-        messages: [
-          { role: "system", content: MARKET_BRIEFING_SYSTEM },
-          {
-            role: "user",
-            content: buildMarketBriefingPrompt(reportDate, news.news_text),
-          },
-        ],
-      },
+      messages: [
+        { role: "system", content: MARKET_BRIEFING_SYSTEM },
+        {
+          role: "user",
+          content: buildMarketBriefingPrompt(reportDate, news.news_text),
+        },
+      ],
     },
     {
       gateway: {
@@ -180,37 +175,14 @@ export async function generateMarketBriefing(
         requestTimeoutMs: 120_000,
         metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
       },
+      tags: ["eastmoney", "market-briefing", "model:dynamic-rag"],
     },
   );
-  const output = (await gatewayResponse.json()) as unknown;
-  if (!gatewayResponse.ok) {
-    console.error(
-      JSON.stringify({
-        event: "market_briefing_gateway_response",
-        status: gatewayResponse.status,
-        gateway_log_id: env.AI.aiGatewayLogId,
-        output: summarizeGatewayOutput(output),
-      }),
-    );
-  }
   const content = extractBriefingContent(output).trim();
   if (!content) {
     throw new MarketBriefingError(502, "模型未返回市场聚焦内容");
   }
   return { report_date: reportDate, content, news_count: news.news_count };
-}
-
-function summarizeGatewayOutput(output: unknown): Record<string, unknown> {
-  if (!output || typeof output !== "object" || Array.isArray(output)) {
-    return { type: typeof output };
-  }
-  const record = output as Record<string, unknown>;
-  const summary: Record<string, unknown> = { keys: Object.keys(record) };
-  for (const key of ["name", "internalCode", "httpCode", "message", "description", "requestId"]) {
-    const value = record[key];
-    if (typeof value === "string" || typeof value === "number") summary[key] = value;
-  }
-  return summary;
 }
 
 interface BriefingNews {
