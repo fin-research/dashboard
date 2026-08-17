@@ -1,7 +1,7 @@
 import type { MarketBriefing } from "../../types";
 
-const BRIEFING_MODEL = "opencode/deepseek-v4-flash" as const;
-const PROMPT_VERSION = "market-briefing-v1";
+const BRIEFING_MODEL = "dynamic/rag" as const;
+const PROMPT_VERSION = "market-briefing-v2";
 const DATA_TIMEOUT_MS = 60_000;
 
 /**
@@ -156,26 +156,34 @@ export async function generateMarketBriefing(
   reportDate: string,
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
-  const output = await env.AI.run(
-    BRIEFING_MODEL,
+  const gatewayResponse = await env.AI.gateway(env.AI_GATEWAY_ID || "default").run(
     {
-      messages: [
-        { role: "system", content: MARKET_BRIEFING_SYSTEM },
-        {
-          role: "user",
-          content: buildMarketBriefingPrompt(reportDate, news.news_text),
-        },
-      ],
+      provider: "compat",
+      endpoint: "chat/completions",
+      headers: {},
+      query: {
+        model: BRIEFING_MODEL,
+        reasoning_effort: "max",
+        messages: [
+          { role: "system", content: MARKET_BRIEFING_SYSTEM },
+          {
+            role: "user",
+            content: buildMarketBriefingPrompt(reportDate, news.news_text),
+          },
+        ],
+      },
     },
     {
       gateway: {
         id: env.AI_GATEWAY_ID || "default",
         skipCache: true,
         collectLog: true,
+        requestTimeoutMs: 120_000,
         metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
       },
     },
   );
+  const output = await gatewayResponse.json();
   const content = extractBriefingContent(output).trim();
   if (!content) {
     throw new MarketBriefingError(502, "模型未返回市场聚焦内容");

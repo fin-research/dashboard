@@ -5,15 +5,11 @@ import {
   type HotspotScope,
 } from "$lib/hotspots";
 
-const HOTSPOT_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
-const PROMPT_VERSION = "d1-hotspots-v4";
+const HOTSPOT_MODEL = "dynamic/rag" as const;
+const PROMPT_VERSION = "d1-hotspots-v5";
 const HOTSPOT_GENERATION_CONFIG = {
   temperature: 1.0,
-  top_p: 0.95,
-  top_k: 64,
-  repetition_penalty: 1.0,
-  seed: 42,
-  chat_template_kwargs: { enable_thinking: true },
+  reasoning_effort: "max",
 } as const;
 
 const HOTSPOT_RESPONSE_SCHEMA = {
@@ -96,6 +92,15 @@ const HOTSPOT_RESPONSE_SCHEMA = {
   required: ["marketSummary", "hotspots", "relationships", "watchItems"],
 } as const;
 
+const HOTSPOT_RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "market_hotspots",
+    strict: true,
+    schema: HOTSPOT_RESPONSE_SCHEMA,
+  },
+} as const;
+
 interface ArticleRow {
   id: string;
   title: string;
@@ -131,7 +136,7 @@ export type HotspotRequestScope =
 
 const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场首席研究员。输入是第一阶段产生的全部结构化证据卡片，不包含完整原文。请先按“同一驱动、政策操作、资产定价主题”聚类，再生成供词云与解释面板直接使用的热点。
 
-进行简洁、低深度思考。先在内部完成事件归并、同义词统一、证据交叉验证、重要性排序和市场影响判断，不展开冗长推理。最终只输出结果 JSON。
+先在内部完成事件归并、同义词统一、证据交叉验证、重要性排序和市场影响判断，不输出推理过程。最终只输出结果 JSON。
 
 证据边界：
 1. 只能使用输入的标题、summary、importance 和 keywords 证据，不得补充常识、旧闻或模型知识；明确区分文章观点与跨文档归纳。
@@ -180,27 +185,32 @@ export async function getMarketHotspots(
     }
   }
 
-  const output = await env.AI.run(
-    HOTSPOT_MODEL,
+  const gatewayResponse = await env.AI.gateway(env.AI_GATEWAY_ID || "default").run(
     {
-      messages: buildAggregateMessages(cards),
-      ...HOTSPOT_GENERATION_CONFIG,
-      response_format: {
-        type: "json_schema",
-        json_schema: HOTSPOT_RESPONSE_SCHEMA,
+      provider: "compat",
+      endpoint: "chat/completions",
+      headers: {},
+      query: {
+        model: HOTSPOT_MODEL,
+        messages: buildAggregateMessages(cards),
+        ...HOTSPOT_GENERATION_CONFIG,
+        response_format: HOTSPOT_RESPONSE_FORMAT,
       },
     },
     {
-      tags: [`market-hotspots:${date}`, "stage:aggregate-d1-v4"],
       gateway: {
         id: env.AI_GATEWAY_ID || "default",
         skipCache: true,
         collectLog: true,
+        requestTimeoutMs: 120_000,
         metadata: { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION },
       },
     },
   );
-  const content = output.choices[0]?.message?.content;
+  const output = (await gatewayResponse.json()) as {
+    choices?: Array<{ message?: { content?: unknown } }>;
+  };
+  const content = output.choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
     throw new HotspotError(502, "Workers AI 未返回可解析的热点结果");
   }

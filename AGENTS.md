@@ -14,7 +14,7 @@
 - `GET /data/report?date=YYYY-MM-DD[&refresh=1]`：获取指定日期的统一报告数据。每个区块都是完整版原始行：`omo`（窗口原始行）、`rates`（dr/dibo/bonds/futures）、`stock_paragraphs`、`margin`（原始行）、`primary`/`inventory`（原始行 + 视觉派生列）、`secondary`（原始行）；视觉与文字版共用同一份字段，前端按需派生
 - `GET /api/rag/hotspots?mode=rolling&count=20[&refresh=1]`：按最新文章数聚合热点（默认 20 篇）
 - `GET /api/rag/hotspots?mode=range&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD[&refresh=1]`：按日期范围聚合热点
-- `POST /api/market-briefing?date=YYYY-MM-DD`：今日聚焦生成（Worker 路由）。Worker 先从后端 `/data/market-briefing/news` 取当日新闻素材，再经 Workers AI binding 走 AI Gateway（`AI_GATEWAY_ID=default`）调用 `opencode/deepseek-v4-flash`；系统提示为 `src/lib/server/market-briefing.ts` 内嵌的 market-briefing skill 全文，用户提示与旧版后端 Codex 生成逐字一致
+- `POST /api/market-briefing?date=YYYY-MM-DD`：今日聚焦生成（Worker 路由）。Worker 先从后端 `/data/market-briefing/news` 取当日新闻素材，再经 Workers AI binding 走 AI Gateway（`AI_GATEWAY_ID=default`）`dynamic/rag` 动态路由；系统提示为 `src/lib/server/market-briefing.ts` 内嵌的 market-briefing skill 全文，用户提示与旧版后端 Codex 生成逐字一致
 
 本地开发直接运行 `pnpm dev`，不需要先启动仓库内的 Python API。
 
@@ -36,7 +36,7 @@
 - `src/App.svelte`：既有报告页面布局与数据装配
 - `src/routes/`：SvelteKit 页面和 RAG API
 - `src/lib/server/hotspots.ts`：D1 证据读取、Workers AI 聚合与缓存
-- `src/lib/server/market-briefing.ts`：今日聚焦生成（后端取数 + `opencode/deepseek-v4-flash` 经 AI Gateway 调用，提示词逐字复刻旧版 Codex 流程）
+- `src/lib/server/market-briefing.ts`：今日聚焦生成（后端取数 + `dynamic/rag` 经 AI Gateway 调用，提示词逐字复刻旧版 Codex 流程）
 - `src/routes/api/market-briefing/+server.ts`：`/api/market-briefing` Worker 路由（日期解析、错误映射 400/502/503/504）
 - `src/lib/components/WordCloud.svelte`：可点击、可键盘操作的 SVG 词云
 - `src/components/`：UI 组件（表格、指标卡片、摘要条、聚焦编辑器等）
@@ -54,7 +54,7 @@
 - `/api` 的其他路径仍由原 Cloudflare Tunnel 提供；Worker 只新增更具体的 `/api/rag/*` 路由，不改变 Swagger `/api/docs`。
 - Worker 额外接管 `/api/market-briefing`（见 `wrangler.jsonc` routes），浏览器生成聚焦不再调用 `/data/market-briefing`；后端 `/data/market-briefing/news` 只提供素材，文本生成在 Worker 内完成。
 - D1 固定绑定现有 `eastmoney` 数据库，文章正文仍不得写入 D1；热点聚合只读取 `article.summary`、`importance` 和 `keyword` 结构化证据，并把按范围键与输入指纹缓存的最终热点写入 `hotspot_cache`。
-- Workers AI 固定使用 binding，不得在应用中保存或调用 Cloudflare API Token。Gemma 4 通过 Cloudflare JSON Mode（response_format json_schema）直接产生结构化 JSON，应用只做同一运行时校验；单来源热点热度不超过 60。
+- Workers AI 固定使用 binding，不得在应用中保存或调用 Cloudflare API Token。热点聚合经 `dynamic/rag` 动态路由，通过 Cloudflare JSON Mode（response_format json_schema）直接产生结构化 JSON，应用只做同一运行时校验；单来源热点热度不超过 60。
 - 热点输出固定为 8–15 个；默认跨日期滚动读取最近 20 篇已完成特征抽取的文章，日期范围模式最多读取最近 100 篇。热点热度由模型直接给出 0-100 分，权重公式仅作为提示，应用不自行计算加权得分，只做范围校验与单来源封顶。
 - 文字版直接消费 `/data/report` 顶层完整字段（OMO 按报告日过滤 `operationDate`），由 `src/text-report.ts` 严格复刻 `api/scripts/report_cli.py` 的筛选、排序、条件分支、数字格式与完整文本；不得直接读取 Python 生成的报告文本，也不得自行改写既有格式。
 - 端口约定：前端 8765，API 8766，均绑定 127.0.0.1。
