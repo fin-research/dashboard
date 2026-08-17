@@ -5,7 +5,6 @@ import {
   buildMarketBriefingPrompt,
   extractBriefingContent,
   generateMarketBriefing,
-  limitBriefingNews,
   MARKET_BRIEFING_SYSTEM,
 } from "../src/lib/server/market-briefing.ts";
 
@@ -27,14 +26,6 @@ test("系统提示完整包含 market-briefing skill 的输出规范", () => {
   assert.match(MARKET_BRIEFING_SYSTEM, /## 输出前自检/);
 });
 
-test("过长新闻按完整文章块限制在动态路由可处理的输入范围内", () => {
-  const news = `【1】第一篇\n${"正文一".repeat(5_300)}\n【2】第二篇\n${"正文二".repeat(100)}\n`;
-  const limited = limitBriefingNews(news);
-  assert.ok(limited.length <= 16_000);
-  assert.match(limited, /^【1】/);
-  assert.doesNotMatch(limited, /【2】/);
-});
-
 test("模型输出兼容 AI Gateway OpenAI 格式与 Workers AI 原生格式", () => {
   assert.equal(
     extractBriefingContent({
@@ -52,7 +43,7 @@ test("模型输出兼容 AI Gateway OpenAI 格式与 Workers AI 原生格式", (
   assert.equal(extractBriefingContent({ choices: [] }), "");
 });
 
-test("生成流程从后端取数并经 Workers AI binding 调用 Gemma 4", async () => {
+test("生成流程从后端取数并调用 opencode/deepseek-v4-flash", async () => {
   const originalFetch = globalThis.fetch;
   const aiCalls = [];
   globalThis.fetch = async (url, init) => {
@@ -69,9 +60,8 @@ test("生成流程从后端取数并经 Workers AI binding 调用 Gemma 4", asyn
   };
   const env = {
     AI: {
-      aiGatewayLogId: null,
-      run: async (model, input, options) => {
-        aiCalls.push({ model, input, options });
+      run: async (model, args, options) => {
+        aiCalls.push({ model, args, options });
         return { choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }] };
       },
     },
@@ -85,29 +75,15 @@ test("生成流程从后端取数并经 Workers AI binding 调用 Gemma 4", asyn
       content: "1、股市结论。\n2、债市结论。",
       news_count: 2,
     });
-    assert.equal(aiCalls[0].model, "@cf/google/gemma-4-26b-a4b-it");
-    assert.equal(aiCalls[0].input.temperature, 0.1);
-    assert.equal(aiCalls[0].input.max_completion_tokens, 1_200);
-    assert.deepEqual(aiCalls[0].input.chat_template_kwargs, { enable_thinking: false });
-    assert.deepEqual(aiCalls[0].options, {
-      gateway: {
-        id: "default",
-        skipCache: true,
-        collectLog: true,
-        requestTimeoutMs: 120_000,
-        metadata: {
-          report_date: "2026-08-10",
-          prompt_version: "market-briefing-v5",
-        },
-      },
-      tags: ["eastmoney", "market-briefing", "model:gemma4"],
-    });
-    assert.match(aiCalls[0].input.messages[0].content, /^---\nname: market-briefing/);
+    assert.equal(aiCalls[0].model, "opencode/deepseek-v4-flash");
+    assert.equal(aiCalls[0].options.gateway.id, "default");
+    assert.equal(aiCalls[0].options.gateway.skipCache, true);
+    assert.match(aiCalls[0].args.messages[0].content, /^---\nname: market-briefing/);
     assert.match(
-      aiCalls[0].input.messages[1].content,
+      aiCalls[0].args.messages[1].content,
       /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
     );
-    assert.match(aiCalls[0].input.messages[1].content, /【1】股市收盘正文/);
+    assert.match(aiCalls[0].args.messages[1].content, /【1】股市收盘正文/);
   } finally {
     globalThis.fetch = originalFetch;
   }

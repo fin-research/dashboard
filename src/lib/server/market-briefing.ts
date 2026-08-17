@@ -1,9 +1,8 @@
 import type { MarketBriefing } from "../../types";
 
-const BRIEFING_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
-const PROMPT_VERSION = "market-briefing-v5";
+const BRIEFING_MODEL = "opencode/deepseek-v4-flash" as const;
+const PROMPT_VERSION = "market-briefing-v1";
 const DATA_TIMEOUT_MS = 60_000;
-const MAX_BRIEFING_NEWS_CHARS = 16_000;
 
 /**
  * market-briefing skill 全文，与后端旧版 Codex 生成时挂载的 SKILL.md 逐字一致。
@@ -157,75 +156,31 @@ export async function generateMarketBriefing(
   reportDate: string,
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
-  let output: unknown;
-  try {
-    output = await env.AI.run(
-      BRIEFING_MODEL,
-      {
-        temperature: 0.1,
-        max_completion_tokens: 1_200,
-        chat_template_kwargs: { enable_thinking: false },
-        messages: [
-          { role: "system", content: MARKET_BRIEFING_SYSTEM },
-          {
-            role: "user",
-            content: buildMarketBriefingPrompt(
-              reportDate,
-              limitBriefingNews(news.news_text),
-            ),
-          },
-        ],
-      },
-      {
-        gateway: {
-          id: env.AI_GATEWAY_ID || "default",
-          skipCache: true,
-          collectLog: true,
-          requestTimeoutMs: 120_000,
-          metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
+  const output = await env.AI.run(
+    BRIEFING_MODEL,
+    {
+      messages: [
+        { role: "system", content: MARKET_BRIEFING_SYSTEM },
+        {
+          role: "user",
+          content: buildMarketBriefingPrompt(reportDate, news.news_text),
         },
-        tags: ["eastmoney", "market-briefing", "model:gemma4"],
+      ],
+    },
+    {
+      gateway: {
+        id: env.AI_GATEWAY_ID || "default",
+        skipCache: true,
+        collectLog: true,
+        metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
       },
-    );
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: "market_briefing_ai_error",
-        gateway_log_id: env.AI.aiGatewayLogId,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    );
-    throw new MarketBriefingError(502, "模型调用失败，请稍后重试");
-  }
+    },
+  );
   const content = extractBriefingContent(output).trim();
   if (!content) {
     throw new MarketBriefingError(502, "模型未返回市场聚焦内容");
   }
   return { report_date: reportDate, content, news_count: news.news_count };
-}
-
-export function limitBriefingNews(newsText: string): string {
-  if (newsText.length <= MAX_BRIEFING_NEWS_CHARS) return newsText;
-  const blocks = newsText.split(/(?=【\d+】)/).filter(Boolean);
-  let limited = "";
-  for (const block of blocks) {
-    if (limited && limited.length + block.length > MAX_BRIEFING_NEWS_CHARS) break;
-    limited += block;
-  }
-  return limited || newsText.slice(0, MAX_BRIEFING_NEWS_CHARS);
-}
-
-function summarizeGatewayOutput(output: unknown): Record<string, unknown> {
-  if (!output || typeof output !== "object" || Array.isArray(output)) {
-    return { type: typeof output };
-  }
-  const record = output as Record<string, unknown>;
-  const summary: Record<string, unknown> = { keys: Object.keys(record) };
-  for (const key of ["name", "internalCode", "httpCode", "message", "description", "requestId"]) {
-    const value = record[key];
-    if (typeof value === "string" || typeof value === "number") summary[key] = value;
-  }
-  return summary;
 }
 
 interface BriefingNews {

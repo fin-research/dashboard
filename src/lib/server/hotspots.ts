@@ -6,11 +6,14 @@ import {
 } from "$lib/hotspots";
 
 const HOTSPOT_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
-const PROMPT_VERSION = "d1-hotspots-v8";
+const PROMPT_VERSION = "d1-hotspots-v4";
 const HOTSPOT_GENERATION_CONFIG = {
-  temperature: 0.7,
-  max_completion_tokens: 8_000,
-  chat_template_kwargs: { enable_thinking: false },
+  temperature: 1.0,
+  top_p: 0.95,
+  top_k: 64,
+  repetition_penalty: 1.0,
+  seed: 42,
+  chat_template_kwargs: { enable_thinking: true },
 } as const;
 
 const HOTSPOT_RESPONSE_SCHEMA = {
@@ -28,11 +31,10 @@ const HOTSPOT_RESPONSE_SCHEMA = {
         properties: {
           keyword: { type: "string" },
           aliases: { type: "array", items: { type: "string" }, maxItems: 8 },
-          heat: { type: "integer", minimum: 0, maximum: 100 },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-          conflicts: { type: "array", items: { type: "string" }, maxItems: 6 },
           explanation: { type: "string" },
           drivers: { type: "array", items: { type: "string" }, maxItems: 8 },
+          conflicts: { type: "array", items: { type: "string" }, maxItems: 6 },
+          heat: { type: "number", minimum: 0, maximum: 100 },
           assetImpacts: {
             type: "object",
             additionalProperties: false,
@@ -56,17 +58,18 @@ const HOTSPOT_RESPONSE_SCHEMA = {
               required: ["articleId", "evidence"],
             },
           },
+          confidence: { type: "string", enum: ["high", "medium", "low"] },
         },
         required: [
           "keyword",
           "aliases",
-          "heat",
-          "confidence",
-          "conflicts",
           "explanation",
           "drivers",
+          "conflicts",
           "assetImpacts",
+          "heat",
           "evidence",
+          "confidence",
         ],
       },
     },
@@ -84,18 +87,13 @@ const HOTSPOT_RESPONSE_SCHEMA = {
         required: ["source", "target", "explanation"],
       },
     },
-    watchItems: { type: "array", items: { type: "string" }, maxItems: 12 },
+    watchItems: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: 12,
+    },
   },
   required: ["marketSummary", "hotspots", "relationships", "watchItems"],
-} as const;
-
-const HOTSPOT_RESPONSE_FORMAT = {
-  type: "json_schema",
-  json_schema: {
-    name: "market_hotspots",
-    strict: true,
-    schema: HOTSPOT_RESPONSE_SCHEMA,
-  },
 } as const;
 
 interface ArticleRow {
@@ -133,7 +131,7 @@ export type HotspotRequestScope =
 
 const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场首席研究员。输入是第一阶段产生的全部结构化证据卡片，不包含完整原文。请先按“同一驱动、政策操作、资产定价主题”聚类，再生成供词云与解释面板直接使用的热点。
 
-先在内部完成事件归并、同义词统一、证据交叉验证、重要性排序和市场影响判断，不输出推理过程。最终只输出结果 JSON。
+进行简洁、低深度思考。先在内部完成事件归并、同义词统一、证据交叉验证、重要性排序和市场影响判断，不展开冗长推理。最终只输出结果 JSON。
 
 证据边界：
 1. 只能使用输入的标题、summary、importance 和 keywords 证据，不得补充常识、旧闻或模型知识；明确区分文章观点与跨文档归纳。
@@ -182,45 +180,28 @@ export async function getMarketHotspots(
     }
   }
 
-  let output: unknown;
-  try {
-    output = await env.AI.run(
-      HOTSPOT_MODEL,
-      {
-        messages: buildAggregateMessages(cards),
-        ...HOTSPOT_GENERATION_CONFIG,
-        response_format: HOTSPOT_RESPONSE_FORMAT,
+  const output = await env.AI.run(
+    HOTSPOT_MODEL,
+    {
+      messages: buildAggregateMessages(cards),
+      ...HOTSPOT_GENERATION_CONFIG,
+      response_format: {
+        type: "json_schema",
+        json_schema: HOTSPOT_RESPONSE_SCHEMA,
       },
-      {
-        gateway: {
-          id: env.AI_GATEWAY_ID || "default",
-          skipCache: true,
-          collectLog: true,
-          requestTimeoutMs: 120_000,
-          metadata: { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION },
-        },
-        tags: ["eastmoney", "market-hotspots", "model:gemma4"],
+    },
+    {
+      tags: [`market-hotspots:${date}`, "stage:aggregate-d1-v4"],
+      gateway: {
+        id: env.AI_GATEWAY_ID || "default",
+        skipCache: true,
+        collectLog: true,
+        metadata: { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION },
       },
-    );
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: "market_hotspots_ai_error",
-        gateway_log_id: env.AI.aiGatewayLogId,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    );
-    throw new HotspotError(502, "模型调用失败，请稍后重试");
-  }
-  const content = extractHotspotContent(output);
-  if (!content) {
-    console.error(
-      JSON.stringify({
-        event: "market_hotspots_ai_response",
-        gateway_log_id: env.AI.aiGatewayLogId,
-        output: summarizeGatewayOutput(output),
-      }),
-    );
+    },
+  );
+  const content = output.choices[0]?.message?.content;
+  if (typeof content !== "string" || !content.trim()) {
     throw new HotspotError(502, "Workers AI 未返回可解析的热点结果");
   }
   const analysis = parseHotspotAnalysis(content, { date, articleIds });
@@ -241,47 +222,6 @@ export async function getMarketHotspots(
     .run();
 
   return withMetadata(analysis, generatedAt, HOTSPOT_MODEL, false, scope);
-}
-
-function extractHotspotContent(output: unknown): string {
-  if (!output || typeof output !== "object" || Array.isArray(output)) return "";
-  const record = output as {
-    choices?: Array<{ message?: { content?: unknown } }>;
-    response?: unknown;
-  };
-  const choiceContent = record.choices?.[0]?.message?.content;
-  if (typeof choiceContent === "string" && choiceContent.trim()) return choiceContent;
-  if (Array.isArray(choiceContent)) {
-    const text = choiceContent
-      .filter((part): part is { text?: unknown } => typeof part === "object" && part !== null)
-      .map((part) => (typeof part.text === "string" ? part.text : ""))
-      .join("")
-      .trim();
-    if (text) return text;
-  }
-  return typeof record.response === "string" ? record.response : "";
-}
-
-function summarizeGatewayOutput(output: unknown): Record<string, unknown> {
-  if (!output || typeof output !== "object" || Array.isArray(output)) {
-    return { type: typeof output };
-  }
-  const record = output as Record<string, unknown>;
-  const error = record.error;
-  const summary: Record<string, unknown> = {
-    keys: Object.keys(record),
-    error:
-      typeof error === "string"
-        ? error.slice(0, 300)
-        : error && typeof error === "object"
-          ? Object.keys(error as object)
-          : undefined,
-  };
-  for (const key of ["name", "internalCode", "httpCode", "message", "description", "requestId"]) {
-    const value = record[key];
-    if (typeof value === "string" || typeof value === "number") summary[key] = value;
-  }
-  return summary;
 }
 
 async function loadEvidenceCards(
