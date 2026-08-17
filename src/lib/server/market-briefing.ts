@@ -1,7 +1,7 @@
 import type { MarketBriefing } from "../../types";
 
 const BRIEFING_MODEL = "dynamic/rag" as const;
-const PROMPT_VERSION = "market-briefing-v2";
+const PROMPT_VERSION = "market-briefing-v3";
 const DATA_TIMEOUT_MS = 60_000;
 
 /**
@@ -163,7 +163,6 @@ export async function generateMarketBriefing(
       headers: {},
       query: {
         model: BRIEFING_MODEL,
-        reasoning_effort: "max",
         messages: [
           { role: "system", content: MARKET_BRIEFING_SYSTEM },
           {

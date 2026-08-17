@@ -84,7 +84,7 @@ test("生成流程从后端取数并经 dynamic/rag 路由调用", async () => {
     assert.equal(aiCalls[0].data.provider, "compat");
     assert.equal(aiCalls[0].data.endpoint, "chat/completions");
     assert.equal(aiCalls[0].data.query.model, "dynamic/rag");
-    assert.equal(aiCalls[0].data.query.reasoning_effort, "max");
+    assert.equal(aiCalls[0].data.query.reasoning_effort, undefined);
     assert.deepEqual(aiCalls[0].data.headers, {});
     assert.equal(aiCalls[0].options.gateway.id, "default");
     assert.equal(aiCalls[0].options.gateway.skipCache, true);
