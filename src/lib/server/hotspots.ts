@@ -6,7 +6,7 @@ import {
 } from "$lib/hotspots";
 
 const HOTSPOT_MODEL = "dynamic/rag" as const;
-const PROMPT_VERSION = "d1-hotspots-v5";
+const PROMPT_VERSION = "d1-hotspots-v6";
 const HOTSPOT_GENERATION_CONFIG = {
   temperature: 1.0,
   reasoning_effort: "max",
@@ -207,11 +207,17 @@ export async function getMarketHotspots(
       },
     },
   );
-  const output = (await gatewayResponse.json()) as {
-    choices?: Array<{ message?: { content?: unknown } }>;
-  };
-  const content = output.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) {
+  const output = (await gatewayResponse.json()) as unknown;
+  const content = extractHotspotContent(output);
+  if (!gatewayResponse.ok || !content) {
+    console.error(
+      JSON.stringify({
+        event: "market_hotspots_gateway_response",
+        status: gatewayResponse.status,
+        gateway_log_id: env.AI.aiGatewayLogId,
+        output: summarizeGatewayOutput(output),
+      }),
+    );
     throw new HotspotError(502, "Workers AI 未返回可解析的热点结果");
   }
   const analysis = parseHotspotAnalysis(content, { date, articleIds });
@@ -232,6 +238,42 @@ export async function getMarketHotspots(
     .run();
 
   return withMetadata(analysis, generatedAt, HOTSPOT_MODEL, false, scope);
+}
+
+function extractHotspotContent(output: unknown): string {
+  if (!output || typeof output !== "object" || Array.isArray(output)) return "";
+  const record = output as {
+    choices?: Array<{ message?: { content?: unknown } }>;
+    response?: unknown;
+  };
+  const choiceContent = record.choices?.[0]?.message?.content;
+  if (typeof choiceContent === "string" && choiceContent.trim()) return choiceContent;
+  if (Array.isArray(choiceContent)) {
+    const text = choiceContent
+      .filter((part): part is { text?: unknown } => typeof part === "object" && part !== null)
+      .map((part) => (typeof part.text === "string" ? part.text : ""))
+      .join("")
+      .trim();
+    if (text) return text;
+  }
+  return typeof record.response === "string" ? record.response : "";
+}
+
+function summarizeGatewayOutput(output: unknown): Record<string, unknown> {
+  if (!output || typeof output !== "object" || Array.isArray(output)) {
+    return { type: typeof output };
+  }
+  const record = output as Record<string, unknown>;
+  const error = record.error;
+  return {
+    keys: Object.keys(record),
+    error:
+      typeof error === "string"
+        ? error.slice(0, 300)
+        : error && typeof error === "object"
+          ? Object.keys(error as object)
+          : undefined,
+  };
 }
 
 async function loadEvidenceCards(
