@@ -1,8 +1,9 @@
 import type { MarketBriefing } from "../../types";
 
-const BRIEFING_MODEL = "opencode/deepseek-v4-flash" as const;
-const PROMPT_VERSION = "market-briefing-v3";
+const BRIEFING_MODEL = "dynamic/rag" as const;
+const PROMPT_VERSION = "market-briefing-v4";
 const DATA_TIMEOUT_MS = 60_000;
+const BRIEFING_REASONING_EFFORT = "high" as const;
 
 /**
  * market-briefing skill 全文，与后端旧版 Codex 生成时挂载的 SKILL.md 逐字一致。
@@ -156,33 +157,60 @@ export async function generateMarketBriefing(
   reportDate: string,
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
-  const output = await env.AI.run(
-    BRIEFING_MODEL,
+  const gatewayId = env.AI_GATEWAY_ID || "default";
+  const metadata = { report_date: reportDate, prompt_version: PROMPT_VERSION };
+  const gatewayResponse = await env.AI.gateway(gatewayId).run(
     {
-      messages: [
-        { role: "system", content: MARKET_BRIEFING_SYSTEM },
-        {
-          role: "user",
-          content: buildMarketBriefingPrompt(reportDate, news.news_text),
-        },
-      ],
-    },
-    {
-      gateway: {
-        id: env.AI_GATEWAY_ID || "default",
-        skipCache: true,
-        collectLog: true,
-        requestTimeoutMs: 120_000,
-        metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
+      provider: "compat",
+      endpoint: "chat/completions",
+      headers: {
+        "cf-aig-skip-cache": "true",
+        "cf-aig-collect-log": "true",
+        "cf-aig-request-timeout": String(120_000),
+        "cf-aig-metadata": JSON.stringify(metadata),
       },
-      tags: ["eastmoney", "market-briefing", "model:dynamic-rag"],
+      query: {
+        model: BRIEFING_MODEL,
+        reasoning_effort: BRIEFING_REASONING_EFFORT,
+        messages: [
+          { role: "system", content: MARKET_BRIEFING_SYSTEM },
+          {
+            role: "user",
+            content: buildMarketBriefingPrompt(reportDate, news.news_text),
+          },
+        ],
+      },
     },
   );
+  const output = (await gatewayResponse.json()) as unknown;
+  if (!gatewayResponse.ok) {
+    console.error(
+      JSON.stringify({
+        event: "market_briefing_gateway_response",
+        status: gatewayResponse.status,
+        gateway_log_id: env.AI.aiGatewayLogId,
+        output: summarizeGatewayOutput(output),
+      }),
+    );
+  }
   const content = extractBriefingContent(output).trim();
   if (!content) {
     throw new MarketBriefingError(502, "模型未返回市场聚焦内容");
   }
   return { report_date: reportDate, content, news_count: news.news_count };
+}
+
+function summarizeGatewayOutput(output: unknown): Record<string, unknown> {
+  if (!output || typeof output !== "object" || Array.isArray(output)) {
+    return { type: typeof output };
+  }
+  const record = output as Record<string, unknown>;
+  const summary: Record<string, unknown> = { keys: Object.keys(record) };
+  for (const key of ["name", "internalCode", "httpCode", "message", "description", "requestId"]) {
+    const value = record[key];
+    if (typeof value === "string" || typeof value === "number") summary[key] = value;
+  }
+  return summary;
 }
 
 interface BriefingNews {

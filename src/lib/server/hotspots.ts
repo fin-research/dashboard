@@ -6,10 +6,10 @@ import {
 } from "$lib/hotspots";
 
 const HOTSPOT_MODEL = "dynamic/rag" as const;
-const PROMPT_VERSION = "d1-hotspots-v6";
+const PROMPT_VERSION = "d1-hotspots-v7";
 const HOTSPOT_GENERATION_CONFIG = {
   temperature: 1.0,
-  reasoning_effort: "max",
+  reasoning_effort: "high",
 } as const;
 
 const HOTSPOT_RESPONSE_SCHEMA = {
@@ -185,25 +185,23 @@ export async function getMarketHotspots(
     }
   }
 
-  const gatewayResponse = await env.AI.gateway(env.AI_GATEWAY_ID || "default").run(
+  const gatewayId = env.AI_GATEWAY_ID || "default";
+  const metadata = { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION };
+  const gatewayResponse = await env.AI.gateway(gatewayId).run(
     {
       provider: "compat",
       endpoint: "chat/completions",
-      headers: {},
+      headers: {
+        "cf-aig-skip-cache": "true",
+        "cf-aig-collect-log": "true",
+        "cf-aig-request-timeout": String(120_000),
+        "cf-aig-metadata": JSON.stringify(metadata),
+      },
       query: {
         model: HOTSPOT_MODEL,
         messages: buildAggregateMessages(cards),
         ...HOTSPOT_GENERATION_CONFIG,
         response_format: HOTSPOT_RESPONSE_FORMAT,
-      },
-    },
-    {
-      gateway: {
-        id: env.AI_GATEWAY_ID || "default",
-        skipCache: true,
-        collectLog: true,
-        requestTimeoutMs: 120_000,
-        metadata: { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION },
       },
     },
   );

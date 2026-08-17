@@ -60,10 +60,15 @@ test("生成流程从后端取数并经 dynamic/rag 路由调用", async () => {
   };
   const env = {
     AI: {
-      run: async (model, args, options) => {
-        aiCalls.push({ model, args, options });
-        return { choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }] };
-      },
+      gateway: (gatewayId) => ({
+        run: async (data) => {
+          aiCalls.push({ gatewayId, data });
+          return new Response(
+            JSON.stringify({ choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }] }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        },
+      }),
     },
     AI_GATEWAY_ID: "default",
     DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
@@ -75,17 +80,26 @@ test("生成流程从后端取数并经 dynamic/rag 路由调用", async () => {
       content: "1、股市结论。\n2、债市结论。",
       news_count: 2,
     });
-    assert.equal(aiCalls[0].model, "opencode/deepseek-v4-flash");
-    assert.equal(aiCalls[0].options.gateway.id, "default");
-    assert.equal(aiCalls[0].options.gateway.skipCache, true);
-    assert.equal(aiCalls[0].options.gateway.collectLog, true);
-    assert.equal(aiCalls[0].options.gateway.requestTimeoutMs, 120_000);
-    assert.match(aiCalls[0].args.messages[0].content, /^---\nname: market-briefing/);
+    assert.equal(aiCalls[0].gatewayId, "default");
+    assert.equal(aiCalls[0].data.provider, "compat");
+    assert.equal(aiCalls[0].data.endpoint, "chat/completions");
+    assert.equal(aiCalls[0].data.query.model, "dynamic/rag");
+    assert.equal(aiCalls[0].data.query.reasoning_effort, "high");
+    assert.deepEqual(aiCalls[0].data.headers, {
+      "cf-aig-skip-cache": "true",
+      "cf-aig-collect-log": "true",
+      "cf-aig-request-timeout": "120000",
+      "cf-aig-metadata": JSON.stringify({
+        report_date: "2026-08-10",
+        prompt_version: "market-briefing-v4",
+      }),
+    });
+    assert.match(aiCalls[0].data.query.messages[0].content, /^---\nname: market-briefing/);
     assert.match(
-      aiCalls[0].args.messages[1].content,
+      aiCalls[0].data.query.messages[1].content,
       /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
     );
-    assert.match(aiCalls[0].args.messages[1].content, /【1】股市收盘正文/);
+    assert.match(aiCalls[0].data.query.messages[1].content, /【1】股市收盘正文/);
   } finally {
     globalThis.fetch = originalFetch;
   }
