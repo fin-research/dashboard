@@ -83,10 +83,14 @@ test("生成流程从后端取数并调用 dynamic/rag", async () => {
   };
   const env = {
     AI: {
-      run: async (model, args, options) => {
-        aiCalls.push({ model, args, options });
-        return { choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }] };
-      },
+      gateway: (gatewayId) => ({
+        run: async (request, options) => {
+          aiCalls.push({ gatewayId, request, options });
+          return Response.json({
+            choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }],
+          });
+        },
+      }),
     },
     AI_GATEWAY_ID: "default",
     DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
@@ -98,19 +102,27 @@ test("生成流程从后端取数并调用 dynamic/rag", async () => {
       content: "1、股市结论。\n2、债市结论。",
       news_count: 2,
     });
-    assert.equal(aiCalls[0].model, "dynamic/rag");
-    assert.equal(aiCalls[0].args.reasoning_effort, "high");
-    assert.equal(aiCalls[0].args.chat_template_kwargs.enable_thinking, true);
-    assert.equal("max_completion_tokens" in aiCalls[0].args, false);
-    assert.equal(aiCalls[0].options.gateway.id, "default");
-    assert.equal(aiCalls[0].options.gateway.skipCache, true);
-    assert.equal(aiCalls[0].options.gateway.requestTimeoutMs, 120_000);
-    assert.match(aiCalls[0].args.messages[0].content, /^---\nname: market-briefing/);
+    assert.equal(aiCalls[0].gatewayId, "default");
+    assert.equal(aiCalls[0].request.provider, "compat");
+    assert.equal(aiCalls[0].request.endpoint, "chat/completions");
+    assert.equal(aiCalls[0].request.query.model, "dynamic/rag");
+    assert.equal(aiCalls[0].request.query.reasoning_effort, "high");
+    assert.equal(aiCalls[0].request.query.chat_template_kwargs.enable_thinking, true);
+    assert.equal("max_completion_tokens" in aiCalls[0].request.query, false);
+    assert.equal(aiCalls[0].request.headers["cf-aig-skip-cache"], true);
+    assert.equal(aiCalls[0].request.headers["cf-aig-collect-log"], true);
+    assert.equal(aiCalls[0].request.headers["cf-aig-request-timeout"], 120_000);
+    assert.deepEqual(aiCalls[0].request.headers["cf-aig-metadata"], {
+      report_date: "2026-08-10",
+      prompt_version: "market-briefing-v3-dynamic-rag-thinking-filtered",
+    });
+    assert.ok(aiCalls[0].options.signal instanceof AbortSignal);
+    assert.match(aiCalls[0].request.query.messages[0].content, /^---\nname: market-briefing/);
     assert.match(
-      aiCalls[0].args.messages[1].content,
+      aiCalls[0].request.query.messages[1].content,
       /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
     );
-    assert.match(aiCalls[0].args.messages[1].content, /【1】股市收盘正文/);
+    assert.match(aiCalls[0].request.query.messages[1].content, /【1】股市收盘正文/);
   } finally {
     globalThis.fetch = originalFetch;
   }

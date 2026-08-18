@@ -1,4 +1,5 @@
 import type { MarketBriefing } from "../../types";
+import { runDynamicRoute } from "./ai-gateway.ts";
 
 const BRIEFING_MODEL = "dynamic/rag" as const;
 const PROMPT_VERSION = "market-briefing-v3-dynamic-rag-thinking-filtered";
@@ -228,9 +229,11 @@ export async function generateMarketBriefing(
   reportDate: string,
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
-  const output = await env.AI.run(
-    BRIEFING_MODEL,
+  const output = await runDynamicRoute(
+    env.AI,
+    env.AI_GATEWAY_ID || "default",
     {
+      model: BRIEFING_MODEL,
       temperature: 0.1,
       reasoning_effort: "high",
       chat_template_kwargs: { enable_thinking: true },
@@ -246,13 +249,8 @@ export async function generateMarketBriefing(
       ],
     },
     {
-      gateway: {
-        id: env.AI_GATEWAY_ID || "default",
-        skipCache: true,
-        collectLog: true,
-        requestTimeoutMs: 120_000,
-        metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
-      },
+      requestTimeoutMs: 120_000,
+      metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
     },
   );
   const content = extractBriefingContent(output).trim();

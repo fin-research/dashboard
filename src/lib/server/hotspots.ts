@@ -4,6 +4,7 @@ import {
   type HotspotApiResponse,
   type HotspotScope,
 } from "$lib/hotspots";
+import { runDynamicRoute } from "./ai-gateway.ts";
 
 const HOTSPOT_MODEL = "dynamic/rag" as const;
 const PROMPT_VERSION = "d1-hotspots-v8-dynamic-rag-thinking-unbounded";
@@ -91,21 +92,22 @@ export async function getMarketHotspots(
     }
   }
 
-  const output = await env.AI.run(
-    HOTSPOT_MODEL,
+  const output = await runDynamicRoute(
+    env.AI,
+    env.AI_GATEWAY_ID || "default",
     {
+      model: HOTSPOT_MODEL,
       messages: buildAggregateMessages(cards),
       ...HOTSPOT_GENERATION_CONFIG,
       response_format: { type: "json_object" },
     },
     {
-      tags: [`market-hotspots:${date}`, "stage:aggregate-d1-v4"],
-      gateway: {
-        id: env.AI_GATEWAY_ID || "default",
-        skipCache: true,
-        collectLog: true,
-        requestTimeoutMs: 120_000,
-        metadata: { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION },
+      requestTimeoutMs: 120_000,
+      metadata: {
+        date,
+        scope_key: scopeKey,
+        prompt_version: PROMPT_VERSION,
+        tags: "market-hotspots,stage:aggregate-d1-v4",
       },
     },
   );
