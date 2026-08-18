@@ -32,8 +32,12 @@ test("dynamic route uses the authenticated compat gateway binding", async () => 
   assert.equal(calls[0].request.provider, "compat");
   assert.equal(calls[0].request.endpoint, "chat/completions");
   assert.equal(calls[0].request.query.model, "dynamic/rag");
-  assert.equal(calls[0].request.headers["cf-aig-skip-cache"], true);
-  assert.deepEqual(calls[0].request.headers["cf-aig-metadata"], {
+  assert.deepEqual(calls[0].request.headers, {});
+  assert.equal(calls[0].options.gateway.id, "default");
+  assert.equal(calls[0].options.gateway.skipCache, true);
+  assert.equal(calls[0].options.gateway.collectLog, true);
+  assert.equal(calls[0].options.gateway.requestTimeoutMs, 120_000);
+  assert.deepEqual(calls[0].options.gateway.metadata, {
     prompt_version: "test-v1",
   });
   assert.ok(calls[0].options.signal instanceof AbortSignal);

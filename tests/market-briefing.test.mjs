@@ -109,10 +109,12 @@ test("生成流程从后端取数并调用 dynamic/rag", async () => {
     assert.equal(aiCalls[0].request.query.reasoning_effort, "high");
     assert.equal(aiCalls[0].request.query.chat_template_kwargs.enable_thinking, true);
     assert.equal("max_completion_tokens" in aiCalls[0].request.query, false);
-    assert.equal(aiCalls[0].request.headers["cf-aig-skip-cache"], true);
-    assert.equal(aiCalls[0].request.headers["cf-aig-collect-log"], true);
-    assert.equal(aiCalls[0].request.headers["cf-aig-request-timeout"], 120_000);
-    assert.deepEqual(aiCalls[0].request.headers["cf-aig-metadata"], {
+    assert.deepEqual(aiCalls[0].request.headers, {});
+    assert.equal(aiCalls[0].options.gateway.id, "default");
+    assert.equal(aiCalls[0].options.gateway.skipCache, true);
+    assert.equal(aiCalls[0].options.gateway.collectLog, true);
+    assert.equal(aiCalls[0].options.gateway.requestTimeoutMs, 120_000);
+    assert.deepEqual(aiCalls[0].options.gateway.metadata, {
       report_date: "2026-08-10",
       prompt_version: "market-briefing-v3-dynamic-rag-thinking-filtered",
     });
