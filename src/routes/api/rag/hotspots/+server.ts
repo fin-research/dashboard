@@ -27,7 +27,8 @@ export const GET: RequestHandler = async ({ platform, url }) => {
         event: "market_hotspots_failed",
         scope: scopeForLog(url),
         status,
-        error: error instanceof Error ? error.message : String(error),
+        gateway_log_id: platform.env.AI.aiGatewayLogId,
+        error: describeError(error),
       }),
     );
     return Response.json(
@@ -70,6 +71,23 @@ function requestScope(url: URL): HotspotRequestScope {
 
 function scopeForLog(url: URL): string {
   return url.searchParams.toString().slice(0, 240) || "rolling:20";
+}
+
+function describeError(error: unknown): Record<string, unknown> | string {
+  if (!(error instanceof Error)) return String(error);
+  const details: Record<string, unknown> = {
+    name: error.name,
+    message: error.message,
+    stack: error.stack?.slice(0, 2_000),
+  };
+  for (const key of Object.getOwnPropertyNames(error)) {
+    if (key in details) continue;
+    const value = (error as unknown as Record<string, unknown>)[key];
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      details[key] = value;
+    }
+  }
+  return details;
 }
 
 function publicErrorMessage(error: unknown, status: number): string {

@@ -5,95 +5,21 @@ import {
   type HotspotScope,
 } from "$lib/hotspots";
 
-const HOTSPOT_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
-const PROMPT_VERSION = "d1-hotspots-v4";
+const HOTSPOT_MODEL = "dynamic/rag" as const;
+const PROMPT_VERSION = "d1-hotspots-v8-dynamic-rag-thinking-unbounded";
+const MAX_KEYWORDS_PER_CARD = 3;
+const MAX_TITLE_CHARS = 120;
+const MAX_SUMMARY_CHARS = 480;
+const MAX_KEYWORD_TOPIC_CHARS = 40;
+const MAX_KEYWORD_FIELD_CHARS = 240;
 const HOTSPOT_GENERATION_CONFIG = {
-  temperature: 1.0,
+  temperature: 0.7,
   top_p: 0.95,
   top_k: 64,
   repetition_penalty: 1.0,
   seed: 42,
+  reasoning_effort: "low",
   chat_template_kwargs: { enable_thinking: true },
-} as const;
-
-const HOTSPOT_RESPONSE_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    marketSummary: { type: "string" },
-    hotspots: {
-      type: "array",
-      minItems: 8,
-      maxItems: 15,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          keyword: { type: "string" },
-          aliases: { type: "array", items: { type: "string" }, maxItems: 8 },
-          explanation: { type: "string" },
-          drivers: { type: "array", items: { type: "string" }, maxItems: 8 },
-          conflicts: { type: "array", items: { type: "string" }, maxItems: 6 },
-          heat: { type: "number", minimum: 0, maximum: 100 },
-          assetImpacts: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              fixedIncome: { type: "string" },
-              equities: { type: "string" },
-            },
-            required: ["fixedIncome", "equities"],
-          },
-          evidence: {
-            type: "array",
-            minItems: 1,
-            maxItems: 5,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                articleId: { type: "string" },
-                evidence: { type: "string" },
-              },
-              required: ["articleId", "evidence"],
-            },
-          },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-        },
-        required: [
-          "keyword",
-          "aliases",
-          "explanation",
-          "drivers",
-          "conflicts",
-          "assetImpacts",
-          "heat",
-          "evidence",
-          "confidence",
-        ],
-      },
-    },
-    relationships: {
-      type: "array",
-      maxItems: 24,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          source: { type: "string" },
-          target: { type: "string" },
-          explanation: { type: "string" },
-        },
-        required: ["source", "target", "explanation"],
-      },
-    },
-    watchItems: {
-      type: "array",
-      items: { type: "string" },
-      maxItems: 12,
-    },
-  },
-  required: ["marketSummary", "hotspots", "relationships", "watchItems"],
 } as const;
 
 interface ArticleRow {
@@ -129,28 +55,13 @@ export type HotspotRequestScope =
   | { mode: "rolling"; rollingCount: number }
   | { mode: "range"; startDate: string; endDate: string };
 
-const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场首席研究员。输入是第一阶段产生的全部结构化证据卡片，不包含完整原文。请先按“同一驱动、政策操作、资产定价主题”聚类，再生成供词云与解释面板直接使用的热点。
+const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场研究员。必须开启内部思考，但只做简短的事件归并、同义词统一、证据交叉验证和热度排序；不要输出思考过程。
 
-进行简洁、低深度思考。先在内部完成事件归并、同义词统一、证据交叉验证、重要性排序和市场影响判断，不展开冗长推理。最终只输出结果 JSON。
+输入是第一阶段产生的结构化证据卡片，不包含完整原文。只能使用输入的标题、summary、importance、keywords 和 articleId，不得补充常识、旧闻或模型知识。合并同一驱动和同源观点，但保留有证据支持的不同主题；必须输出 8-15 个热点。
 
-证据边界：
-1. 只能使用输入的标题、summary、importance 和 keywords 证据，不得补充常识、旧闻或模型知识；明确区分文章观点与跨文档归纳。
-2. 必须逐一阅读全部输入 articleId；coverage 由应用根据实际输入范围生成，无需在模型结果中输出。
-3. 同一主题列出所有直接相关的 evidence，最多 5 篇；不得只挑一篇代表性文章后宣称跨文档共振。
-
-热点聚类与排序：
-4. 合并同义词、上下位概念和同源观点，不得把同一 articleId 的近义概念拆成多个热点。
-5. 同一事件的不同表述必须合并；过宽词必须细化为具体事件。每条至少引用 1 个 evidence；单一来源观点必须按"单一来源"处理，不得写成跨文档共振；high 至少需要 2 个不同 articleId。
-6. 输出 8-15 个热点，并为每个热点直接给出 0-100 的整数 heat。评分可参考以下权重公式自行判断，公式仅为提示：热点得分 ≈ 来源覆盖度 × 0.30 + 市场影响程度 × 0.25 + 信息新鲜度 × 0.20 + 证据可信度 × 0.15 + 跨资产关联度 × 0.10。单一来源观点应相应压低 heat。
-7. keyword 使用 2-8 个汉字或常用市场缩写。禁止"市场、政策、经济、利率、债券、股票、风险"等无辨识度词，也禁止近义关键词重复。
-
-解释质量：
-8. explanation 用 80-180 个汉字的自然语言写成一段，不使用模板标签或箭头。说明事实或分歧、传导机制、受影响资产以及验证或失效条件。
-9. assetImpacts 只输出一条 fixedIncome（固收）和一条 equities（权益）；无直接影响时写“证据不足”，不得机械填写“中性”。
-10. relationships 的 source 和 target 必须与最终 keyword 完全一致，且只保留证据支持的传导关系。
-11. evidence.articleId 必须去重。涉及汇率时必须写清货币对方向，避免"汇价走低"与"币值走低"混淆。
-12. 事实冲突时在 conflicts 中逐条保留冲突，不自行选择；没有冲突时输出空数组。解析中不得出现证据卡片以外的新数据。
-13. 最终输出必须是符合给定 JSON Schema 的单个 JSON 对象，不要输出其他正文、Markdown、代码围栏、注释或思考过程。`;
+为了保证响应稳定，最终只输出以下紧凑 JSON，不要输出 Markdown 或其他字段：
+{"marketSummary":"120字以内总览","hotspots":[{"keyword":"2-8字主题","heat":0,"articleIds":["输入中的articleId"]}]}
+heat 必须是 0-100 的整数；articleIds 必须来自输入且每条至少一个；按综合影响排序。`;
 
 export async function getMarketHotspots(
   env: Env,
@@ -185,10 +96,7 @@ export async function getMarketHotspots(
     {
       messages: buildAggregateMessages(cards),
       ...HOTSPOT_GENERATION_CONFIG,
-      response_format: {
-        type: "json_schema",
-        json_schema: HOTSPOT_RESPONSE_SCHEMA,
-      },
+      response_format: { type: "json_object" },
     },
     {
       tags: [`market-hotspots:${date}`, "stage:aggregate-d1-v4"],
@@ -196,15 +104,19 @@ export async function getMarketHotspots(
         id: env.AI_GATEWAY_ID || "default",
         skipCache: true,
         collectLog: true,
+        requestTimeoutMs: 120_000,
         metadata: { date, scope_key: scopeKey, prompt_version: PROMPT_VERSION },
       },
     },
   );
-  const content = output.choices[0]?.message?.content;
+  const content = extractModelContent(output);
   if (typeof content !== "string" || !content.trim()) {
     throw new HotspotError(502, "Workers AI 未返回可解析的热点结果");
   }
-  const analysis = parseHotspotAnalysis(content, { date, articleIds });
+  const analysis = parseHotspotAnalysis(
+    JSON.stringify(expandCompactHotspotOutput(content, cards)),
+    { date, articleIds },
+  );
   const generatedAt = new Date().toISOString();
   const payload = JSON.stringify(analysis);
 
@@ -290,31 +202,247 @@ async function loadEvidenceCards(
 function buildAggregateMessages(
   cards: EvidenceCard[],
 ): Array<{ role: "system" | "user"; content: string }> {
-  const cardBlocks = cards.map((card, index) => {
-    const keywordLines = card.keywords
-      .map(
-        (keyword) =>
-          `- **主题**：${keyword.topic}\n  - 事实：${keyword.fact}\n  - 解读：${keyword.interpretation}\n  - 影响：${keyword.impact}`,
-      )
-      .join("\n");
-    return [
-      `## 证据卡 ${index + 1}`,
-      `- **articleId**：${card.id}`,
-      `- **标题**：${card.title}`,
-      `- **发布时间**：${card.published_at}`,
-      `- **importance**：${card.importance}`,
-      `- **摘要**：${card.summary}`,
-      `- **关键词**：`,
-      keywordLines,
-    ].join("\n");
-  });
+  const evidence = cards.map((card) => ({
+    articleId: card.id,
+    title: truncate(card.title, MAX_TITLE_CHARS),
+    summary: truncate(card.summary, MAX_SUMMARY_CHARS),
+    importance: card.importance,
+    keywords: card.keywords.slice(0, MAX_KEYWORDS_PER_CARD).map((keyword) => ({
+      topic: truncate(keyword.topic, MAX_KEYWORD_TOPIC_CHARS),
+      fact: truncate(keyword.fact, MAX_KEYWORD_FIELD_CHARS),
+      interpretation: truncate(keyword.interpretation, MAX_KEYWORD_FIELD_CHARS),
+      impact: truncate(keyword.impact, MAX_KEYWORD_FIELD_CHARS),
+    })),
+  }));
   return [
     { role: "system", content: AGGREGATE_SYSTEM },
     {
       role: "user",
-      content: `${cardBlocks.join("\n\n")}\n\n请输出 8-15 个热点，禁止为了凑数拆分近义主题。严格按 JSON Schema 输出：marketSummary 为 120-220 字总览；每条 evidence 只引用上面的 articleId；heat 为 0-100 的整数，直接给出综合热度。`,
+      content: [
+        "以下 JSON 是全部可用证据卡片。请先在内部完成归并和排序，再输出结果。",
+        JSON.stringify({ evidenceCards: evidence }),
+        "只返回紧凑 JSON：marketSummary 和 hotspots；每条 hotspot 只包含 keyword、heat、articleIds。articleIds 只能引用上面的 articleId，heat 为 0-100 的整数，按综合影响排序。必须输出至少 8 条，不要输出思考过程、Markdown 或其他字段。",
+      ].join("\n"),
     },
   ];
+}
+
+function extractModelContent(output: unknown): string {
+  if (typeof output === "string") return output;
+  if (!output || typeof output !== "object" || Array.isArray(output)) return "";
+  const record = output as {
+    choices?: Array<{ message?: { content?: unknown } }>;
+    response?: unknown;
+    content?: unknown;
+  };
+  const choiceContent = record.choices?.[0]?.message?.content;
+  if (typeof choiceContent === "string" && choiceContent.trim()) return choiceContent;
+  if (Array.isArray(choiceContent)) {
+    const text = choiceContent
+      .filter((part): part is { text?: unknown } => typeof part === "object" && part !== null)
+      .map((part) => (typeof part.text === "string" ? part.text : ""))
+      .join("")
+      .trim();
+    if (text) return text;
+  }
+  if (typeof record.content === "string" && record.content.trim()) return record.content;
+  if (typeof record.response === "string" && record.response.trim()) return record.response;
+  return record.response && typeof record.response === "object"
+    ? extractModelContent(record.response)
+    : "";
+}
+
+interface CompactHotspotRow {
+  keyword?: unknown;
+  heat?: unknown;
+  articleIds?: unknown;
+  evidence?: unknown;
+}
+
+function expandCompactHotspotOutput(
+  raw: string,
+  cards: EvidenceCard[],
+): Record<string, unknown> {
+  const value = parseCompactJson(raw);
+  const rows = Array.isArray(value.hotspots)
+    ? value.hotspots.filter(
+        (row): row is CompactHotspotRow =>
+          typeof row === "object" && row !== null && !Array.isArray(row),
+      )
+    : [];
+  const cardById = new Map(cards.map((card) => [card.id, card]));
+  const candidates = cards
+    .flatMap((card) => card.keywords.map((keyword) => ({ card, keyword })))
+    .sort((left, right) => right.card.importance - left.card.importance);
+  const usedKeywords = new Set<string>();
+  const compactRows: Array<{
+    keyword: string;
+    heat: number;
+    articleIds: string[];
+    fallback?: boolean;
+  }> = [];
+
+  for (const row of rows) {
+    const keyword = textValue(row.keyword, 40);
+    if (!keyword) continue;
+    const keywordKey = normalizeKeyword(keyword);
+    if (usedKeywords.has(keywordKey)) continue;
+    const articleIds = validArticleIds(row.articleIds ?? row.evidence, cardById);
+    const relatedIds = articleIds.length
+      ? articleIds
+      : cards.filter((card) => cardMatchesKeyword(card, keyword)).map((card) => card.id);
+    const fallbackIds = relatedIds.length ? relatedIds : [cards[0]!.id];
+    const heat =
+      typeof row.heat === "number" && Number.isFinite(row.heat)
+        ? Math.round(Math.max(0, Math.min(100, row.heat)))
+        : 0;
+    usedKeywords.add(keywordKey);
+    compactRows.push({ keyword, heat, articleIds: [...new Set(fallbackIds)] });
+  }
+
+  for (const candidate of candidates) {
+    if (compactRows.length >= 8) break;
+    const keyword = candidate.keyword.topic.trim();
+    const keywordKey = normalizeKeyword(keyword);
+    if (!keyword || usedKeywords.has(keywordKey)) continue;
+    usedKeywords.add(keywordKey);
+    compactRows.push({
+      keyword,
+      heat: 0,
+      articleIds: [candidate.card.id],
+      fallback: true,
+    });
+  }
+
+  return {
+    marketSummary:
+      textValue(value.marketSummary, 1_200) || truncate(cards[0]!.summary, 1_200),
+    hotspots: compactRows.map((row) => {
+      const evidenceCards = row.articleIds
+        .map((id) => cardById.get(id))
+        .filter((card): card is EvidenceCard => Boolean(card));
+      const relatedKeywords = evidenceCards.flatMap((card) =>
+        card.keywords.filter(
+          (keyword) =>
+            normalizeKeyword(keyword.topic) === normalizeKeyword(row.keyword) ||
+            row.keyword.includes(keyword.topic) ||
+            keyword.topic.includes(row.keyword),
+        ),
+      );
+      const selectedKeywords = relatedKeywords.length
+        ? relatedKeywords
+        : evidenceCards.flatMap((card) => card.keywords).slice(0, 3);
+      const evidence = evidenceCards.slice(0, 5).map((card) => {
+        const keyword =
+          selectedKeywords.find((item) =>
+            card.keywords.some((candidate) => candidate.topic === item.topic),
+          ) ?? card.keywords[0];
+        return {
+          articleId: card.id,
+          evidence: truncate(
+            keyword
+              ? keyword.topic + "：" + keyword.fact + "；" + keyword.interpretation + "。" + keyword.impact
+              : card.summary,
+            500,
+          ),
+        };
+      });
+      const impacts = selectedKeywords.map((keyword) => keyword.impact);
+      const fixedIncome = impacts.filter(isFixedIncomeImpact);
+      const equities = impacts.filter(isEquitiesImpact);
+      const drivers = [...new Set(selectedKeywords.map((keyword) => keyword.topic))].slice(0, 8);
+      const explanation = selectedKeywords.length
+        ? "证据显示" +
+          selectedKeywords
+            .slice(0, 2)
+            .map((keyword) => keyword.fact + "，" + keyword.interpretation)
+            .join("；") +
+          "。" +
+          selectedKeywords[0]!.impact
+        : evidenceCards[0]?.summary ?? "证据不足";
+      return {
+        keyword: row.keyword,
+        aliases: [],
+        heat: row.heat,
+        conflicts: [],
+        explanation: truncate(explanation, 1_000),
+        drivers: drivers.length ? drivers : [row.keyword],
+        assetImpacts: {
+          fixedIncome: truncate(fixedIncome.join("；") || "证据不足", 500),
+          equities: truncate(equities.join("；") || "证据不足", 500),
+        },
+        evidence,
+        confidence: evidence.length >= 2 && !row.fallback ? "high" : "medium",
+      };
+    }),
+    relationships: [],
+    watchItems: [],
+  };
+}
+
+function parseCompactJson(raw: string): Record<string, unknown> {
+  const cleaned = raw.trim();
+  try {
+    return JSON.parse(cleaned) as Record<string, unknown>;
+  } catch (error) {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
+      } catch {
+        // Fall through to the public error below.
+      }
+    }
+    throw new HotspotError(
+      502,
+      "模型输出不是有效 JSON：" + (error instanceof Error ? error.message : String(error)),
+    );
+  }
+}
+
+function textValue(value: unknown, maxLength: number): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function truncate(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : value.slice(0, maxLength);
+}
+
+function normalizeKeyword(value: string): string {
+  return value.replaceAll(/\s+/g, "").toLocaleLowerCase("zh-CN");
+}
+
+function validArticleIds(
+  value: unknown,
+  cardById: Map<string, EvidenceCard>,
+): string[] {
+  const items = Array.isArray(value) ? value : [];
+  const ids = items.flatMap((item) => {
+    if (typeof item === "string") return [item];
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      const articleId = (item as { articleId?: unknown }).articleId;
+      return typeof articleId === "string" ? [articleId] : [];
+    }
+    return [];
+  });
+  return [...new Set(ids.filter((id) => cardById.has(id)))];
+}
+
+function cardMatchesKeyword(card: EvidenceCard, keyword: string): boolean {
+  return (
+    card.title.includes(keyword) ||
+    card.summary.includes(keyword) ||
+    card.keywords.some((item) => item.topic.includes(keyword) || keyword.includes(item.topic))
+  );
+}
+
+function isFixedIncomeImpact(value: string): boolean {
+  return /债|利率|收益率|资金|流动性|货币|曲线/.test(value);
+}
+
+function isEquitiesImpact(value: string): boolean {
+  return /权益|股票|消费|地产|风险偏好|板块/.test(value);
 }
 
 async function createFingerprint(cards: EvidenceCard[]): Promise<string> {

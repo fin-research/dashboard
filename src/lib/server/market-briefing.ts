@@ -1,8 +1,17 @@
 import type { MarketBriefing } from "../../types";
 
-const BRIEFING_MODEL = "opencode/deepseek-v4-flash" as const;
-const PROMPT_VERSION = "market-briefing-v1";
+const BRIEFING_MODEL = "dynamic/rag" as const;
+const PROMPT_VERSION = "market-briefing-v3-dynamic-rag-thinking-filtered";
 const DATA_TIMEOUT_MS = 60_000;
+const DISCARD_TITLE_PREFIXES = [
+  "A股早盘收盘",
+  "DMI外币资金日评",
+  "DMI离岸债日报",
+] as const;
+const TRUNCATE_RULES = [
+  { titlePrefix: "DM债市要闻速览", paragraphPrefix: "地方" },
+  { titlePrefix: "DM利率债午间速览", paragraphPrefix: "现券方面" },
+] as const;
 
 /**
  * market-briefing skill 全文，与后端旧版 Codex 生成时挂载的 SKILL.md 逐字一致。
@@ -112,6 +121,69 @@ export function buildMarketBriefingPrompt(
 }
 
 /**
+ * Remove low-value/duplicative briefing items and cut selected long articles
+ * before they enter the thinking prompt. The source API contract remains
+ * unchanged; this is a prompt-only transformation.
+ */
+export function filterMarketBriefingNews(newsText: string): string {
+  const items = splitBriefingItems(newsText);
+  if (items.length === 0) return newsText;
+
+  const filtered = items
+    .map((item) => {
+      const title = briefingItemTitle(item);
+      if (DISCARD_TITLE_PREFIXES.some((prefix) => title.startsWith(prefix))) {
+        return "";
+      }
+      const rule = TRUNCATE_RULES.find((candidate) =>
+        title.startsWith(candidate.titlePrefix),
+      );
+      return rule ? truncateBriefingItem(item, rule.paragraphPrefix) : item;
+    })
+    .filter(Boolean)
+    .map((item, index) => renumberBriefingItem(item, index + 1));
+
+  return filtered.join("\n\n");
+}
+
+function splitBriefingItems(newsText: string): string[] {
+  return newsText
+    .split(/(?=^【\d+】)/m)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function briefingItemTitle(item: string): string {
+  const firstLine = item.split(/\r?\n/, 1)[0] ?? "";
+  return firstLine
+    .replace(/^【\d+】/, "")
+    .replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+/, "")
+    .trim();
+}
+
+function truncateBriefingItem(item: string, paragraphPrefix: string): string {
+  const bodyMarker = /\n正文：\n?/;
+  const match = bodyMarker.exec(item);
+  if (!match || match.index < 0) return item;
+
+  const bodyStart = match.index + match[0].length;
+  const header = item.slice(0, bodyStart);
+  const body = item.slice(bodyStart);
+  const paragraphs = body.split(/\r?\n\s*\r?\n/);
+  const cutoff = paragraphs.findIndex((paragraph) =>
+    paragraph.trimStart().startsWith(paragraphPrefix),
+  );
+  if (cutoff < 0) return item;
+
+  const keptBody = paragraphs.slice(0, cutoff).join("\n\n").trimEnd();
+  return `${header}${keptBody}`.trimEnd();
+}
+
+function renumberBriefingItem(item: string, index: number): string {
+  return item.replace(/^【\d+】/, `【${index}】`);
+}
+
+/**
  * 兼容 AI Gateway 的 OpenAI 格式与 Workers AI 原生格式。
  */
 export function extractBriefingContent(output: unknown): string {
@@ -159,11 +231,17 @@ export async function generateMarketBriefing(
   const output = await env.AI.run(
     BRIEFING_MODEL,
     {
+      temperature: 0.1,
+      reasoning_effort: "high",
+      chat_template_kwargs: { enable_thinking: true },
       messages: [
         { role: "system", content: MARKET_BRIEFING_SYSTEM },
         {
           role: "user",
-          content: buildMarketBriefingPrompt(reportDate, news.news_text),
+          content: buildMarketBriefingPrompt(
+            reportDate,
+            filterMarketBriefingNews(news.news_text),
+          ),
         },
       ],
     },
@@ -172,6 +250,7 @@ export async function generateMarketBriefing(
         id: env.AI_GATEWAY_ID || "default",
         skipCache: true,
         collectLog: true,
+        requestTimeoutMs: 120_000,
         metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
       },
     },

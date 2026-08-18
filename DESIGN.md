@@ -14,10 +14,12 @@ Cloudflare Worker 通过原生 binding 访问 D1 与 Workers AI。日常开发�
 文字版 `dm-report` 继续独立生成，两条链路互不依赖。
 
 热点聚合只输入第一阶段生成的标题、summary、importance 与 keywords 证据卡片，不再
-输入完整原文。Gemma 4 使用 `temperature=1.0`、`top_p=0.95`、`top_k=64`、
-`repetition_penalty=1.0`、`seed=42` 和 `enable_thinking=true`，不设置
-`max_completion_tokens`；系统提示要求简洁、低深度思考。结果通过 Cloudflare JSON
-Mode（response_format json_schema）直接返回结构化 JSON，应用只做同一运行时校验。
+输入完整原文。`dynamic/rag` 上游使用 Gemma 4，调用使用 `temperature=0.7`、
+`top_p=0.95`、`top_k=64`、`repetition_penalty=1.0`、`seed=42`、
+`reasoning_effort=low`、`enable_thinking=true`，不设置 completion token 上限；
+系统提示要求简洁思考，只返回热点主题、模型 heat 与 articleId。结果通过兼容
+dynamic route 的 JSON Mode（response_format json_object）返回，应用依据原始证据卡片
+展开 explanation、drivers、assetImpacts 和 evidence，再做完整运行时校验。
 heat 由模型直接给出（0-100 分），`来源覆盖度×0.30 + 市场影响×0.25 + 新鲜度×0.20 +
 证据可信度×0.15 + 跨资产关联度×0.10` 权重公式仅作为提示，应用不自行计算；单来源
 热点热度不超过 60。只输出固收与权益两条影响。
