@@ -1,5 +1,4 @@
 import {
-  hasValue,
   isEastmoneyText,
   isPublicBond,
   normalizeCompany,
@@ -10,9 +9,13 @@ import {
   string,
   type Row,
 } from "./rows.ts";
+import {
+  formatPrimaryAmount,
+  formatPrimaryCoupons,
+  primaryIssueDetails,
+} from "./primary-issues.ts";
 import type { ReportData } from "./types";
 
-const PRIMARY_ORDER = ["短融", "公募短债", "小公募", "公募次级债", "私募债"];
 const FUTURES = [
   ["TL9999", "30年期主力合约", true],
   ["T9999", "10年期主力合约", false],
@@ -20,7 +23,7 @@ const FUTURES = [
   ["TS9999", "2年期主力合约", false],
 ] as const;
 
-export function buildTextReport(data: ReportData): string {
+export function buildTextReport(data: ReportData, focusText = ""): string {
   return `${data.report_date.replaceAll("-", "")} 境内市场点评
 
 【央行】
@@ -36,7 +39,7 @@ ${marginTrading(data.margin)}
 
 【一级发行】
 可比证券公司发行情况:${" "}
-${primaryIssue(data.primary)}
+${primaryIssue(data.primary, data.report_date)}
 
 【二级行情】
 可比证券公司债券成交：(公募债)
@@ -46,7 +49,7 @@ ${secondaryMarket(data.secondary)}
 ${emBonds(data.inventory)}
 
 【今日聚焦】
-
+${focusText}
 `;
 }
 
@@ -165,21 +168,22 @@ function marginTrading(rows: Row[]): string {
 
 function marginRow(row: Row) { return { date: string(row.DIM_DATE), total: number(row.TOTAL_RZRQYE)! / 1e8, financing: number(row.TOTAL_RZYE)! / 1e8, lending: number(row.TOTAL_RQYE)! / 1e8 }; }
 
-function primaryIssue(rows: Row[]): string {
-  const groups = new Map(PRIMARY_ORDER.map((category) => [category, [] as Row[]]));
-  for (const row of rows) {
-    if (isEastmoneyIssue(row) || !hasValue(row.issueCouponRate)) continue;
-    groups.get(primaryCategory(row))!.push(row);
-  }
+function primaryIssue(rows: Row[], reportDate: string): string {
+  const issues = primaryIssueDetails(rows, reportDate);
   const lines: string[] = [];
-  for (const category of PRIMARY_ORDER) {
-    const group = groups.get(category)!;
-    if (!group.length) continue;
-    lines.push(`${category}:`);
-    group.sort(primaryCompare).forEach((row) => lines.push(`${primaryDate(row)}-${primaryIssuer(row)}-${transformPrimaryTenor(row.issueTenor)}-${compactDecimal(row.planIssueAmount)}亿-${compactDecimal(row.issueCouponRate)}%`));
+  let section = "";
+  for (const issue of issues) {
+    const nextSection = `${issue.issue_date_key}:${issue.category}`;
+    if (section !== nextSection) {
+      section = nextSection;
+      lines.push(`${issue.category}:`);
+    }
+    lines.push(
+      `${issue.issue_date}-${issue.issuer}-${issue.tenors.join("/")}-` +
+        `${formatPrimaryAmount(issue.amount)}-${formatPrimaryCoupons(issue.coupons)}`,
+    );
   }
-  if (lines.length === 1) lines.push("今日暂无。");
-  return lines.join("\n");
+  return lines.length ? lines.join("\n") : "今日暂无。";
 }
 
 function secondaryMarket(rows: Row[]): string {
@@ -229,25 +233,7 @@ function directionSummary(values: number[], upWord: string, downWord: string): s
 function formatChange(value: unknown, up: string, down: string, unchanged: string, unit: "bp" | "%"): string { const parsed = number(value); if (parsed === null || parsed === 0) return unchanged; return `${parsed < 0 ? down : up}${fixed(Math.abs(parsed), 2)}${unit}`; }
 function groupDirection(signs: Map<string, number>, keys: string[]): string { const values = keys.flatMap((key) => signs.has(key) ? [signs.get(key)!] : []); if (!values.length) return ""; if (values.some((v) => v > 0) && values.some((v) => v < 0)) return "分化"; if (values.some((v) => v > 0)) return "上行"; if (values.some((v) => v < 0)) return "下行"; return "持平"; }
 function curvePart(label: string, direction: string): string { return direction === "分化" ? `${label}分化` : `${label}${direction}`; }
-function primaryCategory(row: Row): string { if (string(row.publicOffering) === "2" || [row.publicOfferingText, row.offeringType, row.issueWay, row.raisingMode].some((v) => v != null && string(v).includes("私募"))) return "私募债"; if (string(row.bondTypeText).includes("短期融资券")) return "短融"; if (string(row.bondTypeText).includes("次级债")) return "公募次级债"; if (primaryTenorLeOne(row.issueTenor) || /S\d+$/.test(string(row.bondShortName))) return "公募短债"; return "小公募"; }
-function primaryTenorLeOne(value: unknown): boolean { const match = string(value).trim().toUpperCase().match(/^([0-9]+(?:\.[0-9]+)?)([YD]).*$/); return !!match && (match[2] === "Y" ? Number(match[1]) <= 1 : Number(match[1]) <= 365); }
-function primaryIssuer(row: Row): string { for (const key of ["comShortName", "issuerShortName", "issuerShortNameCn"]) { const value = normalizePrimary(normalizeCompany(row[key])); if (value) return value; } return normalizePrimary(row.comFullName || row.issuerName); }
-function normalizePrimary(value: unknown): string { let text = string(value).replace(/\s+/g, ""); if (!text) return ""; if (text === "中国国际金融股份有限公司") return "中金公司"; if (text === "中国中金财富证券有限公司") return "中金财富"; for (const suffix of ["股份有限公司", "有限责任公司", "有限公司"]) if (text.endsWith(suffix)) { text = text.slice(0, -suffix.length); break; } if (text.startsWith("中国中金")) text = text.slice(2); return [...text].slice(0, 4).join(""); }
-function primaryCompare(a: Row, b: Row): number { return compare(primaryIssuer(a), primaryIssuer(b)) || primaryTenorDays(a.issueTenor) - primaryTenorDays(b.issueTenor) || compare(primaryDate(a), primaryDate(b)) || compare(string(a.bondShortName), string(b.bondShortName)); }
-function primaryDate(row: Row): string { const value = row.bidStartDate || row.issueStartDate; if (hasValue(value)) { const text = string(value); return `${text.slice(5, 7)}/${text.slice(8, 10)}`; } const bidding = string(row.biddingTime); return /^\d{2}-\d{2}/.test(bidding) ? bidding.slice(0, 5).replace("-", "/") : "--/--"; }
-function isEastmoneyIssue(row: Row): boolean {
-  return (
-    isEastmoneyText(row.bondShortName) ||
-    isEastmoneyText(row.issuer) ||
-    isEastmoneyText(row.comShortName) ||
-    isEastmoneyText(row.issuerShortName) ||
-    isEastmoneyText(row.issuerShortNameCn)
-  );
-}
-function transformPrimaryTenor(value: unknown): string { const text = string(value).trim(); if (text.startsWith("0.") && text.toUpperCase().endsWith("Y")) { const parsed = Number(text.slice(0, -1)); if (Number.isFinite(parsed)) return `${Math.trunc(parsed * 365)}D`; } return text; }
-function primaryTenorDays(value: unknown): number { const match = string(value).trim().toUpperCase().match(/^([0-9]+(?:\.[0-9]+)?)([YD])/); return match ? Number(match[1]) * (match[2] === "D" ? 1 : 365) : Infinity; }
 function formatSecondaryTenor(value: unknown): string { const years = secondaryTenorYears(value); return years === null ? string(value || "--") : years >= 1 ? `${fixed(years, 1)}年` : `${fixed(years * 365, 0)}天`; }
-function compactDecimal(value: unknown): string { if (!hasValue(value)) return "--"; const parsed = Number(string(value).trim()); return Number.isNaN(parsed) ? string(value).trim() : compact(parsed); }
 function formatNumber(value: unknown, digits: number): string { const parsed = number(value); return parsed === null ? "--" : fixed(parsed, digits); }
 function fixed(value: number, digits: number): string {
   const fraction = floatFraction(value);
@@ -313,4 +299,3 @@ function divideHalfEven(numerator: bigint, denominator: bigint): bigint {
   return quotient;
 }
 function sign(value: number): number { return value > 0 ? 1 : value < 0 ? -1 : 0; }
-function compare(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }

@@ -84,7 +84,7 @@ test("融资融券快照从原始行推导余额与变动", () => {
   });
 });
 
-test("一级发行点从富化行过滤派生列", () => {
+test("一级发行点保留无票息条目并统一次级债名称", () => {
   const points = primaryPoints([
     {
       bondShortName: "26首集Y1",
@@ -122,11 +122,17 @@ test("一级发行点从富化行过滤派生列", () => {
       amount: 10,
       coupon: null,
     },
-  ]);
+  ], "2026-08-10");
 
-  assert.equal(points.length, 1);
-  assert.equal(points[0].tenor_years, 2);
-  assert.equal(points[0].category, "公募次级债");
+  assert.equal(points.length, 2);
+  assert.deepEqual(
+    points.find((point) => point.category === "次级债")?.tenors,
+    ["2+N年"],
+  );
+  assert.deepEqual(
+    points.find((point) => point.issuer === "丙")?.coupons,
+    [null],
+  );
 });
 
 test("一级发行点排除东方财富（含非证券简称）条目", () => {
@@ -153,11 +159,81 @@ test("一级发行点排除东方财富（含非证券简称）条目", () => {
       amount: 20,
       coupon: 1.65,
     },
-  ]);
+  ], "2026-08-13");
 
   assert.deepEqual(
-    points.map((point) => point.bond_name),
+    points.flatMap((point) => point.bond_names),
     ["26东莞03"],
+  );
+});
+
+test("一级发行按当天优先并合并同类型同发行人", () => {
+  const points = primaryPoints(
+    [
+      {
+        bondShortName: "26甲02",
+        bidStartDate: "2026-08-18",
+        comShortName: "甲证券",
+        bondTypeText: "公司债",
+        issueTenor: "5Y",
+        planIssueAmount: "12.4",
+        issueCouponRate: "2.28",
+      },
+      {
+        bondShortName: "26甲01",
+        bidStartDate: "2026-08-18",
+        comShortName: "甲证券",
+        bondTypeText: "公司债",
+        issueTenor: "3Y",
+        planIssueAmount: "20",
+        issueCouponRate: "1.86",
+      },
+      {
+        bondShortName: "26乙01",
+        bidStartDate: "2026-08-17",
+        comShortName: "乙证券",
+        bondTypeText: "公司债",
+        issueTenor: "3Y",
+        planIssueAmount: "8",
+        issueCouponRate: "--",
+      },
+      {
+        bondShortName: "26丙01",
+        bidStartDate: "2026-08-14",
+        comShortName: "丙证券",
+        bondTypeText: "公司债",
+        issueTenor: "3Y",
+        planIssueAmount: "9",
+        issueCouponRate: "1.9",
+      },
+    ],
+    "2026-08-18",
+  );
+
+  assert.deepEqual(
+    points.map((point) => ({
+      date: point.issue_date,
+      issuer: point.issuer,
+      tenors: point.tenors,
+      amount: point.amount,
+      coupons: point.coupons,
+    })),
+    [
+      {
+        date: "08/18",
+        issuer: "甲证券",
+        tenors: ["3年", "5年"],
+        amount: 32.4,
+        coupons: [1.86, 2.28],
+      },
+      {
+        date: "08/17",
+        issuer: "乙证券",
+        tenors: ["3年"],
+        amount: 8,
+        coupons: [null],
+      },
+    ],
   );
 });
 

@@ -60,7 +60,7 @@ test("旧接口缺少同业发行摘要时不会导致页面加载失败", () =>
   const normalized = normalizeReport(reportPayload());
 
   assert.deepEqual(normalized.primary_summary, {
-    current_amount: 88,
+    current_amount: 58,
     change_amount: null,
   });
 });

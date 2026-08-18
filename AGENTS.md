@@ -46,6 +46,7 @@
 - `src/api.ts`：浏览器数据客户端（只请求同源 `/data/*`）
 - `src/rows.ts`：共享的行解析 helper（`number`/`string`/`secondaryTenorYears`/`isPublicBond` 等），文字版复刻与视觉派生共用
 - `src/report-view.ts`：从统一 `/data/report` 原始行派生视觉视图（OMO 日净额、资金面/国债指标、融资融券快照、一级发行点、可比债券含 Theil-Sen/MAD 离群过滤、存量债点）
+- `src/primary-issues.ts`：可视化与文字版共用的一级发行细项派生；仅消费 API 返回的报告日与上一交易日行，按日期、类型、发行人合并期限/票息并统一格式
 - `tests/`：单元测试（纯 TS 逻辑的 node:test 测试）
 
 ## 注意事项
@@ -56,7 +57,7 @@
 - D1 固定绑定现有 `eastmoney` 数据库，文章正文仍不得写入 D1；热点聚合只读取 `article.summary`、`importance` 和 `keyword` 结构化证据，并把按范围键与输入指纹缓存的最终热点写入 `hotspot_cache`。
 - Workers AI 固定使用 binding，不得在应用中保存或调用 Cloudflare API Token。所有模型调用统一走 `dynamic/rag`；热点聚合保持 `enable_thinking=true`（`reasoning_effort=low`，不设置 completion token 上限），使用兼容 dynamic route 的 `response_format: json_object` 返回紧凑主题 JSON，再由应用基于证据卡片展开完整热点并做运行时校验；单来源热点热度不超过 60。
 - 热点输出固定为 8–15 个；默认跨日期滚动读取最近 20 篇已完成特征抽取的文章，日期范围模式最多读取最近 100 篇。热点热度由模型直接给出 0-100 分，权重公式仅作为提示，应用不自行计算加权得分，只做范围校验与单来源封顶。
-- 文字版直接消费 `/data/report` 顶层完整字段（OMO 按报告日过滤 `operationDate`），由 `src/text-report.ts` 严格复刻 `api/scripts/report_cli.py` 的筛选、排序、条件分支、数字格式与完整文本；不得直接读取 Python 生成的报告文本，也不得自行改写既有格式。
+- 文字版直接消费 `/data/report` 顶层完整字段（OMO 按报告日过滤 `operationDate`），由 `src/text-report.ts` 严格复刻 `api/scripts/report_cli.py` 的筛选、排序、条件分支、数字格式与完整文本；一级发行必须与可视化共用 `src/primary-issues.ts`，不得形成平行口径；不得直接读取 Python 生成的报告文本。
 - 端口约定：前端 8765，API 8766，均绑定 127.0.0.1。
 - 本地启动前只读增量同步远程 D1 中的结构化文章、关键词和热点缓存，不清空本地库、不复制文章正文；空库首次也只读取最近 100 篇已完成特征抽取的文章。请求在本地 D1 上执行，Workers AI 仍使用远程 binding，调用可能产生费用。
 - 本项目不做浏览器或截图视觉检查；验证只运行类型检查、单元测试、构建、dry-run 与必要的接口请求。

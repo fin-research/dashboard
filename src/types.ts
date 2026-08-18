@@ -22,14 +22,15 @@ export interface IndustryPoint {
   market_cap_yuan: number;
 }
 
-export interface PrimaryPoint {
+export interface PrimaryIssueDetail {
   issue_date: string;
+  issue_date_key: string;
   issuer: string;
-  bond_name: string;
   category: string;
-  tenor_years: number;
+  bond_names: string[];
+  tenors: string[];
+  coupons: Array<number | null>;
   amount: number;
-  coupon: number;
 }
 
 export interface PrimarySummary {
@@ -81,10 +82,6 @@ export interface ReportData {
   primary: Row[];
   secondary: Row[];
   inventory: Row[];
-}
-
-export interface ApiConfig {
-  defaultDate: string;
 }
 
 export interface MarketBriefing {

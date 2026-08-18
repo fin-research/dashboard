@@ -81,15 +81,15 @@ A股主要指数集体收涨。全市场成交保持活跃。
 【一级发行】
 可比证券公司发行情况:${" "}
 短融:
-08/13-甲证券-180D-10亿-1.5%
+08/13-甲证券-180天-10亿-1.50%
 公募短债:
-08/13-乙证券-182D-20亿-1.6%
+08/13-乙证券-182天-20亿-1.60%
 小公募:
-08/13-丙证券-3Y-30亿-1.7%
-公募次级债:
-08/13-丁证券-2+N-40亿-1.8%
+08/13-丙证券-3年-30亿-1.70%
+次级债:
+08/13-丁证券-2+N年-40亿-1.80%
 私募债:
-08/13-戊证券-2Y-50亿-1.9%
+08/13-戊证券-2年-50亿-1.90%
 
 【二级行情】
 可比证券公司债券成交：(公募债)
@@ -155,4 +155,60 @@ test("一级发行与二级行情统一排除东方财富并回退相近券", ()
   assert.ok(!secondarySection.includes("东方财富"));
   assert.ok(!secondarySection.includes("25东财G9"));
   assert.ok(secondarySection.includes("己证券"));
+});
+
+test("一级发行当天优先合并发行腿且不展示更早日期", () => {
+  const input = structuredClone(data);
+  input.primary.push(
+    {
+      bondShortName: "26丙02",
+      bondTypeText: "公司债",
+      issueTenor: "5Y",
+      issueCouponRate: "2.28",
+      planIssueAmount: "12.4",
+      bidStartDate: "2026-08-13",
+      comShortName: "丙证券",
+    },
+    {
+      bondShortName: "26己01",
+      bondTypeText: "公司债",
+      issueTenor: "3Y",
+      issueCouponRate: "--",
+      planIssueAmount: "8",
+      bidStartDate: "2026-08-12",
+      comShortName: "己证券",
+    },
+    {
+      bondShortName: "26庚01",
+      bondTypeText: "公司债",
+      issueTenor: "3Y",
+      issueCouponRate: "1.95",
+      planIssueAmount: "9",
+      bidStartDate: "2026-08-11",
+      comShortName: "庚证券",
+    },
+  );
+
+  const report = buildTextReport(input);
+  const primarySection = report.slice(
+    report.indexOf("【一级发行】"),
+    report.indexOf("【二级行情】"),
+  );
+
+  assert.ok(
+    primarySection.includes(
+      "08/13-丙证券-3年/5年-42亿-1.70%/2.28%",
+    ),
+  );
+  assert.ok(primarySection.includes("08/12-己证券-3年-8亿--"));
+  assert.ok(!primarySection.includes("08/11"));
+  assert.ok(
+    primarySection.indexOf("08/13") < primarySection.indexOf("08/12"),
+  );
+});
+
+test("文字版展示当前手动修改后的今日聚焦", () => {
+  assert.ok(buildTextReport(data, "手动修改后的判断").endsWith(
+    "【今日聚焦】\n手动修改后的判断\n",
+  ));
 });

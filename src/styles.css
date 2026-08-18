@@ -945,6 +945,14 @@ h2 {
   flex-direction: column;
 }
 
+.panel--primary .data-list {
+  scrollbar-width: none;
+}
+
+.panel--primary .data-list::-webkit-scrollbar {
+  display: none;
+}
+
 .panel--comparable .data-list {
   overflow: hidden;
 }

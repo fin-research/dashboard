@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { PrimaryPoint } from "../types";
+  import type { PrimaryIssueDetail } from "../types";
   import { primaryRows } from "../view-model";
 
-  export let points: PrimaryPoint[];
+  export let points: PrimaryIssueDetail[];
 
   $: rows = primaryRows(points);
 </script>

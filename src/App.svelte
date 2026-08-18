@@ -5,7 +5,6 @@
   import "./styles.css";
 
   import {
-    fetchConfig,
     fetchReport,
     generateMarketBriefing,
   } from "./api";
@@ -23,6 +22,7 @@
   import { loadStoredFocusText } from "./focus-editor";
   import { chineseDateParts } from "./formatters";
   import { deriveReport, type ReportDerived } from "./report-view";
+  import { currentReportDate } from "./report-date";
   import {
     pathnameForReportView,
     reportViewFromPathname,
@@ -48,6 +48,7 @@
     inventory: [],
   };
   let reportSurface: HTMLElement;
+  let dateInput: HTMLInputElement;
   let selectedDate = "";
   let data: ReportData | null = null;
   let charts: ChartRenderers | null = null;
@@ -75,8 +76,7 @@
   onMount(async () => {
     activeView = reportViewFromPathname(window.location.pathname);
     try {
-      const config = await fetchConfig();
-      selectedDate = config.defaultDate;
+      selectedDate = currentReportDate();
       await loadReport(false);
     } catch (error) {
       showError(error);
@@ -131,6 +131,18 @@
       }
     } finally {
       briefingLoading = false;
+    }
+  }
+
+  function handleBriefingApplied(briefing: MarketBriefing): void {
+    if (generatedBriefing === briefing) generatedBriefing = null;
+  }
+
+  function openDatePicker(): void {
+    try {
+      dateInput.showPicker?.();
+    } catch {
+      // The native input click remains available where showPicker is unsupported.
     }
   }
 
@@ -241,10 +253,12 @@
         <label class="hero-date">
           <span class="sr-only">选择报告日期</span>
           <input
+            bind:this={dateInput}
             class="hero-date__input"
             type="date"
             aria-label="选择报告日期"
             bind:value={selectedDate}
+            onclick={openDatePicker}
             onchange={() => loadReport(false)}
           />
           <time
@@ -318,6 +332,7 @@
             reportDate={data.report_date}
             {generatedBriefing}
             onTextChange={(value) => (focusText = value)}
+            onBriefingApplied={handleBriefingApplied}
           />
         </section>
 
@@ -451,7 +466,7 @@
           role="tabpanel"
           aria-labelledby="text-report-tab"
         >
-          <TextReport data={data} />
+          <TextReport data={data} {focusText} />
         </div>
       {/if}
     {/if}

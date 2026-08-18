@@ -3,7 +3,6 @@
 // this layer only projects what the visual charts and tables need.
 
 import {
-  hasValue,
   isEastmoneyText,
   isPublicBond,
   median,
@@ -12,13 +11,14 @@ import {
   secondaryTenorYears,
   string,
 } from "./rows.ts";
+import { primaryIssueDetails } from "./primary-issues.ts";
 import type {
   ComparablePoint,
   InventoryPoint,
   MarginSnapshot,
   MarketMetric,
   OmoPoint,
-  PrimaryPoint,
+  PrimaryIssueDetail,
   ReportData,
   Row,
 } from "./types";
@@ -28,7 +28,7 @@ export interface ReportDerived {
   funds: MarketMetric[];
   governmentBonds: MarketMetric[];
   margin: MarginSnapshot;
-  primary: PrimaryPoint[];
+  primary: PrimaryIssueDetail[];
   comparable: ComparablePoint[];
   inventory: InventoryPoint[];
 }
@@ -39,7 +39,7 @@ export function deriveReport(data: ReportData): ReportDerived {
     funds: fundMetrics(data.rates),
     governmentBonds: governmentBondMetrics(data.rates.bonds),
     margin: marginSnapshot(data.margin),
-    primary: primaryPoints(data.primary),
+    primary: primaryPoints(data.primary, data.report_date),
     comparable: comparablePoints(data.secondary),
     inventory: inventoryPoints(data.inventory),
   };
@@ -116,32 +116,11 @@ export function marginSnapshot(rows: Row[]): MarginSnapshot {
   };
 }
 
-export function primaryPoints(rows: Row[]): PrimaryPoint[] {
-  const points: PrimaryPoint[] = [];
-  for (const row of rows) {
-    if (
-      isEastmoneyText(row.bondShortName) ||
-      isEastmoneyText(row.issuer) ||
-      isEastmoneyText(row.comShortName)
-    ) {
-      continue;
-    }
-    if (!hasValue(row.issueCouponRate)) continue;
-    const tenor_years = number(row.tenor_years);
-    const amount = number(row.amount);
-    const coupon = number(row.coupon);
-    if (tenor_years === null || amount === null || coupon === null) continue;
-    points.push({
-      issue_date: string(row.issue_date),
-      issuer: string(row.issuer),
-      bond_name: string(row.bond_name),
-      category: string(row.category),
-      tenor_years,
-      amount,
-      coupon,
-    });
-  }
-  return points;
+export function primaryPoints(
+  rows: Row[],
+  reportDate: string,
+): PrimaryIssueDetail[] {
+  return primaryIssueDetails(rows, reportDate);
 }
 
 export function comparablePoints(rows: Row[]): ComparablePoint[] {

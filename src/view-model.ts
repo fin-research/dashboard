@@ -11,10 +11,15 @@ import type {
   InventoryPoint,
   MarginSnapshot,
   OmoPoint,
-  PrimaryPoint,
+  PrimaryIssueDetail,
   PrimarySummary,
   ReportData,
 } from "./types";
+import {
+  formatPrimaryAmount,
+  formatPrimaryCoupons,
+  PRIMARY_CATEGORY_ORDER,
+} from "./primary-issues.ts";
 
 export type MetricIconName =
   | "bank"
@@ -237,31 +242,22 @@ export function inventorySummaryItems(
   ];
 }
 
-export function primaryRows(points: PrimaryPoint[]): TableRowView[] {
-  const categoryOrder = ["短融", "公募短债", "小公募", "公募次级债", "私募债"];
-  return [...points]
-    .sort((left, right) => {
-      const category =
-        categoryOrder.indexOf(left.category) -
-        categoryOrder.indexOf(right.category);
-      return (
-        category ||
-        left.issuer.localeCompare(right.issuer, "zh-CN") ||
-        left.tenor_years - right.tenor_years
-      );
-    })
-    .map((point) => ({
-      title: point.bond_name,
-      tagIndex: categoryOrder.indexOf(point.category) + 1,
-      values: [
-        point.category,
-        point.issue_date,
-        point.issuer,
-        tenorLabel(point.tenor_years),
-        `${number(point.amount, 2)}亿`,
-        `${number(point.coupon, 2)}%`,
-      ],
-    }));
+export function primaryRows(points: PrimaryIssueDetail[]): TableRowView[] {
+  return points.map((point) => ({
+    title: point.bond_names.join("/"),
+    tagIndex:
+      PRIMARY_CATEGORY_ORDER.indexOf(
+        point.category as (typeof PRIMARY_CATEGORY_ORDER)[number],
+      ) + 1,
+    values: [
+      point.category,
+      point.issue_date,
+      point.issuer,
+      point.tenors.join("/"),
+      formatPrimaryAmount(point.amount),
+      formatPrimaryCoupons(point.coupons),
+    ],
+  }));
 }
 
 export function comparableTenorRows(
@@ -322,9 +318,4 @@ function compactValue(value: number): string {
   return value.toLocaleString("zh-CN", {
     maximumFractionDigits: 3,
   });
-}
-
-function tenorLabel(value: number): string {
-  if (value < 1) return `${Math.round(value * 365)}天`;
-  return `${compactValue(value)}年`;
 }

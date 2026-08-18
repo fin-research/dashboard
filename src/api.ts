@@ -1,10 +1,9 @@
 import type {
-  ApiConfig,
   MarketBriefing,
   PrimarySummary,
   ReportData,
 } from "./types";
-import { number } from "./rows.ts";
+import { primaryIssueDetails } from "./primary-issues.ts";
 
 type ReportPayload = Omit<ReportData, "primary_summary"> & {
   primary_summary?: PrimarySummary;
@@ -42,10 +41,6 @@ export function generateMarketBriefing(
   );
 }
 
-export function fetchConfig(signal?: AbortSignal): Promise<ApiConfig> {
-  return getJson<ApiConfig>("/data/config", signal);
-}
-
 export function fetchReport(
   reportDate: string,
   refresh: boolean,
@@ -59,10 +54,12 @@ export function fetchReport(
 }
 
 export function normalizeReport(payload: ReportPayload): ReportData {
-  const fallbackAmount = payload.primary.reduce(
-    (total, point) => total + (number(point.amount) ?? 0),
-    0,
-  );
+  const fallbackAmount = primaryIssueDetails(
+    payload.primary,
+    payload.report_date,
+  )
+    .filter((issue) => issue.issue_date_key === payload.report_date)
+    .reduce((total, issue) => total + issue.amount, 0);
   return {
     ...payload,
     primary_summary: payload.primary_summary ?? {
