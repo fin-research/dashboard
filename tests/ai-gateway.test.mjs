@@ -104,7 +104,8 @@ test("AI SDK sends one standard JSON Schema and returns a validated object", asy
   assert.equal(query.response_format.json_schema.strict, true);
   assert.deepEqual(query.response_format.json_schema.schema.required, ["ok"]);
   assert.equal(query.response_format.json_schema.schema.additionalProperties, false);
-  assert.deepEqual(query.messages, [{ role: "user", content: "test" }]);
+  assert.match(query.messages[0].content, /"required":\["ok"\]/);
+  assert.deepEqual(query.messages[1], { role: "user", content: "test" });
 });
 
 test("AI SDK rejects JSON that does not satisfy the response schema", async () => {
