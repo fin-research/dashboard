@@ -1,27 +1,52 @@
+import { z } from "zod";
+
 import {
   parseHotspotAnalysis,
   type HotspotAnalysis,
   type HotspotApiResponse,
   type HotspotScope,
 } from "$lib/hotspots";
-import { runDynamicRoute } from "./ai-gateway.ts";
+import {
+  DYNAMIC_ROUTE_MODEL,
+  generateDynamicRouteObject,
+} from "./ai-gateway.ts";
 
-const HOTSPOT_MODEL = "dynamic/rag" as const;
-const PROMPT_VERSION = "d1-hotspots-v8-dynamic-rag-thinking-unbounded";
+const HOTSPOT_MODEL = DYNAMIC_ROUTE_MODEL;
+const PROMPT_VERSION = "d1-hotspots-v9-dynamic-rag-json-schema";
 const MAX_KEYWORDS_PER_CARD = 3;
 const MAX_TITLE_CHARS = 120;
 const MAX_SUMMARY_CHARS = 480;
 const MAX_KEYWORD_TOPIC_CHARS = 40;
 const MAX_KEYWORD_FIELD_CHARS = 240;
-const HOTSPOT_GENERATION_CONFIG = {
-  temperature: 0.7,
-  top_p: 0.95,
-  top_k: 64,
-  repetition_penalty: 1.0,
-  seed: 42,
-  reasoning_effort: "low",
-  chat_template_kwargs: { enable_thinking: true },
-} as const;
+export const hotspotResponseSchema = z
+  .object({
+    marketSummary: z
+      .string()
+      .min(1)
+      .max(120)
+      .describe("120字以内的股债市场热点总览"),
+    hotspots: z
+      .array(
+        z
+          .object({
+            keyword: z.string().min(2).max(8).describe("2到8字的具体主题"),
+            heat: z.number().int().min(0).max(100).describe("综合影响热度"),
+            articleIds: z
+              .array(z.string().min(1))
+              .min(1)
+              .describe("只引用输入证据卡片中的articleId"),
+          })
+          .strict(),
+      )
+      .min(8)
+      .max(15)
+      .describe("按综合影响降序排列的8到15个热点"),
+  })
+  .strict();
+
+type CompactHotspotOutput = z.infer<typeof hotspotResponseSchema>;
+
+export const hotspotOutputSchema = hotspotResponseSchema;
 
 interface ArticleRow {
   id: string;
@@ -60,9 +85,7 @@ const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场研
 
 输入是第一阶段产生的结构化证据卡片，不包含完整原文。只能使用输入的标题、summary、importance、keywords 和 articleId，不得补充常识、旧闻或模型知识。合并同一驱动和同源观点，但保留有证据支持的不同主题；必须输出 8-15 个热点。
 
-为了保证响应稳定，最终只输出以下紧凑 JSON，不要输出 Markdown 或其他字段：
-{"marketSummary":"120字以内总览","hotspots":[{"keyword":"2-8字主题","heat":0,"articleIds":["输入中的articleId"]}]}
-heat 必须是 0-100 的整数；articleIds 必须来自输入且每条至少一个；按综合影响排序。`;
+严格遵循响应 JSON Schema 输出，不要输出思考过程、Markdown 或 Schema 以外字段。字段语义和数量约束以 Schema 为准。`;
 
 export async function getMarketHotspots(
   env: Env,
@@ -92,20 +115,20 @@ export async function getMarketHotspots(
     }
   }
 
-  const output = await runDynamicRoute(
+  const output = await generateDynamicRouteObject(
     {
       accountId: env.CLOUDFLARE_ACCOUNT_ID,
       gatewayId: env.AI_GATEWAY_ID || "default",
       token: env.CF_AIG_TOKEN,
     },
-    {
-      model: HOTSPOT_MODEL,
-      messages: buildAggregateMessages(cards),
-      ...HOTSPOT_GENERATION_CONFIG,
-      response_format: { type: "json_object" },
-    },
+    buildAggregateMessages(cards),
+    hotspotOutputSchema,
+    "market_hotspots",
     {
       requestTimeoutMs: 120_000,
+      maxRetries: 2,
+      reasoningEffort: "low",
+      enableThinking: true,
       metadata: {
         date,
         scope_key: scopeKey,
@@ -114,12 +137,8 @@ export async function getMarketHotspots(
       },
     },
   );
-  const content = extractModelContent(output);
-  if (typeof content !== "string" || !content.trim()) {
-    throw new HotspotError(502, "AI Gateway 未返回可解析的热点结果");
-  }
   const analysis = parseHotspotAnalysis(
-    JSON.stringify(expandCompactHotspotOutput(content, cards)),
+    JSON.stringify(expandCompactHotspotOutput(output, cards)),
     { date, articleIds },
   );
   const generatedAt = new Date().toISOString();
@@ -226,55 +245,17 @@ function buildAggregateMessages(
       content: [
         "以下 JSON 是全部可用证据卡片。请先在内部完成归并和排序，再输出结果。",
         JSON.stringify({ evidenceCards: evidence }),
-        "只返回紧凑 JSON：marketSummary 和 hotspots；每条 hotspot 只包含 keyword、heat、articleIds。articleIds 只能引用上面的 articleId，heat 为 0-100 的整数，按综合影响排序。必须输出至少 8 条，不要输出思考过程、Markdown 或其他字段。",
+        "严格遵循响应 JSON Schema；articleIds 只能引用上面的 articleId，按综合影响排序。不要输出思考过程、Markdown 或其他字段。",
       ].join("\n"),
     },
   ];
 }
 
-function extractModelContent(output: unknown): string {
-  if (typeof output === "string") return output;
-  if (!output || typeof output !== "object" || Array.isArray(output)) return "";
-  const record = output as {
-    choices?: Array<{ message?: { content?: unknown } }>;
-    response?: unknown;
-    content?: unknown;
-  };
-  const choiceContent = record.choices?.[0]?.message?.content;
-  if (typeof choiceContent === "string" && choiceContent.trim()) return choiceContent;
-  if (Array.isArray(choiceContent)) {
-    const text = choiceContent
-      .filter((part): part is { text?: unknown } => typeof part === "object" && part !== null)
-      .map((part) => (typeof part.text === "string" ? part.text : ""))
-      .join("")
-      .trim();
-    if (text) return text;
-  }
-  if (typeof record.content === "string" && record.content.trim()) return record.content;
-  if (typeof record.response === "string" && record.response.trim()) return record.response;
-  return record.response && typeof record.response === "object"
-    ? extractModelContent(record.response)
-    : "";
-}
-
-interface CompactHotspotRow {
-  keyword?: unknown;
-  heat?: unknown;
-  articleIds?: unknown;
-  evidence?: unknown;
-}
-
 function expandCompactHotspotOutput(
-  raw: string,
+  value: CompactHotspotOutput,
   cards: EvidenceCard[],
 ): Record<string, unknown> {
-  const value = parseCompactJson(raw);
-  const rows = Array.isArray(value.hotspots)
-    ? value.hotspots.filter(
-        (row): row is CompactHotspotRow =>
-          typeof row === "object" && row !== null && !Array.isArray(row),
-      )
-    : [];
+  const rows = value.hotspots;
   const cardById = new Map(cards.map((card) => [card.id, card]));
   const candidates = cards
     .flatMap((card) => card.keywords.map((keyword) => ({ card, keyword })))
@@ -292,7 +273,7 @@ function expandCompactHotspotOutput(
     if (!keyword) continue;
     const keywordKey = normalizeKeyword(keyword);
     if (usedKeywords.has(keywordKey)) continue;
-    const articleIds = validArticleIds(row.articleIds ?? row.evidence, cardById);
+    const articleIds = validArticleIds(row.articleIds, cardById);
     const relatedIds = articleIds.length
       ? articleIds
       : cards.filter((card) => cardMatchesKeyword(card, keyword)).map((card) => card.id);
@@ -383,27 +364,6 @@ function expandCompactHotspotOutput(
     relationships: [],
     watchItems: [],
   };
-}
-
-function parseCompactJson(raw: string): Record<string, unknown> {
-  const cleaned = raw.trim();
-  try {
-    return JSON.parse(cleaned) as Record<string, unknown>;
-  } catch (error) {
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      try {
-        return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
-      } catch {
-        // Fall through to the public error below.
-      }
-    }
-    throw new HotspotError(
-      502,
-      "模型输出不是有效 JSON：" + (error instanceof Error ? error.message : String(error)),
-    );
-  }
 }
 
 function textValue(value: unknown, maxLength: number): string {

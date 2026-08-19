@@ -14,12 +14,12 @@ Cloudflare Worker 通过原生 binding 访问 D1 与 Workers AI。日常开发�
 文字版 `dm-report` 继续独立生成，两条链路互不依赖。
 
 热点聚合只输入第一阶段生成的标题、summary、importance 与 keywords 证据卡片，不再
-输入完整原文。`dynamic/rag` 上游使用 Gemma 4，调用使用 `temperature=0.7`、
-`top_p=0.95`、`top_k=64`、`repetition_penalty=1.0`、`seed=42`、
-`reasoning_effort=low`、`enable_thinking=true`，不设置 completion token 上限；
-系统提示要求简洁思考，只返回热点主题、模型 heat 与 articleId。结果通过兼容
-dynamic route 的 JSON Mode（response_format json_object）返回，应用依据原始证据卡片
-展开 explanation、drivers、assetImpacts 和 evidence，再做完整运行时校验。
+输入完整原文。所有生成调用由 AI SDK 经统一 OpenAI-compatible Gateway 适配器发送到
+`dynamic/rag`，固定 `temperature=0.1`；热点使用 `reasoning_effort=low`、
+`enable_thinking=true`，不设置 completion token 上限，也不发送 top-p、top-k、重复惩罚
+或 seed。系统提示只描述业务判断和证据边界，Zod Schema 自动转换为标准
+`response_format.json_schema`，AI SDK 在应用端校验结果。应用再依据原始证据卡片展开
+explanation、drivers、assetImpacts 和 evidence，并做领域校验。
 heat 由模型直接给出（0-100 分），`来源覆盖度×0.30 + 市场影响×0.25 + 新鲜度×0.20 +
 证据可信度×0.15 + 跨资产关联度×0.10` 权重公式仅作为提示，应用不自行计算；单来源
 热点热度不超过 60。只输出固收与权益两条影响。
@@ -199,7 +199,8 @@ heat 由模型直接给出（0-100 分），`来源覆盖度×0.30 + 市场影�
 - `src/styles.css`：既有报告版式、响应式、颜色语义和动效。
 - `src/App.svelte`：报告页面状态、加载/错误/导出流程和视图组合。
 - `src/routes/`：页面路由和 `/api/rag/*` 应用接口；不实现 `/data/*` 后端代理。
-- `src/lib/server/hotspots.ts`：D1 证据读取、Workers AI 聚合、确定性校验和缓存。
+- `src/lib/server/ai-gateway.ts`：AI SDK、Dynamic Routing、认证和协议兼容的唯一调用边界。
+- `src/lib/server/hotspots.ts`：D1 证据读取、结构化 AI 聚合、确定性校验和缓存。
 - `src/lib/components/WordCloud.svelte`：`d3-cloud` 布局与可交互 SVG 词云。
 - `src/components/`：页面使用的 Svelte 指标卡、表格、编辑器、汇总条和
   ECharts 宿主组件。
@@ -213,7 +214,7 @@ heat 由模型直接给出（0-100 分），`来源覆盖度×0.30 + 市场影�
 
 数据依赖方向为：线上 `browser -> /data -> Python API`，本地
 `browser -> Vite /data proxy -> https://eastmoney.hasbai.xyz/data`；线上热点依赖方向为
-`browser -> /api/rag/hotspots -> D1 structured features -> Workers AI -> hotspot_cache`。
+`browser -> /api/rag/hotspots -> D1 structured features -> AI Gateway dynamic/rag -> hotspot_cache`。
 本地热点在启动时只读增量同步上述 D1 结构化数据，再以相同接口逻辑读取本地副本。
 Python 不读取、打包或提供前端资源，浏览器不导入 Python 实现。
 

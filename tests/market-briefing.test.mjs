@@ -3,7 +3,6 @@ import test from "node:test";
 
 import {
   buildMarketBriefingPrompt,
-  extractBriefingContent,
   filterMarketBriefingNews,
   generateMarketBriefing,
   MARKET_BRIEFING_SYSTEM,
@@ -49,23 +48,6 @@ test("系统提示完整包含 market-briefing skill 的输出规范", () => {
   assert.match(MARKET_BRIEFING_SYSTEM, /## 输出前自检/);
 });
 
-test("模型输出兼容 AI Gateway OpenAI 格式与 Workers AI 原生格式", () => {
-  assert.equal(
-    extractBriefingContent({
-      choices: [{ message: { content: "1、股市结论。" } }],
-    }),
-    "1、股市结论。",
-  );
-  assert.equal(extractBriefingContent({ response: "2、债市结论。" }), "2、债市结论。");
-  assert.equal(
-    extractBriefingContent({
-      choices: [{ message: { content: [{ type: "text", text: "分段结论" }] } }],
-    }),
-    "分段结论",
-  );
-  assert.equal(extractBriefingContent({ choices: [] }), "");
-});
-
 test("生成流程从后端取数并调用 dynamic/rag", async () => {
   const originalFetch = globalThis.fetch;
   const aiCalls = [];
@@ -88,7 +70,18 @@ test("生成流程从后端取数并调用 dynamic/rag", async () => {
     }
     aiCalls.push({ target, init, query: JSON.parse(init.body) });
     return Response.json({
-      choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }],
+      id: "chatcmpl-test",
+      object: "chat.completion",
+      created: 1,
+      model: "gpt-5.6-luna",
+      choices: [
+        {
+          index: 0,
+          message: { role: "assistant", content: "1、股市结论。\n2、债市结论。" },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
     });
   };
   const env = {
@@ -109,8 +102,14 @@ test("生成流程从后端取数并调用 dynamic/rag", async () => {
       "https://gateway.ai.cloudflare.com/v1/account-id/default/compat/chat/completions",
     );
     assert.equal(aiCalls[0].query.model, "dynamic/rag");
+    assert.equal(aiCalls[0].query.temperature, 0.1);
     assert.equal(aiCalls[0].query.reasoning_effort, "high");
     assert.equal(aiCalls[0].query.chat_template_kwargs.enable_thinking, true);
+    assert.equal("response_format" in aiCalls[0].query, false);
+    assert.equal("top_p" in aiCalls[0].query, false);
+    assert.equal("top_k" in aiCalls[0].query, false);
+    assert.equal("repetition_penalty" in aiCalls[0].query, false);
+    assert.equal("seed" in aiCalls[0].query, false);
     assert.equal("max_completion_tokens" in aiCalls[0].query, false);
     const headers = new Headers(aiCalls[0].init.headers);
     assert.equal(headers.get("cf-aig-authorization"), "Bearer test-token");

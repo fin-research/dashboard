@@ -20,12 +20,15 @@
     "prepare": "svelte-kit sync"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.31",
     "@sveltejs/adapter-cloudflare": "^7.2.9",
     "@sveltejs/kit": "^2.70.2",
+    "ai": "7.0.68",
     "d3-cloud": "^1.2.9",
     "echarts": "^6.0.0",
     "html-to-image": "^1.11.13",
-    "svelte": "5.56.8"
+    "svelte": "5.56.8",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260814.1",

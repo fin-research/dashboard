@@ -1,7 +1,6 @@
 import type { MarketBriefing } from "../../types";
-import { runDynamicRoute } from "./ai-gateway.ts";
+import { generateDynamicRouteText } from "./ai-gateway.ts";
 
-const BRIEFING_MODEL = "dynamic/rag" as const;
 const PROMPT_VERSION = "market-briefing-v3-dynamic-rag-thinking-filtered";
 const DATA_TIMEOUT_MS = 60_000;
 const DISCARD_TITLE_PREFIXES = [
@@ -184,34 +183,6 @@ function renumberBriefingItem(item: string, index: number): string {
   return item.replace(/^【\d+】/, `【${index}】`);
 }
 
-/**
- * 兼容 AI Gateway 的 OpenAI 格式与 Workers AI 原生格式。
- */
-export function extractBriefingContent(output: unknown): string {
-  if (typeof output !== "object" || output === null) return "";
-  const record = output as {
-    choices?: Array<{ message?: { content?: unknown } }>;
-    response?: unknown;
-  };
-  const choiceContent = record.choices?.[0]?.message?.content;
-  if (typeof choiceContent === "string" && choiceContent.trim()) {
-    return choiceContent;
-  }
-  if (Array.isArray(choiceContent)) {
-    const text = choiceContent
-      .filter(
-        (part): part is { text?: unknown } =>
-          typeof part === "object" && part !== null,
-      )
-      .map((part) => (typeof part.text === "string" ? part.text : ""))
-      .join("")
-      .trim();
-    if (text) return text;
-  }
-  if (typeof record.response === "string") return record.response;
-  return "";
-}
-
 export class MarketBriefingError extends Error {
   readonly status: number;
 
@@ -229,38 +200,35 @@ export async function generateMarketBriefing(
   reportDate: string,
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
-  const output = await runDynamicRoute(
+  const content = await generateDynamicRouteText(
     {
       accountId: env.CLOUDFLARE_ACCOUNT_ID,
       gatewayId: env.AI_GATEWAY_ID || "default",
       token: env.CF_AIG_TOKEN,
     },
-    {
-      model: BRIEFING_MODEL,
-      temperature: 0.1,
-      reasoning_effort: "high",
-      chat_template_kwargs: { enable_thinking: true },
-      messages: [
-        { role: "system", content: MARKET_BRIEFING_SYSTEM },
-        {
-          role: "user",
-          content: buildMarketBriefingPrompt(
-            reportDate,
-            filterMarketBriefingNews(news.news_text),
-          ),
-        },
-      ],
-    },
+    [
+      { role: "system", content: MARKET_BRIEFING_SYSTEM },
+      {
+        role: "user",
+        content: buildMarketBriefingPrompt(
+          reportDate,
+          filterMarketBriefingNews(news.news_text),
+        ),
+      },
+    ],
     {
       requestTimeoutMs: 120_000,
+      maxRetries: 2,
+      reasoningEffort: "high",
+      enableThinking: true,
       metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
     },
   );
-  const content = extractBriefingContent(output).trim();
-  if (!content) {
+  const normalized = content.trim();
+  if (!normalized) {
     throw new MarketBriefingError(502, "模型未返回市场聚焦内容");
   }
-  return { report_date: reportDate, content, news_count: news.news_count };
+  return { report_date: reportDate, content: normalized, news_count: news.news_count };
 }
 
 interface BriefingNews {

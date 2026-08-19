@@ -38,6 +38,7 @@
 - `src/routes/`：SvelteKit 页面和 RAG API
 - `src/lib/server/hotspots.ts`：D1 证据读取、AI Gateway 聚合与缓存
 - `src/lib/server/market-briefing.ts`：今日聚焦生成（后端取数 + `dynamic/rag` 经 AI Gateway 调用，提示词逐字复刻旧版 Codex 流程）
+- `src/lib/server/ai-gateway.ts`：基于 AI SDK 的统一 OpenAI-compatible Gateway 适配器，负责认证、参数白名单、响应限长、协议归一和结构化输出校验
 - `src/routes/api/market-briefing/+server.ts`：`/api/market-briefing` Worker 路由（日期解析、错误映射 400/502/503/504）
 - `src/lib/components/WordCloud.svelte`：可点击、可键盘操作的 SVG 词云
 - `src/components/`：UI 组件（表格、指标卡片、摘要条、聚焦编辑器等）
@@ -56,7 +57,7 @@
 - `/api` 的其他路径仍由原 Cloudflare Tunnel 提供；Worker 只新增更具体的 `/api/rag/*` 路由，不改变 Swagger `/api/docs`。
 - Worker 额外接管 `/api/market-briefing`（见 `wrangler.jsonc` routes），浏览器生成聚焦不再调用 `/data/market-briefing`；后端 `/data/market-briefing/news` 只提供素材，文本生成在 Worker 内完成。
 - D1 固定绑定现有 `eastmoney` 数据库，文章正文仍不得写入 D1；热点聚合只读取 `article.summary`、`importance` 和 `keyword` 结构化证据，并把按范围键与输入指纹缓存的最终热点写入 `hotspot_cache`。
-- 所有模型调用统一通过 `https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/compat/chat/completions` 走 `dynamic/rag`。生产认证只允许使用 Worker Secret `CF_AIG_TOKEN`，账户 ID 与 Gateway ID 分别使用非敏感变量 `CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID`；不得把 token 写入源码或 `wrangler.jsonc`。`compat` 端点虽已被 Cloudflare 标记为 deprecated，但它是当前已验证同时兼容动态路由内第三方 provider 与 Workers AI 节点的路径；迁移到新版 REST API 前必须先完成同等线上兼容性验证。热点聚合保持 `enable_thinking=true`（`reasoning_effort=low`，不设置 completion token 上限），使用兼容 dynamic route 的 `response_format: json_object` 返回紧凑主题 JSON，再由应用基于证据卡片展开完整热点并做运行时校验；单来源热点热度不超过 60。
+- 所有模型调用只通过 `src/lib/server/ai-gateway.ts`，经 `https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/compat/chat/completions` 走 `dynamic/rag`。生产认证只允许使用 Worker Secret `CF_AIG_TOKEN`，账户 ID 与 Gateway ID 分别使用非敏感变量 `CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID`；不得把 token 写入源码或 `wrangler.jsonc`。结构化调用用一个 Zod Schema 自动生成标准 `response_format.json_schema`，由 AI SDK 校验结果，Prompt 不重复手写结构。热点聚合保持 `enable_thinking=true`（`reasoning_effort=low`，不设置 completion token 上限）；单来源热点热度不超过 60。统一参数和调用方式以根目录 `README.md` 为准。
 - 热点输出固定为 8–15 个；默认跨日期滚动读取最近 20 篇已完成特征抽取的文章，日期范围模式最多读取最近 100 篇。热点热度由模型直接给出 0-100 分，权重公式仅作为提示，应用不自行计算加权得分，只做范围校验与单来源封顶。
 - 文字版直接消费 `/data/report` 顶层完整字段（OMO 按报告日过滤 `operationDate`），由 `src/text-report.ts` 严格复刻 `api/scripts/report_cli.py` 的筛选、排序、条件分支、数字格式与完整文本；一级发行必须与可视化共用 `src/primary-issues.ts`，不得形成平行口径；不得直接读取 Python 生成的报告文本。
 - 端口约定：前端 8765，API 8766，均绑定 127.0.0.1。
