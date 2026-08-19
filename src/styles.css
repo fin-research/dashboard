@@ -1340,6 +1340,366 @@ h2 {
   }
 }
 
+@media (max-width: 900px) {
+  html {
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .page-shell {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding:
+      env(safe-area-inset-top, 0)
+      max(10px, env(safe-area-inset-right, 0px))
+      max(18px, env(safe-area-inset-bottom, 0px))
+      max(10px, env(safe-area-inset-left, 0px));
+    overflow: visible;
+  }
+
+  #report-surface {
+    display: grid;
+    height: auto;
+    min-height: calc(100vh - 18px);
+    min-height: calc(100dvh - 18px);
+    grid-template-rows: auto auto;
+    gap: 10px;
+  }
+
+  .report-masthead {
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 2px 0;
+    flex-direction: column;
+  }
+
+  h1 {
+    gap: 7px;
+  }
+
+  .report-title__department,
+  .report-title__subject {
+    font-size: 1.125rem;
+  }
+
+  .masthead-controls {
+    width: 100%;
+    align-items: stretch;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .titlebar-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+  }
+
+  .view-toggle {
+    min-width: 0;
+  }
+
+  .view-toggle button {
+    min-width: 0;
+    min-height: 40px;
+    flex: 1;
+    padding-inline: 6px;
+  }
+
+  .refresh-button,
+  .export-button,
+  .hero-date,
+  .view-toggle button,
+  .focus-generate-button,
+  .error-state button {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .refresh-button,
+  .export-button {
+    justify-content: center;
+    padding-inline: 10px;
+  }
+
+  .hero-date {
+    width: 100%;
+    justify-content: center;
+    padding: 4px 8px;
+  }
+
+  .visual-report-view {
+    display: flex;
+    min-height: 0;
+    gap: 10px;
+    flex-direction: column;
+  }
+
+  .core-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .core-card {
+    min-height: 82px;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .core-card .core-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .core-card .card__balance {
+    display: none;
+  }
+
+  .core-card .card__label,
+  .core-card .card__detail,
+  .core-card .card__list-value {
+    font-size: 0.875rem;
+  }
+
+  .core-card .card__value {
+    font-size: 1.25rem;
+  }
+
+  .report-content {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    gap: 10px;
+  }
+
+  .report-content > .dashboard-panel {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .dashboard-panel {
+    min-height: auto;
+  }
+
+  .panel-heading {
+    min-height: 46px;
+    padding: 6px 10px;
+  }
+
+  .focus-generate-button {
+    min-height: 44px;
+    padding-inline: 10px;
+  }
+
+  .focus-editor {
+    min-height: 240px;
+    padding: 12px;
+    overflow: visible;
+  }
+
+  .panel--omo .chart-host,
+  .panel--rates .chart-host {
+    min-height: 300px;
+    flex: none;
+  }
+
+  .panel--inventory .chart-host {
+    min-height: 340px;
+    flex: none;
+  }
+
+  .indicator-grid {
+    min-height: 136px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .indicator .card__label,
+  .indicator .card__detail {
+    font-size: 0.875rem;
+  }
+
+  .indicator .card__value {
+    font-size: 1rem;
+  }
+
+  .equity-stage {
+    min-height: 0;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .equity-dial-stage {
+    min-height: 290px;
+    flex: none;
+  }
+
+  .equity-value {
+    grid-template-columns: 44% 56%;
+  }
+
+  .equity-value strong,
+  .equity-value small {
+    font-size: 1rem;
+  }
+
+  .stat-grid {
+    min-height: 92px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .equity-heatmap-stage {
+    min-height: 360px;
+    flex: none;
+  }
+
+  .panel--primary .data-list,
+  .panel--comparable .data-list {
+    display: block;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .primary-table {
+    min-width: 560px;
+  }
+
+  .secondary-table,
+  .panel--comparable .secondary-table {
+    min-width: 440px;
+    height: auto;
+    table-layout: auto;
+  }
+
+  .panel--comparable .secondary-table thead,
+  .panel--comparable .secondary-table tbody tr {
+    height: auto;
+  }
+
+  .primary-table th,
+  .primary-table td,
+  .secondary-table th,
+  .secondary-table td {
+    height: 44px;
+  }
+
+  .summary-strip {
+    min-height: 58px;
+  }
+
+  .summary-strip__item {
+    padding: 6px 4px;
+  }
+
+  .summary-strip__item span {
+    font-size: 0.8125rem;
+  }
+
+  .summary-strip__item strong {
+    font-size: 1rem;
+  }
+
+  .text-report-view {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .text-report {
+    width: 100%;
+    height: auto;
+    min-height: calc(100vh - 172px);
+    min-height: calc(100dvh - 172px);
+    padding: 20px 16px 36px;
+    overflow: visible;
+  }
+
+  .loading-state,
+  .error-state {
+    width: 100%;
+    min-height: 160px;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 20px 18px;
+    flex-wrap: wrap;
+  }
+
+  .error-state button {
+    min-height: 44px;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .page-shell {
+    padding-right: max(8px, env(safe-area-inset-right, 0px));
+    padding-left: max(8px, env(safe-area-inset-left, 0px));
+  }
+
+  .titlebar-actions {
+    grid-template-columns: minmax(0, 1fr) 44px 44px;
+  }
+
+  .refresh-button,
+  .export-button {
+    min-width: 44px;
+    padding: 0;
+  }
+
+  .refresh-button span,
+  .export-button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .refresh-button svg,
+  .export-button svg {
+    width: 19px;
+  }
+
+  .core-card {
+    min-height: 78px;
+    gap: 6px;
+    padding: 7px 6px;
+  }
+
+  .core-card .core-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .core-card .card__label,
+  .core-card .card__detail,
+  .core-card .card__list-value {
+    font-size: 0.8125rem;
+  }
+
+  .core-card .card__value {
+    font-size: 1.125rem;
+  }
+
+  .equity-value {
+    grid-template-columns: 42% 58%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
