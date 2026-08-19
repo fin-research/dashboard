@@ -70,29 +70,31 @@ test("生成流程从后端取数并调用 dynamic/rag", async () => {
   const originalFetch = globalThis.fetch;
   const aiCalls = [];
   globalThis.fetch = async (url, init) => {
-    assert.equal(String(url), "https://eastmoney.hasbai.xyz/data/market-briefing/news?date=2026-08-10");
-    assert.equal(init?.method, "POST");
-    return new Response(
-      JSON.stringify({
-        report_date: "2026-08-10",
-        news_count: 2,
-        news_text: "【1】股市收盘正文",
-      }),
-      { status: 200, headers: { "content-type": "application/json" } },
-    );
+    const target = String(url);
+    if (target.includes("/data/market-briefing/news")) {
+      assert.equal(
+        target,
+        "https://eastmoney.hasbai.xyz/data/market-briefing/news?date=2026-08-10",
+      );
+      assert.equal(init?.method, "POST");
+      return new Response(
+        JSON.stringify({
+          report_date: "2026-08-10",
+          news_count: 2,
+          news_text: "【1】股市收盘正文",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    aiCalls.push({ target, init, query: JSON.parse(init.body) });
+    return Response.json({
+      choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }],
+    });
   };
   const env = {
-    AI: {
-      gateway: (gatewayId) => ({
-        run: async (request, options) => {
-          aiCalls.push({ gatewayId, request, options });
-          return Response.json({
-            choices: [{ message: { content: "1、股市结论。\n2、债市结论。" } }],
-          });
-        },
-      }),
-    },
+    CLOUDFLARE_ACCOUNT_ID: "account-id",
     AI_GATEWAY_ID: "default",
+    CF_AIG_TOKEN: "test-token",
     DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
   };
   try {
@@ -102,29 +104,30 @@ test("生成流程从后端取数并调用 dynamic/rag", async () => {
       content: "1、股市结论。\n2、债市结论。",
       news_count: 2,
     });
-    assert.equal(aiCalls[0].gatewayId, "default");
-    assert.equal(aiCalls[0].request.provider, "compat");
-    assert.equal(aiCalls[0].request.endpoint, "chat/completions");
-    assert.equal(aiCalls[0].request.query.model, "dynamic/rag");
-    assert.equal(aiCalls[0].request.query.reasoning_effort, "high");
-    assert.equal(aiCalls[0].request.query.chat_template_kwargs.enable_thinking, true);
-    assert.equal("max_completion_tokens" in aiCalls[0].request.query, false);
-    assert.deepEqual(aiCalls[0].request.headers, {});
-    assert.equal(aiCalls[0].options.gateway.id, "default");
-    assert.equal(aiCalls[0].options.gateway.skipCache, true);
-    assert.equal(aiCalls[0].options.gateway.collectLog, true);
-    assert.equal(aiCalls[0].options.gateway.requestTimeoutMs, 120_000);
-    assert.deepEqual(aiCalls[0].options.gateway.metadata, {
+    assert.equal(
+      aiCalls[0].target,
+      "https://gateway.ai.cloudflare.com/v1/account-id/default/compat/chat/completions",
+    );
+    assert.equal(aiCalls[0].query.model, "dynamic/rag");
+    assert.equal(aiCalls[0].query.reasoning_effort, "high");
+    assert.equal(aiCalls[0].query.chat_template_kwargs.enable_thinking, true);
+    assert.equal("max_completion_tokens" in aiCalls[0].query, false);
+    const headers = new Headers(aiCalls[0].init.headers);
+    assert.equal(headers.get("cf-aig-authorization"), "Bearer test-token");
+    assert.equal(headers.get("cf-aig-skip-cache"), "true");
+    assert.equal(headers.get("cf-aig-collect-log"), "true");
+    assert.equal(headers.get("cf-aig-request-timeout"), "120000");
+    assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
       report_date: "2026-08-10",
       prompt_version: "market-briefing-v3-dynamic-rag-thinking-filtered",
     });
-    assert.ok(aiCalls[0].options.signal instanceof AbortSignal);
-    assert.match(aiCalls[0].request.query.messages[0].content, /^---\nname: market-briefing/);
+    assert.ok(aiCalls[0].init.signal instanceof AbortSignal);
+    assert.match(aiCalls[0].query.messages[0].content, /^---\nname: market-briefing/);
     assert.match(
-      aiCalls[0].request.query.messages[1].content,
+      aiCalls[0].query.messages[1].content,
       /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
     );
-    assert.match(aiCalls[0].request.query.messages[1].content, /【1】股市收盘正文/);
+    assert.match(aiCalls[0].query.messages[1].content, /【1】股市收盘正文/);
   } finally {
     globalThis.fetch = originalFetch;
   }

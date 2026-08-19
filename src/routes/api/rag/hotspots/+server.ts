@@ -6,9 +6,13 @@ import {
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform, url }) => {
-  if (!platform?.env.DB || !platform.env.AI) {
+  if (
+    !platform?.env.DB ||
+    !platform.env.CLOUDFLARE_ACCOUNT_ID ||
+    !platform.env.CF_AIG_TOKEN
+  ) {
     return Response.json(
-      { error: "D1 或 Workers AI binding 未配置" },
+      { error: "D1 或 AI Gateway 认证未配置" },
       { status: 503 },
     );
   }
@@ -27,7 +31,6 @@ export const GET: RequestHandler = async ({ platform, url }) => {
         event: "market_hotspots_failed",
         scope: scopeForLog(url),
         status,
-        gateway_log_id: platform.env.AI.aiGatewayLogId,
         error: describeError(error),
       }),
     );

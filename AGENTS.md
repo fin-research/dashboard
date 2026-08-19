@@ -2,7 +2,7 @@
 
 ## 项目简介
 
-债券市场可视化研究报告全栈应用。技术栈：SvelteKit + Svelte 5 + TypeScript + daisyUI（Tailwind CSS 4）+ Cloudflare Workers/D1/Workers AI + pnpm。
+债券市场可视化研究报告全栈应用。技术栈：SvelteKit + Svelte 5 + TypeScript + daisyUI（Tailwind CSS 4）+ Cloudflare Workers/D1/AI Gateway + pnpm。
 
 ## 数据来源
 
@@ -14,7 +14,7 @@
 - `GET /data/report?date=YYYY-MM-DD[&refresh=1]`：获取指定日期的统一报告数据。每个区块都是完整版原始行：`omo`（窗口原始行）、`rates`（dr/dibo/bonds/futures）、`stock_paragraphs`、`margin`（原始行）、`primary`/`inventory`（原始行 + 视觉派生列）、`secondary`（原始行）；视觉与文字版共用同一份字段，前端按需派生
 - `GET /api/rag/hotspots?mode=rolling&count=20[&refresh=1]`：按最新文章数聚合热点（默认 20 篇）
 - `GET /api/rag/hotspots?mode=range&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD[&refresh=1]`：按日期范围聚合热点
-- `POST /api/market-briefing?date=YYYY-MM-DD`：今日聚焦生成（Worker 路由）。Worker 先从后端 `/data/market-briefing/news` 取当日新闻素材，再经 Workers AI binding 走 AI Gateway（`AI_GATEWAY_ID=default`）调用 `dynamic/rag`；系统提示为 `src/lib/server/market-briefing.ts` 内嵌的 market-briefing skill 全文，用户提示与旧版后端 Codex 生成逐字一致
+- `POST /api/market-briefing?date=YYYY-MM-DD`：今日聚焦生成（Worker 路由）。Worker 先从后端 `/data/market-briefing/news` 取当日新闻素材，再通过 AI Gateway `compat/chat/completions`（`AI_GATEWAY_ID=default`）调用 `dynamic/rag`；系统提示为 `src/lib/server/market-briefing.ts` 内嵌的 market-briefing skill 全文，用户提示与旧版后端 Codex 生成逐字一致
 
 本地开发直接运行 `pnpm dev`，不需要先启动仓库内的 Python API。
 
@@ -27,6 +27,7 @@
 - `pnpm typecheck`：svelte-check 类型检查
 - `pnpm worker:dev`：构建后使用 Wrangler 在本地运行 Cloudflare Worker
 - `pnpm worker:deploy`：构建并部署 `eastmoney-dashboard` Worker
+- `pnpm exec wrangler secret put CF_AIG_TOKEN`：交互式配置生产 AI Gateway 认证 Secret；不得把值写入命令、源码或配置文件
 - `pnpm worker:typegen`：根据 `wrangler.jsonc` 更新 Worker 绑定类型
 - `pnpm db:sync:remote`：按本地最新 `updated_at` / `generated_at` 只读查询远程 D1，增量 upsert `article`、`keyword`、`hotspot_cache`；空库首次只建立最近 100 篇已完成特征抽取文章的有限基线，不读取全库
 - `pnpm db:migrate:local` / `pnpm db:migrate:remote`：应用热点缓存表迁移
@@ -35,7 +36,7 @@
 
 - `src/App.svelte`：既有报告页面布局与数据装配
 - `src/routes/`：SvelteKit 页面和 RAG API
-- `src/lib/server/hotspots.ts`：D1 证据读取、Workers AI 聚合与缓存
+- `src/lib/server/hotspots.ts`：D1 证据读取、AI Gateway 聚合与缓存
 - `src/lib/server/market-briefing.ts`：今日聚焦生成（后端取数 + `dynamic/rag` 经 AI Gateway 调用，提示词逐字复刻旧版 Codex 流程）
 - `src/routes/api/market-briefing/+server.ts`：`/api/market-briefing` Worker 路由（日期解析、错误映射 400/502/503/504）
 - `src/lib/components/WordCloud.svelte`：可点击、可键盘操作的 SVG 词云
@@ -55,10 +56,10 @@
 - `/api` 的其他路径仍由原 Cloudflare Tunnel 提供；Worker 只新增更具体的 `/api/rag/*` 路由，不改变 Swagger `/api/docs`。
 - Worker 额外接管 `/api/market-briefing`（见 `wrangler.jsonc` routes），浏览器生成聚焦不再调用 `/data/market-briefing`；后端 `/data/market-briefing/news` 只提供素材，文本生成在 Worker 内完成。
 - D1 固定绑定现有 `eastmoney` 数据库，文章正文仍不得写入 D1；热点聚合只读取 `article.summary`、`importance` 和 `keyword` 结构化证据，并把按范围键与输入指纹缓存的最终热点写入 `hotspot_cache`。
-- Workers AI 固定使用 binding，不得在应用中保存或调用 Cloudflare API Token。所有模型调用统一走 `dynamic/rag`；热点聚合保持 `enable_thinking=true`（`reasoning_effort=low`，不设置 completion token 上限），使用兼容 dynamic route 的 `response_format: json_object` 返回紧凑主题 JSON，再由应用基于证据卡片展开完整热点并做运行时校验；单来源热点热度不超过 60。
+- 所有模型调用统一通过 `https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/compat/chat/completions` 走 `dynamic/rag`。生产认证只允许使用 Worker Secret `CF_AIG_TOKEN`，账户 ID 与 Gateway ID 分别使用非敏感变量 `CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID`；不得把 token 写入源码或 `wrangler.jsonc`。`compat` 端点虽已被 Cloudflare 标记为 deprecated，但它是当前已验证同时兼容动态路由内第三方 provider 与 Workers AI 节点的路径；迁移到新版 REST API 前必须先完成同等线上兼容性验证。热点聚合保持 `enable_thinking=true`（`reasoning_effort=low`，不设置 completion token 上限），使用兼容 dynamic route 的 `response_format: json_object` 返回紧凑主题 JSON，再由应用基于证据卡片展开完整热点并做运行时校验；单来源热点热度不超过 60。
 - 热点输出固定为 8–15 个；默认跨日期滚动读取最近 20 篇已完成特征抽取的文章，日期范围模式最多读取最近 100 篇。热点热度由模型直接给出 0-100 分，权重公式仅作为提示，应用不自行计算加权得分，只做范围校验与单来源封顶。
 - 文字版直接消费 `/data/report` 顶层完整字段（OMO 按报告日过滤 `operationDate`），由 `src/text-report.ts` 严格复刻 `api/scripts/report_cli.py` 的筛选、排序、条件分支、数字格式与完整文本；一级发行必须与可视化共用 `src/primary-issues.ts`，不得形成平行口径；不得直接读取 Python 生成的报告文本。
 - 端口约定：前端 8765，API 8766，均绑定 127.0.0.1。
-- 本地启动前只读增量同步远程 D1 中的结构化文章、关键词和热点缓存，不清空本地库、不复制文章正文；空库首次也只读取最近 100 篇已完成特征抽取的文章。请求在本地 D1 上执行，Workers AI 仍使用远程 binding，调用可能产生费用。
+- 本地启动前只读增量同步远程 D1 中的结构化文章、关键词和热点缓存，不清空本地库、不复制文章正文；空库首次也只读取最近 100 篇已完成特征抽取的文章。需要本地调用模型时，从 `.dev.vars.example` 创建未纳入版本控制的 `.dev.vars` 并配置 `CF_AIG_TOKEN`；请求在本地 D1 上执行，AI Gateway 调用仍会产生费用。
 - 本项目不做浏览器或截图视觉检查；验证只运行类型检查、单元测试、构建、dry-run 与必要的接口请求。
 - 提交前请确保 `pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过。

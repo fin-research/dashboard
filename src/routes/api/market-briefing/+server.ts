@@ -5,9 +5,9 @@ import {
 import type { RequestHandler } from "./$types";
 
 export const POST: RequestHandler = async ({ platform, url }) => {
-  if (!platform?.env.AI) {
+  if (!platform?.env.CLOUDFLARE_ACCOUNT_ID || !platform.env.CF_AIG_TOKEN) {
     return Response.json(
-      { error: "Workers AI binding 未配置" },
+      { error: "AI Gateway 认证未配置" },
       { status: 503 },
     );
   }

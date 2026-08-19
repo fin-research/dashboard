@@ -6,59 +6,59 @@ import {
   runDynamicRoute,
 } from "../src/lib/server/ai-gateway.ts";
 
-test("dynamic route uses the authenticated compat gateway binding", async () => {
+test("dynamic route uses the authenticated compat HTTP endpoint", async () => {
   const calls = [];
-  const ai = {
-    gateway: (gatewayId) => ({
-      run: async (request, options) => {
-        calls.push({ gatewayId, request, options });
-        return Response.json(
-          { choices: [{ message: { content: "OK" } }] },
-          { headers: { "cf-aig-log-id": "log-success" } },
-        );
-      },
-    }),
+  const fetcher = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return Response.json(
+      { choices: [{ message: { content: "OK" } }] },
+      { headers: { "cf-aig-log-id": "log-success" } },
+    );
   };
 
   const result = await runDynamicRoute(
-    ai,
-    "default",
+    { accountId: "account-id", gatewayId: "default", token: "test-token" },
     { model: "dynamic/rag", messages: [{ role: "user", content: "test" }] },
     { requestTimeoutMs: 120_000, metadata: { prompt_version: "test-v1" } },
+    fetcher,
   );
 
   assert.deepEqual(result, { choices: [{ message: { content: "OK" } }] });
-  assert.equal(calls[0].gatewayId, "default");
-  assert.equal(calls[0].request.provider, "compat");
-  assert.equal(calls[0].request.endpoint, "chat/completions");
-  assert.equal(calls[0].request.query.model, "dynamic/rag");
-  assert.deepEqual(calls[0].request.headers, {});
-  assert.equal(calls[0].options.gateway.id, "default");
-  assert.equal(calls[0].options.gateway.skipCache, true);
-  assert.equal(calls[0].options.gateway.collectLog, true);
-  assert.equal(calls[0].options.gateway.requestTimeoutMs, 120_000);
-  assert.deepEqual(calls[0].options.gateway.metadata, {
+  assert.equal(
+    calls[0].url,
+    "https://gateway.ai.cloudflare.com/v1/account-id/default/compat/chat/completions",
+  );
+  assert.equal(calls[0].init.method, "POST");
+  const headers = new Headers(calls[0].init.headers);
+  assert.equal(headers.get("content-type"), "application/json");
+  assert.equal(headers.get("cf-aig-authorization"), "Bearer test-token");
+  assert.equal(headers.get("cf-aig-skip-cache"), "true");
+  assert.equal(headers.get("cf-aig-collect-log"), "true");
+  assert.equal(headers.get("cf-aig-request-timeout"), "120000");
+  assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
     prompt_version: "test-v1",
   });
-  assert.ok(calls[0].options.signal instanceof AbortSignal);
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    model: "dynamic/rag",
+    messages: [{ role: "user", content: "test" }],
+  });
+  assert.ok(calls[0].init.signal instanceof AbortSignal);
 });
 
 test("dynamic route reports bounded upstream errors with the gateway log id", async () => {
-  const ai = {
-    gateway: () => ({
-      run: async () =>
-        new Response('{"error":"bad request"}', {
-          status: 400,
-          headers: { "cf-aig-log-id": "log-failure" },
-        }),
-    }),
-  };
+  const fetcher = async () =>
+    new Response('{"error":"bad request"}', {
+      status: 400,
+      headers: { "cf-aig-log-id": "log-failure" },
+    });
 
   await assert.rejects(
-    runDynamicRoute(ai, "default", { model: "dynamic/rag" }, {
-      requestTimeoutMs: 120_000,
-      metadata: {},
-    }),
+    runDynamicRoute(
+      { accountId: "account-id", gatewayId: "default", token: "test-token" },
+      { model: "dynamic/rag" },
+      { requestTimeoutMs: 120_000, metadata: {} },
+      fetcher,
+    ),
     (error) => {
       assert.ok(error instanceof AiGatewayResponseError);
       assert.equal(error.status, 400);

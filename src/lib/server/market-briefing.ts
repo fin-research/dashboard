@@ -230,8 +230,11 @@ export async function generateMarketBriefing(
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
   const output = await runDynamicRoute(
-    env.AI,
-    env.AI_GATEWAY_ID || "default",
+    {
+      accountId: env.CLOUDFLARE_ACCOUNT_ID,
+      gatewayId: env.AI_GATEWAY_ID || "default",
+      token: env.CF_AIG_TOKEN,
+    },
     {
       model: BRIEFING_MODEL,
       temperature: 0.1,

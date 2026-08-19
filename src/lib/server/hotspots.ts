@@ -93,8 +93,11 @@ export async function getMarketHotspots(
   }
 
   const output = await runDynamicRoute(
-    env.AI,
-    env.AI_GATEWAY_ID || "default",
+    {
+      accountId: env.CLOUDFLARE_ACCOUNT_ID,
+      gatewayId: env.AI_GATEWAY_ID || "default",
+      token: env.CF_AIG_TOKEN,
+    },
     {
       model: HOTSPOT_MODEL,
       messages: buildAggregateMessages(cards),
@@ -113,7 +116,7 @@ export async function getMarketHotspots(
   );
   const content = extractModelContent(output);
   if (typeof content !== "string" || !content.trim()) {
-    throw new HotspotError(502, "Workers AI 未返回可解析的热点结果");
+    throw new HotspotError(502, "AI Gateway 未返回可解析的热点结果");
   }
   const analysis = parseHotspotAnalysis(
     JSON.stringify(expandCompactHotspotOutput(content, cards)),
