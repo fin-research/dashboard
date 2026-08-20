@@ -111,7 +111,7 @@ export function parseHotspotAnalysis(
 
   return {
     date: context.date,
-    marketSummary: requiredString(value.marketSummary, "marketSummary", 1_200),
+    marketSummary: requiredString(value.marketSummary, "marketSummary"),
     hotspots,
     relationships,
     watchItems: stringArray(value.watchItems, "watchItems", 12, 300),
@@ -211,13 +211,15 @@ function stringArray(
 function requiredString(
   value: unknown,
   name: string,
-  maxLength: number,
+  maxLength?: number,
 ): string {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`${name} must be a string`);
   }
   const trimmed = value.trim();
-  if (trimmed.length > maxLength) throw new Error(`${name} is too long`);
+  if (maxLength !== undefined && trimmed.length > maxLength) {
+    throw new Error(`${name} is too long`);
+  }
   return trimmed;
 }
 

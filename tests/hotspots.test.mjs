@@ -136,3 +136,21 @@ test("缓存中的结果可重新校验并解析", () => {
 
   assert.deepEqual(cached, first);
 });
+
+test("市场总览超过建议字数时仍完整接收", () => {
+  const marketSummary = "热点总览允许模型根据证据完整表达，不因略微超出建议篇幅而拒绝整次聚合结果。".repeat(4);
+  const result = parseHotspotAnalysis(
+    JSON.stringify({
+      marketSummary,
+      hotspots: Array.from({ length: 8 }, (_, index) =>
+        hotspot({ keyword: `长总览热点${index + 1}` }),
+      ),
+      relationships: [],
+      watchItems: [],
+    }),
+    { date: "2026-08-19", articleIds: ["A001"] },
+  );
+
+  assert.ok(marketSummary.length > 120);
+  assert.equal(result.marketSummary, marketSummary);
+});

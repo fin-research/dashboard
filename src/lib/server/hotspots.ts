@@ -12,7 +12,8 @@ import {
 } from "./ai-gateway.ts";
 
 const HOTSPOT_MODEL = DYNAMIC_ROUTE_MODEL;
-const PROMPT_VERSION = "d1-hotspots-v9-dynamic-rag-json-schema";
+const PROMPT_VERSION = "d1-hotspots-v10-unbounded-summary";
+const HOTSPOT_REQUEST_TIMEOUT_MS = 360_000;
 const MAX_KEYWORDS_PER_CARD = 3;
 const MAX_TITLE_CHARS = 120;
 const MAX_SUMMARY_CHARS = 480;
@@ -23,8 +24,7 @@ export const hotspotResponseSchema = z
     marketSummary: z
       .string()
       .min(1)
-      .max(120)
-      .describe("120字以内的股债市场热点总览"),
+      .describe("简明的股债市场热点总览"),
     hotspots: z
       .array(
         z
@@ -125,7 +125,7 @@ export async function getMarketHotspots(
     hotspotOutputSchema,
     "market_hotspots",
     {
-      requestTimeoutMs: 120_000,
+      requestTimeoutMs: HOTSPOT_REQUEST_TIMEOUT_MS,
       maxRetries: 2,
       reasoningEffort: "low",
       enableThinking: true,
@@ -301,8 +301,7 @@ function expandCompactHotspotOutput(
   }
 
   return {
-    marketSummary:
-      textValue(value.marketSummary, 1_200) || truncate(cards[0]!.summary, 1_200),
+    marketSummary: textValue(value.marketSummary) || truncate(cards[0]!.summary, 1_200),
     hotspots: compactRows.map((row) => {
       const evidenceCards = row.articleIds
         .map((id) => cardById.get(id))
@@ -366,8 +365,10 @@ function expandCompactHotspotOutput(
   };
 }
 
-function textValue(value: unknown, maxLength: number): string {
-  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+function textValue(value: unknown, maxLength?: number): string {
+  if (typeof value !== "string") return "";
+  const text = value.trim();
+  return maxLength === undefined ? text : text.slice(0, maxLength);
 }
 
 function truncate(value: string, maxLength: number): string {

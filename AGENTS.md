@@ -16,12 +16,12 @@
 - `GET /api/rag/hotspots?mode=range&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD[&refresh=1]`：按日期范围聚合热点
 - `POST /api/market-briefing?date=YYYY-MM-DD`：今日聚焦生成（Worker 路由）。Worker 先从后端 `/data/market-briefing/news` 取当日新闻素材，再通过 AI Gateway `compat/chat/completions`（`AI_GATEWAY_ID=default`）调用 `dynamic/rag`；系统提示为 `src/lib/server/market-briefing.ts` 内嵌的 market-briefing skill 全文，用户提示与旧版后端 Codex 生成逐字一致
 
-本地开发直接运行 `pnpm dev`，不需要先启动仓库内的 Python API。
+本地开发直接运行 `pnpm dev`，不需要先启动仓库内的 Python API，也不会自动同步远程 D1。
 
 ## 常用命令
 
 - `pnpm install`：安装依赖
-- `pnpm dev`：以 `dev` mode 读取 `.env.dev`，先增量同步远程 D1 的结构化文章、关键词和热点缓存，再启动开发服务器（127.0.0.1:8765，访问入口 `http://127.0.0.1:8765/dashboard/`）
+- `pnpm dev`：以 `dev` mode 读取 `.env.dev` 并直接启动开发服务器（127.0.0.1:8765，访问入口 `http://127.0.0.1:8765/`）；不同步远程数据库
 - `pnpm build`：类型检查 + SvelteKit Cloudflare 生产构建
 - `pnpm test`：运行单元测试（node --test，`tests/*.test.mjs`）
 - `pnpm typecheck`：svelte-check 类型检查
@@ -29,7 +29,7 @@
 - `pnpm worker:deploy`：构建并部署 `eastmoney-dashboard` Worker
 - `pnpm exec wrangler secret put CF_AIG_TOKEN`：交互式配置生产 AI Gateway 认证 Secret；不得把值写入命令、源码或配置文件
 - `pnpm worker:typegen`：根据 `wrangler.jsonc` 更新 Worker 绑定类型
-- `pnpm db:sync:remote`：按本地最新 `updated_at` / `generated_at` 只读查询远程 D1，增量 upsert `article`、`keyword`、`hotspot_cache`；空库首次只建立最近 100 篇已完成特征抽取文章的有限基线，不读取全库
+- `pnpm db:sync:remote`：仅在明确需要时手动运行；按本地最新 `updated_at` / `generated_at` 只读查询远程 D1，增量 upsert `article`、`keyword`、`hotspot_cache`；空库首次只建立最近 100 篇已完成特征抽取文章的有限基线，不读取全库
 - `pnpm db:migrate:local` / `pnpm db:migrate:remote`：应用热点缓存表迁移
 
 ## 目录结构
@@ -61,6 +61,6 @@
 - 热点输出固定为 8–15 个；默认跨日期滚动读取最近 20 篇已完成特征抽取的文章，日期范围模式最多读取最近 100 篇。热点热度由模型直接给出 0-100 分，权重公式仅作为提示，应用不自行计算加权得分，只做范围校验与单来源封顶。
 - 文字版直接消费 `/data/report` 顶层完整字段（OMO 按报告日过滤 `operationDate`），由 `src/text-report.ts` 严格复刻 `api/scripts/report_cli.py` 的筛选、排序、条件分支、数字格式与完整文本；一级发行必须与可视化共用 `src/primary-issues.ts`，不得形成平行口径；不得直接读取 Python 生成的报告文本。
 - 端口约定：前端 8765，API 8766，均绑定 127.0.0.1。
-- 本地启动前只读增量同步远程 D1 中的结构化文章、关键词和热点缓存，不清空本地库、不复制文章正文；空库首次也只读取最近 100 篇已完成特征抽取的文章。需要本地调用模型时，从 `.dev.vars.example` 创建未纳入版本控制的 `.dev.vars` 并配置 `CF_AIG_TOKEN`；请求在本地 D1 上执行，AI Gateway 调用仍会产生费用。
+- `pnpm dev` 不得同步远程 D1；只有在明确需要刷新本地热点证据时，才手动运行 `pnpm db:sync:remote`。需要本地调用模型时，从 `.dev.vars.example` 创建未纳入版本控制的 `.dev.vars` 并配置 `CF_AIG_TOKEN`；请求在本地 D1 上执行，AI Gateway 调用仍会产生费用。
 - 本项目不做浏览器或截图视觉检查；验证只运行类型检查、单元测试、构建、dry-run 与必要的接口请求。
 - 提交前请确保 `pnpm typecheck`、`pnpm test`、`pnpm build` 全部通过。
