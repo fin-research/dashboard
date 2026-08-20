@@ -1,6 +1,7 @@
 import {
   compact,
   formatOmoNetAmount,
+  integer,
   number,
   signed,
   tone,
@@ -131,18 +132,18 @@ export function equityStatCards(
   return [
     {
       label: "沪深京成交额",
-      value: compact(data.turnover_yi, " 亿元"),
+      value: integer(data.turnover_yi, " 亿元"),
       change: Number.isFinite(data.turnover_change_yi)
-        ? signed(data.turnover_change_yi, " 亿元")
+        ? signed(data.turnover_change_yi, " 亿元", 0)
         : "较前日变动暂缺",
       valueTone: tone(data.turnover_change_yi),
       icon: "turnover",
     },
     {
       label: "融资融券余额",
-      value: compact(margin.total, " 亿元"),
+      value: integer(margin.total, " 亿元"),
       change: Number.isFinite(margin.total_change)
-        ? signed(margin.total_change, " 亿元")
+        ? signed(margin.total_change, " 亿元", 0)
         : "较前日变动暂缺",
       valueTone: tone(margin.total_change),
       icon: "margin",

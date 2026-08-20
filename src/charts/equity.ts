@@ -13,9 +13,30 @@ import {
 } from "./common";
 import { setChart, setEmpty } from "./charting";
 
+interface GaugeLayout {
+  centers: string[][];
+  radius: string;
+  showLabels: boolean;
+}
+
 export function renderEquityGauges(
   host: HTMLElement,
   points: EquityPoint[],
+): void {
+  renderEquityGaugeLayout(host, points, false);
+}
+
+export function renderEquityGaugesMobile(
+  host: HTMLElement,
+  points: EquityPoint[],
+): void {
+  renderEquityGaugeLayout(host, points, true);
+}
+
+function renderEquityGaugeLayout(
+  host: HTMLElement,
+  points: EquityPoint[],
+  mobile: boolean,
 ): void {
   const valid = points.filter((point) => Number.isFinite(point.change_pct));
   if (!valid.length) {
@@ -28,40 +49,42 @@ export function renderEquityGauges(
     Math.ceil(Math.max(...valid.map((point) => Math.abs(point.change_pct))) * 2) /
       2,
   );
-  const compact = host.clientWidth < 400;
-  const centers = compact
-    ? [
-        ["11%", "22%"],
-        ["61%", "22%"],
-        ["11%", "72%"],
-        ["61%", "72%"],
-      ]
-    : [
-        ["13%", "22%"],
-        ["63%", "22%"],
-        ["13%", "72%"],
-        ["63%", "72%"],
-      ];
-  const gaugeRadius = compact ? "29%" : "36%";
-
-  setChart(host, {
-    animationDuration: 280,
-    aria: { enabled: true, description: "A股四个主要指数红绿方向仪表盘" },
-    tooltip: {
-      ...tooltip,
-      trigger: "item",
-      formatter: (params: unknown) => {
-        const item = params as { seriesName: string };
-        const point = valid.find((candidate) => candidate.name === item.seriesName);
-        if (!point) return "";
-        return `<strong>${escapeHtml(point.name)}</strong><br>收报 ${number(point.close, 2)}<br>涨跌 ${signed(point.change_pct, "%")}`;
-      },
-    },
-    series: valid.slice(0, 4).map((point, index) => ({
+  const sideCompactLayout: GaugeLayout = {
+    centers: [
+      ["11%", "22%"],
+      ["61%", "22%"],
+      ["11%", "72%"],
+      ["61%", "72%"],
+    ],
+    radius: "29%",
+    showLabels: false,
+  };
+  const stackedLayout: GaugeLayout = {
+    centers: [
+      ["25%", "15.5%"],
+      ["75%", "15.5%"],
+      ["25%", "65.5%"],
+      ["75%", "65.5%"],
+    ],
+    radius: "28%",
+    showLabels: true,
+  };
+  const regularLayout: GaugeLayout = {
+    centers: [
+      ["13%", "22%"],
+      ["63%", "22%"],
+      ["13%", "72%"],
+      ["63%", "72%"],
+    ],
+    radius: "36%",
+    showLabels: false,
+  };
+  const gaugeSeries = (layout: GaugeLayout) =>
+    valid.slice(0, 4).map((point, index) => ({
       name: point.name,
-      type: "gauge",
-      center: centers[index],
-      radius: gaugeRadius,
+      type: "gauge" as const,
+      center: layout.centers[index],
+      radius: layout.radius,
       min: -maxAbs,
       max: maxAbs,
       startAngle: 215,
@@ -115,16 +138,70 @@ export function renderEquityGauges(
         },
       },
       title: {
-        show: false,
-        offsetCenter: [0, "48%"],
+        show: layout.showLabels,
+        offsetCenter: layout.showLabels ? ["0%", "130%"] : [0, "48%"],
         color: colors.ink,
         fontFamily,
-        fontSize: Math.max(11, chartTextSize * 0.75),
-        fontWeight: 650,
+        fontSize: layout.showLabels
+          ? Math.max(13, chartTextSize * 0.875)
+          : Math.max(11, chartTextSize * 0.75),
+        fontWeight: layout.showLabels ? 700 : 650,
+        align: "center",
       },
-      detail: { show: false },
+      detail: layout.showLabels
+        ? {
+            show: true,
+            offsetCenter: ["0%", "185%"],
+            align: "center",
+            formatter: `{close|${number(point.close, 2)}}  {change|${signed(point.change_pct, "%")}}`,
+            rich: {
+              close: {
+                color: colors.ink,
+                fontFamily,
+                fontSize: Math.max(13, chartTextSize * 0.875),
+                fontWeight: 800,
+                lineHeight: Math.round(chartTextSize * 1.05),
+              },
+              change: {
+                color: point.change_pct >= 0 ? colors.red : colors.green,
+                fontFamily,
+                fontSize: Math.max(13, chartTextSize * 0.875),
+                fontWeight: 800,
+                lineHeight: Math.round(chartTextSize * 1.05),
+              },
+            },
+          }
+        : { show: false },
       data: [{ value: point.change_pct, name: point.name }],
-    })),
+    }));
+
+  setChart(host, {
+    animationDuration: 280,
+    aria: { enabled: true, description: "A股四个主要指数红绿方向仪表盘" },
+    tooltip: {
+      ...tooltip,
+      trigger: "item",
+      formatter: (params: unknown) => {
+        const item = params as { seriesName: string };
+        const point = valid.find((candidate) => candidate.name === item.seriesName);
+        if (!point) return "";
+        return `<strong>${escapeHtml(point.name)}</strong><br>收报 ${number(point.close, 2)}<br>涨跌 ${signed(point.change_pct, "%")}`;
+      },
+    },
+    series: gaugeSeries(mobile ? stackedLayout : regularLayout),
+    ...(mobile
+      ? {}
+      : {
+          media: [
+            {
+              query: { maxWidth: 399 },
+              option: { series: gaugeSeries(sideCompactLayout) },
+            },
+            {
+              option: { series: gaugeSeries(regularLayout) },
+            },
+          ],
+        }),
   });
 }
 

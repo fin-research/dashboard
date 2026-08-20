@@ -1,4 +1,5 @@
 import { toPng } from "html-to-image";
+import { reportImageFilename } from "./export-filename";
 
 const EXPORT_SCALE = 3;
 
@@ -45,7 +46,8 @@ export async function exportReportImage(
     });
 
     const download = document.createElement("a");
-    download.download = `资金管理部-市场点评-${reportDate}-${EXPORT_SCALE}x.png`;
+    const isMobile = window.matchMedia("(max-width: 900px)").matches;
+    download.download = reportImageFilename(reportDate, isMobile);
     download.href = dataUrl;
     document.body.append(download);
     download.click();

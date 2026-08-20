@@ -22,6 +22,11 @@
   import { loadStoredFocusText } from "./focus-editor";
   import { chineseDateParts } from "./formatters";
   import { deriveReport, type ReportDerived } from "./report-view";
+  import {
+    readCachedReport,
+    type ReportCacheStorage,
+    writeCachedReport,
+  } from "./report-cache";
   import { currentReportDate } from "./report-date";
   import {
     pathnameForReportView,
@@ -95,14 +100,22 @@
     briefingRequest?.abort();
     briefingLoading = false;
     briefingError = "";
-    activeRequest = new AbortController();
+    const request = new AbortController();
+    activeRequest = request;
+    const requestedDate = selectedDate;
+    const storage = browserReportStorage();
+    const cachedReport = refresh || !storage
+      ? null
+      : readCachedReport(storage, requestedDate);
     loading = true;
     errorMessage = "";
     try {
       const [report, chartModule] = await Promise.all([
-        fetchReport(selectedDate, refresh, activeRequest.signal),
+        cachedReport ?? fetchReport(requestedDate, refresh, request.signal),
         import("./charts"),
       ]);
+      if (request.signal.aborted || selectedDate !== requestedDate) return;
+      if (!cachedReport && storage) writeCachedReport(storage, report);
       data = report;
       focusText = loadStoredFocusText(report.report_date);
       charts = chartModule;
@@ -169,6 +182,14 @@
   function showError(error: unknown): void {
     loading = false;
     errorMessage = error instanceof Error ? error.message : String(error);
+  }
+
+  function browserReportStorage(): ReportCacheStorage | null {
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
   }
 
   function selectView(view: ReportView): void {
@@ -380,6 +401,12 @@
               <ChartHost
                 id="equity-chart"
                 renderer={charts.renderEquityGauges}
+                args={[data.equities]}
+                ariaLabel="A股四个主要指数收盘仪表盘"
+              />
+              <ChartHost
+                id="equity-chart-mobile"
+                renderer={charts.renderEquityGaugesMobile}
                 args={[data.equities]}
                 ariaLabel="A股四个主要指数收盘仪表盘"
               />

@@ -775,9 +775,14 @@ h2 {
 }
 
 .equity-dial-stage #equity-chart,
+.equity-dial-stage #equity-chart-mobile,
 .equity-values {
   position: absolute;
   inset: 0;
+}
+
+#equity-chart-mobile {
+  display: none;
 }
 
 .equity-values {
@@ -1544,13 +1549,13 @@ h2 {
     flex: none;
   }
 
-  .equity-value {
-    grid-template-columns: 44% 56%;
+  #equity-chart,
+  .equity-values {
+    display: none;
   }
 
-  .equity-value strong,
-  .equity-value small {
-    font-size: 1rem;
+  #equity-chart-mobile {
+    display: block;
   }
 
   .stat-grid {
@@ -1693,10 +1698,6 @@ h2 {
 
   .core-card .card__value {
     font-size: 1.125rem;
-  }
-
-  .equity-value {
-    grid-template-columns: 42% 58%;
   }
 }
 

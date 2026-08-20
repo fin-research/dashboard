@@ -18,6 +18,14 @@ export function compact(
   return `${compactNumber.format(value as number)}${suffix}`;
 }
 
+export function integer(
+  value: number | null | undefined,
+  suffix = "",
+): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${number(value, 0)}${suffix}`;
+}
+
 export function signed(
   value: number | null | undefined,
   suffix = "",
