@@ -11,6 +11,7 @@ import type {
 } from "./types";
 
 const DAY_MS = 86_400_000;
+const BUSINESS_TRADING_DAYS = 252;
 const TRANSACTION_SIDES: Array<{
   side: LedgerTransactionSide;
   field: "buyQuantity" | "sellQuantity" | "maturityQuantity";
@@ -84,9 +85,10 @@ export function buildBondLedgerAnalytics(
           rangeProfit,
         )
       : null;
-  const ytdAnnualizedReturn = currentPerformance
-    ? calculateYtdAnnualizedReturn(currentPerformance)
-    : null;
+  const ytdAnnualizedReturn = calculateBusinessAnnualizedReturn(
+    latestLedger.performance,
+    effectiveEndDate,
+  );
   const comparisonStartDate = effectiveStartDate
     ? addDays(effectiveStartDate, -7)
     : null;
@@ -154,8 +156,11 @@ export function buildBondLedgerAnalytics(
       ),
       ytdAnnualizedReturn: difference(
         ytdAnnualizedReturn,
-        previousPerformance
-          ? calculateYtdAnnualizedReturn(previousPerformance)
+        comparisonEndDate
+          ? calculateBusinessAnnualizedReturn(
+              latestLedger.performance,
+              comparisonEndDate,
+            )
           : null,
       ),
       rangeProfit: difference(rangeProfit, previousRangeProfit),
@@ -188,23 +193,44 @@ export function weekRange(referenceDate: string): {
   };
 }
 
-export function calculateYtdAnnualizedReturn(
-  row: LedgerPerformanceRow,
+export function calculateBusinessAnnualizedReturn(
+  performance: LedgerPerformanceRow[],
+  throughDate?: string,
 ): number | null {
-  const start = `${row.date.slice(0, 4)}-01-01`;
-  const elapsedDays = Math.max(1, daysBetween(start, row.date));
-  if (row.timeWeightedPrincipal <= 0) return row.ytdAnnualizedReturn;
-  return (
-    (row.cumulativeProfit / row.timeWeightedPrincipal) *
-    (365 / elapsedDays)
-  );
+  return calculateBusinessAnnualizedReturnTrend(performance, throughDate)
+    .map((point) => point.value)
+    .filter((value): value is number => value !== null)
+    .at(-1) ?? null;
 }
 
-export function calculateDailyAnnualizedReturn(
-  row: LedgerPerformanceRow,
-): number | null {
-  if (row.principal <= 0) return null;
-  return (row.dailyRevenue / row.principal) * 365;
+export function calculateBusinessAnnualizedReturnTrend(
+  performance: LedgerPerformanceRow[],
+  throughDate?: string,
+): Array<{ date: string; value: number | null }> {
+  let dailyReturnSum = 0;
+  let tradingDayCount = 0;
+  let activeYear = "";
+  return performance
+    .filter((row) => !throughDate || row.date <= throughDate)
+    .map((row) => {
+      const year = row.date.slice(0, 4);
+      if (year !== activeYear) {
+        activeYear = year;
+        dailyReturnSum = 0;
+        tradingDayCount = 0;
+      }
+      if (row.principal > 0 && Number.isFinite(row.dailyRevenue)) {
+        dailyReturnSum += row.dailyRevenue / row.principal;
+        tradingDayCount += 1;
+      }
+      return {
+        date: row.date,
+        value:
+          tradingDayCount > 0
+            ? (dailyReturnSum / tradingDayCount) * BUSINESS_TRADING_DAYS
+            : null,
+      };
+    });
 }
 
 function calculateRangeProfit(

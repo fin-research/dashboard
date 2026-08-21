@@ -49,8 +49,8 @@
   gap: 9px;
   margin: 0;
   color: var(--text-2);
-  font-size: 1.35rem;
-  font-weight: 800;
+  font-size: 1.5rem;
+  font-weight: bolder;
   letter-spacing: -0.025em;
 }
 
@@ -120,7 +120,7 @@
   background: var(--surface);
   box-shadow: var(--shadow-card);
   cursor: pointer;
-  font-weight: 700;
+  font-weight: bold;
 }
 
 .ledger-range-trigger:hover,
@@ -186,7 +186,7 @@
 .mini-calendar h2 {
   margin: 0 0 9px;
   color: var(--text-1);
-  font-size: 0.9375rem;
+  font-size: 1rem;
   text-align: center;
 }
 
@@ -202,7 +202,7 @@
   place-items: center;
   color: var(--muted);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: bold;
 }
 
 .calendar-grid button {
@@ -216,7 +216,7 @@
   background: transparent;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-weight: bold;
 }
 
 .calendar-grid button:hover:not(:disabled) {
@@ -248,6 +248,7 @@
 .ledger-actions .export-button {
   min-height: 44px;
   padding-inline: 12px;
+  font-weight: bold;
 }
 
 .ledger-status {
@@ -257,7 +258,7 @@
   gap: 12px;
   padding: 5px 2px;
   font-size: 0.875rem;
-  font-weight: 650;
+  font-weight: bold;
 }
 
 .ledger-status p,
@@ -367,24 +368,32 @@
 .ledger-metric small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 650;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.ledger-metric span {
+  font-size: 0.8125rem;
+  font-weight: bold;
+}
+
+.ledger-metric small {
+  font-size: 1rem;
+  font-weight: normal;
+}
+
 .ledger-metric small b {
-  font-weight: 800;
+  font-weight: bold;
 }
 
 .ledger-metric strong {
   overflow: hidden;
   margin: 2px 0;
   color: var(--text-1);
-  font-size: clamp(1.2rem, 1.35vw, 1.55rem);
+  font-size: clamp(1.25rem, 1.35vw, 1.5rem);
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: bolder;
   letter-spacing: -0.03em;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -413,15 +422,58 @@
 
 .ledger-panel-heading h2 {
   font-size: 1rem;
+  font-weight: bold;
 }
 
-.ledger-panel-heading time {
+.ledger-trend-legend {
+  display: flex;
+  align-items: center;
+  gap: 18px;
   margin-left: auto;
   color: var(--muted);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 650;
+  font-size: 1rem;
+  font-weight: normal;
   white-space: nowrap;
+}
+
+.ledger-trend-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ledger-legend-line {
+  position: relative;
+  display: inline-block;
+  width: 24px;
+  height: 3px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.ledger-legend-line--scale {
+  background: #2f6fed;
+}
+
+.ledger-legend-line--return {
+  background: #6941c6;
+}
+
+.ledger-legend-line--range {
+  background: #f79009;
+}
+
+.ledger-legend-line--range::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border: 2px solid #f79009;
+  border-radius: 50%;
+  background: var(--surface);
+  content: "";
+  transform: translate(-50%, -50%);
 }
 
 .ledger-chart {
@@ -463,12 +515,12 @@
 .ledger-table thead th {
   color: var(--muted);
   background: #f1f5fb;
-  font-weight: 750;
+  font-weight: bold;
 }
 
 .ledger-table tbody th {
   color: var(--text-1);
-  font-weight: 700;
+  font-weight: bold;
 }
 
 .ledger-table :is(th, td):first-child,
@@ -517,7 +569,7 @@
   color: var(--muted);
   background: var(--surface);
   font-size: 0.75rem;
-  font-weight: 650;
+  font-weight: bold;
   white-space: nowrap;
 }
 
@@ -552,7 +604,7 @@
   justify-content: center;
   padding: 0 8px;
   border-radius: var(--radius-tag);
-  font-weight: 750;
+  font-weight: bold;
 }
 
 .transaction-side--buy {
@@ -616,12 +668,15 @@
   color: #fff;
   background: var(--brand);
   cursor: pointer;
-  font-weight: 750;
+  font-weight: bold;
 }
 
 .ledger-management-dialog {
+  position: fixed;
+  inset: 50% auto auto 50%;
   width: min(780px, calc(100% - 32px));
   max-height: calc(100dvh - 32px);
+  margin: 0;
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -629,6 +684,7 @@
   color: var(--text-2);
   background: var(--surface);
   box-shadow: 0 28px 80px rgba(23, 32, 51, 0.24);
+  transform: translate(-50%, -50%);
 }
 
 .ledger-management-dialog::backdrop {
@@ -678,7 +734,7 @@
   color: #fff;
   background: var(--brand);
   cursor: pointer;
-  font-weight: 750;
+  font-weight: bold;
 }
 
 .ledger-upload-primary:disabled {
@@ -689,7 +745,7 @@
 .ledger-management-toolbar > span {
   color: var(--muted);
   font-size: 0.875rem;
-  font-weight: 650;
+  font-weight: bold;
 }
 
 .ledger-management-status {
@@ -699,7 +755,7 @@
   border-radius: var(--radius-inner);
   background: #f8fafc;
   font-size: 0.8125rem;
-  font-weight: 650;
+  font-weight: bold;
 }
 
 .management-calendar-nav {
@@ -735,9 +791,9 @@
 }
 
 .management-calendar .calendar-grid i {
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   font-style: normal;
-  font-weight: 750;
+  font-weight: bold;
 }
 
 .ledger-management-detail {
@@ -784,7 +840,7 @@
   color: var(--brand-deep);
   background: var(--surface);
   cursor: pointer;
-  font-weight: 700;
+  font-weight: bold;
 }
 
 .ledger-management-actions button.danger {
@@ -857,7 +913,7 @@
   }
 
   .ledger-title-block h1 {
-    font-size: 1.1rem;
+    font-size: 1.125rem;
   }
 
   .ledger-actions {
@@ -900,17 +956,32 @@
   }
 
   .ledger-metric strong {
-    font-size: 1.08rem;
+    font-size: 1.125rem;
   }
 
-  .ledger-metric span,
-  .ledger-metric small {
+  .ledger-metric span {
     font-size: 0.75rem;
+  }
+
+  .ledger-metric small {
+    font-size: 1rem;
   }
 
   .ledger-chart,
   .ledger-chart--trend {
     min-height: 320px;
+  }
+
+  .ledger-panel--trend .ledger-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ledger-trend-legend {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-left: 0;
   }
 
   .ledger-panel-heading--transactions {

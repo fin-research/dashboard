@@ -63,9 +63,7 @@ export async function archiveBondLedgerRequest(
   const key = ledgerKey(metadata.date);
   const object = await storage.put(
     key,
-    request.body.pipeThrough(
-      sizeLimitedStream(MAX_LEDGER_BYTES, metadata.size),
-    ),
+    request.body,
     {
       httpMetadata: {
         contentType: XLSX_CONTENT_TYPE,
@@ -203,10 +201,12 @@ function validateUploadRequest(request: Request): {
   if (size > MAX_LEDGER_BYTES) {
     throw new BondLedgerUploadError(413, "台账文件不能超过 12 MB");
   }
-  const contentLength = Number(request.headers.get("Content-Length"));
+  const contentLengthHeader = request.headers.get("Content-Length");
+  const contentLength =
+    contentLengthHeader === null ? Number.NaN : Number(contentLengthHeader);
   if (
-    Number.isFinite(contentLength) &&
-    contentLength > 0 &&
+    !Number.isInteger(contentLength) ||
+    contentLength <= 0 ||
     contentLength !== size
   ) {
     throw new BondLedgerUploadError(400, "台账文件大小与请求内容不一致");
@@ -258,30 +258,6 @@ function ledgerDateFromObject(object: LedgerR2Object): string | null {
   if (isIsoDate(metadataDate)) return metadataDate;
   const match = object.key.match(/^daily\/(\d{4}-\d{2}-\d{2})\.xlsx$/);
   return match && isIsoDate(match[1] ?? "") ? (match[1] as string) : null;
-}
-
-function sizeLimitedStream(
-  maxBytes: number,
-  expectedBytes: number,
-): TransformStream<Uint8Array, Uint8Array> {
-  let received = 0;
-  return new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      received += chunk.byteLength;
-      if (received > maxBytes) {
-        controller.error(new BondLedgerUploadError(413, "台账文件不能超过 12 MB"));
-        return;
-      }
-      controller.enqueue(chunk);
-    },
-    flush(controller) {
-      if (received !== expectedBytes) {
-        controller.error(
-          new BondLedgerUploadError(400, "台账文件大小与请求内容不一致"),
-        );
-      }
-    },
-  });
 }
 
 function isIsoDate(value: string): boolean {

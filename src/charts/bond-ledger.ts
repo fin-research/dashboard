@@ -1,4 +1,4 @@
-import { calculateDailyAnnualizedReturn } from "../lib/bond-ledger/analytics";
+import { calculateBusinessAnnualizedReturnTrend } from "../lib/bond-ledger/analytics";
 import { formatYield } from "../lib/bond-ledger/format";
 import type {
   HoldingTypeStat,
@@ -27,6 +27,11 @@ export const FIN_OPS_CHART_PALETTE = [
   "#12b76a",
 ] as const;
 
+const ledgerAxisLabel = {
+  ...axisLabel,
+  fontWeight: "normal" as const,
+};
+
 export function renderBondScaleReturnTrend(
   host: HTMLElement,
   points: LedgerPerformanceRow[],
@@ -38,10 +43,10 @@ export function renderBondScaleReturnTrend(
     return;
   }
   const dates = points.map((point) => point.date);
-  const returns = points.map((point) => {
-    const value = calculateDailyAnnualizedReturn(point);
-    return value === null ? null : value * 100;
-  });
+  const annualizedReturnTrend = calculateBusinessAnnualizedReturnTrend(points);
+  const returns = annualizedReturnTrend.map(({ value }) =>
+    value === null ? null : value * 100,
+  );
   const selectedReturns = points.map((point, index) =>
     point.date >= startDate && point.date <= endDate
       ? returns[index]
@@ -52,30 +57,23 @@ export function renderBondScaleReturnTrend(
     aria: {
       enabled: true,
       description:
-        "二级资金池规模面积图与每日年化收益率双轴折线图，所选日期范围使用强调色",
+        "二级资金池规模面积图与业务口径年化收益率双轴折线图，所选日期范围使用强调色",
     },
     color: [...FIN_OPS_CHART_PALETTE],
-    grid: { left: 10, right: 12, top: 34, bottom: 4, containLabel: true },
-    legend: {
-      top: 0,
-      right: 4,
-      itemWidth: 16,
-      itemHeight: 6,
-      textStyle: axisLabel,
-      data: ["规模", "每日年化收益率", "所选区间"],
-    },
+    grid: { left: 10, right: 12, top: 28, bottom: 4, containLabel: true },
     tooltip: {
       ...tooltip,
       trigger: "axis",
       formatter: (params: unknown) => {
         const items = params as Array<{ dataIndex: number }>;
-        const point = points[items[0]?.dataIndex ?? -1];
+        const dataIndex = items[0]?.dataIndex ?? -1;
+        const point = points[dataIndex];
         if (!point) return "";
-        const dailyReturn = calculateDailyAnnualizedReturn(point);
+        const annualizedReturn = annualizedReturnTrend[dataIndex]?.value ?? null;
         return [
           `<strong>${escapeHtml(point.date)}</strong>`,
           `规模 ${(point.marketValue / 100_000_000).toFixed(2)} 亿元`,
-          `每日年化 ${dailyReturn === null ? "—" : `${(dailyReturn * 100).toFixed(3)}%`}`,
+          `年化收益率 ${annualizedReturn === null ? "—" : `${(annualizedReturn * 100).toFixed(3)}%`}`,
           `当日损益 ${(point.dailyRevenue / 10_000).toFixed(1)} 万元`,
         ].join("<br>");
       },
@@ -87,7 +85,7 @@ export function renderBondScaleReturnTrend(
       axisLine: { lineStyle: { color: colors.line } },
       axisTick: { show: false },
       axisLabel: {
-        ...axisLabel,
+        ...ledgerAxisLabel,
         hideOverlap: true,
         formatter: (value: string) => value.slice(5).replace("-", "/"),
       },
@@ -99,18 +97,18 @@ export function renderBondScaleReturnTrend(
         scale: true,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel,
-        nameTextStyle: axisLabel,
+        axisLabel: ledgerAxisLabel,
+        nameTextStyle: ledgerAxisLabel,
         splitLine: { lineStyle: gridLine },
       },
       {
         type: "value",
-        name: "每日年化",
+        name: "年化收益率",
         scale: true,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { ...axisLabel, formatter: "{value}%" },
-        nameTextStyle: axisLabel,
+        axisLabel: { ...ledgerAxisLabel, formatter: "{value}%" },
+        nameTextStyle: ledgerAxisLabel,
         splitLine: { show: false },
       },
     ],
@@ -139,7 +137,7 @@ export function renderBondScaleReturnTrend(
         },
       },
       {
-        name: "每日年化收益率",
+        name: "年化收益率",
         type: "line",
         yAxisIndex: 1,
         data: returns,
@@ -192,7 +190,7 @@ export function renderHoldingDistribution(
       top: "middle",
       itemWidth: 12,
       itemHeight: 12,
-      textStyle: axisLabel,
+      textStyle: ledgerAxisLabel,
     },
     tooltip: {
       ...tooltip,
@@ -279,13 +277,13 @@ export function renderMaturityDistribution(
       data: stats.map((stat) => stat.bucket),
       axisLine: { lineStyle: { color: colors.line } },
       axisTick: { show: false },
-      axisLabel: { ...axisLabel, interval: 0 },
+      axisLabel: { ...ledgerAxisLabel, interval: 0 },
     },
     yAxis: {
       type: "value",
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { ...axisLabel, formatter: "{value}亿" },
+      axisLabel: { ...ledgerAxisLabel, formatter: "{value}亿" },
       splitLine: { lineStyle: gridLine },
     },
     series: [
@@ -307,7 +305,7 @@ export function renderMaturityDistribution(
           color: colors.ink,
           fontFamily,
           fontSize: chartTextSize,
-          fontWeight: 700,
+          fontWeight: "bold",
           formatter: ({ value }: { value: number }) =>
             value > 0 ? value.toFixed(1) : "",
         },

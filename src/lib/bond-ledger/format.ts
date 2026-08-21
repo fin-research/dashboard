@@ -28,6 +28,11 @@ export function formatDecimalPercent(
   return `${(value * 100).toFixed(digits)}%`;
 }
 
+export function formatMultiple(value: number | null, digits = 2): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return `${value.toFixed(digits)} 倍`;
+}
+
 export function formatYield(value: number | null, digits = 3): string {
   if (value === null || !Number.isFinite(value) || value <= 0) return "—";
   return `${value.toFixed(digits)}%`;

@@ -3,8 +3,8 @@ import test from "node:test";
 
 import {
   buildBondLedgerAnalytics,
-  calculateDailyAnnualizedReturn,
-  calculateYtdAnnualizedReturn,
+  calculateBusinessAnnualizedReturn,
+  calculateBusinessAnnualizedReturnTrend,
   weekRange,
 } from "../src/lib/bond-ledger/analytics.ts";
 import {
@@ -156,19 +156,26 @@ test("区间收益、类型加权收益率与成交方向统一派生", () => {
   );
 });
 
-test("年初至今收益率按台账既有日历年化口径复核", () => {
-  const row = performanceRow("2026-08-20", 71_268_981.61771776, 1);
-  row.timeWeightedPrincipal = 4_585_525_788.793101;
+test("业务收益率按交易日单日收益率算术平均乘 252 年化", () => {
+  const monday = performanceRow("2026-08-17", 0, 1_000);
+  monday.dailyRevenue = 0.08;
+  const tuesday = performanceRow("2026-08-18", 0, 2_000);
+  tuesday.dailyRevenue = 0.2511111111111111;
+  const performance = [monday, tuesday];
+  const expected = ((0.08 / 1_000 + 0.2511111111111111 / 2_000) / 2) * 252;
+
   assert.ok(
-    Math.abs(calculateYtdAnnualizedReturn(row) - 0.024557960551832805) < 1e-12,
+    Math.abs(calculateBusinessAnnualizedReturn(performance) - expected) < 1e-12,
+  );
+  assert.equal(Number((expected * 100).toFixed(2)), 2.59);
+  assert.deepEqual(
+    calculateBusinessAnnualizedReturnTrend(performance).map(({ value }) => value),
+    [0.00008 * 252, expected],
   );
   assert.deepEqual(weekRange("2026-08-20"), {
     startDate: "2026-08-17",
     endDate: "2026-08-20",
   });
-  row.principal = 1_000;
-  row.dailyRevenue = 2;
-  assert.equal(calculateDailyAnnualizedReturn(row), 0.73);
 });
 
 test("上传始终写入 R2，同日报表使用固定 key 覆盖", async () => {
@@ -186,7 +193,7 @@ test("上传始终写入 R2，同日报表使用固定 key 覆盖", async () => 
   const bucket = {
     async put(key, value, options) {
       const bytes = await new Response(value).arrayBuffer();
-      calls.push({ key, bytes: bytes.byteLength, options });
+      calls.push({ key, value, bytes: bytes.byteLength, options });
       return {
         key,
         size: bytes.byteLength,
@@ -194,11 +201,36 @@ test("上传始终写入 R2，同日报表使用固定 key 覆盖", async () => 
       };
     },
   };
-  const production = await archiveBondLedgerRequest(request.clone(), bucket);
+  const productionRequest = request.clone();
+  const requestBody = productionRequest.body;
+  const production = await archiveBondLedgerRequest(productionRequest, bucket);
   assert.equal(production.stored, true);
   assert.equal(production.key, "daily/2026-08-20.xlsx");
+  assert.equal(calls[0].value, requestBody);
   assert.equal(calls[0].bytes, body.size);
   assert.equal(calls[0].options.customMetadata.ledgerDate, "2026-08-20");
+});
+
+test("上传接口要求可信的请求体长度", async () => {
+  const body = new Blob(["xlsx-bytes"], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  await assert.rejects(
+    archiveBondLedgerRequest(
+      uploadRequest(body, { "Content-Length": "" }),
+      { put: async () => assert.fail("长度缺失时不应写入 R2") },
+    ),
+    (error) =>
+      error instanceof BondLedgerUploadError && error.status === 400,
+  );
+  await assert.rejects(
+    archiveBondLedgerRequest(
+      uploadRequest(body, { "Content-Length": String(body.size + 1) }),
+      { put: async () => assert.fail("长度不一致时不应写入 R2") },
+    ),
+    (error) =>
+      error instanceof BondLedgerUploadError && error.status === 400,
+  );
 });
 
 test("上传接口拒绝跨站请求", async () => {
@@ -379,6 +411,7 @@ function uploadRequest(body, extraHeaders = {}) {
       "X-Ledger-Date": "2026-08-20",
       "X-Ledger-Filename": encodeURIComponent("二级资金池台账20260820.xlsx"),
       "X-Ledger-Size": String(body.size),
+      "Content-Length": String(body.size),
       ...extraHeaders,
     },
     body,

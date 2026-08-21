@@ -32,6 +32,7 @@
   } from "$lib/bond-ledger/db";
   import {
     formatDecimalPercent,
+    formatMultiple,
     formatSignedWan,
     formatYears,
     formatYi,
@@ -88,29 +89,42 @@
     {
       label: "当前规模",
       value: formatYi(current?.marketValue ?? null),
-      detail: signedYi(analytics.metricDeltas.marketValue),
+      detail: signedMetric(
+        analytics.metricDeltas.marketValue,
+        100_000_000,
+        2,
+        "亿元",
+      ),
       delta: analytics.metricDeltas.marketValue,
       icon: "bank" as MetricIconName,
     },
     {
       label: "杠杆率",
-      value: formatDecimalPercent(current?.leverage ?? null),
-      detail: signedNumber(analytics.metricDeltas.leverage, 2, "x"),
+      value: formatMultiple(current?.leverage ?? null),
+      detail: signedMetric(analytics.metricDeltas.leverage, 1, 2, "倍"),
       delta: analytics.metricDeltas.leverage,
       icon: "leverage" as MetricIconName,
     },
     {
       label: "修正久期",
       value: formatYears(current?.modifiedDuration ?? null),
-      detail: signedNumber(analytics.metricDeltas.modifiedDuration, 2, "年"),
+      detail: signedMetric(
+        analytics.metricDeltas.modifiedDuration,
+        1,
+        2,
+        "年",
+      ),
       delta: analytics.metricDeltas.modifiedDuration,
       icon: "bond" as MetricIconName,
     },
     {
       label: "年初至今收益率",
       value: formatDecimalPercent(analytics.ytdAnnualizedReturn),
-      detail: signedPercentagePoint(
+      detail: signedMetric(
         analytics.metricDeltas.ytdAnnualizedReturn,
+        0.01,
+        2,
+        "pct",
       ),
       delta: analytics.metricDeltas.ytdAnnualizedReturn,
       icon: "equity" as MetricIconName,
@@ -118,14 +132,24 @@
     {
       label: isDefaultWeek ? "本周损益" : "区间损益",
       value: formatSignedWan(analytics.rangeProfit),
-      detail: formatSignedWan(analytics.metricDeltas.rangeProfit),
+      detail: signedMetric(
+        analytics.metricDeltas.rangeProfit,
+        10_000,
+        1,
+        "万元",
+      ),
       delta: analytics.metricDeltas.rangeProfit,
       icon: "profit" as MetricIconName,
     },
     {
       label: isDefaultWeek ? "本周交易" : "区间交易",
       value: `${analytics.transactionCount} 只`,
-      detail: signedNumber(analytics.metricDeltas.transactionCount, 0, "只"),
+      detail: signedMetric(
+        analytics.metricDeltas.transactionCount,
+        1,
+        0,
+        "只",
+      ),
       delta: analytics.metricDeltas.transactionCount,
       icon: "trade" as MetricIconName,
     },
@@ -415,23 +439,19 @@
         : "tone-down";
   }
 
-  function signedYi(value: number | null): string {
-    if (value === null || !Number.isFinite(value)) return "—";
-    return `${sign(value)}${(Math.abs(value) / 100_000_000).toFixed(2)} 亿元`;
-  }
-
-  function signedPercentagePoint(value: number | null): string {
-    if (value === null || !Number.isFinite(value)) return "—";
-    return `${sign(value)}${(Math.abs(value) * 100).toFixed(2)}pct`;
-  }
-
-  function signedNumber(
+  function signedMetric(
     value: number | null,
+    divisor: number,
     digits: number,
-    suffix: string,
-  ): string {
-    if (value === null || !Number.isFinite(value)) return "—";
-    return `${sign(value)}${Math.abs(value).toFixed(digits)}${suffix}`;
+    unit: string,
+  ): { value: string; unit: string } {
+    if (value === null || !Number.isFinite(value)) {
+      return { value: "—", unit: "" };
+    }
+    return {
+      value: `${sign(value)}${(Math.abs(value) / divisor).toFixed(digits)}`,
+      unit: ` ${unit}`,
+    };
   }
 
   function sign(value: number): string {
@@ -567,7 +587,7 @@
               <div>
                 <span>{card.label}</span>
                 <strong>{card.value}</strong>
-                <small>较上周 <b class={deltaClass(card.delta)}>{card.detail}</b></small>
+                <small>较上周 <b class={deltaClass(card.delta)}>{card.detail.value}</b>{card.detail.unit}</small>
               </div>
             </article>
           {/each}
@@ -577,12 +597,16 @@
           <section class="dashboard-panel ledger-panel ledger-panel--trend" aria-labelledby="return-trend-title">
             <header class="panel-heading ledger-panel-heading">
               <h2 id="return-trend-title">规模&amp;收益率走势</h2>
-              <time datetime={analytics.latestLedger.date}>截至 {analytics.latestLedger.date}</time>
+              <div class="ledger-trend-legend" role="list" aria-label="图例">
+                <span role="listitem"><i class="ledger-legend-line ledger-legend-line--scale" aria-hidden="true"></i>规模</span>
+                <span role="listitem"><i class="ledger-legend-line ledger-legend-line--return" aria-hidden="true"></i>年化收益率</span>
+                <span role="listitem"><i class="ledger-legend-line ledger-legend-line--range" aria-hidden="true"></i>所选区间</span>
+              </div>
             </header>
             <ChartHost
               renderer={renderBondScaleReturnTrend}
               args={[analytics.performanceTrend, startDate, endDate]}
-              ariaLabel="二级池规模与每日年化收益率走势"
+              ariaLabel="二级池规模与业务口径年化收益率走势"
               className="ledger-chart ledger-chart--trend"
             />
           </section>
