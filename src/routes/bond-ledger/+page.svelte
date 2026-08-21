@@ -1,18 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  import "../../../app.css";
-  import "../../../styles.css";
-  import "../../../bond-ledger.css";
+  import "../../app.css";
+  import "../../styles.css";
+  import "../../bond-ledger.css";
 
   import {
     renderBondScaleReturnTrend,
     renderHoldingDistribution,
     renderMaturityDistribution,
-  } from "../../../charts/bond-ledger";
-  import ChartHost from "../../../components/ChartHost.svelte";
-  import MetricIcon from "../../../components/MetricIcon.svelte";
-  import { exportReportImage } from "../../../export";
+  } from "../../charts/bond-ledger";
+  import ChartHost from "../../components/ChartHost.svelte";
+  import MetricIcon from "../../components/MetricIcon.svelte";
+  import { exportReportImage } from "../../export";
   import {
     buildBondLedgerAnalytics,
     weekRange,
@@ -46,8 +46,8 @@
     listRemoteBondLedgers,
     type RemoteBondLedgerFile,
   } from "$lib/bond-ledger/upload";
-  import { currentReportDate } from "../../../report-date";
-  import type { MetricIconName } from "../../../view-model";
+  import { currentReportDate } from "../../report-date";
+  import type { MetricIconName } from "../../view-model";
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
 
@@ -455,7 +455,7 @@
   <div bind:this={reportSurface} class="ledger-report">
     <header class="ledger-masthead">
       <div class="ledger-title-block">
-        <a class="ledger-back" href="/" aria-label="返回市场研究首页">
+        <a class="ledger-back" href="/" aria-label="返回市场研究门户">
           <svg viewBox="0 0 20 20" aria-hidden="true">
             <path d="m12.5 4-6 6 6 6" />
           </svg>

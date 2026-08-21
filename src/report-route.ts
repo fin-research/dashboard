@@ -1,7 +1,7 @@
 export type ReportView = "visual" | "text";
 
-const DASHBOARD_PATH = "/dashboard";
-const TEXT_REPORT_PATH = `${DASHBOARD_PATH}/text`;
+const MARKET_BRIEFING_PATH = "/market-briefing";
+const TEXT_REPORT_PATH = `${MARKET_BRIEFING_PATH}/text`;
 
 export function reportViewFromPathname(pathname: string): ReportView {
   return pathname === TEXT_REPORT_PATH || pathname === `${TEXT_REPORT_PATH}/`
@@ -10,5 +10,5 @@ export function reportViewFromPathname(pathname: string): ReportView {
 }
 
 export function pathnameForReportView(view: ReportView): string {
-  return view === "text" ? TEXT_REPORT_PATH : DASHBOARD_PATH;
+  return view === "text" ? TEXT_REPORT_PATH : MARKET_BRIEFING_PATH;
 }

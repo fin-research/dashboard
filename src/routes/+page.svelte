@@ -77,7 +77,7 @@
         </span>
       </a>
 
-      <a class="tool-card tool-card--hotspots" href="/rag/hotspots">
+      <a class="tool-card tool-card--hotspots" href="/market-hotspots">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <circle cx="6" cy="12" r="2.5" />
@@ -108,7 +108,7 @@
         </span>
       </a>
 
-      <a class="tool-card tool-card--ledger" href="/dashboard/bond-ledger">
+      <a class="tool-card tool-card--ledger" href="/bond-ledger">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M4 4h16v16H4zM8 16v-4m4 4V8m4 8v-6" />

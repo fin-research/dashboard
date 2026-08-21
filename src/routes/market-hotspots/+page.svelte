@@ -144,7 +144,7 @@
 <div class="hotspot-page">
   <header class="hotspot-header">
     <div class="brand-block">
-      <a class="back-link" href="/dashboard" aria-label="返回市场点评">
+      <a class="back-link" href="/" aria-label="返回市场研究门户">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="m15 18-6-6 6-6" />
         </svg>
