@@ -50,11 +50,13 @@
   import type { MetricIconName } from "../../view-model";
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
+  const INITIAL_REPORT_DATE = currentReportDate();
+  const INITIAL_WEEK_RANGE = weekRange(INITIAL_REPORT_DATE);
 
   let records: BondLedgerRecord[] = [];
   let remoteFiles: RemoteBondLedgerFile[] = [];
-  let startDate = "";
-  let endDate = "";
+  let startDate = INITIAL_WEEK_RANGE.startDate;
+  let endDate = INITIAL_WEEK_RANGE.endDate;
   let loadingRecords = true;
   let syncingRecords = false;
   let uploading = false;
@@ -63,8 +65,8 @@
   let errorMessage = "";
   let rangeOpen = false;
   let rangePhase: "start" | "end" = "start";
-  let rangeMonthLeft = "";
-  let managementMonth = "";
+  let rangeMonthLeft = monthStart(startDate);
+  let managementMonth = monthStart(INITIAL_REPORT_DATE);
   let selectedManagedDate = "";
   let reuploadTarget = "";
   let exporting = false;
@@ -130,12 +132,6 @@
   ];
 
   onMount(() => {
-    const today = currentReportDate();
-    const range = weekRange(today);
-    startDate = range.startDate;
-    endDate = range.endDate;
-    rangeMonthLeft = monthStart(startDate);
-    managementMonth = monthStart(today);
     void syncRangeFromRemote(true);
     return () => {
       if (exportTimer !== null) window.clearTimeout(exportTimer);

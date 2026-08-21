@@ -13,6 +13,11 @@ import {
   shiftMonth,
 } from "../src/lib/bond-ledger/calendar.ts";
 import {
+  deleteLocalBondLedger,
+  listBondLedgers,
+  putBondLedger,
+} from "../src/lib/bond-ledger/db.ts";
+import {
   BondLedgerParseError,
   parseBondLedgerMatrices,
 } from "../src/lib/bond-ledger/parser.ts";
@@ -22,6 +27,7 @@ import {
   deleteBondLedgerFile,
   listBondLedgerFiles,
 } from "../src/lib/server/bond-ledger.ts";
+import { GET as redirectLegacyBondLedger } from "../src/routes/bond-ledger/+server.ts";
 import {
   readPreferences,
   savePreferences,
@@ -258,6 +264,25 @@ test("日期范围无台账时回退到线上实际区间", () => {
   );
   assert.equal(calendarDays("2026-08-01").length, 42);
   assert.equal(shiftMonth("2026-08-01", 1), "2026-09-01");
+});
+
+test("浏览器持久化不可用时仍可用内存台账渲染页面", async () => {
+  const record = ledger("2026-08-20", [performanceRow("2026-08-20", 10, 100)], []);
+  await putBondLedger(record);
+  assert.deepEqual(
+    (await listBondLedgers()).map(({ date }) => date),
+    ["2026-08-20"],
+  );
+  await deleteLocalBondLedger(record.date);
+  assert.deepEqual(await listBondLedgers(), []);
+});
+
+test("旧二级池页面地址永久跳转到 /bond", () => {
+  assert.throws(redirectLegacyBondLedger, (error) => {
+    assert.equal(error.status, 308);
+    assert.equal(error.location, "/bond");
+    return true;
+  });
 });
 
 test("个性化颜色逻辑默认红涨绿跌并写入本地存储", () => {

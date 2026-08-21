@@ -3,39 +3,69 @@ import type { BondLedgerRecord } from "./types";
 const DATABASE_NAME = "eastmoney-bond-ledger";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "daily-ledgers";
+const memoryRecords = new Map<string, BondLedgerRecord>();
+let persistentStorageAvailable = true;
 
 export async function listBondLedgers(): Promise<BondLedgerRecord[]> {
-  const database = await openDatabase();
+  if (!canUsePersistentStorage()) return sortedMemoryRecords();
+  let database: IDBDatabase | null = null;
   try {
+    database = await openDatabase();
     const records = await requestResult<BondLedgerRecord[]>(
       database.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).getAll(),
     );
-    return records.sort((left, right) => left.date.localeCompare(right.date));
+    for (const record of records) memoryRecords.set(record.date, record);
+    return sortRecords(records);
+  } catch {
+    persistentStorageAvailable = false;
+    return sortedMemoryRecords();
   } finally {
-    database.close();
+    database?.close();
   }
 }
 
 export async function putBondLedger(record: BondLedgerRecord): Promise<void> {
-  const database = await openDatabase();
+  memoryRecords.set(record.date, record);
+  if (!canUsePersistentStorage()) return;
+  let database: IDBDatabase | null = null;
   try {
+    database = await openDatabase();
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(record);
     await transactionDone(transaction);
+  } catch {
+    persistentStorageAvailable = false;
   } finally {
-    database.close();
+    database?.close();
   }
 }
 
 export async function deleteLocalBondLedger(date: string): Promise<void> {
-  const database = await openDatabase();
+  memoryRecords.delete(date);
+  if (!canUsePersistentStorage()) return;
+  let database: IDBDatabase | null = null;
   try {
+    database = await openDatabase();
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).delete(date);
     await transactionDone(transaction);
+  } catch {
+    persistentStorageAvailable = false;
   } finally {
-    database.close();
+    database?.close();
   }
+}
+
+function canUsePersistentStorage(): boolean {
+  return persistentStorageAvailable && typeof indexedDB !== "undefined";
+}
+
+function sortedMemoryRecords(): BondLedgerRecord[] {
+  return sortRecords([...memoryRecords.values()]);
+}
+
+function sortRecords(records: BondLedgerRecord[]): BondLedgerRecord[] {
+  return records.sort((left, right) => left.date.localeCompare(right.date));
 }
 
 function openDatabase(): Promise<IDBDatabase> {

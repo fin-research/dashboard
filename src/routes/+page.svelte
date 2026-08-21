@@ -108,7 +108,7 @@
         </span>
       </a>
 
-      <a class="tool-card tool-card--ledger" href="/bond-ledger">
+      <a class="tool-card tool-card--ledger" href="/bond">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M4 4h16v16H4zM8 16v-4m4 4V8m4 8v-6" />

@@ -56,7 +56,7 @@
 
 ## 注意事项
 
-- 门户页固定为 `/`；页面路由为 `/market-briefing`、`/market-briefing/text`、`/market-hotspots` 和 `/bond-ledger`。应用 API 位于 `/api/*`。 Python 数据接口为 `/data/*`，该路径只在本地由 Vite 代理，线上不得经过 SvelteKit 后端。
+- 门户页固定为 `/`；页面路由为 `/market-briefing`、`/market-briefing/text`、`/market-hotspots` 和 `/bond`（旧 `/bond-ledger` 仅保留 308 兼容跳转）。应用 API 位于 `/api/*`。 Python 数据接口为 `/data/*`，该路径只在本地由 Vite 代理，线上不得经过 SvelteKit 后端。
 - D1 固定绑定现有 `eastmoney` 数据库，文章正文仍不得写入 D1；热点聚合只读取 `article.summary`、`importance` 和 `keyword` 结构化证据，并把按范围键与输入指纹缓存的最终热点写入 `hotspot_cache`。
 - 所有模型调用只通过 `src/lib/server/ai-gateway.ts`，经 `https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/compat/chat/completions` 走 `dynamic/rag`。生产认证只允许使用 Worker Secret `CF_AIG_TOKEN`，账户 ID 与 Gateway ID 分别使用非敏感变量 `CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID`；不得把 token 写入源码或 `wrangler.jsonc`。结构化调用用一个 Zod Schema 自动生成标准 `response_format.json_schema`，由 AI SDK 校验结果，Prompt 不重复手写结构。热点聚合保持 `enable_thinking=true`（`reasoning_effort=low`，不设置 completion token 上限）；单来源热点热度不超过 60。统一参数和调用方式以根目录 `README.md` 为准。
 - 热点输出固定为 8–15 个；默认跨日期滚动读取最近 20 篇已完成特征抽取的文章，日期范围模式最多读取最近 100 篇。热点热度由模型直接给出 0-100 分，权重公式仅作为提示，应用不自行计算加权得分，只做范围校验与单来源封顶。
