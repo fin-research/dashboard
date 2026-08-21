@@ -284,16 +284,13 @@
       </section>
     {:else if data}
       <section class="cloud-panel" aria-labelledby="cloud-heading">
+        <div class="summary-meta">
+          <time datetime={data.generatedAt}>{formatGeneratedAt(data.generatedAt)} 生成</time>
+        </div>
         <div class="market-summary">
           <div class="summary-heading">
-            <span>MARKET PULSE</span>
+            <span>MARKET<br />PULSE</span>
             <h2 id="cloud-heading">{data.marketSummary}</h2>
-          </div>
-          <div class="summary-meta">
-            <span>{data.coverage.articleCount} 篇证据</span>
-            <span>{data.hotspots.length} 个热点</span>
-            <span>{formatGeneratedAt(data.generatedAt)} 生成</span>
-            {#if data.cached}<span class="cache-tag">已缓存</span>{/if}
           </div>
         </div>
 
@@ -802,17 +799,17 @@
     height: 100%;
   }
 
+  .cloud-panel {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px 24px 22px;
+  }
+
   .market-summary {
-    position: absolute;
     z-index: 4;
-    top: 20px;
-    right: 24px;
-    left: 24px;
     display: flex;
     min-height: 78px;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 28px;
     padding: 14px 18px;
     border: 1px solid var(--line);
     border-radius: 12px;
@@ -823,47 +820,51 @@
 
   .summary-heading {
     display: grid;
+    width: 100%;
     min-width: 0;
-    flex: 1 1 auto;
-    grid-template-columns: 92px minmax(0, 1fr);
-    align-items: center;
-    gap: 14px;
-    margin-right: 18px;
+    grid-template-columns: clamp(112px, 9vw, 176px) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 18px;
   }
 
   .summary-heading > span {
+    display: grid;
+    min-height: 48px;
+    place-items: center;
     color: #f6c96b;
     font-size: 0.66rem;
     font-weight: 750;
+    line-height: 1.45;
     letter-spacing: 0.12em;
+    text-align: center;
   }
 
   .summary-heading h2 {
+    display: flex;
+    min-width: 0;
+    align-items: center;
     color: #dce8f7;
     font-size: 0.88rem;
     font-weight: 480;
     line-height: 1.65;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .summary-meta {
-    flex: 0 0 auto;
-    flex-wrap: wrap;
+    position: relative;
+    z-index: 4;
     justify-content: flex-end;
-    gap: 5px 12px;
+    min-height: 16px;
+    padding-right: 2px;
     color: #8da5c5;
     font-size: 0.68rem;
     line-height: 1.5;
-  }
-
-  .cache-tag {
-    padding: 1px 6px;
-    border: 1px solid rgba(110, 214, 189, 0.27);
-    border-radius: 4px;
-    color: #8ad9ca;
+    font-variant-numeric: tabular-nums;
   }
 
   .cloud-canvas {
-    padding: 102px 22px 22px;
+    min-height: 0;
   }
 
   .detail-scrim {
@@ -1076,20 +1077,19 @@
 
   .evidence-list li {
     display: grid;
-    grid-template-columns: max-content 1fr;
-    align-items: start;
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
     padding: 11px 12px;
     border-left: 1px solid rgba(119, 189, 251, 0.3);
     background: rgba(255, 255, 255, 0.02);
   }
 
   .evidence-list span {
-    padding-top: 1px;
+    min-width: 0;
     color: #6fa5d8;
     font-size: 0.66rem;
     line-height: 1.6;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .evidence-list p {
@@ -1232,45 +1232,26 @@
     }
 
     .market-summary {
-      top: 10px;
-      right: 10px;
-      left: 10px;
-      display: block;
-      max-height: 116px;
       padding: 11px 12px;
-      overflow: hidden;
     }
 
     .summary-heading {
-      display: block;
-    }
-
-    .summary-heading > span {
-      display: none;
+      grid-template-columns: 82px minmax(0, 1fr);
+      gap: 10px;
     }
 
     .summary-heading h2 {
-      display: -webkit-box;
-      overflow: hidden;
       font-size: 0.76rem;
       line-height: 1.55;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
-      line-clamp: 3;
     }
 
     .summary-meta {
-      justify-content: flex-start;
-      margin-top: 7px;
       font-size: 0.62rem;
     }
 
-    .summary-meta span:nth-child(3) {
-      display: none;
-    }
-
-    .cloud-canvas {
-      padding: 122px 7px 12px;
+    .cloud-panel {
+      gap: 6px;
+      padding: 6px 10px 12px;
     }
 
     .detail-scrim {
@@ -1304,6 +1285,11 @@
 
     .header-controls {
       gap: 6px;
+    }
+
+    .summary-heading {
+      grid-template-columns: 68px minmax(0, 1fr);
+      gap: 8px;
     }
 
     .impact-grid div {
