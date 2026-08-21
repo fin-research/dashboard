@@ -88,7 +88,7 @@
       .words(words)
       .padding(() => clamp(width / 120, 5, 13))
       .rotate(0)
-      .font('"PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui')
+      .font('ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif')
       .fontWeight((word) => (word.heat >= 75 ? 720 : 620))
       .fontSize((word) => word.size)
       .spiral("archimedean")

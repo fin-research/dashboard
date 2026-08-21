@@ -27,10 +27,11 @@
     "echarts": "^6.0.0",
     "html-to-image": "^1.11.13",
     "svelte": "5.56.8",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260814.1",
+    "@cloudflare/workers-types": "5.20260821.1",
     "@sveltejs/vite-plugin-svelte": "6.2.4",
     "@tailwindcss/vite": "4.3.3",
     "@types/d3-cloud": "^1.2.9",

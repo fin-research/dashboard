@@ -1,0 +1,991 @@
+.ledger-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.ledger-report {
+  width: min(100%, 2100px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 12px 16px 28px;
+  background: var(--canvas);
+}
+
+.ledger-masthead {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 4px 2px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ledger-title-block,
+.ledger-actions,
+.ledger-range-trigger,
+.ledger-management-button,
+.ledger-upload-primary,
+.ledger-management-toolbar,
+.ledger-management-actions,
+.transaction-summary,
+.transaction-summary > span {
+  display: flex;
+  align-items: center;
+}
+
+.ledger-title-block {
+  min-width: 0;
+  gap: 10px;
+}
+
+.ledger-title-block h1 {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.ledger-title-dot {
+  color: color-mix(in srgb, var(--brand) 72%, var(--muted));
+}
+
+.ledger-title-subject {
+  color: var(--brand-deep);
+}
+
+.ledger-back {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--brand-deep);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.ledger-back:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ledger-back svg,
+.ledger-range-trigger svg,
+.ledger-management-button svg,
+.ledger-upload-primary svg,
+.ledger-empty-icon svg,
+.ledger-management-dialog svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ledger-back svg {
+  width: 20px;
+  stroke-width: 2;
+}
+
+.ledger-actions {
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.ledger-range-picker {
+  position: relative;
+}
+
+.ledger-range-trigger,
+.ledger-management-button {
+  min-height: 44px;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.ledger-range-trigger:hover,
+.ledger-management-button:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ledger-range-trigger svg,
+.ledger-management-button svg,
+.ledger-upload-primary svg {
+  width: 18px;
+  stroke-width: 1.8;
+}
+
+.ledger-range-trigger time {
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-range-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(720px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 24px 64px rgba(23, 32, 51, 0.2);
+}
+
+.range-calendar-nav,
+.management-calendar-nav {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.range-calendar-nav button,
+.management-calendar-nav button,
+.ledger-management-dialog header button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+  background: #f3f6fa;
+  cursor: pointer;
+  font-size: 1.5rem;
+}
+
+.range-calendar-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.mini-calendar h2 {
+  margin: 0 0 9px;
+  color: var(--text-1);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendar-weekdays span {
+  display: grid;
+  min-height: 28px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.calendar-grid button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 42px;
+  place-items: center;
+  border: 0;
+  color: var(--text-2);
+  background: transparent;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.calendar-grid button:hover:not(:disabled) {
+  background: var(--brand-soft);
+}
+
+.calendar-grid button.in-range {
+  background: color-mix(in srgb, var(--brand-soft) 78%, var(--surface));
+}
+
+.calendar-grid button.endpoint {
+  border-radius: 50%;
+  color: #fff;
+  background: var(--brand);
+}
+
+.calendar-grid button.outside {
+  visibility: hidden;
+}
+
+.calendar-grid button:disabled {
+  cursor: default;
+}
+
+.ledger-management-button {
+  color: var(--brand-deep);
+}
+
+.ledger-actions .export-button {
+  min-height: 44px;
+  padding-inline: 12px;
+}
+
+.ledger-status {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 2px;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.ledger-status p,
+.ledger-management-status p {
+  margin: 0;
+}
+
+.ledger-status-success {
+  color: #067647;
+}
+
+.ledger-status-error {
+  color: #b42318;
+}
+
+.ledger-main {
+  display: grid;
+  gap: 12px;
+}
+
+.ledger-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ledger-metric {
+  display: flex;
+  min-width: 0;
+  min-height: 98px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px clamp(10px, 1vw, 16px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.ledger-metric--1 {
+  background: #f5f8ff;
+}
+
+.ledger-metric--2 {
+  background: #f0fdfa;
+}
+
+.ledger-metric--3 {
+  background: #f5f3ff;
+}
+
+.ledger-metric--4 {
+  background: #fff7ed;
+}
+
+.ledger-metric--5 {
+  background: #fff4ed;
+}
+
+.ledger-metric--6 {
+  background: #f0f9ff;
+}
+
+.ledger-metric--1 .core-icon {
+  color: #175cd3;
+  background: #eff4ff;
+}
+
+.ledger-metric--2 .core-icon {
+  color: #087f8c;
+  background: #ecfdff;
+}
+
+.ledger-metric--3 .core-icon {
+  color: #6938ef;
+  background: #f4f3ff;
+}
+
+.ledger-metric--4 .core-icon {
+  color: #c4320a;
+  background: #fff4ed;
+}
+
+.ledger-metric--5 .core-icon {
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.ledger-metric--6 .core-icon {
+  color: #026aa2;
+  background: #f0f9ff;
+}
+
+.ledger-metric .core-icon {
+  width: 2.8rem;
+  height: 2.8rem;
+}
+
+.ledger-metric > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.ledger-metric span,
+.ledger-metric small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-metric small b {
+  font-weight: 800;
+}
+
+.ledger-metric strong {
+  overflow: hidden;
+  margin: 2px 0;
+  color: var(--text-1);
+  font-size: clamp(1.2rem, 1.35vw, 1.55rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ledger-panel {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ledger-panel--trend {
+  grid-column: 1 / -1;
+}
+
+.ledger-panel-heading {
+  min-height: 52px;
+  align-items: center;
+}
+
+.ledger-panel-heading h2 {
+  font-size: 1rem;
+}
+
+.ledger-panel-heading time {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.ledger-chart {
+  width: 100%;
+  min-height: 320px;
+  background: var(--surface);
+}
+
+.ledger-chart--trend {
+  min-height: 350px;
+}
+
+.ledger-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--text-2);
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+  table-layout: auto;
+}
+
+.ledger-table th,
+.ledger-table td {
+  height: 42px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #e2e8f2;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ledger-table thead th {
+  color: var(--muted);
+  background: #f1f5fb;
+  font-weight: 750;
+}
+
+.ledger-table tbody th {
+  color: var(--text-1);
+  font-weight: 700;
+}
+
+.ledger-table :is(th, td):first-child,
+.ledger-table--transactions :is(th, td):nth-child(4),
+.ledger-table--positions :is(th, td):nth-child(2) {
+  text-align: left;
+}
+
+.ledger-table tbody tr:nth-child(even) :is(th, td) {
+  background: #fbfcff;
+}
+
+.ledger-table tbody tr:hover :is(th, td) {
+  background: var(--brand-soft);
+}
+
+.ledger-table-empty td {
+  height: 88px;
+  color: var(--muted);
+  text-align: center !important;
+}
+
+.ledger-table--transactions {
+  min-width: 780px;
+}
+
+.ledger-table--positions {
+  min-width: 940px;
+}
+
+.ledger-panel-heading--transactions {
+  min-height: 58px;
+}
+
+.transaction-summary {
+  margin-left: auto;
+  gap: 6px;
+}
+
+.transaction-summary > span {
+  min-height: 34px;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tag);
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.transaction-summary strong {
+  color: var(--text-1);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.transaction-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.transaction-dot--buy {
+  background: #2f6fed;
+}
+
+.transaction-dot--sell {
+  background: #f79009;
+}
+
+.transaction-dot--maturity {
+  background: #6941c6;
+}
+
+.transaction-side {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: var(--radius-tag);
+  font-weight: 750;
+}
+
+.transaction-side--buy {
+  color: #175cd3;
+  background: #eff4ff;
+}
+
+.transaction-side--sell {
+  color: #b54708;
+  background: #fffaeb;
+}
+
+.transaction-side--maturity {
+  color: #5925dc;
+  background: #f4f3ff;
+}
+
+.ledger-loading,
+.ledger-empty {
+  display: flex;
+  min-height: min(540px, calc(100dvh - 150px));
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.ledger-empty {
+  padding: 40px 20px;
+  flex-direction: column;
+  text-align: center;
+}
+
+.ledger-empty-icon {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+  border-radius: 24px;
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.ledger-empty-icon svg {
+  width: 48px;
+  stroke-width: 1.7;
+}
+
+.ledger-empty h2 {
+  font-size: 1.25rem;
+}
+
+.ledger-empty button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-control);
+  color: #fff;
+  background: var(--brand);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.ledger-management-dialog {
+  width: min(780px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--text-2);
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(23, 32, 51, 0.24);
+}
+
+.ledger-management-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.ledger-management-content {
+  display: grid;
+  max-height: calc(100dvh - 34px);
+  gap: 14px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.ledger-management-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ledger-management-dialog h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.ledger-management-dialog header button {
+  font-size: 1rem;
+}
+
+.ledger-management-dialog header svg {
+  width: 20px;
+  stroke-width: 2;
+}
+
+.ledger-management-toolbar {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ledger-upload-primary {
+  min-height: 44px;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-control);
+  color: #fff;
+  background: var(--brand);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.ledger-upload-primary:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.ledger-management-toolbar > span {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.ledger-management-status {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-inner);
+  background: #f8fafc;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.management-calendar-nav {
+  margin: 0;
+}
+
+.management-calendar {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: #fbfcfe;
+}
+
+.management-calendar .calendar-grid button {
+  min-height: 58px;
+  align-content: center;
+  gap: 3px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-inner);
+}
+
+.management-calendar .calendar-grid button.available {
+  border-color: #a5f0fc;
+  color: #087f8c;
+  background: #ecfdff;
+}
+
+.management-calendar .calendar-grid button.selected {
+  border-color: var(--brand);
+  color: #175cd3;
+  background: #eff4ff;
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+.management-calendar .calendar-grid i {
+  font-size: 0.625rem;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.ledger-management-detail {
+  display: flex;
+  min-height: 70px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.ledger-management-detail > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.ledger-management-detail strong {
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-management-detail span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-management-actions {
+  flex: 0 0 auto;
+  gap: 7px;
+}
+
+.ledger-management-actions button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  color: var(--brand-deep);
+  background: var(--surface);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.ledger-management-actions button.danger {
+  border-color: #fecdca;
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.ledger-management-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.ledger-back:focus-visible,
+.ledger-range-trigger:focus-visible,
+.ledger-management-button:focus-visible,
+.ledger-actions .export-button:focus-visible,
+.ledger-range-popover button:focus-visible,
+.ledger-management-dialog button:focus-visible,
+.ledger-empty button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.is-export-capture .ledger-actions,
+.is-export-capture .ledger-status,
+.is-export-capture .ledger-back {
+  display: none;
+}
+
+.is-export-capture .ledger-masthead {
+  justify-content: flex-start;
+}
+
+@media (max-width: 1500px) {
+  .ledger-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ledger-metric {
+    min-height: 88px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .ledger-masthead {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ledger-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .ledger-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ledger-panel--trend {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .ledger-report {
+    width: 100%;
+    padding: 8px max(10px, env(safe-area-inset-right, 0px)) 24px
+      max(10px, env(safe-area-inset-left, 0px));
+  }
+
+  .ledger-title-block h1 {
+    font-size: 1.1rem;
+  }
+
+  .ledger-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(2, auto);
+  }
+
+  .ledger-range-trigger {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ledger-range-popover {
+    position: fixed;
+    top: 88px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - 104px);
+    overflow-y: auto;
+  }
+
+  .range-calendar-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ledger-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ledger-metric {
+    min-height: 104px;
+    gap: 7px;
+    padding: 8px;
+  }
+
+  .ledger-metric .core-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+  }
+
+  .ledger-metric strong {
+    font-size: 1.08rem;
+  }
+
+  .ledger-metric span,
+  .ledger-metric small {
+    font-size: 0.75rem;
+  }
+
+  .ledger-chart,
+  .ledger-chart--trend {
+    min-height: 320px;
+  }
+
+  .ledger-panel-heading--transactions {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .transaction-summary {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+  }
+
+  .ledger-management-detail {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ledger-management-actions button {
+    flex: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .ledger-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ledger-range-picker {
+    grid-column: 1 / -1;
+  }
+
+  .ledger-management-button,
+  .ledger-actions .export-button {
+    justify-content: center;
+  }
+
+  .ledger-metric .core-icon {
+    display: none;
+  }
+
+  .ledger-management-content {
+    padding: 14px;
+  }
+
+  .ledger-management-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ledger-management-toolbar > span {
+    text-align: right;
+  }
+
+  .management-calendar .calendar-grid button {
+    min-height: 48px;
+  }
+
+  .management-calendar .calendar-grid i {
+    font-size: 0;
+  }
+
+  .management-calendar .calendar-grid i::after {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    content: "";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-back,
+  .ledger-range-trigger,
+  .ledger-management-button {
+    transition: none;
+  }
+}

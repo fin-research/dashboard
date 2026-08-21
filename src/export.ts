@@ -6,7 +6,7 @@ const EXPORT_SCALE = 3;
 export async function exportReportImage(
   report: HTMLElement,
   reportDate: string,
-  options: { captureClass?: boolean } = {},
+  options: { captureClass?: boolean; filename?: string } = {},
 ): Promise<void> {
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
@@ -47,7 +47,8 @@ export async function exportReportImage(
 
     const download = document.createElement("a");
     const isMobile = window.matchMedia("(max-width: 900px)").matches;
-    download.download = reportImageFilename(reportDate, isMobile);
+    download.download =
+      options.filename ?? reportImageFilename(reportDate, isMobile);
     download.href = dataUrl;
     document.body.append(download);
     download.click();

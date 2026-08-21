@@ -97,11 +97,11 @@ function renderEquityGaugeLayout(
           shadowBlur: 6,
           shadowColor: "rgba(32, 38, 34, 0.08)",
           color: [
-            [0.24, colors.green],
+            [0.24, colors.down],
             [0.48, "#a7dcc8"],
             [0.52, "#e8edf4"],
             [0.76, "#f4b3ad"],
-            [1, colors.red],
+            [1, colors.up],
           ],
         },
       },
@@ -117,7 +117,7 @@ function renderEquityGaugeLayout(
         length: "50%",
         width: 3,
         itemStyle: {
-          color: point.change_pct >= 0 ? colors.red : colors.green,
+          color: point.change_pct >= 0 ? colors.up : colors.down,
           shadowBlur: 5,
           shadowColor:
             point.change_pct >= 0
@@ -131,7 +131,7 @@ function renderEquityGaugeLayout(
         itemStyle: {
           color: colors.paper,
           borderColor:
-            point.change_pct >= 0 ? colors.red : colors.green,
+            point.change_pct >= 0 ? colors.up : colors.down,
           borderWidth: 3,
           shadowBlur: 4,
           shadowColor: "rgba(32,38,34,.16)",
@@ -163,7 +163,7 @@ function renderEquityGaugeLayout(
                 lineHeight: Math.round(chartTextSize * 1.05),
               },
               change: {
-                color: point.change_pct >= 0 ? colors.red : colors.green,
+                color: point.change_pct >= 0 ? colors.up : colors.down,
                 fontFamily,
                 fontSize: Math.max(13, chartTextSize * 0.875),
                 fontWeight: 800,

@@ -266,14 +266,14 @@ export function renderGovernmentCurve(
               lineHeight: labelLineHeight,
             },
             up: {
-              color: colors.red,
+              color: colors.up,
               fontFamily,
               fontSize: labelFontSize,
               fontWeight: 700,
               lineHeight: labelLineHeight,
             },
             down: {
-              color: colors.green,
+              color: colors.down,
               fontFamily,
               fontSize: labelFontSize,
               fontWeight: 700,

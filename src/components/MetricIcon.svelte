@@ -26,8 +26,13 @@
     <path d="M7 6h18v20H7zM11 11h10M11 16h10M11 21h6" />
     <circle cx="22.5" cy="22.5" r="5" />
     <path d="M22.5 19.5v6M20.5 21h3.2a1.2 1.2 0 0 1 0 2.4h-2.4" />
+  {:else if icon === "leverage"}
+    <path d="M6 24h20M16 7v17M9 11h14" />
+    <path d="m9 11-4 7h8zm14 0-4 7h8z" />
+  {:else if icon === "profit"}
+    <path d="M7 10.5h18v15H7zM10 10.5V7h12v3.5" />
+    <path d="M12 18h8m-4-4v8" />
   {:else}
     <path d="M6 11h17m0 0-4-4m4 4-4 4M26 21H9m0 0 4-4m-4 4 4 4" />
   {/if}
 </svg>
-

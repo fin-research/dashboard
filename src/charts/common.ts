@@ -15,8 +15,14 @@ export const colors = {
   paper: cssColor("--bg-card", cssColor("--surface", "#ffffff")),
   brand: cssColor("--color-primary", cssColor("--brand", "#f47a20")),
   brandSoft: cssColor("--color-primary-soft", cssColor("--brand-soft", "#fff0e5")),
-  red: cssColor("--color-up", cssColor("--red", "#d94d3f")),
-  green: cssColor("--color-down", cssColor("--green", "#188663")),
+  red: cssColor("--red", "#d92d20"),
+  green: cssColor("--green", "#12a873"),
+  get up() {
+    return cssColor("--color-up", "#d92d20");
+  },
+  get down() {
+    return cssColor("--color-down", "#12a873");
+  },
   gold: cssColor("--color-accent", cssColor("--gold", "#f47a20")),
   blue: cssColor("--color-primary", cssColor("--blue", "#3f708c")),
 } as const;
@@ -87,7 +93,7 @@ export function escapeHtml(value: unknown): string {
 export function heatColor(change: number, maxAbs: number): string {
   if (Math.abs(change) < 0.005) return "#e8edf4";
   const neutral = [226, 232, 241];
-  const target = change > 0 ? [218, 64, 54] : [23, 148, 105];
+  const target = colorChannels(change > 0 ? colors.up : colors.down);
   const ratio = Math.min(1, Math.abs(change) / maxAbs);
   const strength = 0.2 + ratio ** 0.58 * 0.8;
   return `rgb(${neutral
@@ -95,6 +101,17 @@ export function heatColor(change: number, maxAbs: number): string {
       Math.round(value + ((target[index] ?? value) - value) * strength),
     )
     .join(",")})`;
+}
+
+function colorChannels(value: string): [number, number, number] {
+  const match = value.match(/^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i);
+  return match
+    ? [
+        Number.parseInt(match[1] as string, 16),
+        Number.parseInt(match[2] as string, 16),
+        Number.parseInt(match[3] as string, 16),
+      ]
+    : [47, 111, 214];
 }
 
 export function heatTextColor(change: number, maxAbs: number): string {

@@ -28,7 +28,9 @@ export type MetricIconName =
   | "bond"
   | "equity"
   | "issuance"
-  | "trade";
+  | "trade"
+  | "leverage"
+  | "profit";
 export type StatIconName = "turnover" | "margin";
 export type SummaryTone = "up" | "down" | "inject" | "withdraw" | "flat";
 

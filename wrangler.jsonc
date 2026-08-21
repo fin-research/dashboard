@@ -35,6 +35,10 @@
       "zone_name": "hasbai.xyz"
     },
     {
+      "pattern": "eastmoney.hasbai.xyz/api/bond-ledger*",
+      "zone_name": "hasbai.xyz"
+    },
+    {
       "pattern": "eastmoney.hasbai.xyz/_app/*",
       "zone_name": "hasbai.xyz"
     }
@@ -45,6 +49,13 @@
       "database_name": "eastmoney",
       "database_id": "b80cfbe1-1226-46cc-a22b-3ebbaefe85bf",
       "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BOND_LEDGER",
+      "bucket_name": "bond-ledger",
+      "remote": true
     }
   ],
   "secrets": {

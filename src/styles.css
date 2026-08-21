@@ -6,8 +6,10 @@
   --color-primary: #2f6fd6;
   --color-primary-soft: #eaf1fd;
   --color-accent: #ff7a45;
-  --color-up: #e65045;
-  --color-down: #1fa67a;
+  --red: #d92d20;
+  --green: #12a873;
+  --color-up: var(--red);
+  --color-down: var(--green);
   --text-1: #172033;
   --text-2: #273142;
   --text-3: #667085;
@@ -31,11 +33,14 @@
   --brand: var(--color-primary);
   --brand-deep: #245bb2;
   --brand-soft: var(--color-primary-soft);
-  --red: var(--color-up);
-  --green: var(--color-down);
   --blue: var(--color-primary);
   color-scheme: light;
   font-family: var(--font);
+}
+
+:root[data-market-color-convention="green-up-red-down"] {
+  --color-up: var(--green);
+  --color-down: var(--red);
 }
 
 * {
@@ -501,12 +506,12 @@ h1 {
 
 .card--up .card__detail,
 .tone-up {
-  color: var(--red) !important;
+  color: var(--color-up) !important;
 }
 
 .card--down .card__detail,
 .tone-down {
-  color: var(--green) !important;
+  color: var(--color-down) !important;
 }
 
 .card--inject .card__detail {

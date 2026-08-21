@@ -6,6 +6,9 @@ import { defineConfig, loadEnv } from "vite";
 export default defineConfig(({ command, mode }) => {
   const environment = loadEnv(mode, process.cwd(), "");
   const dataProxyTarget = environment.DATA_PROXY_TARGET?.trim();
+  const dataProxyOrigin = dataProxyTarget
+    ? new URL(dataProxyTarget).origin
+    : undefined;
   if (command === "serve" && mode === "dev" && !dataProxyTarget) {
     throw new Error("DATA_PROXY_TARGET must be configured in .env.dev");
   }
@@ -25,6 +28,12 @@ export default defineConfig(({ command, mode }) => {
               target: dataProxyTarget,
               changeOrigin: true,
               agent: dataProxyAgent,
+            },
+            "/api/bond-ledger": {
+              target: dataProxyTarget,
+              changeOrigin: true,
+              agent: dataProxyAgent,
+              headers: dataProxyOrigin ? { Origin: dataProxyOrigin } : undefined,
             },
           }
         : undefined,

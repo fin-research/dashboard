@@ -404,7 +404,8 @@
     overflow: hidden;
     background: #071426;
     font-family:
-      "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+      ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      sans-serif;
   }
 
   :global(button),
@@ -516,7 +517,6 @@
     gap: 7px;
     margin-bottom: 3px;
     color: #83a2ca;
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
     font-size: 0.68rem;
     font-weight: 650;
     letter-spacing: 0.16em;
@@ -621,7 +621,6 @@
 
   .scope-panel__header span {
     color: #7898be;
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.14em;
@@ -834,7 +833,6 @@
 
   .summary-heading > span {
     color: #f6c96b;
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
     font-size: 0.66rem;
     font-weight: 750;
     letter-spacing: 0.12em;
@@ -853,7 +851,6 @@
     justify-content: flex-end;
     gap: 5px 12px;
     color: #8da5c5;
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
     font-size: 0.68rem;
     line-height: 1.5;
   }
@@ -1090,7 +1087,6 @@
   .evidence-list span {
     padding-top: 1px;
     color: #6fa5d8;
-    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
     font-size: 0.66rem;
     line-height: 1.6;
     white-space: nowrap;
