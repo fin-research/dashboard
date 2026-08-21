@@ -44,6 +44,10 @@ export interface HotspotApiResponse extends HotspotAnalysis {
   scope: HotspotScope;
 }
 
+export type HotspotGenerationScope =
+  | { mode: "rolling"; rollingCount: number }
+  | { mode: "range"; startDate: string; endDate: string };
+
 export type HotspotScope =
   | {
       mode: "rolling";

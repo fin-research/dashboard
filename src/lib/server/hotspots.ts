@@ -10,6 +10,7 @@ import {
   DYNAMIC_ROUTE_MODEL,
   generateDynamicRouteObject,
 } from "./ai-gateway.ts";
+import { saveHotspotSnapshot } from "./hotspot-snapshots.ts";
 
 const HOTSPOT_MODEL = DYNAMIC_ROUTE_MODEL;
 const PROMPT_VERSION = "d1-hotspots-v10-unbounded-summary";
@@ -70,13 +71,6 @@ interface EvidenceCard extends ArticleRow {
   keywords: Array<Omit<KeywordRow, "article_id">>;
 }
 
-interface CacheRow {
-  input_fingerprint: string;
-  generated_at: string;
-  model: string;
-  payload: string;
-}
-
 export type HotspotRequestScope =
   | { mode: "rolling"; rollingCount: number }
   | { mode: "range"; startDate: string; endDate: string };
@@ -87,10 +81,9 @@ const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场研
 
 严格遵循响应 JSON Schema 输出，不要输出思考过程、Markdown 或 Schema 以外字段。字段语义和数量约束以 Schema 为准。`;
 
-export async function getMarketHotspots(
+export async function generateMarketHotspots(
   env: Env,
   requestScope: HotspotRequestScope,
-  options: { refresh: boolean },
 ): Promise<HotspotApiResponse> {
   const cards = await loadEvidenceCards(env.DB, requestScope);
   if (cards.length === 0) {
@@ -99,21 +92,7 @@ export async function getMarketHotspots(
   const articleIds = cards.map((card) => card.id);
   const date = cards[0]!.published_at.slice(0, 10);
   const scope = resolvedScope(requestScope, cards);
-  const scopeKey = cacheKey(requestScope);
   const fingerprint = await createFingerprint(cards);
-
-  if (!options.refresh) {
-    const cached = await env.DB.prepare(
-      `SELECT input_fingerprint, generated_at, model, payload
-       FROM hotspot_cache WHERE scope_key = ?`,
-    )
-      .bind(scopeKey)
-      .first<CacheRow>();
-    if (cached?.input_fingerprint === fingerprint) {
-      const analysis = parseHotspotAnalysis(cached.payload, { date, articleIds });
-      return withMetadata(analysis, cached.generated_at, cached.model, true, scope);
-    }
-  }
 
   const output = await generateDynamicRouteObject(
     {
@@ -131,7 +110,7 @@ export async function getMarketHotspots(
       enableThinking: true,
       metadata: {
         date,
-        scope_key: scopeKey,
+        evidence_scope: requestScopeLabel(requestScope),
         prompt_version: PROMPT_VERSION,
         tags: "market-hotspots,stage:aggregate-d1-v4",
       },
@@ -144,18 +123,13 @@ export async function getMarketHotspots(
   const generatedAt = new Date().toISOString();
   const payload = JSON.stringify(analysis);
 
-  await env.DB.prepare(
-    `INSERT INTO hotspot_cache (
-       scope_key, input_fingerprint, generated_at, model, payload
-     ) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(scope_key) DO UPDATE SET
-       input_fingerprint = excluded.input_fingerprint,
-       generated_at = excluded.generated_at,
-       model = excluded.model,
-       payload = excluded.payload`,
-  )
-    .bind(scopeKey, fingerprint, generatedAt, HOTSPOT_MODEL, payload)
-    .run();
+  await saveHotspotSnapshot(env.DB, {
+    inputFingerprint: fingerprint,
+    generatedAt,
+    model: HOTSPOT_MODEL,
+    scope,
+    payload,
+  });
 
   return withMetadata(analysis, generatedAt, HOTSPOT_MODEL, false, scope);
 }
@@ -447,7 +421,7 @@ function resolvedScope(
     : { ...common, ...requestScope };
 }
 
-function cacheKey(scope: HotspotRequestScope): string {
+function requestScopeLabel(scope: HotspotRequestScope): string {
   return scope.mode === "rolling"
     ? `rolling:${scope.rollingCount}`
     : `range:${scope.startDate}:${scope.endDate}`;

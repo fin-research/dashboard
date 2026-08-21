@@ -12,8 +12,8 @@
 
 - `GET /data/config`：获取报告配置
 - `GET /data/report?date=YYYY-MM-DD[&refresh=1]`：获取指定日期的统一报告数据。每个区块都是完整版原始行：`omo`（窗口原始行）、`rates`（dr/dibo/bonds/futures）、`stock_paragraphs`、`margin`（原始行）、`primary`/`inventory`（原始行 + 视觉派生列）、`secondary`（原始行）；视觉与文字版共用同一份字段，前端按需派生
-- `GET /api/rag/hotspots?mode=rolling&count=20[&refresh=1]`：按最新文章数聚合热点（默认 20 篇）
-- `GET /api/rag/hotspots?mode=range&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD[&refresh=1]`：按日期范围聚合热点
+- `GET /api/rag/hotspots`：只读取最近一次成功生成的热点快照，不接收范围参数、不调用模型
+- `POST /api/rag/hotspots`：按 JSON 请求体中的证据范围手动生成并追加快照；滚动范围为 `{"mode":"rolling","rollingCount":20}`，日期范围为 `{"mode":"range","startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}`
 - `POST /api/market-briefing?date=YYYY-MM-DD`：今日聚焦生成（Worker 路由）。Worker 先从后端 `/data/market-briefing/news` 取当日新闻素材，再通过 AI Gateway `compat/chat/completions`（`AI_GATEWAY_ID=default`）调用 `dynamic/rag`；系统提示为 `src/lib/server/market-briefing.ts` 内嵌的 market-briefing skill 全文，用户提示与旧版后端 Codex 生成逐字一致
 - `/api/bond-ledger`：二级池台账 R2 管理接口；`GET` 列出线上台账或按 `date` 下载，`POST` 按报表日覆盖上传，`DELETE` 按 `date` 删除。本地 `pnpm dev` 将该路径代理到 `DATA_PROXY_TARGET`，不使用浏览器假存储；`wrangler dev` 的 `BOND_LEDGER` 绑定使用远程桶。
 
@@ -30,7 +30,7 @@
 - `pnpm worker:deploy`：构建并部署 `eastmoney-dashboard` Worker
 - `pnpm exec wrangler secret put CF_AIG_TOKEN`：交互式配置生产 AI Gateway 认证 Secret；不得把值写入命令、源码或配置文件
 - `pnpm worker:typegen`：根据 `wrangler.jsonc` 更新 Worker 绑定类型
-- `pnpm db:sync:remote`：仅在明确需要时手动运行；按本地最新 `updated_at` / `generated_at` 只读查询远程 D1，增量 upsert `article`、`keyword`、`hotspot_cache`；空库首次只建立最近 100 篇已完成特征抽取文章的有限基线，不读取全库
+- `pnpm db:sync:remote`：仅在明确需要时手动运行；按本地最新 `updated_at` / `generated_at` 只读查询远程 D1，增量 upsert `article`、`keyword`、`hotspot_snapshot`；空库首次只建立最近 100 篇已完成特征抽取文章的有限基线，不读取全库
 - `pnpm db:migrate:local` / `pnpm db:migrate:remote`：应用热点缓存表迁移
 
 ## 目录结构
@@ -38,6 +38,7 @@
 - `src/App.svelte`：既有报告页面布局与数据装配
 - `src/routes/`：SvelteKit 门户、市场点评、市场热点、二级池周报页面和应用 API
 - `src/lib/server/hotspots.ts`：D1 证据读取、AI Gateway 聚合与缓存
+- `src/lib/server/hotspot-snapshots.ts`：最近热点快照读取、完整范围校验与追加写入
 - `src/lib/server/market-briefing.ts`：今日聚焦生成（后端取数 + `dynamic/rag` 经 AI Gateway 调用，提示词逐字复刻旧版 Codex 流程）
 - `src/lib/bond-ledger/`：二级池 Excel 解析、线上台账客户端、本地解析缓存和周报分析。
 - `src/lib/server/bond-ledger.ts`：R2 台账流式上传、分页清单、下载与删除边界。
@@ -57,7 +58,7 @@
 ## 注意事项
 
 - 门户页固定为 `/`；页面路由为 `/market-briefing`、`/market-briefing/text`、`/market-hotspots` 和 `/bond`（旧 `/bond-ledger` 仅保留 308 兼容跳转）。应用 API 位于 `/api/*`。 Python 数据接口为 `/data/*`，该路径只在本地由 Vite 代理，线上不得经过 SvelteKit 后端。
-- D1 固定绑定现有 `eastmoney` 数据库，文章正文仍不得写入 D1；热点聚合只读取 `article.summary`、`importance` 和 `keyword` 结构化证据，并把按范围键与输入指纹缓存的最终热点写入 `hotspot_cache`。
+- D1 固定绑定现有 `eastmoney` 数据库，文章正文仍不得写入 D1；热点聚合只读取 `article.summary`、`importance` 和 `keyword` 结构化证据。每次手动生成都向 `hotspot_snapshot` 追加完整响应、已解析证据范围和输入指纹；首次访问只取最近快照，UI 范围必须由该快照响应回填，不得按当前参数或当前证据重新解释旧响应。
 - 所有模型调用只通过 `src/lib/server/ai-gateway.ts`，经 `https://gateway.ai.cloudflare.com/v1/{account}/{gateway}/compat/chat/completions` 走 `dynamic/rag`。生产认证只允许使用 Worker Secret `CF_AIG_TOKEN`，账户 ID 与 Gateway ID 分别使用非敏感变量 `CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID`；不得把 token 写入源码或 `wrangler.jsonc`。结构化调用用一个 Zod Schema 自动生成标准 `response_format.json_schema`，由 AI SDK 校验结果，Prompt 不重复手写结构。热点聚合保持 `enable_thinking=true`（`reasoning_effort=low`，不设置 completion token 上限）；单来源热点热度不超过 60。统一参数和调用方式以根目录 `README.md` 为准。
 - 热点输出固定为 8–15 个；默认跨日期滚动读取最近 20 篇已完成特征抽取的文章，日期范围模式最多读取最近 100 篇。热点热度由模型直接给出 0-100 分，权重公式仅作为提示，应用不自行计算加权得分，只做范围校验与单来源封顶。
 - 文字版直接消费 `/data/report` 顶层完整字段（OMO 按报告日过滤 `operationDate`），由 `src/text-report.ts` 严格复刻 `api/scripts/report_cli.py` 的筛选、排序、条件分支、数字格式与完整文本；一级发行必须与可视化共用 `src/primary-issues.ts`，不得形成平行口径；不得直接读取 Python 生成的报告文本。

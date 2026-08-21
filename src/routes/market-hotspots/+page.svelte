@@ -2,18 +2,17 @@
   import { onDestroy, onMount } from "svelte";
 
   import WordCloud from "$lib/components/WordCloud.svelte";
-  import type { Hotspot, HotspotApiResponse } from "$lib/hotspots";
+  import type {
+    Hotspot,
+    HotspotApiResponse,
+    HotspotGenerationScope,
+    HotspotScope,
+  } from "$lib/hotspots";
 
   let scopeMode: "rolling" | "range" = "rolling";
   let rollingCount = 20;
   let startDate = offsetShanghaiDate(-7);
   let endDate = shanghaiDate(new Date());
-  let appliedScope:
-    | { mode: "rolling"; rollingCount: number }
-    | { mode: "range"; startDate: string; endDate: string } = {
-    mode: "rolling",
-    rollingCount: 20,
-  };
   let data: HotspotApiResponse | null = null;
   let selected: Hotspot | null = null;
   let loading = true;
@@ -23,37 +22,65 @@
   let configurationOpen = false;
 
   $: scopeLabel =
-    appliedScope.mode === "rolling"
-      ? `最近 ${appliedScope.rollingCount} 篇`
-      : `${appliedScope.startDate} 至 ${appliedScope.endDate}`;
+    data?.scope.mode === "rolling"
+      ? `最近 ${data.scope.rollingCount} 篇`
+      : data?.scope.mode === "range"
+        ? `${data.scope.startDate} 至 ${data.scope.endDate}`
+        : "尚未生成";
 
-  onMount(() => loadHotspots(false));
+  onMount(loadLatestHotspots);
   onDestroy(() => request?.abort());
 
-  async function loadHotspots(refresh: boolean): Promise<void> {
+  async function loadLatestHotspots(): Promise<void> {
     request?.abort();
     request = new AbortController();
-    loading = !data || !refresh;
-    regenerating = refresh;
+    loading = !data;
+    regenerating = false;
     errorMessage = "";
     try {
-      const query = new URLSearchParams({ mode: appliedScope.mode });
-      if (appliedScope.mode === "rolling") {
-        query.set("count", String(appliedScope.rollingCount));
-      } else {
-        query.set("startDate", appliedScope.startDate);
-        query.set("endDate", appliedScope.endDate);
-      }
-      if (refresh) query.set("refresh", "1");
-      const response = await fetch(`/api/rag/hotspots?${query}`, {
+      const response = await fetch("/api/rag/hotspots", {
         signal: request.signal,
         headers: { Accept: "application/json" },
       });
       const payload = (await response.json()) as HotspotApiResponse & {
         error?: string;
       };
+      if (!response.ok) throw new Error(payload.error || "热点快照读取失败");
+      data = payload;
+      syncScopeControls(payload.scope);
+      selected = null;
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        errorMessage = error instanceof Error ? error.message : String(error);
+      }
+    } finally {
+      loading = false;
+      regenerating = false;
+    }
+  }
+
+  async function generateHotspots(scope: HotspotGenerationScope): Promise<void> {
+    request?.abort();
+    request = new AbortController();
+    loading = !data;
+    regenerating = true;
+    errorMessage = "";
+    try {
+      const response = await fetch("/api/rag/hotspots", {
+        method: "POST",
+        signal: request.signal,
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(scope),
+      });
+      const payload = (await response.json()) as HotspotApiResponse & {
+        error?: string;
+      };
       if (!response.ok) throw new Error(payload.error || "热点生成失败");
       data = payload;
+      syncScopeControls(payload.scope);
       selected = null;
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
@@ -70,20 +97,30 @@
   }
 
   function applyConfiguration(): void {
+    let scope: HotspotGenerationScope;
     if (scopeMode === "rolling") {
       rollingCount = Math.min(100, Math.max(8, Math.round(rollingCount || 20)));
-      appliedScope = { mode: "rolling", rollingCount };
+      scope = { mode: "rolling", rollingCount };
     } else {
       if (!startDate || !endDate || startDate > endDate) {
         errorMessage = "开始日期不能晚于结束日期";
         return;
       }
-      appliedScope = { mode: "range", startDate, endDate };
+      scope = { mode: "range", startDate, endDate };
     }
     configurationOpen = false;
-    data = null;
     selected = null;
-    void loadHotspots(false);
+    void generateHotspots(scope);
+  }
+
+  function regenerateCurrentScope(): void {
+    void generateHotspots(data ? generationScope(data.scope) : draftScope());
+  }
+
+  function openConfiguration(): void {
+    if (data) syncScopeControls(data.scope);
+    errorMessage = "";
+    configurationOpen = true;
   }
 
   function closeConfiguration(): void {
@@ -98,6 +135,35 @@
 
   function closeDetails(): void {
     selected = null;
+  }
+
+  function syncScopeControls(scope: HotspotScope): void {
+    scopeMode = scope.mode;
+    if (scope.mode === "rolling") {
+      rollingCount = scope.rollingCount;
+    } else {
+      startDate = scope.startDate;
+      endDate = scope.endDate;
+    }
+  }
+
+  function generationScope(scope: HotspotScope): HotspotGenerationScope {
+    return scope.mode === "rolling"
+      ? { mode: "rolling", rollingCount: scope.rollingCount }
+      : {
+          mode: "range",
+          startDate: scope.startDate,
+          endDate: scope.endDate,
+        };
+  }
+
+  function draftScope(): HotspotGenerationScope {
+    return scopeMode === "rolling"
+      ? {
+          mode: "rolling",
+          rollingCount: Math.min(100, Math.max(8, Math.round(rollingCount || 20))),
+        }
+      : { mode: "range", startDate, endDate };
   }
 
   function formatGeneratedAt(value: string): string {
@@ -165,7 +231,7 @@
           type="button"
           aria-expanded={configurationOpen}
           aria-controls="hotspot-scope-panel"
-          onclick={() => (configurationOpen = !configurationOpen)}
+          onclick={() => (configurationOpen ? closeConfiguration() : openConfiguration())}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6" />
@@ -250,7 +316,7 @@
         class="regenerate-button"
         type="button"
         disabled={loading || regenerating}
-        onclick={() => loadHotspots(true)}
+        onclick={regenerateCurrentScope}
       >
         <svg class:spinning={regenerating} viewBox="0 0 24 24" aria-hidden="true">
           <path d="M20 11a8 8 0 1 0-2.3 5.7" />
@@ -266,8 +332,8 @@
       <section class="state-card loading-card" aria-live="polite">
         <span class="loading-ring" aria-hidden="true"></span>
         <div>
-          <strong>正在读取所选范围的研报证据</strong>
-          <p>汇总摘要、关键词与跨资产传导关系。</p>
+          <strong>{regenerating ? "正在按所选范围生成热点" : "正在读取最近一次生成的热点"}</strong>
+          <p>{regenerating ? "完成后将保存为新的最新快照。" : "证据范围与热点内容来自同一次生成。"}</p>
         </div>
       </section>
     {:else if errorMessage}
@@ -280,7 +346,7 @@
           <strong>热点暂时无法生成</strong>
           <p>{errorMessage}</p>
         </div>
-        <button type="button" onclick={() => loadHotspots(false)}>重新读取</button>
+        <button type="button" onclick={loadLatestHotspots}>重新读取</button>
       </section>
     {:else if data}
       <section class="cloud-panel" aria-labelledby="cloud-heading">

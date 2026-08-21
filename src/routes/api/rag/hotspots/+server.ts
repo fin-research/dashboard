@@ -1,11 +1,44 @@
 import {
-  getMarketHotspots,
+  generateMarketHotspots,
   HotspotError,
   type HotspotRequestScope,
 } from "$lib/server/hotspots";
+import { loadLatestHotspotSnapshot } from "$lib/server/hotspot-snapshots";
 import type { RequestHandler } from "./$types";
 
-export const GET: RequestHandler = async ({ platform, url }) => {
+export const GET: RequestHandler = async ({ platform }) => {
+  if (!platform?.env.DB) {
+    return Response.json(
+      { error: "D1 未配置" },
+      { status: 503 },
+    );
+  }
+  try {
+    const result = await loadLatestHotspotSnapshot(platform.env.DB);
+    if (!result) {
+      throw new HotspotError(404, "尚无已生成的市场热点，请手动生成");
+    }
+    return Response.json(result, {
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    const status = error instanceof HotspotError ? error.status : 500;
+    console.error(
+      JSON.stringify({
+        event: "market_hotspots_failed",
+        action: "load_latest_snapshot",
+        status,
+        error: describeError(error),
+      }),
+    );
+    return Response.json(
+      { error: publicErrorMessage(error, status) },
+      { status, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+};
+
+export const POST: RequestHandler = async ({ platform, request }) => {
   if (
     !platform?.env.DB ||
     !platform.env.CLOUDFLARE_ACCOUNT_ID ||
@@ -16,12 +49,12 @@ export const GET: RequestHandler = async ({ platform, url }) => {
       { status: 503 },
     );
   }
+  let scope: HotspotRequestScope | null = null;
   try {
-    const scope = requestScope(url);
-    const result = await getMarketHotspots(platform.env, scope, {
-      refresh: url.searchParams.get("refresh") === "1",
-    });
+    scope = requestScope(await parseJsonBody(request));
+    const result = await generateMarketHotspots(platform.env, scope);
     return Response.json(result, {
+      status: 201,
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
@@ -29,7 +62,8 @@ export const GET: RequestHandler = async ({ platform, url }) => {
     console.error(
       JSON.stringify({
         event: "market_hotspots_failed",
-        scope: scopeForLog(url),
+        action: "generate_snapshot",
+        scope: scope ? scopeForLog(scope) : "invalid",
         status,
         error: describeError(error),
       }),
@@ -47,22 +81,24 @@ function isIsoDate(value: string): boolean {
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().startsWith(value);
 }
 
-function requestScope(url: URL): HotspotRequestScope {
-  const legacyDate = url.searchParams.get("date");
-  const mode = legacyDate ? "range" : (url.searchParams.get("mode") ?? "rolling");
+function requestScope(value: unknown): HotspotRequestScope {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HotspotError(400, "请求体必须是证据范围对象");
+  }
+  const body = value as Record<string, unknown>;
+  const mode = body.mode;
   if (mode === "rolling") {
-    const rawCount = url.searchParams.get("count") ?? "20";
-    const rollingCount = Number(rawCount);
+    const rollingCount = Number(body.rollingCount);
     if (!Number.isInteger(rollingCount) || rollingCount < 8 || rollingCount > 100) {
-      throw new HotspotError(400, "count 必须是 8-100 的整数");
+      throw new HotspotError(400, "rollingCount 必须是 8-100 的整数");
     }
     return { mode: "rolling", rollingCount };
   }
   if (mode !== "range") {
     throw new HotspotError(400, "mode 必须是 rolling 或 range");
   }
-  const startDate = legacyDate ?? url.searchParams.get("startDate") ?? "";
-  const endDate = legacyDate ?? url.searchParams.get("endDate") ?? "";
+  const startDate = typeof body.startDate === "string" ? body.startDate : "";
+  const endDate = typeof body.endDate === "string" ? body.endDate : "";
   if (!isIsoDate(startDate) || !isIsoDate(endDate)) {
     throw new HotspotError(400, "startDate 和 endDate 必须是有效的 YYYY-MM-DD");
   }
@@ -72,8 +108,18 @@ function requestScope(url: URL): HotspotRequestScope {
   return { mode: "range", startDate, endDate };
 }
 
-function scopeForLog(url: URL): string {
-  return url.searchParams.toString().slice(0, 240) || "rolling:20";
+async function parseJsonBody(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    throw new HotspotError(400, "请求体必须是有效 JSON");
+  }
+}
+
+function scopeForLog(scope: HotspotRequestScope): string {
+  return scope.mode === "rolling"
+    ? `rolling:${scope.rollingCount}`
+    : `range:${scope.startDate}:${scope.endDate}`;
 }
 
 function describeError(error: unknown): Record<string, unknown> | string {
