@@ -21,7 +21,10 @@ await new Promise((resolve, reject) => {
 const declarationUrl = new URL("../worker-configuration.d.ts", import.meta.url);
 const generated = await readFile(declarationUrl, "utf8");
 const withoutBuildImport = generated.replace(
-  /\n\tinterface GlobalProps \{\n\t\tmainModule: typeof import\("\.\/\.svelte-kit\/cloudflare\/_worker"\);\n\t\}\n/,
+  /\n\tinterface GlobalProps \{\n\t\tmainModule: typeof import\("[^"]+"\);\n\t\}\n/,
   "\n",
+).replace(
+  /Workflow<Parameters<import\("\.\/worker\/entry"\)\.BondLedgerImportWorkflow\['run'\]>\[0\]\['payload'\]>/,
+  'Workflow<import("./src/lib/bond-ledger/types").BondLedgerImportParams>',
 );
 await writeFile(declarationUrl, withoutBuildImport);

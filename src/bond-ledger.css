@@ -524,8 +524,7 @@
 }
 
 .ledger-table :is(th, td):first-child,
-.ledger-table--transactions :is(th, td):nth-child(4),
-.ledger-table--positions :is(th, td):nth-child(2) {
+.ledger-table--transactions :is(th, td):nth-child(4) {
   text-align: left;
 }
 
@@ -545,10 +544,6 @@
 
 .ledger-table--transactions {
   min-width: 780px;
-}
-
-.ledger-table--positions {
-  min-width: 940px;
 }
 
 .ledger-panel-heading--transactions {

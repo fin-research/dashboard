@@ -13,20 +13,15 @@ import {
   shiftMonth,
 } from "../src/lib/bond-ledger/calendar.ts";
 import {
-  deleteLocalBondLedger,
-  listBondLedgers,
-  putBondLedger,
-} from "../src/lib/bond-ledger/db.ts";
-import {
   BondLedgerParseError,
   parseBondLedgerMatrices,
 } from "../src/lib/bond-ledger/parser.ts";
 import {
   archiveBondLedgerRequest,
   BondLedgerUploadError,
-  deleteBondLedgerFile,
-  listBondLedgerFiles,
+  workflowStatus,
 } from "../src/lib/server/bond-ledger.ts";
+import { persistParsedBondLedger } from "../src/lib/server/bond-ledger-repository.ts";
 import { GET as redirectLegacyBondLedger } from "../src/routes/bond-ledger/+server.ts";
 import {
   readPreferences,
@@ -83,6 +78,8 @@ test("解析标准台账前两张表并统一日期与数值", () => {
   performance[30] = 71_000_000;
   performance[37] = 0.0245;
   performance[43] = 0.0229;
+  const cachedFuturePerformance = [...performance];
+  cachedFuturePerformance[0] = "2026/08/21";
   const position = Array(29).fill(null);
   position[0] = "2026/8/20";
   position[4] = "260306.IB";
@@ -102,11 +99,12 @@ test("解析标准台账前两张表并统一日期与数值", () => {
   position[27] = 500_000;
 
   const result = parseBondLedgerMatrices(
-    [header, Array(47).fill(null), performance],
+    [header, Array(47).fill(null), performance, cachedFuturePerformance],
     [POSITION_HEADERS, position],
   );
 
   assert.equal(result.date, "2026-08-20");
+  assert.deepEqual(result.performance.map((row) => row.date), ["2026-08-20"]);
   assert.equal(result.performance[0].marketValue, 6_400_000_000);
   assert.equal(result.positions[0].buyQuantity, 11_000_000);
   assert.equal(result.positions[0].reportYield, 1.43);
@@ -178,18 +176,19 @@ test("业务收益率按交易日单日收益率算术平均乘 252 年化", () 
   });
 });
 
-test("上传始终写入 R2，同日报表使用固定 key 覆盖", async () => {
+test("上传先写入不可变 R2 key，再启动 Workflow", async () => {
   const body = new Blob(["xlsx-bytes"], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
   const request = uploadRequest(body);
   await assert.rejects(
-    archiveBondLedgerRequest(request.clone(), undefined),
+    archiveBondLedgerRequest(request.clone(), undefined, undefined),
     (error) =>
       error instanceof BondLedgerUploadError && error.status === 503,
   );
 
   const calls = [];
+  const workflows = [];
   const bucket = {
     async put(key, value, options) {
       const bytes = await new Response(value).arrayBuffer();
@@ -201,14 +200,26 @@ test("上传始终写入 R2，同日报表使用固定 key 覆盖", async () => 
       };
     },
   };
+  const workflow = {
+    async create(options) {
+      workflows.push(options);
+      return { id: options.id };
+    },
+  };
   const productionRequest = request.clone();
   const requestBody = productionRequest.body;
-  const production = await archiveBondLedgerRequest(productionRequest, bucket);
-  assert.equal(production.stored, true);
-  assert.equal(production.key, "daily/2026-08-20.xlsx");
+  const production = await archiveBondLedgerRequest(
+    productionRequest,
+    bucket,
+    workflow,
+  );
+  assert.equal(production.accepted, true);
+  assert.match(production.key, /^uploads\/[0-9a-f-]{36}\.xlsx$/);
   assert.equal(calls[0].value, requestBody);
   assert.equal(calls[0].bytes, body.size);
-  assert.equal(calls[0].options.customMetadata.ledgerDate, "2026-08-20");
+  assert.equal(calls[0].options.customMetadata.originalName, "二级资金池台账20260820.xlsx");
+  assert.equal(workflows[0].id, production.workflowId);
+  assert.equal(workflows[0].params.r2Key, production.key);
 });
 
 test("上传接口要求可信的请求体长度", async () => {
@@ -219,6 +230,7 @@ test("上传接口要求可信的请求体长度", async () => {
     archiveBondLedgerRequest(
       uploadRequest(body, { "Content-Length": "" }),
       { put: async () => assert.fail("长度缺失时不应写入 R2") },
+      { create: async () => assert.fail("长度缺失时不应启动 Workflow") },
     ),
     (error) =>
       error instanceof BondLedgerUploadError && error.status === 400,
@@ -227,6 +239,7 @@ test("上传接口要求可信的请求体长度", async () => {
     archiveBondLedgerRequest(
       uploadRequest(body, { "Content-Length": String(body.size + 1) }),
       { put: async () => assert.fail("长度不一致时不应写入 R2") },
+      { create: async () => assert.fail("长度不一致时不应启动 Workflow") },
     ),
     (error) =>
       error instanceof BondLedgerUploadError && error.status === 400,
@@ -239,46 +252,100 @@ test("上传接口拒绝跨站请求", async () => {
   });
   const request = uploadRequest(body, { Origin: "https://attacker.example" });
   await assert.rejects(
-    archiveBondLedgerRequest(request, undefined),
+    archiveBondLedgerRequest(request, undefined, undefined),
     (error) =>
       error instanceof BondLedgerUploadError && error.status === 403,
   );
 });
 
-test("线上台账清单按日期排序并支持删除", async () => {
-  const deleted = [];
+test("Workflow 启动失败时回滚本次 R2 文件", async () => {
+  const body = new Blob(["xlsx-bytes"], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const calls = [];
   const bucket = {
-    async list() {
-      return {
-        truncated: false,
-        objects: [
-          remoteObject("2026-08-20"),
-          remoteObject("2026-08-18"),
-        ],
-      };
-    },
-    async head(key) {
-      return key === "daily/2026-08-18.xlsx" ? remoteObject("2026-08-18") : null;
+    async put(key) {
+      calls.push(["put", key]);
+      return { key, size: body.size, etag: "etag-test" };
     },
     async delete(key) {
-      deleted.push(key);
+      calls.push(["delete", key]);
     },
   };
-  const inventory = await listBondLedgerFiles(bucket);
-  assert.deepEqual(
-    inventory.files.map((file) => file.date),
-    ["2026-08-18", "2026-08-20"],
+  const workflow = {
+    async create() {
+      calls.push(["workflow"]);
+      throw new Error("workflow unavailable");
+    },
+  };
+
+  await assert.rejects(
+    archiveBondLedgerRequest(uploadRequest(body), bucket, workflow),
+    (error) =>
+      error instanceof BondLedgerUploadError &&
+      error.message.includes("已回滚本次 R2 文件"),
   );
-  assert.equal(inventory.availableStartDate, "2026-08-18");
-  assert.equal(inventory.availableEndDate, "2026-08-20");
-  await deleteBondLedgerFile(
-    new Request("https://eastmoney.hasbai.xyz/api/bond-ledger?date=2026-08-18", {
-      method: "DELETE",
-    }),
-    bucket,
-    "2026-08-18",
+  assert.deepEqual(calls.map(([action]) => action), ["put", "workflow", "delete"]);
+});
+
+test("数据库导入先获取全局锁再获取同日报表锁", async () => {
+  const queries = [];
+  const client = {
+    async query(text) {
+      queries.push(text);
+      if (text.includes("FROM bond.ledger_upload")) return { rows: [] };
+      if (text.includes("max(source_report_date)")) {
+        return { rows: [{ latest_source_date: null }] };
+      }
+      if (text.includes("FROM bond.transaction_record")) {
+        return { rows: [{ count: 0 }] };
+      }
+      return { rows: [], rowCount: 1 };
+    },
+  };
+  const performance = performanceRow("2026-08-20", 1, 100);
+
+  await persistParsedBondLedger(client, {
+    uploadId: "00000000-0000-4000-8000-000000000001",
+    workflowInstanceId: "00000000-0000-4000-8000-000000000001",
+    r2Key: "uploads/test.xlsx",
+    r2Etag: "etag-test",
+    originalName: "test.xlsx",
+    fileSize: 100,
+    expectedDate: "2026-08-20",
+    uploadedAt: "2026-08-20T10:00:00.000Z",
+    parsed: {
+      date: "2026-08-20",
+      performance: [performance],
+      positions: [],
+    },
+  });
+
+  assert.equal(queries[0], "BEGIN");
+  assert.match(queries[1], /bond\.ledger_import/);
+  assert.match(queries[2], /hashtextextended\(\$1, 0\)/);
+  assert.equal(queries.at(-1), "COMMIT");
+});
+
+test("Workflow 状态统一映射为处理中、成功或失败", async () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  const binding = (status) => ({
+    async get() {
+      return { async status() { return status; } };
+    },
+  });
+  assert.equal(
+    (await workflowStatus(binding({ status: "running" }), id)).status,
+    "processing",
   );
-  assert.deepEqual(deleted, ["daily/2026-08-18.xlsx"]);
+  assert.equal(
+    (await workflowStatus(binding({ status: "complete", output: { reportDate: "2026-08-20" } }), id)).status,
+    "succeeded",
+  );
+  assert.equal(
+    (await workflowStatus(binding({ status: "errored", error: { message: "bad workbook" } }), id)).error,
+    "bad workbook",
+  );
 });
 
 test("日期范围无台账时回退到线上实际区间", () => {
@@ -296,17 +363,6 @@ test("日期范围无台账时回退到线上实际区间", () => {
   );
   assert.equal(calendarDays("2026-08-01").length, 42);
   assert.equal(shiftMonth("2026-08-01", 1), "2026-09-01");
-});
-
-test("浏览器持久化不可用时仍可用内存台账渲染页面", async () => {
-  const record = ledger("2026-08-20", [performanceRow("2026-08-20", 10, 100)], []);
-  await putBondLedger(record);
-  assert.deepEqual(
-    (await listBondLedgers()).map(({ date }) => date),
-    ["2026-08-20"],
-  );
-  await deleteLocalBondLedger(record.date);
-  assert.deepEqual(await listBondLedgers(), []);
 });
 
 test("旧二级池页面地址永久跳转到 /bond", () => {
@@ -350,12 +406,17 @@ function performanceRow(date, cumulativeProfit, principal) {
 function positionRow(overrides = {}) {
   return {
     reportDate: "2026-08-18",
+    rowNumber: 1,
+    team: "资金管理部",
+    investmentManager: "测试经理",
+    account: "交易户",
     code: overrides.code ?? "TEST.IB",
     market: "银行间",
     name: overrides.name ?? "测试债券",
     category: overrides.category ?? "国债",
     yieldChangeBp: 0,
     remainingYears: 2,
+    interestStartDate: "2025-08-18",
     maturityDate: "2028-08-18",
     currentQuantity: 1,
     previousQuantity: 1,
@@ -368,24 +429,12 @@ function positionRow(overrides = {}) {
     fullPrice: 100,
     dv01: 1,
     marketValue: overrides.marketValue ?? 100,
+    couponIncome: 0,
+    taxExemptIncome: 0,
     realizedProfit: overrides.realizedProfit ?? null,
     dailyProfit: 1,
     ytdProfit: 2,
     fullPriceCost: 98,
-  };
-}
-
-function remoteObject(date) {
-  return {
-    key: `daily/${date}.xlsx`,
-    size: 1024,
-    etag: `etag-${date}`,
-    uploaded: new Date(`${date}T10:00:00Z`),
-    customMetadata: {
-      ledgerDate: date,
-      originalName: `${date}.xlsx`,
-      uploadedAt: `${date}T10:00:00Z`,
-    },
   };
 }
 
@@ -408,7 +457,6 @@ function uploadRequest(body, extraHeaders = {}) {
     method: "POST",
     headers: {
       "Content-Type": body.type,
-      "X-Ledger-Date": "2026-08-20",
       "X-Ledger-Filename": encodeURIComponent("二级资金池台账20260820.xlsx"),
       "X-Ledger-Size": String(body.size),
       "Content-Length": String(body.size),

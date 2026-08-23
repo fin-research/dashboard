@@ -1,8 +1,8 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "eastmoney-dashboard",
-  "main": ".svelte-kit/cloudflare/_worker.js",
-  "compatibility_date": "2026-08-14",
+  "main": "worker/entry.ts",
+  "compatibility_date": "2026-08-20",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "CLOUDFLARE_ACCOUNT_ID": "5cecc63c78acf8f5473f8745f4244448",
@@ -12,6 +12,9 @@
   "assets": {
     "binding": "ASSETS",
     "directory": ".svelte-kit/cloudflare"
+  },
+  "placement": {
+    "mode": "smart"
   },
   "routes": [
     {
@@ -32,6 +35,19 @@
       "binding": "BOND_LEDGER",
       "bucket_name": "bond-ledger",
       "remote": true
+    }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "26b76413a03a4328836d95f3ca320a1e"
+    }
+  ],
+  "workflows": [
+    {
+      "binding": "BOND_LEDGER_IMPORT",
+      "name": "bond-ledger-import",
+      "class_name": "BondLedgerImportWorkflow"
     }
   ],
   "secrets": {

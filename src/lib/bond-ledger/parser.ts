@@ -56,11 +56,28 @@ export async function parseBondLedgerFile(file: File): Promise<ParsedBondLedger>
     throw new BondLedgerParseError("仅支持 .xlsx 标准台账");
   }
   const { read, utils } = await import("xlsx");
-  const workbook = read(await file.arrayBuffer(), {
+  return parseBondLedgerWorkbook(read(await file.arrayBuffer(), {
     cellDates: true,
     cellFormula: false,
     sheets: [0, 1],
-  });
+  }), utils);
+}
+
+export async function parseBondLedgerBuffer(
+  buffer: ArrayBuffer,
+): Promise<ParsedBondLedger> {
+  const { read, utils } = await import("xlsx");
+  return parseBondLedgerWorkbook(read(buffer, {
+    cellDates: true,
+    cellFormula: false,
+    sheets: [0, 1],
+  }), utils);
+}
+
+function parseBondLedgerWorkbook(
+  workbook: import("xlsx").WorkBook,
+  utils: typeof import("xlsx").utils,
+): ParsedBondLedger {
   if (workbook.SheetNames.length < 2) {
     throw new BondLedgerParseError("台账至少需要前两张工作表");
   }
@@ -97,7 +114,11 @@ export function parseBondLedgerMatrices(
   if (!performance.some((row) => row.date === date)) {
     throw new BondLedgerParseError("两张表的报表日期不一致");
   }
-  return { date, performance, positions };
+  return {
+    date,
+    performance: performance.filter((row) => row.date <= date),
+    positions,
+  };
 }
 
 function validatePerformanceHeader(matrix: Matrix): void {
@@ -161,19 +182,24 @@ function parsePositionRows(matrix: Matrix): LedgerPositionRow[] {
   const optionalColumn = (name: string) => columns.get(normalizeHeader(name));
   const realizedProfitColumn = optionalColumn("资本利得");
   const result: LedgerPositionRow[] = [];
-  for (const row of matrix.slice(1)) {
+  for (const [index, row] of matrix.slice(1).entries()) {
     const reportDate = toIsoDate(row[column("报表日期")]);
     const code = toText(row[column("债券代码")]);
     const name = toText(row[column("债券名称")]);
     if (!reportDate || (!code && !name)) continue;
     result.push({
       reportDate,
+      rowNumber: index + 1,
+      team: toText(row[optionalColumn("团队") ?? -1]),
+      investmentManager: toText(row[optionalColumn("投资经理") ?? -1]),
+      account: toText(row[optionalColumn("账户") ?? -1]),
       code,
       market: toText(row[column("交易市场")]),
       name,
       category: toText(row[column("债券分类")]) || "未分类",
       yieldChangeBp: toNumber(row[column("收益率变动(BP)")]),
       remainingYears: toNumber(row[column("剩余期限（年）")]),
+      interestStartDate: toIsoDate(row[optionalColumn("起息日") ?? -1]),
       maturityDate: toIsoDate(row[column("到期日")]),
       currentQuantity: toNumber(row[column("今日持仓量")]) ?? 0,
       previousQuantity: toNumber(row[column("昨日持仓量")]) ?? 0,
@@ -186,6 +212,8 @@ function parsePositionRows(matrix: Matrix): LedgerPositionRow[] {
       fullPrice: toNumber(row[column("估值全价")]),
       dv01: toNumber(row[column("DV01")]) ?? 0,
       marketValue: toNumber(row[column("全价市值")]) ?? 0,
+      couponIncome: toNumber(row[optionalColumn("票息收入") ?? -1]) ?? 0,
+      taxExemptIncome: toNumber(row[optionalColumn("免税收入") ?? -1]) ?? 0,
       realizedProfit:
         realizedProfitColumn === undefined
           ? null

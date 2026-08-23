@@ -1,23 +1,70 @@
 import {
   archiveBondLedgerRequest,
   BondLedgerUploadError,
-  deleteBondLedgerFile,
   getBondLedgerFile,
   ledgerDownloadHeaders,
-  listBondLedgerFiles,
+  validateLedgerDate,
+  validateSameOrigin,
+  workflowStatus,
 } from "$lib/server/bond-ledger";
+import {
+  BondLedgerDatabaseError,
+  deleteBondLedgerDate,
+  findBondLedgerFile,
+  listBondLedgerInventory,
+  loadBondLedgerReport,
+} from "$lib/server/bond-ledger-repository";
+import { withPostgres } from "$lib/server/postgres";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform, url }) => {
   try {
-    const date = url.searchParams.get("date");
-    if (date) {
-      const object = await getBondLedgerFile(platform?.env.BOND_LEDGER, date);
-      return new Response(object.body as BodyInit, {
-        headers: ledgerDownloadHeaders(object),
+    const workflowId = url.searchParams.get("workflow");
+    if (workflowId) {
+      return Response.json(
+        await workflowStatus(platform?.env.BOND_LEDGER_IMPORT, workflowId),
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    const startDate = url.searchParams.get("start");
+    const endDate = url.searchParams.get("end");
+    if (startDate || endDate) {
+      if (!startDate || !endDate) {
+        throw new BondLedgerUploadError(400, "统计范围必须同时包含起止日期");
+      }
+      validateLedgerDate(startDate);
+      validateLedgerDate(endDate);
+      if (startDate > endDate) {
+        throw new BondLedgerUploadError(400, "统计起始日期不能晚于结束日期");
+      }
+      const report = await withPostgres(
+        platform?.env.HYPERDRIVE?.connectionString,
+        "eastmoney-bond-report",
+        (client) => loadBondLedgerReport(client, startDate, endDate),
+      );
+      return Response.json(report, {
+        headers: { "Cache-Control": "no-store" },
       });
     }
-    return Response.json(await listBondLedgerFiles(platform?.env.BOND_LEDGER), {
+    const date = url.searchParams.get("date");
+    if (date) {
+      validateLedgerDate(date);
+      const file = await withPostgres(
+        platform?.env.HYPERDRIVE?.connectionString,
+        "eastmoney-bond-download",
+        (client) => findBondLedgerFile(client, date),
+      );
+      const object = await getBondLedgerFile(platform?.env.BOND_LEDGER, file);
+      return new Response(object.body as BodyInit, {
+        headers: ledgerDownloadHeaders(object, file.fileName),
+      });
+    }
+    const inventory = await withPostgres(
+      platform?.env.HYPERDRIVE?.connectionString,
+      "eastmoney-bond-inventory",
+      listBondLedgerInventory,
+    );
+    return Response.json(inventory, {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
@@ -30,9 +77,10 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
     const result = await archiveBondLedgerRequest(
       request,
       platform?.env.BOND_LEDGER,
+      platform?.env.BOND_LEDGER_IMPORT,
     );
     return Response.json(result, {
-      status: 201,
+      status: 202,
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
@@ -43,7 +91,13 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
 export const DELETE: RequestHandler = async ({ request, platform, url }) => {
   try {
     const date = url.searchParams.get("date") ?? "";
-    await deleteBondLedgerFile(request, platform?.env.BOND_LEDGER, date);
+    validateSameOrigin(request);
+    validateLedgerDate(date);
+    await withPostgres(
+      platform?.env.HYPERDRIVE?.connectionString,
+      "eastmoney-bond-delete",
+      (client) => deleteBondLedgerDate(client, date),
+    );
     return Response.json(
       { deleted: true, date },
       { headers: { "Cache-Control": "no-store" } },
@@ -54,7 +108,11 @@ export const DELETE: RequestHandler = async ({ request, platform, url }) => {
 };
 
 function errorResponse(error: unknown, url: URL, action: string): Response {
-  const status = error instanceof BondLedgerUploadError ? error.status : 500;
+  const status =
+    error instanceof BondLedgerUploadError ||
+    error instanceof BondLedgerDatabaseError
+      ? error.status
+      : 500;
   console.error(
     JSON.stringify({
       event: `bond_ledger_${action}_failed`,
@@ -66,7 +124,8 @@ function errorResponse(error: unknown, url: URL, action: string): Response {
   return Response.json(
     {
       error:
-        error instanceof BondLedgerUploadError
+        error instanceof BondLedgerUploadError ||
+        error instanceof BondLedgerDatabaseError
           ? error.message
           : "台账管理失败，请稍后重试",
     },

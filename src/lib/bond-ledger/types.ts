@@ -13,12 +13,17 @@ export interface LedgerPerformanceRow {
 
 export interface LedgerPositionRow {
   reportDate: string;
+  rowNumber: number;
+  team: string;
+  investmentManager: string;
+  account: string;
   code: string;
   market: string;
   name: string;
   category: string;
   yieldChangeBp: number | null;
   remainingYears: number | null;
+  interestStartDate: string | null;
   maturityDate: string | null;
   currentQuantity: number;
   previousQuantity: number;
@@ -31,6 +36,8 @@ export interface LedgerPositionRow {
   fullPrice: number | null;
   dv01: number;
   marketValue: number;
+  couponIncome: number;
+  taxExemptIncome: number;
   realizedProfit: number | null;
   dailyProfit: number;
   ytdProfit: number;
@@ -43,14 +50,17 @@ export interface ParsedBondLedger {
   positions: LedgerPositionRow[];
 }
 
-export interface BondLedgerRecord extends ParsedBondLedger {
-  fileName: string;
+export interface BondLedgerImportParams {
+  uploadId: string;
+  r2Key: string;
+  r2Etag: string | null;
+  originalName: string;
   fileSize: number;
-  fileBlob: Blob;
+  expectedDate: string | null;
   uploadedAt: string;
-  cloudStored: boolean;
-  cloudKey: string | null;
 }
+
+export type BondLedgerSource = ParsedBondLedger;
 
 export type LedgerTransactionSide = "买入" | "卖出" | "到期";
 
@@ -90,8 +100,8 @@ export interface MaturityBucketStat {
 }
 
 export interface BondLedgerAnalytics {
-  selectedLedgers: BondLedgerRecord[];
-  latestLedger: BondLedgerRecord | null;
+  selectedLedgers: BondLedgerSource[];
+  latestLedger: BondLedgerSource | null;
   currentPerformance: LedgerPerformanceRow | null;
   performanceTrend: LedgerPerformanceRow[];
   rangePerformance: LedgerPerformanceRow[];
@@ -114,6 +124,23 @@ export interface BondLedgerAnalytics {
   };
   detailMarketValue: number;
   reconciliationGap: number | null;
+  effectiveStartDate: string | null;
+  effectiveEndDate: string | null;
+}
+
+export interface BondLedgerReport {
+  hasData: boolean;
+  currentPerformance: LedgerPerformanceRow | null;
+  performanceTrend: LedgerPerformanceRow[];
+  holdingTypes: HoldingTypeStat[];
+  maturityBuckets: MaturityBucketStat[];
+  transactions: LedgerTransaction[];
+  transactionTotals: Record<LedgerTransactionSide, number>;
+  rangeProfit: number | null;
+  rangeAnnualizedReturn: number | null;
+  ytdAnnualizedReturn: number | null;
+  transactionCount: number;
+  metricDeltas: BondLedgerAnalytics["metricDeltas"];
   effectiveStartDate: string | null;
   effectiveEndDate: string | null;
 }

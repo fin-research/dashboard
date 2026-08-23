@@ -1,6 +1,7 @@
 import type {
   BondLedgerAnalytics,
-  BondLedgerRecord,
+  BondLedgerReport,
+  BondLedgerSource,
   HoldingTypeStat,
   LedgerPerformanceRow,
   LedgerPositionDetail,
@@ -33,9 +34,10 @@ const MATURITY_BUCKETS = [
 ] as const;
 
 export function buildBondLedgerAnalytics(
-  ledgers: BondLedgerRecord[],
+  ledgers: BondLedgerSource[],
   startDate: string,
   endDate: string,
+  storedTransactions?: LedgerTransaction[],
 ): BondLedgerAnalytics {
   const selectedLedgers = ledgers
     .filter((ledger) => ledger.date >= startDate && ledger.date <= endDate)
@@ -62,8 +64,12 @@ export function buildBondLedgerAnalytics(
     selectedLedgers,
   );
   const detailMarketValue = sum(currentPositions.map((row) => row.marketValue));
-  const transactions = selectedLedgers
-    .flatMap((ledger) => transactionsForLedger(ledger))
+  const transactions = (storedTransactions
+    ? storedTransactions.filter(
+        (transaction) =>
+          transaction.date >= startDate && transaction.date <= endDate,
+      )
+    : selectedLedgers.flatMap((ledger) => transactionsForLedger(ledger)))
     .sort((left, right) => {
       const dateOrder = right.date.localeCompare(left.date);
       return dateOrder || right.faceAmount - left.faceAmount;
@@ -108,13 +114,19 @@ export function buildBondLedgerAnalytics(
       : null;
   const previousTransactions =
     comparisonStartDate && comparisonEndDate
-      ? ledgers
-          .filter(
-            (ledger) =>
-              ledger.date >= comparisonStartDate &&
-              ledger.date <= comparisonEndDate,
+      ? storedTransactions
+        ? storedTransactions.filter(
+            (transaction) =>
+              transaction.date >= comparisonStartDate &&
+              transaction.date <= comparisonEndDate,
           )
-          .flatMap((ledger) => transactionsForLedger(ledger))
+        : ledgers
+            .filter(
+              (ledger) =>
+                ledger.date >= comparisonStartDate &&
+                ledger.date <= comparisonEndDate,
+            )
+            .flatMap((ledger) => transactionsForLedger(ledger))
       : [];
   const transactionCount = uniqueTransactionCount(transactions);
   const previousTransactionCount = uniqueTransactionCount(previousTransactions);
@@ -178,6 +190,31 @@ export function buildBondLedgerAnalytics(
     effectiveStartDate,
     effectiveEndDate,
   };
+}
+
+export function toBondLedgerReport(
+  analytics: BondLedgerAnalytics,
+): BondLedgerReport {
+  return {
+    hasData: analytics.latestLedger !== null,
+    currentPerformance: analytics.currentPerformance,
+    performanceTrend: analytics.performanceTrend,
+    holdingTypes: analytics.holdingTypes,
+    maturityBuckets: analytics.maturityBuckets,
+    transactions: analytics.transactions,
+    transactionTotals: analytics.transactionTotals,
+    rangeProfit: analytics.rangeProfit,
+    rangeAnnualizedReturn: analytics.rangeAnnualizedReturn,
+    ytdAnnualizedReturn: analytics.ytdAnnualizedReturn,
+    transactionCount: analytics.transactionCount,
+    metricDeltas: analytics.metricDeltas,
+    effectiveStartDate: analytics.effectiveStartDate,
+    effectiveEndDate: analytics.effectiveEndDate,
+  };
+}
+
+export function emptyBondLedgerReport(): BondLedgerReport {
+  return toBondLedgerReport(emptyAnalytics([]));
 }
 
 export function weekRange(referenceDate: string): {
@@ -387,7 +424,7 @@ function aggregateMaturityBuckets(
   });
 }
 
-function transactionsForLedger(ledger: BondLedgerRecord): LedgerTransaction[] {
+function transactionsForLedger(ledger: BondLedgerSource): LedgerTransaction[] {
   const transactions: LedgerTransaction[] = [];
   for (const row of ledger.positions) {
     for (const { side, field } of TRANSACTION_SIDES) {
@@ -426,7 +463,7 @@ function transactionTotalMap(
 }
 
 function emptyAnalytics(
-  selectedLedgers: BondLedgerRecord[],
+  selectedLedgers: BondLedgerSource[],
 ): BondLedgerAnalytics {
   return {
     selectedLedgers,
@@ -460,7 +497,7 @@ function emptyAnalytics(
 
 function addRangeProfit(
   positions: LedgerPositionRow[],
-  ledgers: BondLedgerRecord[],
+  ledgers: BondLedgerSource[],
 ): LedgerPositionDetail[] {
   const profits = new Map<string, number>();
   for (const ledger of ledgers) {

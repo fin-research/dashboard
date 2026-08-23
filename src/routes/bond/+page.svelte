@@ -14,7 +14,7 @@
   import MetricIcon from "../../components/MetricIcon.svelte";
   import { exportReportImage } from "../../export";
   import {
-    buildBondLedgerAnalytics,
+    emptyBondLedgerReport,
     weekRange,
   } from "$lib/bond-ledger/analytics";
   import {
@@ -22,14 +22,8 @@
     monthLabel,
     monthStart,
     resolveAvailableRange,
-    shiftDate,
     shiftMonth,
   } from "$lib/bond-ledger/calendar";
-  import {
-    deleteLocalBondLedger,
-    listBondLedgers,
-    putBondLedger,
-  } from "$lib/bond-ledger/db";
   import {
     formatDecimalPercent,
     formatMultiple,
@@ -37,14 +31,14 @@
     formatYears,
     formatYi,
   } from "$lib/bond-ledger/format";
-  import { parseBondLedgerFile } from "$lib/bond-ledger/parser";
-  import type { BondLedgerRecord } from "$lib/bond-ledger/types";
+  import type { BondLedgerReport } from "$lib/bond-ledger/types";
   import {
     archiveBondLedgerFile,
     deleteRemoteBondLedger,
     downloadRemoteBondLedger,
-    fetchRemoteBondLedgerFile,
     listRemoteBondLedgers,
+    loadBondLedgerReport,
+    waitForBondLedgerImport,
     type RemoteBondLedgerFile,
   } from "$lib/bond-ledger/upload";
   import { currentReportDate } from "../../report-date";
@@ -54,7 +48,7 @@
   const INITIAL_REPORT_DATE = currentReportDate();
   const INITIAL_WEEK_RANGE = weekRange(INITIAL_REPORT_DATE);
 
-  let records: BondLedgerRecord[] = [];
+  let analytics: BondLedgerReport = emptyBondLedgerReport();
   let remoteFiles: RemoteBondLedgerFile[] = [];
   let startDate = INITIAL_WEEK_RANGE.startDate;
   let endDate = INITIAL_WEEK_RANGE.endDate;
@@ -79,7 +73,6 @@
   let managementDialog: HTMLDialogElement;
   let reportSurface: HTMLElement;
 
-  $: analytics = buildBondLedgerAnalytics(records, startDate, endDate);
   $: current = analytics.currentPerformance;
   $: isDefaultWeek = isCurrentWeek(startDate, endDate);
   $: rangeMonths = [rangeMonthLeft, shiftMonth(rangeMonthLeft, 1)];
@@ -156,13 +149,13 @@
   ];
 
   onMount(() => {
-    void syncRangeFromRemote(true);
+    void refreshReport(true);
     return () => {
       if (exportTimer !== null) window.clearTimeout(exportTimer);
     };
   });
 
-  async function syncRangeFromRemote(allowFallback: boolean): Promise<void> {
+  async function refreshReport(allowFallback: boolean): Promise<void> {
     const generation = ++syncGeneration;
     syncingRecords = true;
     if (loadingRecords) errorMessage = "";
@@ -176,7 +169,7 @@
         endDate,
       );
       if (!resolved) {
-        records = [];
+        analytics = emptyBondLedgerReport();
         return;
       }
       if (resolved.fellBack && allowFallback) {
@@ -185,55 +178,12 @@
         rangeMonthLeft = monthStart(startDate);
         uploadMessage = `所选范围无线上台账，已回退至 ${startDate}—${endDate}`;
       }
-      const comparisonStart = shiftDate(startDate, -7);
-      const comparisonEnd = shiftDate(endDate, -7);
-      const needed = remoteFiles.filter(
-        (file) =>
-          isWithin(file.date, startDate, endDate) ||
-          isWithin(file.date, comparisonStart, comparisonEnd),
-      );
-      const neededStart = comparisonStart < startDate ? comparisonStart : startDate;
-      const neededEnd = comparisonEnd > endDate ? comparisonEnd : endDate;
-      const remoteDates = new Set(needed.map((file) => file.date));
-      const local = await listBondLedgers();
-      for (const record of local) {
-        if (
-          isWithin(record.date, neededStart, neededEnd) &&
-          !remoteDates.has(record.date)
-        ) {
-          await deleteLocalBondLedger(record.date);
-        }
-      }
-      const errors: string[] = [];
-      for (const remote of needed) {
-        try {
-          const file = await fetchRemoteBondLedgerFile(remote);
-          const parsed = await parseBondLedgerFile(file);
-          if (parsed.date !== remote.date) {
-            throw new Error(`文件报表日为 ${parsed.date}`);
-          }
-          await putBondLedger({
-            ...parsed,
-            fileName: remote.fileName,
-            fileSize: remote.size,
-            fileBlob: file,
-            uploadedAt: remote.uploadedAt,
-            cloudStored: true,
-            cloudKey: remote.key,
-          });
-        } catch (error) {
-          errors.push(
-            `${remote.date}：${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
       if (generation !== syncGeneration) return;
-      records = await listBondLedgers();
-      if (errors.length) errorMessage = errors.join("；");
+      analytics = await loadBondLedgerReport(startDate, endDate);
     } catch (error) {
       if (generation !== syncGeneration) return;
       errorMessage = error instanceof Error ? error.message : String(error);
-      records = await listBondLedgers().catch(() => []);
+      analytics = emptyBondLedgerReport();
     } finally {
       if (generation === syncGeneration) {
         loadingRecords = false;
@@ -263,13 +213,17 @@
     for (const [index, file] of files.entries()) {
       uploadMessage = `正在上传 ${index + 1}/${files.length}：${file.name}`;
       try {
-        const parsed = await parseBondLedgerFile(file);
-        if (target && parsed.date !== target) {
-          throw new Error(`重新上传文件的报表日必须为 ${target}`);
-        }
-        await archiveBondLedgerFile(file, parsed.date);
+        const archived = await archiveBondLedgerFile(file, target || undefined);
+        const imported = await waitForBondLedgerImport(
+          archived.workflowId,
+          () => {
+            uploadMessage = `正在导入 ${index + 1}/${files.length}：${file.name}`;
+          },
+        );
         successCount += 1;
-        if (parsed.date > latestUploadedDate) latestUploadedDate = parsed.date;
+        if (imported.reportDate > latestUploadedDate) {
+          latestUploadedDate = imported.reportDate;
+        }
       } catch (error) {
         errors.push(
           `${file.name}：${error instanceof Error ? error.message : String(error)}`,
@@ -278,7 +232,6 @@
     }
     try {
       await refreshRemoteFiles();
-      records = await listBondLedgers();
       if (latestUploadedDate) {
         managementMonth = monthStart(latestUploadedDate);
         selectedManagedDate = latestUploadedDate;
@@ -287,7 +240,9 @@
         latestUploadedDate &&
         isWithin(latestUploadedDate, startDate, endDate)
       ) {
-        await syncRangeFromRemote(false);
+        await refreshReport(false);
+      } else if (successCount) {
+        await refreshReport(true);
       }
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
@@ -295,7 +250,7 @@
       uploading = false;
     }
     uploadMessage = successCount
-      ? `已上传 ${successCount} 份线上台账，重复日期已覆盖`
+      ? `已完成 ${successCount} 份 Excel 的 R2 归档和数据库导入`
       : "";
     if (errors.length) errorMessage = errors.join("；");
   }
@@ -303,18 +258,17 @@
   async function removeRemoteLedger(remote: RemoteBondLedgerFile): Promise<void> {
     if (deleting) return;
     const confirmed = window.confirm(
-      `删除 ${remote.date} 的线上台账？删除后无法恢复。`,
+      `删除 ${remote.date} 的周报数据库数据？原始 Excel 仍保留在 R2 归档。`,
     );
     if (!confirmed) return;
     deleting = true;
     errorMessage = "";
     try {
       await deleteRemoteBondLedger(remote.date);
-      await deleteLocalBondLedger(remote.date);
       await refreshRemoteFiles();
       selectedManagedDate = "";
       uploadMessage = `已删除 ${remote.date} 线上台账`;
-      await syncRangeFromRemote(true);
+      await refreshReport(true);
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
@@ -389,11 +343,11 @@
       endDate = date;
     }
     rangeOpen = false;
-    void syncRangeFromRemote(true);
+    void refreshReport(true);
   }
 
   async function exportImage(): Promise<void> {
-    if (!analytics.latestLedger || exporting) return;
+    if (!analytics.hasData || exporting) return;
     exporting = true;
     exportLabel = "正在导出";
     try {
@@ -543,7 +497,7 @@
           class:is-exporting={exporting}
           class="export-button"
           type="button"
-          disabled={!analytics.latestLedger || loadingRecords || exporting}
+          disabled={!analytics.hasData || loadingRecords || exporting}
           onclick={exportImage}
         >
           <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -557,7 +511,7 @@
     </header>
 
     <div class="ledger-status" aria-live="polite">
-      {#if syncingRecords && !loadingRecords}<p>正在同步线上台账</p>{/if}
+      {#if syncingRecords && !loadingRecords}<p>正在读取数据库周报</p>{/if}
       {#if uploadMessage}<p class="ledger-status-success">{uploadMessage}</p>{/if}
       {#if errorMessage}<p class="ledger-status-error" role="alert">{errorMessage}</p>{/if}
     </div>
@@ -565,9 +519,9 @@
     {#if loadingRecords}
       <main class="ledger-loading" aria-live="polite">
         <span class="loading-orbit" aria-hidden="true"></span>
-        <strong>正在同步线上台账</strong>
+        <strong>正在读取数据库周报</strong>
       </main>
-    {:else if !analytics.latestLedger}
+    {:else if !analytics.hasData}
       <main class="ledger-empty">
         <div class="ledger-empty-icon" aria-hidden="true">
           <svg viewBox="0 0 48 48">
@@ -575,7 +529,7 @@
             <path d="M31 6v8h8M16 23h16M16 29h16M16 35h10" />
           </svg>
         </div>
-        <h2>线上暂无台账</h2>
+        <h2>数据库暂无周报数据</h2>
         <button type="button" onclick={openManagement}>打开台账管理</button>
       </main>
     {:else}
@@ -677,41 +631,6 @@
           </div>
         </section>
 
-        <section class="dashboard-panel ledger-panel" aria-labelledby="positions-title">
-          <header class="panel-heading ledger-panel-heading">
-            <h2 id="positions-title">持仓明细</h2>
-          </header>
-          <div class="ledger-table-wrap">
-            <table class="ledger-table ledger-table--positions">
-              <thead>
-                <tr>
-                  <th>债券代码</th>
-                  <th>债券名称</th>
-                  <th>债券类型</th>
-                  <th>规模</th>
-                  <th>剩余期限</th>
-                  <th>收益率变动</th>
-                  <th>{isDefaultWeek ? "本周损益" : "区间损益"}</th>
-                  <th>累计损益</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each analytics.currentPositions as position (`${position.code}-${position.name}`)}
-                  <tr>
-                    <td>{position.code}</td>
-                    <th scope="row">{position.name}</th>
-                    <td>{position.category}</td>
-                    <td>{formatYi(position.marketValue)}</td>
-                    <td>{formatYears(position.remainingYears)}</td>
-                    <td class={deltaClass(position.yieldChangeBp)}>{position.yieldChangeBp === null ? "-" : `${sign(position.yieldChangeBp)}${Math.abs(position.yieldChangeBp).toFixed(2)} BP`}</td>
-                    <td class={deltaClass(position.rangeProfit)}>{formatSignedWan(position.rangeProfit)}</td>
-                    <td class={deltaClass(position.ytdProfit)}>{formatSignedWan(position.ytdProfit)}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        </section>
       </main>
     {/if}
   </div>
@@ -748,7 +667,7 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5M4 12.5V17h12v-4.5" /></svg>
         <span>{uploading ? "正在上传" : "批量上传 Excel"}</span>
       </button>
-      <span>{remoteFiles.length} 个线上台账日</span>
+      <span>{remoteFiles.length} 个数据库报表日</span>
     </div>
     {#if uploadMessage || errorMessage}
       <div class="ledger-management-status" aria-live="polite">
