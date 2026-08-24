@@ -43,6 +43,7 @@
     type RemoteBondLedgerFile,
   } from "$lib/bond-ledger/upload";
   import { currentReportDate } from "../../report-date";
+  import { globalMessages } from "$lib/global-messages";
   import type { MetricIconName } from "../../view-model";
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
@@ -173,10 +174,13 @@
       if (generation !== syncGeneration) return;
       remoteFiles = inventory.files;
       databaseLedgerDates = inventory.databaseDates;
+      const currentWeek = weekRange(currentReportDate());
       const resolved = resolveAvailableRange(
         databaseLedgerDates,
         startDate,
         endDate,
+        currentWeek.startDate,
+        currentWeek.endDate,
       );
       if (!resolved) {
         analytics = emptyBondLedgerReport();
@@ -186,7 +190,14 @@
         startDate = resolved.startDate;
         endDate = resolved.endDate;
         rangeMonthLeft = monthStart(startDate);
-        uploadMessage = `所选范围无线上台账，已回退至 ${startDate}—${endDate}`;
+        globalMessages.warning(
+          `所选范围无线上台账，已回退至 ${startDate}—${endDate}`,
+          {
+            key: "bond-ledger-range-fallback",
+            title: "日期范围已调整",
+            duration: 6000,
+          },
+        );
       }
       if (generation !== syncGeneration) return;
       analytics = await loadBondLedgerReport(startDate, endDate);

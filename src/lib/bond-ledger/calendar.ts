@@ -61,6 +61,8 @@ export function resolveAvailableRange(
   dates: string[],
   requestedStart: string,
   requestedEnd: string,
+  fallbackStart: string,
+  fallbackEnd: string,
 ): { startDate: string; endDate: string; fellBack: boolean } | null {
   const sorted = [...new Set(dates)].sort();
   if (!sorted.length) return null;
@@ -71,9 +73,13 @@ export function resolveAvailableRange(
       fellBack: false,
     };
   }
+  const fallbackDates = sorted.filter(
+    (date) => date >= fallbackStart && date <= fallbackEnd,
+  );
+  if (!fallbackDates.length) return null;
   return {
-    startDate: sorted[0] as string,
-    endDate: sorted.at(-1) as string,
+    startDate: fallbackDates[0] as string,
+    endDate: fallbackDates.at(-1) as string,
     fellBack: true,
   };
 }
