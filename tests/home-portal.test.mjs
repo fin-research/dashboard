@@ -13,5 +13,9 @@ test("首页提供融资工作台生产路由入口", async () => {
     /<a class="tool-card tool-card--workspace" href="\/financing\/">[\s\S]*?<h2>融资工作台<\/h2>/,
   );
   assert.equal((page.match(/class="tool-card /g) ?? []).length, 5);
-  assert.match(page, /grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(
+    page,
+    /grid-template-columns:\s*repeat\(auto-fill, minmax\(280px, 1fr\)\)/,
+  );
+  assert.doesNotMatch(page, /@media\s*\(max-width:\s*1080px\)/);
 });

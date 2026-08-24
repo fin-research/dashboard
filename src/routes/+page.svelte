@@ -343,7 +343,7 @@
 
   .tool-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 24px;
   }
 
@@ -521,13 +521,6 @@
 
   .tool-action svg {
     width: 19px;
-  }
-
-  @media (max-width: 1080px) {
-    .tool-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
   }
 
   @media (max-width: 720px) {
