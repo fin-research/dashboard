@@ -220,6 +220,7 @@ test("上传先写入不可变 R2 key，再启动 Workflow", async () => {
   assert.equal(calls[0].options.customMetadata.originalName, "二级资金池台账20260820.xlsx");
   assert.equal(workflows[0].id, production.workflowId);
   assert.equal(workflows[0].params.r2Key, production.key);
+  assert.equal(workflows[0].locationHint, "apac");
 });
 
 test("上传接口要求可信的请求体长度", async () => {

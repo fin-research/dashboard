@@ -80,7 +80,7 @@ export async function archiveBondLedgerRequest(
         successRetention: "7 days",
         errorRetention: "30 days",
       },
-      locationHint: "apac-ne",
+      locationHint: "apac",
     });
     return {
       accepted: true,
