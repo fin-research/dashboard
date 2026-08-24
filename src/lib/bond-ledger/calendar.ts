@@ -6,6 +6,10 @@ export interface CalendarDay {
   inMonth: boolean;
 }
 
+export interface LedgerCalendarDay extends CalendarDay {
+  hasLedger: boolean;
+}
+
 export function monthStart(date: string): string {
   return `${date.slice(0, 7)}-01`;
 }
@@ -34,6 +38,17 @@ export function calendarDays(month: string): CalendarDay[] {
       inMonth: iso.slice(0, 7) === month.slice(0, 7),
     };
   });
+}
+
+export function calendarDaysWithLedgerStatus(
+  month: string,
+  ledgerDates: string[],
+): LedgerCalendarDay[] {
+  const dates = new Set(ledgerDates);
+  return calendarDays(month).map((day) => ({
+    ...day,
+    hasLedger: dates.has(day.date),
+  }));
 }
 
 export function shiftDate(value: string, offset: number): string {

@@ -19,6 +19,7 @@
   } from "$lib/bond-ledger/analytics";
   import {
     calendarDays,
+    calendarDaysWithLedgerStatus,
     monthLabel,
     monthStart,
     resolveAvailableRange,
@@ -79,7 +80,13 @@
   $: rangeMonths = [rangeMonthLeft, shiftMonth(rangeMonthLeft, 1)];
   $: managedFile =
     remoteFiles.find((file) => file.date === selectedManagedDate) ?? null;
-  $: managementCalendarDays = calendarDays(managementMonth);
+  $: managementCalendarDays = calendarDaysWithLedgerStatus(
+    managementMonth,
+    databaseLedgerDates,
+  );
+  $: selectedManagedDateHasLedger = databaseLedgerDates.includes(
+    selectedManagedDate,
+  );
   $: metricCards = [
     {
       label: "当前规模",
@@ -373,10 +380,6 @@
 
   function remoteForDate(date: string): RemoteBondLedgerFile | null {
     return remoteFiles.find((file) => file.date === date) ?? null;
-  }
-
-  function hasDatabaseLedger(date: string): boolean {
-    return databaseLedgerDates.includes(date);
   }
 
   function isSelectedDate(date: string): boolean {
@@ -694,18 +697,17 @@
       </div>
       <div class="calendar-grid">
         {#each managementCalendarDays as day (day.date)}
-          {@const hasLedger = hasDatabaseLedger(day.date)}
           <button
             type="button"
             class:outside={!day.inMonth}
-            class:available={hasLedger}
+            class:available={day.hasLedger}
             class:selected={day.date === selectedManagedDate}
-            disabled={!day.inMonth || !hasLedger}
-            aria-label={hasLedger ? `${day.date} 数据库有台账，查看管理操作` : `${day.date} 数据库无台账`}
+            disabled={!day.inMonth || !day.hasLedger}
+            aria-label={day.hasLedger ? `${day.date} 数据库有台账，查看管理操作` : `${day.date} 数据库无台账`}
             onclick={() => (selectedManagedDate = day.date)}
           >
             <span>{day.day}</span>
-            <span class="sr-only">{hasLedger ? "有台账" : "无台账"}</span>
+            <span class="sr-only">{day.hasLedger ? "有台账" : "无台账"}</span>
           </button>
         {/each}
       </div>
@@ -721,7 +723,7 @@
           <button type="button" disabled={uploading} onclick={() => openReupload(managedFile.date)}>重新上传</button>
           <button class="danger" type="button" disabled={deleting} onclick={() => removeRemoteLedger(managedFile)}>删除</button>
         </div>
-      {:else if selectedManagedDate && hasDatabaseLedger(selectedManagedDate)}
+      {:else if selectedManagedDate && selectedManagedDateHasLedger}
         <div>
           <strong>{selectedManagedDate}</strong>
           <span>数据库已有台账，暂无原始文件管理信息</span>

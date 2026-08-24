@@ -9,6 +9,7 @@ import {
 } from "../src/lib/bond-ledger/analytics.ts";
 import {
   calendarDays,
+  calendarDaysWithLedgerStatus,
   resolveAvailableRange,
   shiftMonth,
 } from "../src/lib/bond-ledger/calendar.ts";
@@ -402,6 +403,17 @@ test("日期范围无台账时回退到线上实际区间", () => {
   );
   assert.equal(calendarDays("2026-08-01").length, 42);
   assert.equal(shiftMonth("2026-08-01", 1), "2026-09-01");
+});
+
+test("数据库日期首次载入后立即派生日历台账状态", () => {
+  const days = calendarDaysWithLedgerStatus("2026-08-01", [
+    "2026-08-20",
+    "2026-08-21",
+  ]);
+
+  assert.equal(days.find((day) => day.date === "2026-08-19")?.hasLedger, false);
+  assert.equal(days.find((day) => day.date === "2026-08-20")?.hasLedger, true);
+  assert.equal(days.find((day) => day.date === "2026-08-21")?.hasLedger, true);
 });
 
 test("旧二级池页面地址永久跳转到 /bond", () => {
