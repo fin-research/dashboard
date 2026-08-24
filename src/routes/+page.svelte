@@ -27,7 +27,7 @@
 
 <svelte:head>
   <title>市场研究 · 资金管理部</title>
-  <meta name="description" content="市场点评、市场热点、融资择时模型与二级池周报入口" />
+  <meta name="description" content="市场点评、市场热点、二级池周报、融资择时模型与融资工作台入口" />
   <meta name="theme-color" content="#fffbf4" />
 </svelte:head>
 
@@ -162,6 +162,29 @@
           </svg>
         </span>
       </a>
+
+      <a class="tool-card tool-card--workspace" href="/financing/">
+        <span class="tool-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8M8 16h5" />
+          </svg>
+        </span>
+        <span class="card-visual card-visual--workspace" aria-hidden="true">
+          <svg viewBox="0 0 180 100">
+            <path d="M18 18h144v68H18zM18 37h144M61 37v49" />
+            <path d="m30 53 6 6 12-14M30 73l6 6 12-14M75 52h67M75 70h49" />
+          </svg>
+        </span>
+        <span class="tool-copy">
+          <h2>融资工作台</h2>
+        </span>
+        <span class="tool-action">
+          打开融资工作台
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>
+        </span>
+      </a>
     </nav>
   </main>
 </div>
@@ -222,6 +245,7 @@
     --blue: #91ceff;
     --mint: #bce9d9;
     --lavender: #d8d2f4;
+    --peach: #ffc9a9;
     min-height: 100dvh;
     background: var(--background);
   }
@@ -319,7 +343,7 @@
 
   .tool-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 24px;
   }
 
@@ -382,6 +406,11 @@
   .tool-card--model {
     background: var(--lavender);
     box-shadow: 0 24px 54px rgba(88, 70, 156, 0.14);
+  }
+
+  .tool-card--workspace {
+    background: var(--peach);
+    box-shadow: 0 24px 54px rgba(184, 91, 43, 0.14);
   }
 
   .tool-card:hover {
