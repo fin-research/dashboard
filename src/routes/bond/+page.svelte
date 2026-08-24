@@ -80,12 +80,6 @@
   $: managedFile =
     remoteFiles.find((file) => file.date === selectedManagedDate) ?? null;
   $: managementCalendarDays = calendarDays(managementMonth);
-  $: managementMonthDayCount = managementCalendarDays.filter(
-    (day) => day.inMonth,
-  ).length;
-  $: managementMonthLedgerCount = managementCalendarDays.filter(
-    (day) => day.inMonth && databaseLedgerDates.includes(day.date),
-  ).length;
   $: metricCards = [
     {
       label: "当前规模",
@@ -694,11 +688,6 @@
       <strong>{monthLabel(managementMonth)}</strong>
       <button type="button" aria-label="下一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, 1))}>›</button>
     </div>
-    <div class="management-calendar-summary" aria-live="polite">
-      <span><b>{managementMonthLedgerCount}</b> 天有台账</span>
-      <span><b>{managementMonthDayCount - managementMonthLedgerCount}</b> 天无台账</span>
-      <small>状态来自 Neon 数据库，不按 R2 文件判断</small>
-    </div>
     <section class="management-calendar" aria-label={monthLabel(managementMonth)}>
       <div class="calendar-weekdays" aria-hidden="true">
         {#each WEEKDAYS as weekday}<span>{weekday}</span>{/each}
@@ -710,14 +699,13 @@
             type="button"
             class:outside={!day.inMonth}
             class:available={hasLedger}
-            class:unavailable={!hasLedger}
             class:selected={day.date === selectedManagedDate}
             disabled={!day.inMonth || !hasLedger}
             aria-label={hasLedger ? `${day.date} 数据库有台账，查看管理操作` : `${day.date} 数据库无台账`}
             onclick={() => (selectedManagedDate = day.date)}
           >
             <span>{day.day}</span>
-            <i>{hasLedger ? "有台账" : "无台账"}</i>
+            <span class="sr-only">{hasLedger ? "有台账" : "无台账"}</span>
           </button>
         {/each}
       </div>

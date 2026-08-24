@@ -757,28 +757,6 @@
   margin: 0;
 }
 
-.management-calendar-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  color: var(--muted);
-  font-size: 0.8125rem;
-}
-
-.management-calendar-summary span {
-  font-weight: bold;
-}
-
-.management-calendar-summary b {
-  color: var(--text-1);
-}
-
-.management-calendar-summary small {
-  margin-left: auto;
-  font-size: inherit;
-}
-
 .management-calendar {
   padding: 10px;
   border: 1px solid var(--line);
@@ -786,24 +764,22 @@
   background: #fbfcfe;
 }
 
+.management-calendar .calendar-weekdays,
+.management-calendar .calendar-grid {
+  gap: 8px;
+}
+
 .management-calendar .calendar-grid button {
-  min-height: 58px;
+  min-height: 52px;
   align-content: center;
-  gap: 3px;
   border: 1px solid transparent;
   border-radius: var(--radius-inner);
 }
 
 .management-calendar .calendar-grid button.available {
-  border-color: #a5f0fc;
-  color: #087f8c;
-  background: #ecfdff;
-}
-
-.management-calendar .calendar-grid button.unavailable:not(.outside) {
-  border-color: #eaecf0;
-  color: #98a2b3;
-  background: #f8fafc;
+  border-color: var(--brand);
+  color: var(--text-1);
+  background: var(--surface);
 }
 
 .management-calendar .calendar-grid button.selected {
@@ -811,12 +787,6 @@
   color: #175cd3;
   background: #eff4ff;
   box-shadow: inset 0 0 0 1px var(--brand);
-}
-
-.management-calendar .calendar-grid i {
-  font-size: 0.75rem;
-  font-style: normal;
-  font-weight: bold;
 }
 
 .ledger-management-detail {
@@ -1063,14 +1033,9 @@
     min-height: 48px;
   }
 
-  .management-calendar .calendar-grid i {
-    font-size: 0.625rem;
-    line-height: 1;
-  }
-
-  .management-calendar-summary small {
-    width: 100%;
-    margin-left: 0;
+  .management-calendar .calendar-weekdays,
+  .management-calendar .calendar-grid {
+    gap: 4px;
   }
 }
 
