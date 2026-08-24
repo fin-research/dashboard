@@ -4,7 +4,7 @@
 
 债券市场研究全栈应用，提供市场点评、市场热点和二级池周报。技术栈为 SvelteKit、Svelte 5、TypeScript、Tailwind CSS 4、daisyUI、ECharts、Cloudflare Workers/D1/R2/Workflows/Hyperdrive、Neon PostgreSQL 与 AI Gateway。
 
-运行入口：门户 `/`，市场点评 `/market-briefing`，文字版 `/market-briefing/text`，市场热点 `/market-hotspots`，二级池 `/bond`。
+运行入口：门户 `/`，市场点评 `/market-briefing`，文字版 `/market-briefing/text`，市场热点 `/market-hotspots`，融资择时模型 `/financing-model`，二级池 `/bond`。
 
 ## Repository Structure
 
@@ -15,7 +15,7 @@
 - `src/lib/server/`：仅服务端运行的数据访问、AI、快照和台账逻辑。
 - `src/lib/bond-ledger/`：Excel 解析、校验、格式化与分析。
 - `worker/`：自定义 Worker 入口和二级池导入 Workflow。
-- `migrations/`：D1 migration；`postgres-migrations/`：Neon `bond` schema migration。
+- `migrations/`：D1 migration；`postgres-migrations/`：Neon `bond` schema migration；`financing-model-migrations/`：Neon `financing_model` schema migration。
 - `scripts/`：类型生成、D1 同步、Neon migration 与台账回填。
 - `tests/`：Node 单元与契约测试。
 
@@ -30,6 +30,8 @@
 - 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。
 - D1 与 Neon migration 必须放入各自目录，不得混用。结构变化时检查写入方、读取方和回填脚本。
 - 所有生成式 AI 调用只通过 `src/lib/server/ai-gateway.ts`；Schema 由 Zod 定义并在应用端校验，密钥只读 Worker Secret。
+- 融资择时模型原始快照只由 quant pipeline 追加；dashboard 只写人工结论修订和 AI Search 卖方观点快照，不覆盖 `model_run.payload`。
+- 融资择时卖方观点固定调用 `https://search.hasbai.xyz/mcp` 的 `search` 工具，检索参数和日期硬过滤遵循项目组 `AI.md`，不得读取 quant 旧 R2 研报脚本。
 - 不手动编辑生成文件 `worker-configuration.d.ts`；绑定变化使用 `pnpm worker:typegen`。
 - `pnpm dev` 不自动同步远程 D1。只有任务明确需要本地证据时才运行 `pnpm db:sync:remote`。
 - 保留用户已有改动，不做无关重构，不通过删除测试或关闭检查掩盖错误。
@@ -47,6 +49,7 @@
 - D1 migration：`pnpm db:migrate:local` / `pnpm db:migrate:remote`
 - 显式同步远程 D1：`pnpm db:sync:remote`
 - Neon migration：`pnpm bond:db:migrate`
+- 融资择时 Neon migration：`pnpm financing-model:db:migrate`
 - 台账回填盘点：`pnpm bond:db:backfill`；只有显式增加 `--apply` 才写入
 - 部署：`pnpm worker:deploy`；仅在用户明确授权部署时执行
 

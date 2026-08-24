@@ -13,6 +13,10 @@ Browser
                           ├→ AI Gateway
                           ├→ R2
                           └→ Workflow → Hyperdrive → Neon bond
+
+quant pipeline ──────────→ Neon financing_model
+Browser /financing-model → Worker → Hyperdrive → financing_model
+                                  └→ AI Search MCP → AI Gateway
 ```
 
 ## 页面与派生层
@@ -32,6 +36,7 @@ Browser
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。
+- `src/lib/server/financing-model-repository.ts` 读取 quant 快照并追加人工结论和卖方观点；`src/lib/server/financing-model-research.ts` 按 `AI.md` 调用 AI Search MCP，再通过统一 AI Gateway 生成结构化交叉验证。
 
 ## 核心数据流
 
@@ -46,6 +51,10 @@ Browser
 ### 二级池
 
 浏览器上传 Excel → Worker 流式写入不可变 R2 key → 创建 Workflow → Worker 内解析 → Neon 单事务更新 → 页面按日期区间查询数据库生成周报。
+
+### 融资择时模型
+
+quant pipeline → 本地结构化 JSON → Neon `financing_model.model_run` 追加快照 → dashboard 读取最新运行。人工结论写入追加修订表；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳后追加保存。
 
 ## 依赖规则
 

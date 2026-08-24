@@ -35,6 +35,7 @@ git diff --check
 - D1 本地 migration：`pnpm db:migrate:local`。
 - D1 远端 migration：`pnpm db:migrate:remote`；只在明确的 schema 交付任务中执行。
 - Neon migration：配置直连 `DATABASE_URL` 后运行 `pnpm bond:db:migrate`。
+- 融资择时 schema：配置同一 Neon `DATABASE_URL` 后运行 `pnpm financing-model:db:migrate`。
 - 台账回填默认只读；`--apply` 会写数据库，必须先确认目标环境和授权。
 
 ## 发布

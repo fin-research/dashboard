@@ -37,10 +37,18 @@
 - `POST`：上传 Excel，成功归档并启动 Workflow 后返回 202。
 - `DELETE ?date=YYYY-MM-DD`：删除该日数据库业务数据，保留 R2 归档。
 
+### 融资择时模型
+
+- `GET /api/financing-model`：返回最新 quant 模型快照、当前有效整体结论和最近卖方观点；无模型运行返回 404。
+- `GET /api/financing-model?run=<uuid>`：读取指定不可变模型运行。
+- `PATCH /api/financing-model/conclusion`：追加人工整体结论修订；请求含 `runId`、`verdict`、`preferredWindow`、`narrative`。
+- `POST /api/financing-model/sell-side`：按 `runId` 使用 AI Search 与 AI Gateway 生成并追加卖方观点，成功为 201。
+
 ## 通用约定
 
 - JSON 错误使用 `{ "error": "可公开信息" }`；服务端日志可记录诊断信息，但不得包含 Secret 或完整敏感输入。
 - 动态生成和台账 JSON 响应使用 `Cache-Control: no-store`。
+- 融资择时模型读取、人工结论和卖方生成响应同样使用 `Cache-Control: no-store`；两个写接口执行同源校验，但当前不等同于账号鉴权。
 - 日期参数使用严格 `YYYY-MM-DD`；起止日期必须同时提供且起始不晚于结束。
 - route handler 只做解析、校验、错误映射和服务调用；业务逻辑放入 `src/lib`。
 - 兼容跳转 `/bond-ledger` 固定以 308 指向 `/bond`。

@@ -27,7 +27,7 @@
 
 <svelte:head>
   <title>市场研究 · 资金管理部</title>
-  <meta name="description" content="市场点评、市场热点与二级池周报入口" />
+  <meta name="description" content="市场点评、市场热点、融资择时模型与二级池周报入口" />
   <meta name="theme-color" content="#fffbf4" />
 </svelte:head>
 
@@ -134,6 +134,34 @@
           </svg>
         </span>
       </a>
+
+      <a class="tool-card tool-card--model" href="/financing-model">
+        <span class="tool-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 19V9m5 10V5m5 14v-7m5 7V8M3 21h18" />
+          </svg>
+        </span>
+        <span class="card-visual card-visual--model" aria-hidden="true">
+          <svg viewBox="0 0 180 100">
+            <path d="M12 82h156M18 68l34-22 30 13 35-36 43 19" />
+            <path d="M24 76V63m34 13V42m34 34V54m34 22V31m30 45V39" />
+            <circle cx="18" cy="68" r="4" />
+            <circle cx="52" cy="46" r="4" />
+            <circle cx="82" cy="59" r="4" />
+            <circle cx="117" cy="23" r="4" />
+            <circle cx="160" cy="42" r="4" />
+          </svg>
+        </span>
+        <span class="tool-copy">
+          <h2>融资择时模型</h2>
+        </span>
+        <span class="tool-action">
+          打开融资择时模型
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>
+        </span>
+      </a>
     </nav>
   </main>
 </div>
@@ -193,6 +221,7 @@
     --yellow: #ffda6a;
     --blue: #91ceff;
     --mint: #bce9d9;
+    --lavender: #d8d2f4;
     min-height: 100dvh;
     background: var(--background);
   }
@@ -290,7 +319,7 @@
 
   .tool-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 24px;
   }
 
@@ -348,6 +377,11 @@
   .tool-card--ledger {
     background: var(--mint);
     box-shadow: 0 24px 54px rgba(30, 128, 94, 0.14);
+  }
+
+  .tool-card--model {
+    background: var(--lavender);
+    box-shadow: 0 24px 54px rgba(88, 70, 156, 0.14);
   }
 
   .tool-card:hover {
@@ -465,9 +499,6 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .tool-card--ledger {
-      grid-column: 1 / -1;
-    }
   }
 
   @media (max-width: 720px) {
@@ -487,10 +518,6 @@
     .tool-grid {
       grid-template-columns: 1fr;
       gap: 18px;
-    }
-
-    .tool-card--ledger {
-      grid-column: 1;
     }
 
     .tool-card {

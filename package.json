@@ -16,6 +16,7 @@
     "worker:typecheck": "tsc --project tsconfig.worker.json",
     "bond:db:migrate": "node scripts/apply-bond-migrations.mjs",
     "bond:db:backfill": "node scripts/backfill-bond-ledgers.mjs",
+    "financing-model:db:migrate": "node scripts/apply-financing-model-migrations.mjs",
     "db:sync:remote": "node scripts/sync-remote-d1.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
