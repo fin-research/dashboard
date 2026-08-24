@@ -21,7 +21,10 @@ import {
   BondLedgerUploadError,
   workflowStatus,
 } from "../src/lib/server/bond-ledger.ts";
-import { persistParsedBondLedger } from "../src/lib/server/bond-ledger-repository.ts";
+import {
+  listBondLedgerInventory,
+  persistParsedBondLedger,
+} from "../src/lib/server/bond-ledger-repository.ts";
 import { GET as redirectLegacyBondLedger } from "../src/routes/bond-ledger/+server.ts";
 import {
   readPreferences,
@@ -326,6 +329,41 @@ test("数据库导入先获取全局锁再获取同日报表锁", async () => {
   assert.match(queries[1], /bond\.ledger_import/);
   assert.match(queries[2], /hashtextextended\(\$1, 0\)/);
   assert.equal(queries.at(-1), "COMMIT");
+});
+
+test("台账日状态从持仓数据库读取而不是按 R2 文件推断", async () => {
+  const queries = [];
+  const client = {
+    async query(text) {
+      queries.push(text);
+      if (text.includes("FROM bond.daily_position")) {
+        return {
+          rows: [{ date: "2026-08-20" }, { date: "2026-08-21" }],
+        };
+      }
+      return {
+        rows: [
+          {
+            date: "2026-08-21",
+            file_name: "二级资金池台账20260821.xlsx",
+            r2_key: "uploads/example.xlsx",
+            file_size: 170704,
+            r2_etag: "etag",
+            uploaded_at: "2026-08-24T01:54:23.034Z",
+          },
+        ],
+      };
+    },
+  };
+
+  const inventory = await listBondLedgerInventory(client);
+
+  assert.deepEqual(inventory.databaseDates, ["2026-08-20", "2026-08-21"]);
+  assert.equal(inventory.files.length, 1);
+  assert.equal(inventory.availableStartDate, "2026-08-20");
+  assert.equal(inventory.availableEndDate, "2026-08-21");
+  assert.match(queries[0], /FROM bond\.ledger_upload/);
+  assert.match(queries[1], /FROM bond\.daily_position/);
 });
 
 test("Workflow 状态统一映射为处理中、成功或失败", async () => {

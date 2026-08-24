@@ -15,7 +15,7 @@
 - `GET /api/rag/hotspots`：只读取最近一次成功生成的热点快照，不接收范围参数、不调用模型
 - `POST /api/rag/hotspots`：按 JSON 请求体中的证据范围手动生成并追加快照；滚动范围为 `{"mode":"rolling","rollingCount":20}`，日期范围为 `{"mode":"range","startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}`
 - `POST /api/market-briefing?date=YYYY-MM-DD`：今日聚焦生成（Worker 路由）。Worker 先从后端 `/data/market-briefing/news` 取当日新闻素材，再通过 AI Gateway `compat/chat/completions`（`AI_GATEWAY_ID=default`）调用 `dynamic/rag`；系统提示为 `src/lib/server/market-briefing.ts` 内嵌的 market-briefing skill 全文，用户提示与旧版后端 Codex 生成逐字一致
-- `/api/bond-ledger`：二级池周报数据库与台账管理接口。无参数 `GET` 从 Neon `bond.ledger_upload` 列出已成功导入的报表日；`GET ?start&end` 从 `bond` schema 读取并在 Worker 服务端计算周报；`GET ?date` 按数据库记录的 R2 key 下载原始 Excel；`GET ?workflow` 查询导入 Workflow；`POST` 先把 Excel 流式写入不可变 R2 key，再返回 202 并启动 `BondLedgerImportWorkflow`；`DELETE ?date` 删除该报表日三张业务表中的数据并保留 R2 原始归档。本地 `pnpm dev` 将该路径代理到 `DATA_PROXY_TARGET`，不使用浏览器存储。
+- `/api/bond-ledger`：二级池周报数据库与台账管理接口。无参数 `GET` 从 Neon `bond.daily_position` 列出数据库实际存在的报表日，并从 `bond.ledger_upload` 补充原始文件管理信息；`GET ?start&end` 从 `bond` schema 读取并在 Worker 服务端计算周报；`GET ?date` 按数据库记录的 R2 key 下载原始 Excel；`GET ?workflow` 查询导入 Workflow；`POST` 先把 Excel 流式写入不可变 R2 key，再返回 202 并启动 `BondLedgerImportWorkflow`；`DELETE ?date` 删除该报表日三张业务表中的数据并保留 R2 原始归档。本地 `pnpm dev` 将该路径代理到 `DATA_PROXY_TARGET`，不使用浏览器存储。
 
 本地开发直接运行 `pnpm dev`，不需要先启动仓库内的 Python API，也不会自动同步远程 D1。
 

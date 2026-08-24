@@ -64,6 +64,7 @@ export interface RemoteBondLedgerFile {
 
 export interface BondLedgerInventoryResponse {
   files: RemoteBondLedgerFile[];
+  databaseDates: string[];
   availableStartDate: string | null;
   availableEndDate: string | null;
 }
@@ -284,7 +285,7 @@ export async function recordFailedBondLedgerImport(
 export async function listBondLedgerInventory(
   client: BondDatabaseClient,
 ): Promise<BondLedgerInventoryResponse> {
-  const result = await client.query<InventoryRow>(
+  const filesResult = await client.query<InventoryRow>(
     `SELECT
        to_char(report_date, 'YYYY-MM-DD') AS date,
        original_name AS file_name,
@@ -296,7 +297,13 @@ export async function listBondLedgerInventory(
      WHERE status = 'succeeded'
      ORDER BY report_date`,
   );
-  const files = result.rows.map((row) => ({
+  const databaseDatesResult = await client.query<{ date: string }>(
+    `SELECT to_char(report_date, 'YYYY-MM-DD') AS date
+     FROM bond.daily_position
+     GROUP BY report_date
+     ORDER BY report_date`,
+  );
+  const files = filesResult.rows.map((row) => ({
     date: row.date,
     fileName: row.file_name,
     key: row.r2_key,
@@ -304,10 +311,12 @@ export async function listBondLedgerInventory(
     etag: row.r2_etag,
     uploadedAt: row.uploaded_at,
   }));
+  const databaseDates = databaseDatesResult.rows.map((row) => row.date);
   return {
     files,
-    availableStartDate: files.at(0)?.date ?? null,
-    availableEndDate: files.at(-1)?.date ?? null,
+    databaseDates,
+    availableStartDate: databaseDates.at(0) ?? null,
+    availableEndDate: databaseDates.at(-1) ?? null,
   };
 }
 

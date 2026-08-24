@@ -757,6 +757,28 @@
   margin: 0;
 }
 
+.management-calendar-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.management-calendar-summary span {
+  font-weight: bold;
+}
+
+.management-calendar-summary b {
+  color: var(--text-1);
+}
+
+.management-calendar-summary small {
+  margin-left: auto;
+  font-size: inherit;
+}
+
 .management-calendar {
   padding: 10px;
   border: 1px solid var(--line);
@@ -776,6 +798,12 @@
   border-color: #a5f0fc;
   color: #087f8c;
   background: #ecfdff;
+}
+
+.management-calendar .calendar-grid button.unavailable:not(.outside) {
+  border-color: #eaecf0;
+  color: #98a2b3;
+  background: #f8fafc;
 }
 
 .management-calendar .calendar-grid button.selected {
@@ -1036,15 +1064,13 @@
   }
 
   .management-calendar .calendar-grid i {
-    font-size: 0;
+    font-size: 0.625rem;
+    line-height: 1;
   }
 
-  .management-calendar .calendar-grid i::after {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    content: "";
+  .management-calendar-summary small {
+    width: 100%;
+    margin-left: 0;
   }
 }
 

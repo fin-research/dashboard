@@ -32,6 +32,7 @@ export interface RemoteBondLedgerFile {
 
 export interface BondLedgerInventory {
   files: RemoteBondLedgerFile[];
+  databaseDates: string[];
   availableStartDate: string | null;
   availableEndDate: string | null;
 }
@@ -125,16 +126,27 @@ export async function listRemoteBondLedgers(): Promise<BondLedgerInventory> {
   const files = Array.isArray(inventory.files)
     ? inventory.files.filter(isRemoteBondLedgerFile).sort(compareRemoteFiles)
     : [];
+  const databaseDates = Array.isArray(inventory.databaseDates)
+    ? [
+        ...new Set(
+          inventory.databaseDates.filter(
+            (value): value is string =>
+              typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value),
+          ),
+        ),
+      ].sort()
+    : files.map((file) => file.date);
   return {
     files,
+    databaseDates,
     availableStartDate:
       typeof inventory.availableStartDate === "string"
         ? inventory.availableStartDate
-        : files.at(0)?.date ?? null,
+        : databaseDates.at(0) ?? null,
     availableEndDate:
       typeof inventory.availableEndDate === "string"
         ? inventory.availableEndDate
-        : files.at(-1)?.date ?? null,
+        : databaseDates.at(-1) ?? null,
   };
 }
 

@@ -50,6 +50,7 @@
 
   let analytics: BondLedgerReport = emptyBondLedgerReport();
   let remoteFiles: RemoteBondLedgerFile[] = [];
+  let databaseLedgerDates: string[] = [];
   let startDate = INITIAL_WEEK_RANGE.startDate;
   let endDate = INITIAL_WEEK_RANGE.endDate;
   let loadingRecords = true;
@@ -78,6 +79,13 @@
   $: rangeMonths = [rangeMonthLeft, shiftMonth(rangeMonthLeft, 1)];
   $: managedFile =
     remoteFiles.find((file) => file.date === selectedManagedDate) ?? null;
+  $: managementCalendarDays = calendarDays(managementMonth);
+  $: managementMonthDayCount = managementCalendarDays.filter(
+    (day) => day.inMonth,
+  ).length;
+  $: managementMonthLedgerCount = managementCalendarDays.filter(
+    (day) => day.inMonth && databaseLedgerDates.includes(day.date),
+  ).length;
   $: metricCards = [
     {
       label: "当前规模",
@@ -163,8 +171,9 @@
       const inventory = await listRemoteBondLedgers();
       if (generation !== syncGeneration) return;
       remoteFiles = inventory.files;
+      databaseLedgerDates = inventory.databaseDates;
       const resolved = resolveAvailableRange(
-        remoteFiles.map((file) => file.date),
+        databaseLedgerDates,
         startDate,
         endDate,
       );
@@ -192,9 +201,10 @@
     }
   }
 
-  async function refreshRemoteFiles(): Promise<void> {
+  async function refreshLedgerInventory(): Promise<void> {
     const inventory = await listRemoteBondLedgers();
     remoteFiles = inventory.files;
+    databaseLedgerDates = inventory.databaseDates;
   }
 
   async function handleFiles(event: Event): Promise<void> {
@@ -231,7 +241,7 @@
       }
     }
     try {
-      await refreshRemoteFiles();
+      await refreshLedgerInventory();
       if (latestUploadedDate) {
         managementMonth = monthStart(latestUploadedDate);
         selectedManagedDate = latestUploadedDate;
@@ -265,7 +275,7 @@
     errorMessage = "";
     try {
       await deleteRemoteBondLedger(remote.date);
-      await refreshRemoteFiles();
+      await refreshLedgerInventory();
       selectedManagedDate = "";
       uploadMessage = `已删除 ${remote.date} 线上台账`;
       await refreshReport(true);
@@ -279,11 +289,11 @@
   async function openManagement(): Promise<void> {
     managementDialog.showModal();
     try {
-      await refreshRemoteFiles();
-      const latest = remoteFiles.at(-1);
-      if (latest) {
-        managementMonth = monthStart(latest.date);
-        selectedManagedDate = latest.date;
+      await refreshLedgerInventory();
+      const latestDate = databaseLedgerDates.at(-1);
+      if (latestDate) {
+        managementMonth = monthStart(latestDate);
+        selectedManagedDate = latestDate;
       }
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
@@ -369,6 +379,10 @@
 
   function remoteForDate(date: string): RemoteBondLedgerFile | null {
     return remoteFiles.find((file) => file.date === date) ?? null;
+  }
+
+  function hasDatabaseLedger(date: string): boolean {
+    return databaseLedgerDates.includes(date);
   }
 
   function isSelectedDate(date: string): boolean {
@@ -667,7 +681,7 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5M4 12.5V17h12v-4.5" /></svg>
         <span>{uploading ? "正在上传" : "批量上传 Excel"}</span>
       </button>
-      <span>{remoteFiles.length} 个数据库报表日</span>
+      <span>数据库共 {databaseLedgerDates.length} 个报表日</span>
     </div>
     {#if uploadMessage || errorMessage}
       <div class="ledger-management-status" aria-live="polite">
@@ -680,24 +694,30 @@
       <strong>{monthLabel(managementMonth)}</strong>
       <button type="button" aria-label="下一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, 1))}>›</button>
     </div>
+    <div class="management-calendar-summary" aria-live="polite">
+      <span><b>{managementMonthLedgerCount}</b> 天有台账</span>
+      <span><b>{managementMonthDayCount - managementMonthLedgerCount}</b> 天无台账</span>
+      <small>状态来自 Neon 数据库，不按 R2 文件判断</small>
+    </div>
     <section class="management-calendar" aria-label={monthLabel(managementMonth)}>
       <div class="calendar-weekdays" aria-hidden="true">
         {#each WEEKDAYS as weekday}<span>{weekday}</span>{/each}
       </div>
       <div class="calendar-grid">
-        {#each calendarDays(managementMonth) as day (day.date)}
-          {@const remote = remoteForDate(day.date)}
+        {#each managementCalendarDays as day (day.date)}
+          {@const hasLedger = hasDatabaseLedger(day.date)}
           <button
             type="button"
             class:outside={!day.inMonth}
-            class:available={Boolean(remote)}
+            class:available={hasLedger}
+            class:unavailable={!hasLedger}
             class:selected={day.date === selectedManagedDate}
-            disabled={!day.inMonth || !remote}
-            aria-label={remote ? `${day.date} 已上传，查看管理操作` : `${day.date} 无台账`}
+            disabled={!day.inMonth || !hasLedger}
+            aria-label={hasLedger ? `${day.date} 数据库有台账，查看管理操作` : `${day.date} 数据库无台账`}
             onclick={() => (selectedManagedDate = day.date)}
           >
             <span>{day.day}</span>
-            {#if remote}<i>已上传</i>{/if}
+            <i>{hasLedger ? "有台账" : "无台账"}</i>
           </button>
         {/each}
       </div>
@@ -713,8 +733,13 @@
           <button type="button" disabled={uploading} onclick={() => openReupload(managedFile.date)}>重新上传</button>
           <button class="danger" type="button" disabled={deleting} onclick={() => removeRemoteLedger(managedFile)}>删除</button>
         </div>
+      {:else if selectedManagedDate && hasDatabaseLedger(selectedManagedDate)}
+        <div>
+          <strong>{selectedManagedDate}</strong>
+          <span>数据库已有台账，暂无原始文件管理信息</span>
+        </div>
       {:else}
-        <strong>请选择已上传日期</strong>
+        <strong>请选择有台账日期</strong>
       {/if}
     </section>
   </div>
