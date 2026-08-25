@@ -9,7 +9,8 @@ pnpm dev
 
 - 开发服务器绑定 `127.0.0.1:8765`。
 - `.env.dev` 必须提供 `DATA_PROXY_TARGET`；Vite 代理 `/data/*` 与本地二级池接口。
-- `pnpm dev` 使用本地 D1，不自动同步远端数据。
+- 从 `.env.local.example` 创建未跟踪的 `.env.local`，并把 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` 设置为带 TLS 参数的线上 Neon 直连连接串。`pnpm dev` 会在 Vite 启动前加载该文件，使本地 Worker 直连线上 Neon；本地开发不经过 Hyperdrive 缓存。
+- `pnpm dev` 仍使用本地 D1，不自动同步远端 D1 数据。
 - 只有明确需要热点证据时运行 `pnpm db:sync:remote`。本地模型请求仍会产生外部调用。
 
 ## 默认验证

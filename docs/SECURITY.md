@@ -4,9 +4,9 @@
 
 - `CF_AIG_TOKEN` 只通过 Worker Secret 注入，禁止写入源码、`wrangler.jsonc`、`.env.dev`、日志或文档。
 - `CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID` 和数据服务基址是非敏感配置，但仍应通过 Worker/Vite 配置读取。
-- Neon 直连 `DATABASE_URL` 只供本地 migration 与回填脚本使用；生产 Worker 只读取 `HYPERDRIVE.connectionString`。
+- Neon 直连 `DATABASE_URL` 只供本地 migration 与回填脚本使用；本地 `pnpm dev` 通过未跟踪的 `.env.local` 注入 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`，生产 Worker 仍只读取 `HYPERDRIVE.connectionString`。
 - quant 在本机使用 `DATABASE_URL` 追加融资择时模型快照；连接串不得经 dashboard 页面或 API 暴露。
-- 本地需要调用模型时从 `.dev.vars.example` 创建未跟踪的 `.dev.vars`；不要提交该文件。
+- 本地需要调用模型时从 `.dev.vars.example` 创建未跟踪的 `.dev.vars`；Neon 开发直连从 `.env.local.example` 创建未跟踪的 `.env.local`。不要提交这两个文件。
 
 ## 客户端与服务端边界
 
