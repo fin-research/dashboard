@@ -27,7 +27,7 @@
 
 <svelte:head>
   <title>市场研究 · 资金管理部</title>
-  <meta name="description" content="市场点评、市场热点、交易研究工作台与融资工作台入口" />
+  <meta name="description" content="资金日报、市场研究工作台与管理入口" />
   <meta name="theme-color" content="#fffbf4" />
 </svelte:head>
 
@@ -49,6 +49,34 @@
   <main>
     <h1 class="sr-only">市场研究</h1>
     <nav class="tool-grid" aria-label="市场研究内容">
+      <a class="tool-card tool-card--fund-report" href="/fund-report">
+        <span class="tool-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 4h16v16H4zM7 8h10M7 12h4M7 16h6" />
+            <path d="m14 15 2-2 2 2" />
+          </svg>
+        </span>
+        <span class="card-visual card-visual--fund-report" aria-hidden="true">
+          <svg viewBox="0 0 180 100">
+            <path d="M22 14h136v72H22zM22 34h136M58 34v52" />
+            <path d="M31 48h18M31 61h18M31 74h18M72 69l18-18 17 11 31-30" />
+            <circle cx="72" cy="69" r="3" />
+            <circle cx="90" cy="51" r="3" />
+            <circle cx="107" cy="62" r="3" />
+            <circle cx="138" cy="32" r="3" />
+          </svg>
+        </span>
+        <span class="tool-copy">
+          <h2>资金日报</h2>
+        </span>
+        <span class="tool-action">
+          打开今日资金日报
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>
+        </span>
+      </a>
+
       <a class="tool-card tool-card--briefing" href="/market-briefing">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -155,6 +183,32 @@
           </svg>
         </span>
       </a>
+
+      <a class="tool-card tool-card--management" href="/management">
+        <span class="tool-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8M8 16h5" />
+            <circle cx="17" cy="16" r="2" />
+          </svg>
+        </span>
+        <span class="card-visual card-visual--management" aria-hidden="true">
+          <svg viewBox="0 0 180 100">
+            <path d="M22 18h136v68H22zM22 37h136M62 37v49" />
+            <path d="M33 52h18M33 65h18M33 78h18M76 51h62M76 66h44" />
+            <circle cx="141" cy="70" r="13" />
+            <path d="M141 63v14M134 70h14" />
+          </svg>
+        </span>
+        <span class="tool-copy">
+          <h2>管理</h2>
+        </span>
+        <span class="tool-action">
+          打开管理
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>
+        </span>
+      </a>
     </nav>
   </main>
 </div>
@@ -197,6 +251,8 @@
     --blue: #91ceff;
     --slate-blue: #d6e4f3;
     --peach: #ffc9a9;
+    --mint: #a9e8d2;
+    --lilac: #dfceff;
     min-height: 100dvh;
     background: var(--background);
   }
@@ -348,6 +404,11 @@
     box-shadow: 0 24px 54px rgba(195, 139, 27, 0.16);
   }
 
+  .tool-card--fund-report {
+    background: var(--mint);
+    box-shadow: 0 24px 54px rgba(22, 163, 148, 0.16);
+  }
+
   .tool-card--hotspots {
     background: var(--blue);
     box-shadow: 0 24px 54px rgba(31, 119, 183, 0.16);
@@ -361,6 +422,11 @@
   .tool-card--trading-research {
     background: var(--slate-blue);
     box-shadow: 0 24px 54px rgba(47, 111, 214, 0.14);
+  }
+
+  .tool-card--management {
+    background: var(--lilac);
+    box-shadow: 0 24px 54px rgba(105, 65, 198, 0.14);
   }
 
   .tool-card:hover {

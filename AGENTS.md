@@ -4,7 +4,7 @@
 
 债券市场研究全栈应用，提供市场点评、市场热点和二级池周报。技术栈为 SvelteKit、Svelte 5、TypeScript、Tailwind CSS 4、daisyUI、ECharts、Cloudflare Workers/D1/R2/Workflows/Hyperdrive、Neon PostgreSQL 与 AI Gateway。
 
-运行入口：门户 `/`，市场点评 `/market-briefing`，文字版 `/market-briefing/text`，市场热点 `/market-hotspots`，融资择时模型 `/financing-model`，二级池 `/bond`。
+运行入口：门户 `/`，资金日报 `/fund-report`，管理 `/management`，市场点评 `/market-briefing`，文字版 `/market-briefing/text`，市场热点 `/market-hotspots`，融资择时模型 `/financing-model`，二级池 `/bond`。
 
 ## Repository Structure
 
@@ -36,6 +36,7 @@
 - `pnpm dev` 不自动同步远程 D1。只有任务明确需要本地证据时才运行 `pnpm db:sync:remote`。
 - 保留用户已有改动，不做无关重构，不通过删除测试或关闭检查掩盖错误。
 - 默认验收为 `pnpm typecheck`、`pnpm test`、`pnpm build`、`git diff --check`。未实际执行浏览器或截图检查时，不得声明视觉验收通过。
+- 独立功能完成对应默认验证后，默认直接提交并推送目标仓库当前分支，无需再次询问；提交前核对状态并只暂存本功能文件，推送后核对远端分支。用户明确要求不提交或不推送时除外。
 
 ## Commands
 

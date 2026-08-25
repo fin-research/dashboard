@@ -4,9 +4,12 @@
 
 项目由 SvelteKit 应用和自定义 Cloudflare Worker 入口组成。`worker/entry.ts` 承载构建后的 SvelteKit Worker，并注册 `BondLedgerImportWorkflow`。静态资源由 Worker Assets 提供。
 
+Worker Assets 只承载随应用版本一起构建、发布的前端资源。资金日报是每日独立上传且需要运行时立即生效的业务文件，因此存入 R2，不写入构建目录，也不触发 Worker 重新发布。
+
 ```text
 Browser
 ├→ Svelte pages / components / charts
+├→ /fund-report/* ──────→ R2 HTML 日报
 ├→ /data/* ─────────────→ Python data service
 └→ /api/* ──────────────→ SvelteKit Worker routes
                           ├→ D1
@@ -36,6 +39,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 - `src/lib/server/market-briefing.ts` 从 `/data/market-briefing/news` 取材并生成今日聚焦。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
+- `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，按确定性的日期 key 从 R2 读取。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。
 - `src/lib/server/financing-model-repository.ts` 读取 quant 快照并追加人工结论和卖方观点；`src/lib/server/financing-model-research.ts` 按 `AI.md` 调用 AI Search MCP，再通过统一 AI Gateway 生成结构化交叉验证。
 
@@ -52,6 +56,10 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 ### 二级池
 
 浏览器上传 Excel → Worker 流式写入不可变 R2 key → 创建 Workflow → Worker 内解析 → Neon 单事务更新 → 页面按日期区间查询数据库生成周报。
+
+### 资金日报
+
+管理页上传完整 HTML → Worker 校验文件名日期、大小、编码和 HTML 文档头 → R2 `fund-reports/YYYY-MM-DD.html`。`/fund-report` 按上海时区临时跳转当天 `/fund-report/YYYY-MM-DD.html`；日期页只解析确定性的对象 key，不接受任意 R2 路径。
 
 ### 融资择时模型
 
