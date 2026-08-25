@@ -97,3 +97,41 @@ test("工作台数据图表统一通过 ChartHost 和 ECharts renderer", async (
   assert.match(charts, /markLine/);
   assert.doesNotMatch(styles, /\.tr-(progress|distribution-bar|usage-fill|curve-list)\b/);
 });
+
+test("工作台与并入模块复用统一指标卡和结构组件", async () => {
+  const viewUrls = [
+    "../src/lib/trading-research/OverviewView.svelte",
+    "../src/lib/trading-research/TradingView.svelte",
+    "../src/lib/trading-research/CreditView.svelte",
+    "../src/lib/trading-research/ResearchView.svelte",
+    "../src/lib/trading-research/WorkflowView.svelte",
+  ];
+  const [metricCard, bond, financing, styles, design, ...views] = await Promise.all([
+    readFile(new URL("../src/components/MetricCard.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/pages/BondLedgerPage.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/workbench.css", import.meta.url), "utf8"),
+    readFile(new URL("../DESIGN.md", import.meta.url), "utf8"),
+    ...viewUrls.map((url) => readFile(new URL(url, import.meta.url), "utf8")),
+  ]);
+
+  for (const view of views) {
+    assert.match(view, /SectionHeading from "\.\/SectionHeading\.svelte"/);
+    assert.match(view, /PanelHeading from "\.\/PanelHeading\.svelte"/);
+    assert.match(view, /Badge from "\.\/Badge\.svelte"/);
+  }
+  for (const view of views.slice(0, 4)) {
+    assert.match(view, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
+  }
+  for (const integratedPage of [bond, financing]) {
+    assert.match(integratedPage, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
+    assert.match(integratedPage, /<MetricCard/);
+  }
+  assert.match(metricCard, /detailPrefix/);
+  assert.match(metricCard, /iconPosition/);
+  assert.doesNotMatch(metricCard, /text-overflow:\s*ellipsis/);
+  assert.doesNotMatch(styles, /\.tr-(metric-card|rate-card)\b/);
+  assert.match(design, /共享组件归属与复用顺序/);
+  assert.match(design, /src\/components\/MetricCard\.svelte/);
+  assert.match(design, /禁止先在页面内实现/);
+});

@@ -13,6 +13,7 @@
     renderMaturityDistribution,
   } from "../../charts/bond-ledger";
   import ChartHost from "../../components/ChartHost.svelte";
+  import MetricCard from "../../components/MetricCard.svelte";
   import MetricIcon from "../../components/MetricIcon.svelte";
   import { exportReportImage } from "../../export";
   import {
@@ -51,6 +52,14 @@
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
   const INITIAL_REPORT_DATE = currentReportDate();
   const INITIAL_WEEK_RANGE = weekRange(INITIAL_REPORT_DATE);
+  const METRIC_TONES = [
+    "blue",
+    "teal",
+    "purple",
+    "orange",
+    "red",
+    "cyan",
+  ] as const;
 
   let analytics: BondLedgerReport = emptyBondLedgerReport();
   let remoteFiles: RemoteBondLedgerFile[] = [];
@@ -560,14 +569,18 @@
       <main class="ledger-main">
         <section class="ledger-metrics" aria-label="二级池核心指标">
           {#each metricCards as card, index (card.label)}
-            <article class={`ledger-metric ledger-metric--${index + 1}`}>
-              <MetricIcon icon={card.icon} />
-              <div>
-                <span>{card.label}</span>
-                <strong>{card.value}</strong>
-                <small>较上周 <b class={deltaClass(card.delta)}>{card.detail.value}</b>{card.detail.unit}</small>
-              </div>
-            </article>
+            <MetricCard
+              label={card.label}
+              value={card.value}
+              detail={card.detail.value}
+              detailPrefix="较上周 "
+              detailSuffix={card.detail.unit}
+              detailTone={deltaClass(card.delta)}
+              tone={METRIC_TONES[index] ?? "primary"}
+              iconComponent={MetricIcon}
+              iconProps={{ icon: card.icon }}
+              iconPosition="start"
+            />
           {/each}
         </section>
 

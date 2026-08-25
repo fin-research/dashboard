@@ -8,6 +8,7 @@
 
   import { renderFinancingForecast } from "../../charts/financing-model";
   import ChartHost from "../../components/ChartHost.svelte";
+  import MetricCard from "../../components/MetricCard.svelte";
   import {
     conclusionSchema,
     parseFinancingModelReport,
@@ -110,6 +111,13 @@
     editVerdict = snapshot.base_conclusion.verdict;
     editPreferredWindow = snapshot.base_conclusion.preferred_window;
     editNarrative = snapshot.base_conclusion.narrative;
+  }
+
+  function financingMetricTone(
+    tone: string,
+  ): "primary" | "teal" | "good" | "bad" {
+    if (tone === "teal" || tone === "good" || tone === "bad") return tone;
+    return "primary";
   }
 
   async function saveConclusion(): Promise<void> {
@@ -337,10 +345,13 @@
 
         <div class="metric-strip">
           {#each metrics as metric}
-            <article class={`metric-card metric-card--${metric.tone}`}>
-              <span>{metric.label}</span>
-              <strong>{metric.value}<small>{metric.unit}</small></strong>
-            </article>
+            <MetricCard
+              label={metric.label}
+              value={metric.value}
+              unit={metric.unit}
+              tone={financingMetricTone(metric.tone)}
+              compact
+            />
           {/each}
         </div>
       </section>
@@ -942,57 +953,9 @@
 
   .metric-strip {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
     gap: 8px;
     margin-top: 12px;
-  }
-
-  .metric-card {
-    display: grid;
-    min-width: 0;
-    gap: 8px;
-    align-content: center;
-    padding: 14px 16px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-inner);
-    background: color-mix(in srgb, var(--panel) 62%, var(--surface));
-    box-shadow: inset 3px 0 0 var(--brand);
-  }
-
-  .metric-card > span {
-    color: var(--text-2);
-    font-size: 0.875rem;
-  }
-
-  .metric-card strong {
-    color: var(--color-primary);
-    font-size: 1.5rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .metric-card--teal strong,
-  .metric-card--good strong {
-    color: #087b72;
-  }
-
-  .metric-card--teal,
-  .metric-card--good {
-    box-shadow: inset 3px 0 0 #16a394;
-  }
-
-  .metric-card--bad strong {
-    color: #b42318;
-  }
-
-  .metric-card--bad {
-    box-shadow: inset 3px 0 0 #d92d20;
-  }
-
-  .metric-card small {
-    margin-left: 3px;
-    color: var(--text-3);
-    font-size: 0.875rem;
-    font-weight: normal;
   }
 
   .window-layout {
@@ -1387,10 +1350,6 @@
       grid-column: 1 / -1;
     }
 
-    .metric-strip {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
     .window-layout {
       grid-template-columns: 1fr;
     }
@@ -1423,7 +1382,6 @@
 
     .summary-grid,
     .recommendation-band,
-    .metric-strip,
     .cross-check-card {
       grid-template-columns: 1fr;
     }

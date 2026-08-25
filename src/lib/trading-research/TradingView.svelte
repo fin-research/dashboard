@@ -1,7 +1,10 @@
 <script lang="ts">
   import ChartHost from "../../components/ChartHost.svelte";
+  import MetricCard from "../../components/MetricCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
-  import MetricCard from "./MetricCard.svelte";
+  import Badge from "./Badge.svelte";
+  import PanelHeading from "./PanelHeading.svelte";
+  import SectionHeading from "./SectionHeading.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import { demoMeta, demoTrades, tradingSummary } from "./demo-data";
 
@@ -61,25 +64,65 @@
 
 <div class="tr-view-stack">
   <section aria-labelledby="trading-metrics-title">
-    <div class="tr-section-heading">
-      <div><span class="tr-section-mark" aria-hidden="true"></span><h2 id="trading-metrics-title">当日交易概况</h2></div>
-      <span>截至 {demoMeta.tradingAsOf}</span>
-    </div>
+    <SectionHeading
+      id="trading-metrics-title"
+      title="当日交易概况"
+      meta={`截至 ${demoMeta.tradingAsOf}`}
+    />
     <div class="tr-metric-grid tr-metric-grid--five">
-      <MetricCard label="交易笔数" value={String(tradingSummary.tradeCount)} unit="笔" detail="两类业务合计" icon="trading" tone="orange" />
-      <MetricCard label="同业拆借" value={tradingSummary.interbankAmount.toFixed(1)} unit="亿元" detail="纯信用 · 当日成交" icon="funds" tone="blue" />
-      <MetricCard label="质押回购拆出" value={tradingSummary.repoLendAmount.toFixed(1)} unit="亿元" detail="当日成交" icon="credit" tone="purple" />
-      <MetricCard label="成交加权利率" value={tradingSummary.weightedRate.toFixed(2)} unit="%" detail="按成交金额加权" icon="research" tone="green" />
-      <MetricCard label="待确认" value={String(tradingSummary.pendingCount)} unit="笔" detail="需人工复核" icon="warning" tone="red" />
+      <MetricCard
+        label="交易笔数"
+        value={String(tradingSummary.tradeCount)}
+        unit="笔"
+        detail="两类业务合计"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "trading" }}
+        tone="orange"
+      />
+      <MetricCard
+        label="同业拆借"
+        value={tradingSummary.interbankAmount.toFixed(1)}
+        unit="亿元"
+        detail="纯信用 · 当日成交"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "funds" }}
+        tone="blue"
+      />
+      <MetricCard
+        label="质押回购拆出"
+        value={tradingSummary.repoLendAmount.toFixed(1)}
+        unit="亿元"
+        detail="当日成交"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "credit" }}
+        tone="purple"
+      />
+      <MetricCard
+        label="成交加权利率"
+        value={tradingSummary.weightedRate.toFixed(2)}
+        unit="%"
+        detail="按成交金额加权"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "research" }}
+        tone="green"
+      />
+      <MetricCard
+        label="待确认"
+        value={String(tradingSummary.pendingCount)}
+        unit="笔"
+        detail="需人工复核"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "warning" }}
+        tone="red"
+      />
     </div>
   </section>
 
   <div class="tr-two-column tr-two-column--trading">
     <section class="tr-panel" aria-labelledby="product-structure-title">
-      <div class="tr-panel-heading">
-        <div><h2 id="product-structure-title">业务品种分布</h2></div>
-        <span class="tr-badge tr-badge--neutral">按当日成交金额</span>
-      </div>
+      <PanelHeading id="product-structure-title" title="业务品种分布">
+        <Badge>按当日成交金额</Badge>
+      </PanelHeading>
       <ChartHost
         renderer={renderWorkbenchBarChart}
         args={[productDistribution, "按当日成交金额统计的业务品种分布", "亿元"]}
@@ -89,10 +132,9 @@
     </section>
 
     <section class="tr-panel" aria-labelledby="counterparty-title">
-      <div class="tr-panel-heading">
-        <div><h2 id="counterparty-title">交易对手集中度</h2></div>
-        <span class="tr-badge tr-badge--neutral">前五名</span>
-      </div>
+      <PanelHeading id="counterparty-title" title="交易对手集中度">
+        <Badge>前五名</Badge>
+      </PanelHeading>
       <ol class="tr-ranking-list">
         {#each counterparties as counterparty, index}
           <li>
@@ -106,8 +148,7 @@
   </div>
 
   <section class="tr-panel" aria-labelledby="trade-table-title">
-    <div class="tr-panel-heading tr-panel-heading--wrap">
-      <div><h2 id="trade-table-title">交易记录</h2></div>
+    <PanelHeading id="trade-table-title" title="交易记录" wrap>
       <div class="tr-table-controls" role="search">
         <label class="tr-search-control">
           <span class="sr-only">搜索交易</span>
@@ -132,7 +173,7 @@
         </label>
         <span class="tr-result-count">{filteredTrades.length} 笔</span>
       </div>
-    </div>
+    </PanelHeading>
     <div class="tr-table-scroll">
       <table class="tr-data-table">
         <caption class="sr-only">交易研究工作台交易记录</caption>
@@ -151,7 +192,11 @@
               <td>{trade.term}</td>
               <td class="is-numeric">{trade.rate.toFixed(2)}%</td>
               <td>{trade.collateral}</td>
-              <td><span class={`tr-badge ${trade.status === "待确认" ? "tr-badge--warning" : "tr-badge--success"}`}>{trade.status}</span></td>
+              <td>
+                <Badge tone={trade.status === "待确认" ? "warning" : "success"}
+                  >{trade.status}</Badge
+                >
+              </td>
             </tr>
           {:else}
             <tr><td class="tr-empty-cell" colspan="10">没有符合当前筛选条件的交易记录</td></tr>

@@ -1,7 +1,10 @@
 <script lang="ts">
   import ChartHost from "../../components/ChartHost.svelte";
+  import MetricCard from "../../components/MetricCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
-  import MetricCard from "./MetricCard.svelte";
+  import Badge from "./Badge.svelte";
+  import PanelHeading from "./PanelHeading.svelte";
+  import SectionHeading from "./SectionHeading.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import {
     creditSummary,
@@ -41,20 +44,19 @@
 
 <div class="tr-view-stack">
   <section aria-labelledby="overview-metrics-title">
-    <div class="tr-section-heading">
-      <div>
-        <span class="tr-section-mark" aria-hidden="true"></span>
-        <h2 id="overview-metrics-title">经营全景</h2>
-      </div>
-      <span>不同业务按各自快照基准日展示</span>
-    </div>
+    <SectionHeading
+      id="overview-metrics-title"
+      title="经营全景"
+      meta="不同业务按各自快照基准日展示"
+    />
     <div class="tr-metric-grid">
       <MetricCard
         label="融入融出存量"
         value={fundingOverview.total.toFixed(1)}
         unit="亿元"
         detail={`融入 ${fundingOverview.borrowTotal.toFixed(1)} · 融出 ${fundingOverview.lendTotal.toFixed(1)}`}
-        icon="funds"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "funds" }}
         tone="orange"
       />
       <MetricCard
@@ -62,7 +64,8 @@
         value={tradingSummary.totalAmount.toFixed(1)}
         unit="亿元"
         detail={`${tradingSummary.tradeCount} 笔 · 加权利率 ${tradingSummary.weightedRate.toFixed(2)}%`}
-        icon="trading"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "trading" }}
         tone="blue"
       />
       <MetricCard
@@ -70,7 +73,8 @@
         value={creditSummary.available.toFixed(2)}
         unit="亿元"
         detail={`总体使用率 ${creditSummary.utilization.toFixed(1)}%`}
-        icon="credit"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "credit" }}
         tone="green"
       />
       <MetricCard
@@ -78,7 +82,8 @@
         value={dr007.value.toFixed(4)}
         unit="%"
         detail={`较前值 ${dr007.changeBp.toFixed(2)} bp`}
-        icon="research"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "research" }}
         tone="purple"
       />
     </div>
@@ -86,12 +91,9 @@
 
   <div class="tr-two-column">
     <section class="tr-panel" aria-labelledby="business-snapshot-title">
-      <div class="tr-panel-heading">
-        <div>
-          <h2 id="business-snapshot-title">交易与授信结构</h2>
-        </div>
-        <span class="tr-badge tr-badge--info">多基准日</span>
-      </div>
+      <PanelHeading id="business-snapshot-title" title="交易与授信结构">
+        <Badge tone="info">多基准日</Badge>
+      </PanelHeading>
       <ChartHost
         renderer={renderWorkbenchBarChart}
         args={[structureBars, "交易品种与授信使用率结构", "%", 100]}
@@ -101,12 +103,9 @@
     </section>
 
     <section class="tr-panel" aria-labelledby="coverage-title">
-      <div class="tr-panel-heading">
-        <div>
-          <h2 id="coverage-title">数据覆盖</h2>
-        </div>
-        <span class="tr-status tr-status--success"><WorkbenchIcon name="check" />已校验</span>
-      </div>
+      <PanelHeading id="coverage-title" title="数据覆盖">
+        <Badge tone="success"><WorkbenchIcon name="check" />已校验</Badge>
+      </PanelHeading>
       <div class="tr-coverage-grid">
         {#each coverage as item}
           <article>
@@ -120,12 +119,9 @@
   </div>
 
   <section class="tr-panel" aria-labelledby="overview-alerts-title">
-    <div class="tr-panel-heading">
-      <div>
-        <h2 id="overview-alerts-title">待办与风险</h2>
-      </div>
-      <span class="tr-badge tr-badge--warning">{overviewAlerts.length} 项</span>
-    </div>
+    <PanelHeading id="overview-alerts-title" title="待办与风险">
+      <Badge tone="warning">{overviewAlerts.length} 项</Badge>
+    </PanelHeading>
     <div class="tr-alert-list">
       {#each overviewAlerts as alert}
         <article class={`tr-alert tr-alert--${alert.level}`}>

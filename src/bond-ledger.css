@@ -300,123 +300,8 @@
 
 .ledger-metrics {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
   gap: 8px;
-}
-
-.ledger-metric {
-  display: flex;
-  min-width: 0;
-  min-height: 98px;
-  align-items: center;
-  gap: 10px;
-  padding: 10px clamp(10px, 1vw, 16px);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-}
-
-.ledger-metric--1 {
-  background: #f5f8ff;
-}
-
-.ledger-metric--2 {
-  background: #f0fdfa;
-}
-
-.ledger-metric--3 {
-  background: #f5f3ff;
-}
-
-.ledger-metric--4 {
-  background: #fff7ed;
-}
-
-.ledger-metric--5 {
-  background: #fff4ed;
-}
-
-.ledger-metric--6 {
-  background: #f0f9ff;
-}
-
-.ledger-metric--1 .core-icon {
-  color: #175cd3;
-  background: #eff4ff;
-}
-
-.ledger-metric--2 .core-icon {
-  color: #087f8c;
-  background: #ecfdff;
-}
-
-.ledger-metric--3 .core-icon {
-  color: #6938ef;
-  background: #f4f3ff;
-}
-
-.ledger-metric--4 .core-icon {
-  color: #c4320a;
-  background: #fff4ed;
-}
-
-.ledger-metric--5 .core-icon {
-  color: #b42318;
-  background: #fef3f2;
-}
-
-.ledger-metric--6 .core-icon {
-  color: #026aa2;
-  background: #f0f9ff;
-}
-
-.ledger-metric .core-icon {
-  width: 2.8rem;
-  height: 2.8rem;
-}
-
-.ledger-metric > div {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.ledger-metric span,
-.ledger-metric small {
-  overflow: hidden;
-  color: var(--muted);
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ledger-metric span {
-  font-size: 0.8125rem;
-  font-weight: bold;
-}
-
-.ledger-metric small {
-  font-size: 1rem;
-  font-weight: normal;
-}
-
-.ledger-metric small b {
-  font-weight: bold;
-}
-
-.ledger-metric strong {
-  overflow: hidden;
-  margin: 2px 0;
-  color: var(--text-1);
-  font-size: clamp(1.25rem, 1.35vw, 1.5rem);
-  font-variant-numeric: tabular-nums;
-  font-weight: bolder;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .ledger-chart-grid {
@@ -887,16 +772,6 @@
   justify-content: flex-start;
 }
 
-@media (max-width: 1500px) {
-  .ledger-metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .ledger-metric {
-    min-height: 88px;
-  }
-}
-
 @media (max-width: 1100px) {
   .ledger-masthead {
     align-items: flex-start;
@@ -952,33 +827,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .ledger-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ledger-metric {
-    min-height: 104px;
-    gap: 7px;
-    padding: 8px;
-  }
-
-  .ledger-metric .core-icon {
-    width: 2.4rem;
-    height: 2.4rem;
-  }
-
-  .ledger-metric strong {
-    font-size: 1.125rem;
-  }
-
-  .ledger-metric span {
-    font-size: 0.75rem;
-  }
-
-  .ledger-metric small {
-    font-size: 1rem;
-  }
-
   .ledger-chart,
   .ledger-chart--trend {
     min-height: 320px;
@@ -1029,10 +877,6 @@
   .ledger-management-button,
   .ledger-actions .export-button {
     justify-content: center;
-  }
-
-  .ledger-metric .core-icon {
-    display: none;
   }
 
   .ledger-management-content {

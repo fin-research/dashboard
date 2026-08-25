@@ -1,7 +1,10 @@
 <script lang="ts">
   import ChartHost from "../../components/ChartHost.svelte";
+  import MetricCard from "../../components/MetricCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
-  import MetricCard from "./MetricCard.svelte";
+  import Badge from "./Badge.svelte";
+  import PanelHeading from "./PanelHeading.svelte";
+  import SectionHeading from "./SectionHeading.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import {
     creditAlerts,
@@ -50,16 +53,57 @@
 
 <div class="tr-view-stack">
   <section aria-labelledby="credit-metrics-title">
-    <div class="tr-section-heading">
-      <div><span class="tr-section-mark" aria-hidden="true"></span><h2 id="credit-metrics-title">授信总览</h2></div>
-      <span>数据截至 {demoMeta.creditAsOf} · 共 {creditSummary.count} 条发布范围记录</span>
-    </div>
+    <SectionHeading
+      id="credit-metrics-title"
+      title="授信总览"
+      meta={`数据截至 ${demoMeta.creditAsOf} · 共 ${creditSummary.count} 条发布范围记录`}
+    />
     <div class="tr-metric-grid tr-metric-grid--five">
-      <MetricCard label="授信总额度" value={creditSummary.total.toFixed(2)} unit="亿元" detail={`${creditSummary.count} 条明细`} icon="credit" tone="blue" />
-      <MetricCard label="已使用额度" value={creditSummary.used.toFixed(2)} unit="亿元" detail={`使用率 ${creditSummary.utilization.toFixed(1)}%`} icon="funds" tone="orange" />
-      <MetricCard label="可用额度" value={creditSummary.available.toFixed(2)} unit="亿元" detail="总额度减已使用" icon="check" tone="green" />
-      <MetricCard label="近30日到期" value={String(creditSummary.expiring30)} unit="笔" detail="按快照生成口径" icon="calendar" tone="purple" />
-      <MetricCard label="80%预警" value="4" unit="家" detail="另有13家超过60%" icon="warning" tone="red" />
+      <MetricCard
+        label="授信总额度"
+        value={creditSummary.total.toFixed(2)}
+        unit="亿元"
+        detail={`${creditSummary.count} 条明细`}
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "credit" }}
+        tone="blue"
+      />
+      <MetricCard
+        label="已使用额度"
+        value={creditSummary.used.toFixed(2)}
+        unit="亿元"
+        detail={`使用率 ${creditSummary.utilization.toFixed(1)}%`}
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "funds" }}
+        tone="orange"
+      />
+      <MetricCard
+        label="可用额度"
+        value={creditSummary.available.toFixed(2)}
+        unit="亿元"
+        detail="总额度减已使用"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "check" }}
+        tone="green"
+      />
+      <MetricCard
+        label="近30日到期"
+        value={String(creditSummary.expiring30)}
+        unit="笔"
+        detail="按快照生成口径"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "calendar" }}
+        tone="purple"
+      />
+      <MetricCard
+        label="80%预警"
+        value="4"
+        unit="家"
+        detail="另有13家超过60%"
+        iconComponent={WorkbenchIcon}
+        iconProps={{ name: "warning" }}
+        tone="red"
+      />
     </div>
   </section>
 
@@ -78,10 +122,9 @@
 
   <div class="tr-two-column tr-two-column--credit">
     <section class="tr-panel" aria-labelledby="credit-risk-title">
-      <div class="tr-panel-heading">
-        <div><h2 id="credit-risk-title">高使用率机构</h2></div>
-        <span class="tr-badge tr-badge--neutral">高使用率优先 · 6/120</span>
-      </div>
+      <PanelHeading id="credit-risk-title" title="高使用率机构">
+        <Badge>高使用率优先 · 6/120</Badge>
+      </PanelHeading>
       <ChartHost
         renderer={renderWorkbenchBarChart}
         args={[highUtilizationLines, "高使用率机构及百分之六十和百分之八十阈值", "%", 100, [60, 80]]}
@@ -91,10 +134,9 @@
     </section>
 
     <section class="tr-panel" aria-labelledby="credit-alert-title">
-      <div class="tr-panel-heading">
-        <div><h2 id="credit-alert-title">授信预警</h2></div>
-        <span class="tr-badge tr-badge--warning">{creditAlerts.length} 项</span>
-      </div>
+      <PanelHeading id="credit-alert-title" title="授信预警">
+        <Badge tone="warning">{creditAlerts.length} 项</Badge>
+      </PanelHeading>
       <div class="tr-compact-alerts">
         {#each creditAlerts as alert}
           <article>
@@ -107,8 +149,7 @@
   </div>
 
   <section class="tr-panel" aria-labelledby="credit-table-title">
-    <div class="tr-panel-heading tr-panel-heading--wrap">
-      <div><h2 id="credit-table-title">授信明细</h2></div>
+    <PanelHeading id="credit-table-title" title="授信明细" wrap>
       <div class="tr-table-controls" role="search">
         <label class="tr-search-control">
           <span class="sr-only">搜索授信机构</span>
@@ -125,7 +166,7 @@
         </label>
         <span class="tr-result-count">{filteredLines.length} 条</span>
       </div>
-    </div>
+    </PanelHeading>
     <div class="tr-table-scroll">
       <table class="tr-data-table">
         <caption class="sr-only">授信明细</caption>

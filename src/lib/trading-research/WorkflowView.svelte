@@ -1,13 +1,14 @@
 <script lang="ts">
+  import Badge from "./Badge.svelte";
+  import PanelHeading from "./PanelHeading.svelte";
+  import SectionHeading from "./SectionHeading.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import { workflowDemos } from "./demo-data";
 </script>
 
 <div class="tr-view-stack">
   <section aria-labelledby="workflow-compose-title">
-    <div class="tr-section-heading">
-      <div><span class="tr-section-mark" aria-hidden="true"></span><h2 id="workflow-compose-title">新建流程</h2></div>
-    </div>
+    <SectionHeading id="workflow-compose-title" title="新建流程" />
     <div class="tr-workflow-compose-grid">
       <article class="tr-workflow-composer">
         <div class="tr-workflow-composer__head">
@@ -44,16 +45,15 @@
   </section>
 
   <section class="tr-panel" aria-labelledby="workflow-list-title">
-    <div class="tr-panel-heading">
-      <div><h2 id="workflow-list-title">我的流程与待办复核</h2></div>
-      <span class="tr-badge tr-badge--info">{workflowDemos.length} 条任务</span>
-    </div>
+    <PanelHeading id="workflow-list-title" title="我的流程与待办复核">
+      <Badge tone="info">{workflowDemos.length} 条任务</Badge>
+    </PanelHeading>
     <div class="tr-workflow-list">
       {#each workflowDemos as workflow}
         <article>
           <div class="tr-workflow-task__head">
             <div><span>{workflow.type}</span><h3>{workflow.title}</h3><p>{workflow.businessKey} · {workflow.detail}</p></div>
-            <span class="tr-badge tr-badge--warning">{workflow.state}</span>
+            <Badge tone="warning">{workflow.state}</Badge>
           </div>
           <ol class="tr-workflow-steps" aria-label={`${workflow.title}流程进度`}>
             {#each workflow.steps as step, index}
