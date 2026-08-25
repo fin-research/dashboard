@@ -27,7 +27,7 @@
 
 <svelte:head>
   <title>市场研究 · 资金管理部</title>
-  <meta name="description" content="市场点评、市场热点、二级池周报、融资择时模型与融资工作台入口" />
+  <meta name="description" content="市场点评、市场热点、二级池周报、融资择时模型、交易研究工作台与融资工作台入口" />
   <meta name="theme-color" content="#fffbf4" />
 </svelte:head>
 
@@ -163,6 +163,31 @@
         </span>
       </a>
 
+      <a class="tool-card tool-card--trading-research" href="/trading-research">
+        <span class="tool-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <path d="M9 4v16M9 9h11M9 15h11M13 12h3m-1.5-1.5v3" />
+          </svg>
+        </span>
+        <span class="card-visual card-visual--trading-research" aria-hidden="true">
+          <svg viewBox="0 0 180 100">
+            <path d="M18 18h144v68H18zM18 37h144M58 37v49" />
+            <path d="M29 51h18M29 62h18M29 73h18M72 55h25M72 69h45M130 52h19v19h-19z" />
+            <path d="m133 62 5 5 9-11" />
+          </svg>
+        </span>
+        <span class="tool-copy">
+          <h2>交易研究工作台</h2>
+        </span>
+        <span class="tool-action">
+          打开交易研究工作台
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>
+        </span>
+      </a>
+
       <a class="tool-card tool-card--workspace" href="/financing/">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -245,6 +270,7 @@
     --blue: #91ceff;
     --mint: #bce9d9;
     --lavender: #d8d2f4;
+    --slate-blue: #d6e4f3;
     --peach: #ffc9a9;
     min-height: 100dvh;
     background: var(--background);
@@ -411,6 +437,11 @@
   .tool-card--workspace {
     background: var(--peach);
     box-shadow: 0 24px 54px rgba(184, 91, 43, 0.14);
+  }
+
+  .tool-card--trading-research {
+    background: var(--slate-blue);
+    box-shadow: 0 24px 54px rgba(47, 111, 214, 0.14);
   }
 
   .tool-card:hover {

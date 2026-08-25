@@ -27,6 +27,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 - `src/report-view.ts`、`src/primary-issues.ts`、`src/rows.ts` 将统一报告原始行派生为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
+- `/trading-research` 当前从 `src/lib/trading-research/demo-data.ts` 读取冻结演示数据，五个视图共享同一抽屉导航和数据口径；页面不读取 Excel、不访问数据库，也不产生流程写入。未来接入边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 
 ## 服务端模块
 
@@ -55,6 +56,12 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 ### 融资择时模型
 
 quant pipeline → 本地结构化 JSON → Neon `financing_model.model_run` 追加快照 → dashboard 读取最新运行。人工结论写入追加修订表；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳后追加保存。
+
+### 交易研究工作台
+
+当前：迁入项目冻结快照 → `src/lib/trading-research/demo-data.ts` → `/trading-research` 五个只读视图。
+
+后续：业务数据库 → `api` 仓库 `/data/trading-research/*` → dashboard 浏览器。浏览器不得直连数据库；物理表和权限方案未确认前，不写入现有 `bond` 或 `financing_model` schema。
 
 ## 依赖规则
 
