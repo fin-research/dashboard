@@ -1,4 +1,6 @@
 <script lang="ts">
+  import "../../styles.css";
+
   import {
     fundReportDateFromFileName,
     fundReportFileName,
@@ -110,145 +112,209 @@
 <svelte:head>
   <title>管理 · 资金管理部</title>
   <meta name="description" content="资金日报上传管理" />
+  <meta name="theme-color" content="#f6f8fb" />
 </svelte:head>
 
 <div class="management-page">
-  <header class="management-masthead">
-    <a class="home-link" href="/" aria-label="返回市场研究首页">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7M8 12h11" /></svg>
-      <span>返回首页</span>
-    </a>
-    <h1>管理</h1>
+  <header class="management-header">
+    <div class="management-title-block">
+      <a class="management-back" href="/" aria-label="返回市场研究门户">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4-6 6 6 6" /></svg>
+      </a>
+      <h1>
+        <span>资金管理部</span>
+        <span class="title-dot" aria-hidden="true">•</span>
+        <span class="title-subject">管理</span>
+      </h1>
+    </div>
   </header>
 
   <main>
     <section class="management-panel" aria-labelledby="fund-report-upload-title">
-      <header>
-        <span class="panel-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6" /></svg>
-        </span>
-        <h2 id="fund-report-upload-title">上传资金日报</h2>
+      <header class="panel-heading">
+        <div>
+          <span class="panel-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6" /></svg>
+          </span>
+          <h2 id="fund-report-upload-title">上传资金日报</h2>
+        </div>
       </header>
 
-      <div class="upload-content">
-        <div class="upload-rules">
-          <p>选择 HTML 文件后，系统会读取文件名末尾的日期并保存为 <strong>YYYY-MM-DD.html</strong>。</p>
-          <p>例如：资金日报驾驶舱交互版_20260824.html → 2026-08-24.html</p>
+      <form
+        class="upload-form"
+        aria-busy={uploading}
+        onsubmit={(event) => {
+          event.preventDefault();
+          uploadFundReport();
+        }}
+      >
+        <div class="upload-note">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M10 9v5M10 6.5h.01" /></svg>
+          <p>
+            文件名末尾的日期会自动转换为 <strong>YYYY-MM-DD.html</strong>；例如
+            <span>资金日报驾驶舱交互版_20260824.html</span> 将保存为 <span>2026-08-24.html</span>。
+          </p>
         </div>
 
         <input
           bind:this={fileInput}
-          class="sr-only"
+          class="management-file-input"
           type="file"
           accept=".html,text/html"
+          aria-label="选择资金日报 HTML 文件"
           disabled={uploading}
           onchange={handleFileSelection}
         />
 
         <button
+          class:selected={selectedFile !== null}
           class="file-picker"
           type="button"
           disabled={uploading}
           onclick={chooseFile}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h6l2 2h8v11H4zM12 11v5m-2.5-2.5L12 11l2.5 2.5" /></svg>
-          <span>
-            <strong>{selectedFile ? "重新选择 HTML" : "选择 HTML 文件"}</strong>
-            <small>单个文件不超过 20 MB</small>
+          <span class="file-picker-icon" aria-hidden="true">
+            {#if selectedFile}
+              <svg viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM15 3v5h5M8 13l2.5 2.5L16 10" /></svg>
+            {:else}
+              <svg viewBox="0 0 24 24"><path d="M4 6h6l2 2h8v11H4zM12 11v5m-2.5-2.5L12 11l2.5 2.5" /></svg>
+            {/if}
           </span>
+          <span class="file-picker-copy">
+            <strong>{selectedFile ? selectedFile.name : "选择资金日报 HTML"}</strong>
+            <small>{selectedFile ? "文件已就绪，点击可重新选择" : "点击选择单个文件，最大 20 MB"}</small>
+          </span>
+          <span class="file-picker-action">{selectedFile ? "重新选择" : "选择文件"}</span>
         </button>
 
         {#if selectedFile}
-          <dl class="selected-file">
-            <div>
-              <dt>原始文件</dt>
-              <dd>{selectedFile.name}</dd>
-            </div>
-            <div>
-              <dt>保存名称</dt>
-              <dd>{fundReportFileName(selectedDate)}</dd>
-            </div>
-            <div>
-              <dt>文件大小</dt>
-              <dd>{formatSize(selectedFile.size)}</dd>
-            </div>
-          </dl>
+          <section class="selected-file" aria-label="待上传文件" aria-live="polite">
+            <dl>
+              <div>
+                <dt>报表日期</dt>
+                <dd>{selectedDate}</dd>
+              </div>
+              <div>
+                <dt>保存名称</dt>
+                <dd>{fundReportFileName(selectedDate)}</dd>
+              </div>
+              <div>
+                <dt>文件大小</dt>
+                <dd>{formatSize(selectedFile.size)}</dd>
+              </div>
+            </dl>
+          </section>
         {/if}
 
-        <div class="panel-actions">
-          <button
-            class="upload-button"
-            type="button"
-            disabled={!selectedFile || uploading}
-            onclick={uploadFundReport}
-          >
-            {uploading ? "正在上传" : "上传资金日报"}
+        <footer class="upload-actions">
+          <span>{selectedFile ? `即将发布 ${fundReportFileName(selectedDate)}` : "选择文件后即可上传发布"}</span>
+          <button class="upload-button" type="submit" disabled={!selectedFile || uploading}>
+            {#if uploading}<span class="button-spinner" aria-hidden="true"></span>{/if}
+            <span>{uploading ? "正在上传" : "上传并发布"}</span>
           </button>
-          {#if lastUpload}
-            <a href={lastUpload.url} target="_blank" rel="noreferrer">打开 {lastUpload.date} 资金日报</a>
-          {/if}
-        </div>
-      </div>
+        </footer>
+
+        {#if lastUpload}
+          <div class="upload-success" role="status">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" /><path d="m6.5 10 2.2 2.2 4.8-4.8" /></svg>
+            </span>
+            <strong>{lastUpload.fileName} 已{lastUpload.replaced ? "更新" : "发布"}</strong>
+            <a href={lastUpload.url} target="_blank" rel="noreferrer">打开日报</a>
+          </div>
+        {/if}
+      </form>
     </section>
   </main>
 </div>
 
 <style>
   .management-page {
+    width: min(100%, 2100px);
     min-height: 100dvh;
-    color: var(--ink);
-    background: var(--canvas);
-  }
-
-  .management-masthead,
-  main {
-    width: min(1120px, calc(100% - 48px));
     margin-inline: auto;
+    padding: 12px 16px 40px;
+    color: var(--text-1);
+    background: var(--bg-page);
   }
 
-  .management-masthead {
+  .management-header {
     display: flex;
-    min-height: 88px;
+    min-height: 64px;
     align-items: center;
-    gap: 24px;
+    padding: 4px 2px 12px;
     border-bottom: 1px solid var(--line);
   }
 
-  .management-masthead h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: bolder;
+  .management-title-block {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
   }
 
-  .home-link {
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-    gap: 8px;
-    padding: 0 12px;
+  .management-title-block h1 {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 9px;
+    margin: 0;
+    color: var(--text-2);
+    font-size: 1.5rem;
+    font-weight: bolder;
+    letter-spacing: -0.025em;
+  }
+
+  .title-dot {
+    color: color-mix(in srgb, var(--brand) 72%, var(--muted));
+  }
+
+  .title-subject {
+    color: var(--brand-deep);
+  }
+
+  .management-back {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    place-items: center;
     border: 1px solid var(--line);
     border-radius: var(--radius-control);
     color: var(--brand-deep);
     background: var(--surface);
+    box-shadow: var(--shadow-card);
     text-decoration: none;
+    transition:
+      border-color 160ms ease,
+      background 160ms ease;
   }
 
-  .home-link svg,
+  .management-back:hover {
+    border-color: var(--brand);
+    background: var(--brand-soft);
+  }
+
+  .management-back svg,
   .panel-icon svg,
-  .file-picker svg {
+  .upload-note svg,
+  .file-picker svg,
+  .upload-success svg {
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
     stroke-linejoin: round;
-    stroke-width: 1.8;
+    stroke-width: 1.9;
   }
 
-  .home-link svg {
+  .management-back svg {
     width: 20px;
   }
 
   main {
-    padding-block: 48px;
+    width: min(100%, 1040px);
+    margin-inline: auto;
+    padding-top: clamp(28px, 5vw, 56px);
   }
 
   .management-panel {
@@ -259,16 +325,28 @@
     box-shadow: var(--shadow-card);
   }
 
-  .management-panel > header {
+  .panel-heading,
+  .panel-heading > div,
+  .upload-actions,
+  .upload-success {
     display: flex;
-    min-height: 72px;
     align-items: center;
-    gap: 12px;
+  }
+
+  .panel-heading {
+    min-height: 76px;
+    justify-content: space-between;
+    gap: 16px;
     padding: 14px 20px;
     border-bottom: 1px solid var(--line);
   }
 
-  .management-panel h2 {
+  .panel-heading > div {
+    min-width: 0;
+    gap: 12px;
+  }
+
+  .panel-heading h2 {
     margin: 0;
     font-size: 1.25rem;
     font-weight: bold;
@@ -278,6 +356,7 @@
     display: grid;
     width: 44px;
     height: 44px;
+    flex: 0 0 auto;
     place-items: center;
     border-radius: var(--radius-control);
     color: var(--brand-deep);
@@ -288,80 +367,148 @@
     width: 24px;
   }
 
-  .upload-content {
+  .upload-form {
     display: grid;
-    gap: 24px;
+    gap: 20px;
     padding: 24px;
   }
 
-  .upload-rules {
+  .upload-note {
     display: grid;
-    gap: 8px;
-    color: var(--muted);
-    font-size: 1rem;
-    line-height: 1.6;
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line));
+    border-radius: var(--radius-inner);
+    color: var(--text-2);
+    background: color-mix(in srgb, var(--brand-soft) 44%, var(--surface));
   }
 
-  .upload-rules p {
+  .upload-note svg {
+    width: 20px;
+    margin-top: 2px;
+    color: var(--brand-deep);
+  }
+
+  .upload-note p {
     margin: 0;
+    font-size: 1rem;
+    line-height: 1.55;
   }
 
-  .upload-rules strong {
+  .upload-note strong,
+  .upload-note span {
     color: var(--ink);
     font-weight: bold;
   }
 
+  .management-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   .file-picker {
-    display: flex;
-    min-height: 112px;
+    display: grid;
+    min-height: 124px;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: center;
     gap: 16px;
-    padding: 20px;
+    padding: 20px 22px;
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius-inner);
     color: var(--brand-deep);
-    background: color-mix(in srgb, var(--brand-soft) 42%, var(--surface));
+    background: color-mix(in srgb, var(--brand-soft) 36%, var(--surface));
+    text-align: left;
     cursor: pointer;
+    transition:
+      border-color 160ms ease,
+      background 160ms ease,
+      box-shadow 160ms ease;
   }
 
   .file-picker:hover:not(:disabled) {
     border-color: var(--brand);
     background: var(--brand-soft);
+    box-shadow: 0 8px 24px rgb(47 111 214 / 9%);
   }
 
-  .file-picker svg {
-    width: 36px;
+  .file-picker.selected {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--green) 46%, var(--line));
+    background: color-mix(in srgb, var(--green) 7%, var(--surface));
   }
 
-  .file-picker span {
+  .file-picker-icon {
     display: grid;
-    justify-items: start;
-    gap: 4px;
+    width: 56px;
+    height: 56px;
+    place-items: center;
+    border-radius: var(--radius-control);
+    color: var(--brand-deep);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
   }
 
-  .file-picker strong {
-    font-size: 1rem;
+  .selected .file-picker-icon {
+    color: color-mix(in srgb, var(--green) 82%, #173b31);
+  }
+
+  .file-picker-icon svg {
+    width: 30px;
+  }
+
+  .file-picker-copy {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .file-picker-copy strong {
+    color: var(--ink);
+    font-size: 1.125rem;
     font-weight: bold;
+    overflow-wrap: anywhere;
   }
 
-  .file-picker small {
+  .file-picker-copy small {
     color: var(--muted);
     font-size: 0.875rem;
   }
 
+  .file-picker-action {
+    min-height: 40px;
+    padding: 9px 13px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-control);
+    color: var(--brand-deep);
+    background: var(--surface);
+    font-size: 0.875rem;
+    font-weight: bold;
+  }
+
   .selected-file {
+    padding: 0 2px;
+  }
+
+  .selected-file dl {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
+    gap: 12px;
     margin: 0;
   }
 
-  .selected-file div {
+  .selected-file dl > div {
     display: grid;
     min-width: 0;
-    gap: 6px;
-    padding: 16px;
+    gap: 5px;
+    padding: 13px 14px;
     border: 1px solid var(--line);
     border-radius: var(--radius-inner);
     background: var(--panel);
@@ -374,90 +521,182 @@
 
   .selected-file dd {
     margin: 0;
+    color: var(--text-2);
     font-size: 1rem;
+    font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }
 
-  .panel-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
+  .upload-actions {
+    justify-content: space-between;
+    gap: 16px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
   }
 
-  .upload-button,
-  .panel-actions a {
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-    justify-content: center;
-    padding: 0 16px;
-    border-radius: var(--radius-control);
-    font-size: 1rem;
-    text-decoration: none;
+  .upload-actions > span {
+    color: var(--muted);
+    font-size: 0.875rem;
   }
 
   .upload-button {
+    display: inline-flex;
+    min-width: 168px;
+    min-height: 46px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 18px;
     border: 1px solid var(--brand);
+    border-radius: var(--radius-control);
     color: #fff;
     background: var(--brand);
+    box-shadow: 0 5px 14px rgb(47 111 214 / 18%);
     cursor: pointer;
+    font-weight: bold;
+    transition:
+      border-color 160ms ease,
+      background 160ms ease,
+      box-shadow 160ms ease;
   }
 
   .upload-button:hover:not(:disabled) {
+    border-color: var(--brand-deep);
     background: var(--brand-deep);
+    box-shadow: 0 7px 18px rgb(47 111 214 / 24%);
   }
 
   .upload-button:disabled,
   .file-picker:disabled {
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.48;
   }
 
-  .panel-actions a {
-    border: 1px solid var(--line-strong);
+  .button-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgb(255 255 255 / 40%);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 700ms linear infinite;
+  }
+
+  .upload-success {
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--green) 30%, var(--line));
+    border-radius: var(--radius-inner);
+    color: color-mix(in srgb, var(--green) 76%, #173b31);
+    background: color-mix(in srgb, var(--green) 8%, var(--surface));
+  }
+
+  .upload-success > span {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--green) 12%, var(--surface));
+  }
+
+  .upload-success svg {
+    width: 20px;
+  }
+
+  .upload-success strong {
+    color: var(--text-2);
+    font-weight: bold;
+  }
+
+  .upload-success a {
+    margin-left: auto;
     color: var(--brand-deep);
-    background: var(--surface);
+    font-weight: bold;
+    text-decoration: none;
   }
 
-  .home-link:focus-visible,
+  .management-back:focus-visible,
   .file-picker:focus-visible,
   .upload-button:focus-visible,
-  .panel-actions a:focus-visible {
+  .upload-success a:focus-visible {
     outline: 3px solid color-mix(in srgb, var(--brand) 36%, transparent);
     outline-offset: 2px;
   }
 
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   @media (max-width: 720px) {
-    .management-masthead,
+    .management-page {
+      padding: 10px 12px 28px;
+    }
+
+    .management-title-block h1 {
+      gap: 6px;
+      font-size: 1.25rem;
+    }
+
     main {
-      width: min(100% - 32px, 1120px);
+      padding-top: 20px;
     }
 
-    .management-masthead {
-      min-height: 72px;
+    .panel-heading,
+    .upload-form {
+      padding-inline: 16px;
     }
 
-    main {
-      padding-block: 24px;
+    .file-picker {
+      grid-template-columns: 48px minmax(0, 1fr);
+      min-height: 112px;
+      padding: 16px;
     }
 
-    .upload-content {
-      padding: 20px;
+    .file-picker-icon {
+      width: 48px;
+      height: 48px;
     }
 
-    .selected-file {
+    .file-picker-action {
+      display: none;
+    }
+
+    .selected-file dl {
       grid-template-columns: 1fr;
     }
 
-    .panel-actions {
+    .upload-actions {
       align-items: stretch;
       flex-direction: column;
     }
 
-    .upload-button,
-    .panel-actions a {
+    .upload-button {
       width: 100%;
+    }
+
+    .upload-success {
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .upload-success a {
+      width: 100%;
+      margin-left: 38px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .management-back,
+    .file-picker,
+    .upload-button {
+      transition: none;
+    }
+
+    .button-spinner {
+      animation-duration: 1.4s;
     }
   }
 </style>

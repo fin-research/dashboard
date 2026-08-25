@@ -55,10 +55,7 @@ export async function archiveFundReportRequest(
   const storage = requireFundReportBucket(bucket);
   const { fileName: originalName, reportDate, size } =
     validateUploadMetadata(request);
-  const bytes = await request.arrayBuffer();
-  if (bytes.byteLength !== size) {
-    throw new FundReportError(400, "资金日报文件大小与请求内容不一致");
-  }
+  const bytes = await readUploadBytes(request, size);
   validateHtmlDocument(bytes);
 
   const key = fundReportObjectKey(reportDate);
@@ -165,17 +162,18 @@ function validateUploadMetadata(request: Request): {
     throw new FundReportError(413, "资金日报文件不能超过 20 MB");
   }
   const contentLengthHeader = request.headers.get("Content-Length");
-  const contentLength =
-    contentLengthHeader === null ? Number.NaN : Number(contentLengthHeader);
-  if (
-    !Number.isInteger(contentLength) ||
-    contentLength <= 0 ||
-    contentLength !== size
-  ) {
-    throw new FundReportError(400, "资金日报文件大小与请求内容不一致");
-  }
-  if (contentLength > MAX_FUND_REPORT_BYTES) {
-    throw new FundReportError(413, "资金日报文件不能超过 20 MB");
+  if (contentLengthHeader !== null) {
+    const contentLength = Number(contentLengthHeader);
+    if (
+      !Number.isInteger(contentLength) ||
+      contentLength <= 0 ||
+      contentLength !== size
+    ) {
+      throw new FundReportError(400, "资金日报文件大小与请求内容不一致");
+    }
+    if (contentLength > MAX_FUND_REPORT_BYTES) {
+      throw new FundReportError(413, "资金日报文件不能超过 20 MB");
+    }
   }
   const contentType = (request.headers.get("Content-Type") ?? "")
     .split(";", 1)[0]
@@ -185,6 +183,42 @@ function validateUploadMetadata(request: Request): {
     throw new FundReportError(415, "资金日报文件类型必须是 .html");
   }
   return { fileName, reportDate, size };
+}
+
+async function readUploadBytes(
+  request: Request,
+  declaredSize: number,
+): Promise<ArrayBuffer> {
+  if (!request.body) {
+    throw new FundReportError(400, "资金日报文件内容为空");
+  }
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_FUND_REPORT_BYTES) {
+      await reader.cancel();
+      throw new FundReportError(413, "资金日报文件不能超过 20 MB");
+    }
+    if (total > declaredSize) {
+      await reader.cancel();
+      throw new FundReportError(400, "资金日报文件大小与请求内容不一致");
+    }
+    chunks.push(value);
+  }
+  if (total !== declaredSize) {
+    throw new FundReportError(400, "资金日报文件大小与请求内容不一致");
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes.buffer;
 }
 
 function validateHtmlDocument(bytes: ArrayBuffer): void {

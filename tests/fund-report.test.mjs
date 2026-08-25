@@ -141,7 +141,7 @@ test("资金日报上传拒绝跨站、无日期和非 HTML 内容", async () =>
   );
 });
 
-test("资金日报上传要求请求长度与声明大小一致", async () => {
+test("资金日报上传校验已有请求长度并兼容代理省略 Content-Length", async () => {
   const html = new Blob(["<html></html>"], { type: "text/html" });
   const bucket = {
     async head() {
@@ -160,6 +160,40 @@ test("资金日报上传要求请求长度与声明大小一致", async () => {
     ),
     (error) => error instanceof FundReportError && error.status === 400,
   );
+
+  const requestWithoutLength = uploadRequest(
+    html,
+    "资金日报_20260824.html",
+  );
+  requestWithoutLength.headers.delete("Content-Length");
+  const writableBucket = {
+    async head() {
+      return null;
+    },
+    async put(key) {
+      return { key, size: html.size, etag: "no-content-length" };
+    },
+  };
+  const result = await archiveFundReportRequest(
+    requestWithoutLength,
+    writableBucket,
+  );
+  assert.equal(result.fileName, "2026-08-24.html");
+});
+
+test("管理页加载全局设计令牌并始终展示上传主操作", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const page = await readFile(
+    new URL("../src/routes/management/+page.svelte", import.meta.url),
+    "utf8",
+  );
+  assert.match(page, /import "\.\.\/\.\.\/styles\.css";/);
+  assert.match(page, /class="management-file-input"[\s\S]*?type="file"/);
+  assert.match(
+    page,
+    /<footer class="upload-actions">[\s\S]*?<button class="upload-button" type="submit"/,
+  );
+  assert.match(page, /disabled=\{!selectedFile \|\| uploading\}/);
 });
 
 test("资金日报读取只使用日期派生 key 并添加隔离响应头", async () => {
