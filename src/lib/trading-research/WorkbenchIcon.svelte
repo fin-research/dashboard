@@ -29,15 +29,11 @@
     <path d="M4 4h16v16H4zM8 16v-4m4 4V8m4 8v-6" />
   {:else if name === "financing-model"}
     <path d="M4 19V9m5 10V5m5 14v-7m5 7V8M3 21h18" />
-  {:else if name === "back"}
-    <path d="m14.5 5-7 7 7 7" />
   {:else if name === "calendar"}
     <path d="M4 6.5h16M7 3v3M17 3v3M5 4h14v17H5z" />
   {:else if name === "check"}
     <circle cx="12" cy="12" r="9" />
     <path d="m8 12 2.5 2.5L16 9" />
-  {:else if name === "chevron"}
-    <path d="m15 18-6-6 6-6" />
   {:else if name === "database"}
     <ellipse cx="12" cy="5.5" rx="7.5" ry="3" />
     <path d="M4.5 5.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6M4.5 11.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6" />
@@ -48,6 +44,9 @@
   {:else if name === "search"}
     <circle cx="10.5" cy="10.5" r="6.5" />
     <path d="m15.5 15.5 4 4" />
+  {:else if name === "sidebar"}
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M9 4v16" />
   {:else if name === "warning"}
     <path d="M12 3 2.8 20h18.4L12 3Z" />
     <path d="M12 9v5m0 3h.01" />

@@ -43,12 +43,12 @@
     requestAnimationFrame(() => mainRegion?.focus({ preventScroll: true }));
   });
 
-  function toggleDrawer(): void {
-    if (window.matchMedia("(max-width: 900px)").matches) {
-      mobileDrawerOpen = !mobileDrawerOpen;
-      return;
-    }
+  function toggleDesktopSidebar(): void {
     desktopCollapsed = !desktopCollapsed;
+  }
+
+  function toggleMobileDrawer(): void {
+    mobileDrawerOpen = !mobileDrawerOpen;
   }
 
   function handleWindowKeydown(event: KeyboardEvent): void {
@@ -78,24 +78,44 @@
 >
   <a class="tr-skip-link" href="#tr-workbench-main">跳至工作台内容</a>
 
-  <aside id="tr-workbench-drawer" class="tr-drawer" aria-label="交易研究工作台导航">
-    <div class="tr-drawer__head">
-      <a class="tr-brand" href="/trading-research" aria-label="交易研究工作台总览">
-        <span class="tr-brand__mark" aria-hidden="true"><i></i><i></i></span>
-        <span class="tr-brand__copy"><strong>资金管理部</strong><small>交易研究工作台</small></span>
-      </a>
+  <header class="tr-topbar">
+    <div class="tr-topbar__title">
       <button
-        class="tr-drawer__collapse"
+        class="tr-sidebar-toggle"
         type="button"
-        aria-label={desktopCollapsed ? "展开侧边导航" : "收窄侧边导航"}
+        aria-label={desktopCollapsed ? "展开侧边导航" : "折叠侧边导航"}
         aria-expanded={!desktopCollapsed}
         aria-controls="tr-workbench-drawer"
-        onclick={toggleDrawer}
+        onclick={toggleDesktopSidebar}
       >
-        <WorkbenchIcon name="chevron" />
+        <WorkbenchIcon name="sidebar" />
       </button>
+      <button
+        class="tr-mobile-menu"
+        type="button"
+        aria-label={mobileDrawerOpen ? "关闭导航菜单" : "打开导航菜单"}
+        aria-expanded={mobileDrawerOpen}
+        aria-controls="tr-workbench-drawer"
+        onclick={toggleMobileDrawer}
+      >
+        <WorkbenchIcon name="menu" />
+      </button>
+      <div class="tr-topbar__heading">
+        <a class="tr-portal-link" href="/" aria-label="返回市场研究门户">
+          东方财富证券 · 资金管理部
+        </a>
+        <h1>{activeView?.label}</h1>
+      </div>
     </div>
+    <div class="tr-topbar__meta">
+      {#if activeDate}
+        <span class="tr-as-of"><WorkbenchIcon name="calendar" /><span>数据截至</span><strong>{activeDate}</strong></span>
+      {/if}
+      <div id="tr-topbar-actions" class="tr-topbar__actions"></div>
+    </div>
+  </header>
 
+  <aside id="tr-workbench-drawer" class="tr-drawer" aria-label="交易研究工作台导航">
     <nav class="tr-drawer__nav" aria-label="业务模块">
       {#each workbenchViews as view}
         <a
@@ -121,34 +141,6 @@
   ></button>
 
   <section class="tr-workspace">
-    <header class="tr-topbar">
-      <div class="tr-topbar__title">
-        <button
-          class="tr-mobile-menu"
-          type="button"
-          aria-label={mobileDrawerOpen ? "关闭导航菜单" : "打开导航菜单"}
-          aria-expanded={mobileDrawerOpen}
-          aria-controls="tr-workbench-drawer"
-          onclick={toggleDrawer}
-        >
-          <WorkbenchIcon name="menu" />
-        </button>
-        <a class="tr-back-link" href="/" aria-label="返回市场研究门户">
-          <WorkbenchIcon name="back" />
-        </a>
-        <div>
-          <span>东方财富证券 · 资金管理部</span>
-          <div><h1>交易研究工作台</h1><b aria-hidden="true">/</b><strong>{activeView?.label}</strong></div>
-        </div>
-      </div>
-      <div class="tr-topbar__meta">
-        {#if activeDate}
-          <span class="tr-as-of"><WorkbenchIcon name="calendar" /><span>数据截至</span><strong>{activeDate}</strong></span>
-        {/if}
-        <div id="tr-topbar-actions" class="tr-topbar__actions"></div>
-      </div>
-    </header>
-
     <div
       id="tr-workbench-main"
       class:tr-integrated-page={isIntegratedView(activeViewId)}

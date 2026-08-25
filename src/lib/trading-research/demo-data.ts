@@ -9,14 +9,13 @@ export type WorkbenchViewId =
 
 export type WorkbenchIconName =
   | WorkbenchViewId
-  | "back"
   | "calendar"
   | "check"
-  | "chevron"
   | "database"
   | "funds"
   | "menu"
   | "search"
+  | "sidebar"
   | "warning";
 
 export const workbenchViews: Array<{

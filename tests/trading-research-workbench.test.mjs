@@ -67,12 +67,17 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
 
   assert.match(page, /class="tr-drawer"/);
   assert.match(page, /aria-controls="tr-workbench-drawer"/);
+  assert.match(page, /class="tr-sidebar-toggle"[\s\S]*?<WorkbenchIcon name="sidebar"/);
+  assert.match(page, /class="tr-portal-link" href="\/"[\s\S]*?东方财富证券 · 资金管理部/);
+  assert.doesNotMatch(page, /tr-brand|tr-back-link|tr-drawer__collapse/);
   assert.match(page, /href=\{workbenchViewPath\(view\.id\)\}/);
   assert.match(page, /<BondLedgerPage embedded \/>/);
   assert.match(page, /<FinancingModelPage embedded \/>/);
   assert.doesNotMatch(page, /\?view=|tr-context-strip|演示数据|静态演示|未来统一/);
   assert.match(route, /workbenchViews\.find/);
   assert.match(styles, /\.tr-table-scroll\s*\{[\s\S]*?overflow-x:\s*auto/);
+  assert.match(styles, /grid-template-areas:\s*\n\s*"topbar topbar"\s*\n\s*"drawer workspace"/);
+  assert.match(styles, /\.tr-workspace\s*\{[\s\S]*?overflow-y:\s*auto/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(document, /浏览器不得直连数据库/);
   assert.match(document, /\/data\/trading-research\/trades/);
