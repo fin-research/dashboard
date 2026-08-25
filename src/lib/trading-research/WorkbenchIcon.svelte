@@ -5,7 +5,11 @@
     $props();
 </script>
 
-<svg class={className} viewBox="0 0 24 24" aria-hidden="true">
+<svg
+  class={`tr-workbench-icon${className ? ` ${className}` : ""}`}
+  viewBox="0 0 24 24"
+  aria-hidden="true"
+>
   {#if name === "overview"}
     <rect x="3" y="3" width="7" height="7" rx="2" />
     <rect x="14" y="3" width="7" height="7" rx="2" />

@@ -9,6 +9,7 @@
   import { renderFinancingForecast } from "../../charts/financing-model";
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
+  import MetricIcon from "../../components/MetricIcon.svelte";
   import {
     conclusionSchema,
     parseFinancingModelReport,
@@ -16,6 +17,9 @@
     type FinancingModelConclusion,
     type FinancingModelReport,
   } from "$lib/financing-model";
+  import { globalMessages } from "$lib/global-messages";
+  import { portal } from "$lib/portal";
+  import type { MetricIconName } from "../../view-model";
 
   let report: FinancingModelReport | null = null;
   let loading = true;
@@ -24,7 +28,6 @@
   let editingConclusion = false;
   let futureWindowDetailsOpen = false;
   let errorMessage = "";
-  let statusMessage = "";
   let editVerdict = "";
   let editPreferredWindow = "";
   let editNarrative = "";
@@ -39,36 +42,59 @@
           value: formatSigned(snapshot.prediction.deviation_bp, 2),
           unit: "bp",
           tone: snapshot.prediction.deviation_bp <= 0 ? "good" : "bad",
+          detail:
+            snapshot.prediction.deviation_bp <= 0
+              ? "低于可比债中位数"
+              : "高于可比债中位数",
+          icon: "trade" as MetricIconName,
         },
         {
           label: "历史分位",
           value: `P${snapshot.prediction.historical_percentile.toFixed(0)}`,
           unit: "",
           tone: "primary",
+          detail:
+            snapshot.prediction.historical_percentile <= 50
+              ? "历史融资成本偏低"
+              : "历史融资成本偏高",
+          icon: "bond" as MetricIconName,
         },
         {
           label: "LCR六十日分位",
           value: formatPercent(company?.ef_lcr_pctile_60d),
           unit: "",
           tone: "teal",
+          detail: "短期流动性分位",
+          icon: "liquidity" as MetricIconName,
         },
         {
           label: "NSFR六十日分位",
           value: formatPercent(company?.ef_nsfr_pctile_60d),
           unit: "",
           tone: "teal",
+          detail: "稳定资金分位",
+          icon: "leverage" as MetricIconName,
         },
         {
           label: "资金缺口",
           value: formatSignedNullable(company?.ef_funding_gap, 1),
           unit: "亿元",
           tone: (company?.ef_funding_gap ?? 0) >= 0 ? "good" : "bad",
+          detail:
+            company?.ef_funding_gap === null || company?.ef_funding_gap === undefined
+              ? "公司资金数据暂缺"
+              : company.ef_funding_gap >= 0
+                ? "资金净余量"
+                : "资金净缺口",
+          icon: "bank" as MetricIconName,
         },
         {
           label: "主体利差",
           value: formatNullable(company?.ef_subject_spread_bp, 2),
           unit: "bp",
           tone: "primary",
+          detail: "主体信用定价参考",
+          icon: "issuance" as MetricIconName,
         },
       ]
     : [];
@@ -102,7 +128,6 @@
 
   function openConclusionEditor(): void {
     resetConclusionEditor();
-    statusMessage = "";
     editingConclusion = true;
   }
 
@@ -123,7 +148,6 @@
   async function saveConclusion(): Promise<void> {
     if (!report || saving) return;
     saving = true;
-    statusMessage = "";
     try {
       const response = await fetch("/api/financing-model/conclusion", {
         method: "PATCH",
@@ -140,9 +164,15 @@
       const conclusion: FinancingModelConclusion = conclusionSchema.parse(payload);
       report = { ...report, conclusion };
       editingConclusion = false;
-      statusMessage = "整体结论已保存";
+      globalMessages.success("整体结论已保存", {
+        key: "financing-model-conclusion",
+        title: "保存完成",
+      });
     } catch (error) {
-      statusMessage = error instanceof Error ? error.message : String(error);
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "financing-model-conclusion", title: "结论保存失败" },
+      );
     } finally {
       saving = false;
     }
@@ -151,7 +181,11 @@
   async function generateResearch(): Promise<void> {
     if (!report || generatingResearch) return;
     generatingResearch = true;
-    statusMessage = "正在检索最近七日卖方研报并交叉验证，可能需要数分钟";
+    globalMessages.info("正在检索最近七日卖方研报并交叉验证，可能需要数分钟", {
+      key: "financing-model-research",
+      title: "卖方观点生成中",
+      duration: 600_000,
+    });
     try {
       const response = await fetch("/api/financing-model/sell-side", {
         method: "POST",
@@ -162,9 +196,20 @@
       if (!response.ok) throw new Error(payload.error || "卖方观点生成失败");
       const sellSide = sellSidePayloadSchema.parse(payload);
       report = { ...report, sellSide };
-      statusMessage = "卖方观点已生成并保存";
+      globalMessages.success("卖方观点已生成并保存", {
+        key: "financing-model-research",
+        title: "生成完成",
+        duration: 6000,
+      });
     } catch (error) {
-      statusMessage = error instanceof Error ? error.message : String(error);
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        {
+          key: "financing-model-research",
+          title: "卖方观点生成失败",
+          duration: 10_000,
+        },
+      );
     } finally {
       generatingResearch = false;
     }
@@ -227,7 +272,10 @@
         <span class="model-title-subject">债券融资择时模型</span>
       </h1>
     </div>
-    <div class="model-actions">
+    <div
+      class="model-actions"
+      use:portal={embedded ? "#tr-topbar-actions" : null}
+    >
       {#if snapshot}
         <div class="model-as-of">
           <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -245,8 +293,6 @@
       </button>
     </div>
   </header>
-
-  <div class="status-region" aria-live="polite">{statusMessage}</div>
 
   {#if loading}
     <main id="financing-model-report" class="loading-state" aria-busy="true">
@@ -349,7 +395,10 @@
               label={metric.label}
               value={metric.value}
               unit={metric.unit}
+              detail={metric.detail}
               tone={financingMetricTone(metric.tone)}
+              iconComponent={MetricIcon}
+              iconProps={{ icon: metric.icon }}
               compact
             />
           {/each}
@@ -526,9 +575,7 @@
   }
 
   .financing-model-page--embedded .model-header {
-    min-height: 0;
-    justify-content: flex-end;
-    padding-top: 0;
+    display: none;
   }
 
   .skip-link {
@@ -681,14 +728,6 @@
   .primary-button:disabled {
     cursor: wait;
     opacity: 0.62;
-  }
-
-  .status-region {
-    min-height: 24px;
-    padding: 5px 4px 0;
-    color: var(--text-3);
-    text-align: center;
-    font-size: 0.8125rem;
   }
 
   .report-stack {

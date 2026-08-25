@@ -54,7 +54,7 @@ export const axisLabel = {
   color: colors.muted,
   fontFamily,
   fontSize: chartTextSize,
-  fontWeight: 500,
+  fontWeight: "normal" as const,
 };
 
 export const tooltip = {

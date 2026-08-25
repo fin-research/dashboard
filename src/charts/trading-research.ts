@@ -94,7 +94,7 @@ export function renderWorkbenchBarChart(
           color: colors.ink,
           fontFamily,
           fontSize: chartTextSize,
-          fontWeight: "bold",
+          fontWeight: "normal",
           formatter: ({ value }: { value: unknown }) =>
             `${Number(value).toFixed(1)}${unit}`,
         },

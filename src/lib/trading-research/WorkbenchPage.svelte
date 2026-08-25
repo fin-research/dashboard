@@ -141,11 +141,12 @@
           <div><h1>交易研究工作台</h1><b aria-hidden="true">/</b><strong>{activeView?.label}</strong></div>
         </div>
       </div>
-      {#if activeDate}
-        <div class="tr-topbar__meta">
+      <div class="tr-topbar__meta">
+        {#if activeDate}
           <span class="tr-as-of"><WorkbenchIcon name="calendar" /><span>数据截至</span><strong>{activeDate}</strong></span>
-        </div>
-      {/if}
+        {/if}
+        <div id="tr-topbar-actions" class="tr-topbar__actions"></div>
+      </div>
     </header>
 
     <div

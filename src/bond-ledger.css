@@ -22,14 +22,8 @@
   padding: 0;
 }
 
-.ledger-shell--embedded .ledger-title-block {
-  display: none;
-}
-
 .ledger-shell--embedded .ledger-masthead {
-  min-height: 0;
-  justify-content: flex-end;
-  padding-top: 0;
+  display: none;
 }
 
 .ledger-masthead {
@@ -268,29 +262,6 @@
   min-height: 44px;
   padding-inline: 12px;
   font-weight: bold;
-}
-
-.ledger-status {
-  display: flex;
-  min-height: 32px;
-  align-items: center;
-  gap: 12px;
-  padding: 5px 2px;
-  font-size: 0.875rem;
-  font-weight: bold;
-}
-
-.ledger-status p,
-.ledger-management-status p {
-  margin: 0;
-}
-
-.ledger-status-success {
-  color: #067647;
-}
-
-.ledger-status-error {
-  color: #b42318;
 }
 
 .ledger-main {
@@ -647,16 +618,6 @@
   font-weight: bold;
 }
 
-.ledger-management-status {
-  display: grid;
-  gap: 4px;
-  padding: 8px 10px;
-  border-radius: var(--radius-inner);
-  background: #f8fafc;
-  font-size: 0.8125rem;
-  font-weight: bold;
-}
-
 .management-calendar-nav {
   margin: 0;
 }
@@ -763,7 +724,6 @@
 }
 
 .is-export-capture .ledger-actions,
-.is-export-capture .ledger-status,
 .is-export-capture .ledger-back {
   display: none;
 }

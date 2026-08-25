@@ -25,7 +25,7 @@
     tone = "primary",
     iconComponent: IconComponent,
     iconProps = {},
-    iconPosition = "end",
+    iconPosition = "start",
     compact = false,
   }: {
     label: string;
@@ -183,7 +183,7 @@
 
   .research-metric-card__detail {
     margin: 0;
-    color: var(--text-3, #667085);
+    color: var(--metric-accent);
     font-size: 1rem;
     font-weight: normal;
     line-height: 1.3;
@@ -211,6 +211,11 @@
     padding: 0;
     color: inherit;
     background: transparent;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
   }
 
   @media (max-width: 520px) {

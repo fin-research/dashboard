@@ -79,13 +79,15 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
 });
 
 test("工作台数据图表统一通过 ChartHost 和 ECharts renderer", async () => {
-  const [overview, trading, credit, research, charts, styles] = await Promise.all([
+  const [overview, trading, credit, research, charts, common, styles, icon] = await Promise.all([
     readFile(new URL("../src/lib/trading-research/OverviewView.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/TradingView.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/CreditView.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/ResearchView.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/charts/trading-research.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/charts/common.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/workbench.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/WorkbenchIcon.svelte", import.meta.url), "utf8"),
   ]);
 
   for (const view of [overview, trading, credit, research]) {
@@ -95,6 +97,10 @@ test("工作台数据图表统一通过 ChartHost 和 ECharts renderer", async (
   assert.match(charts, /renderWorkbenchHistoryChart/);
   assert.match(charts, /renderWorkbenchCurveChart/);
   assert.match(charts, /markLine/);
+  assert.match(common, /fontWeight:\s*"normal"/);
+  assert.doesNotMatch(styles, /\.tr-workbench\s+svg\s*\{/);
+  assert.match(styles, /\.tr-workbench-icon\s*\{/);
+  assert.match(icon, /class=\{`tr-workbench-icon/);
   assert.doesNotMatch(styles, /\.tr-(progress|distribution-bar|usage-fill|curve-list)\b/);
 });
 
@@ -106,8 +112,10 @@ test("工作台与并入模块复用统一指标卡和结构组件", async () =>
     "../src/lib/trading-research/ResearchView.svelte",
     "../src/lib/trading-research/WorkflowView.svelte",
   ];
-  const [metricCard, bond, financing, styles, design, ...views] = await Promise.all([
+  const [metricCard, panelHeading, workbenchPage, bond, financing, styles, design, ...views] = await Promise.all([
     readFile(new URL("../src/components/MetricCard.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/PanelHeading.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/WorkbenchPage.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/pages/BondLedgerPage.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/workbench.css", import.meta.url), "utf8"),
@@ -129,7 +137,19 @@ test("工作台与并入模块复用统一指标卡和结构组件", async () =>
   }
   assert.match(metricCard, /detailPrefix/);
   assert.match(metricCard, /iconPosition/);
+  assert.match(metricCard, /iconPosition = "start"/);
+  assert.match(metricCard, /color:\s*var\(--metric-accent\)/);
   assert.doesNotMatch(metricCard, /text-overflow:\s*ellipsis/);
+  assert.match(panelHeading, /tr-panel-heading__controls/);
+  assert.match(styles, /\.tr-panel-heading\s*\{[\s\S]*?display:\s*grid/);
+  assert.match(styles, /\.tr-panel-heading--wrap \.tr-table-controls\s*\{[\s\S]*?flex-wrap:\s*nowrap/);
+  assert.match(workbenchPage, /id="tr-topbar-actions"/);
+  assert.match(bond, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
+  assert.match(financing, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
+  assert.match(bond, /globalMessages\.(success|error|info)/);
+  assert.match(financing, /globalMessages\.(success|error|info)/);
+  assert.doesNotMatch(bond, /class="ledger-status"/);
+  assert.doesNotMatch(financing, /class="status-region"/);
   assert.doesNotMatch(styles, /\.tr-(metric-card|rate-card)\b/);
   assert.match(design, /共享组件归属与复用顺序/);
   assert.match(design, /src\/components\/MetricCard\.svelte/);

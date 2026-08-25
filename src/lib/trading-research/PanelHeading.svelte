@@ -11,6 +11,8 @@
 </script>
 
 <div class:tr-panel-heading--wrap={wrap} class="tr-panel-heading">
-  <div><h2 {id}>{title}</h2></div>
-  {#if children}{@render children()}{/if}
+  <div class="tr-panel-heading__title"><h2 {id}>{title}</h2></div>
+  {#if children}
+    <div class="tr-panel-heading__controls">{@render children()}</div>
+  {/if}
 </div>

@@ -47,6 +47,7 @@
   } from "$lib/bond-ledger/upload";
   import { currentReportDate } from "../../report-date";
   import { globalMessages } from "$lib/global-messages";
+  import { portal } from "$lib/portal";
   import type { MetricIconName } from "../../view-model";
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
@@ -67,11 +68,8 @@
   let startDate = INITIAL_WEEK_RANGE.startDate;
   let endDate = INITIAL_WEEK_RANGE.endDate;
   let loadingRecords = true;
-  let syncingRecords = false;
   let uploading = false;
   let deleting = false;
-  let uploadMessage = "";
-  let errorMessage = "";
   let rangeOpen = false;
   let rangePhase: "start" | "end" = "start";
   let rangeMonthLeft = monthStart(startDate);
@@ -178,8 +176,13 @@
 
   async function refreshReport(allowFallback: boolean): Promise<void> {
     const generation = ++syncGeneration;
-    syncingRecords = true;
-    if (loadingRecords) errorMessage = "";
+    const syncMessageId = loadingRecords
+      ? ""
+      : globalMessages.info("正在读取数据库周报", {
+          key: "bond-ledger-sync",
+          title: "数据刷新中",
+          duration: 30_000,
+        });
     try {
       const inventory = await listRemoteBondLedgers();
       if (generation !== syncGeneration) return;
@@ -214,12 +217,15 @@
       analytics = await loadBondLedgerReport(startDate, endDate);
     } catch (error) {
       if (generation !== syncGeneration) return;
-      errorMessage = error instanceof Error ? error.message : String(error);
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "bond-ledger-error", title: "周报读取失败", duration: 8000 },
+      );
       analytics = emptyBondLedgerReport();
     } finally {
       if (generation === syncGeneration) {
         loadingRecords = false;
-        syncingRecords = false;
+        if (syncMessageId) globalMessages.dismiss(syncMessageId);
       }
     }
   }
@@ -238,19 +244,31 @@
     reuploadTarget = "";
     if (!files.length || uploading) return;
     uploading = true;
-    errorMessage = "";
-    uploadMessage = "";
     const errors: string[] = [];
     let successCount = 0;
     let latestUploadedDate = "";
     for (const [index, file] of files.entries()) {
-      uploadMessage = `正在上传 ${index + 1}/${files.length}：${file.name}`;
+      globalMessages.info(
+        `正在上传 ${index + 1}/${files.length}：${file.name}`,
+        {
+          key: "bond-ledger-operation",
+          title: "台账处理中",
+          duration: 120_000,
+        },
+      );
       try {
         const archived = await archiveBondLedgerFile(file, target || undefined);
         const imported = await waitForBondLedgerImport(
           archived.workflowId,
           () => {
-            uploadMessage = `正在导入 ${index + 1}/${files.length}：${file.name}`;
+            globalMessages.info(
+              `正在导入 ${index + 1}/${files.length}：${file.name}`,
+              {
+                key: "bond-ledger-operation",
+                title: "台账处理中",
+                duration: 120_000,
+              },
+            );
           },
         );
         successCount += 1;
@@ -282,10 +300,25 @@
     } finally {
       uploading = false;
     }
-    uploadMessage = successCount
+    const successMessage = successCount
       ? `已完成 ${successCount} 份 Excel 的 R2 归档和数据库导入`
       : "";
-    if (errors.length) errorMessage = errors.join("；");
+    if (errors.length) {
+      globalMessages.error(
+        [successMessage, errors.join("；")].filter(Boolean).join("；"),
+        {
+          key: "bond-ledger-operation",
+          title: successCount ? "部分台账未完成" : "台账导入失败",
+          duration: 10_000,
+        },
+      );
+    } else if (successMessage) {
+      globalMessages.success(successMessage, {
+        key: "bond-ledger-operation",
+        title: "台账导入完成",
+        duration: 6000,
+      });
+    }
   }
 
   async function removeRemoteLedger(remote: RemoteBondLedgerFile): Promise<void> {
@@ -295,15 +328,20 @@
     );
     if (!confirmed) return;
     deleting = true;
-    errorMessage = "";
     try {
       await deleteRemoteBondLedger(remote.date);
       await refreshLedgerInventory();
       selectedManagedDate = "";
-      uploadMessage = `已删除 ${remote.date} 线上台账`;
+      globalMessages.success(`已删除 ${remote.date} 线上台账`, {
+        key: "bond-ledger-operation",
+        title: "台账已删除",
+      });
       await refreshReport(true);
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error);
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "bond-ledger-operation", title: "台账删除失败" },
+      );
     } finally {
       deleting = false;
     }
@@ -319,7 +357,10 @@
         selectedManagedDate = latestDate;
       }
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error);
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "bond-ledger-operation", title: "台账列表读取失败" },
+      );
     }
   }
 
@@ -336,11 +377,13 @@
   async function downloadManagedFile(
     remote: RemoteBondLedgerFile,
   ): Promise<void> {
-    errorMessage = "";
     try {
       await downloadRemoteBondLedger(remote);
     } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error);
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "bond-ledger-operation", title: "台账下载失败" },
+      );
     }
   }
 
@@ -388,10 +431,16 @@
         captureClass: true,
         filename: `资金管理部-二级池周报-${startDate}至${endDate}.png`,
       });
-      exportLabel = "导出完成";
+      globalMessages.success("二级池周报图片已导出", {
+        key: "bond-ledger-export",
+        title: "导出完成",
+      });
     } catch (error) {
       console.error("导出二级池周报失败", error);
-      exportLabel = "导出失败";
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "bond-ledger-export", title: "导出失败" },
+      );
     } finally {
       exportTimer = window.setTimeout(() => {
         exporting = false;
@@ -470,7 +519,11 @@
         </h1>
       </div>
 
-      <div class="ledger-actions" aria-label="台账、日期范围与导出控制">
+      <div
+        class="ledger-actions"
+        aria-label="台账、日期范围与导出控制"
+        use:portal={embedded ? "#tr-topbar-actions" : null}
+      >
         <div class="ledger-range-picker">
           <button
             class="ledger-range-trigger"
@@ -542,12 +595,6 @@
         </button>
       </div>
     </header>
-
-    <div class="ledger-status" aria-live="polite">
-      {#if syncingRecords && !loadingRecords}<p>正在读取数据库周报</p>{/if}
-      {#if uploadMessage}<p class="ledger-status-success">{uploadMessage}</p>{/if}
-      {#if errorMessage}<p class="ledger-status-error" role="alert">{errorMessage}</p>{/if}
-    </div>
 
     {#if loadingRecords}
       <main class="ledger-loading" aria-live="polite">
@@ -706,12 +753,6 @@
       </button>
       <span>数据库共 {databaseLedgerDates.length} 个报表日</span>
     </div>
-    {#if uploadMessage || errorMessage}
-      <div class="ledger-management-status" aria-live="polite">
-        {#if uploadMessage}<p class="ledger-status-success">{uploadMessage}</p>{/if}
-        {#if errorMessage}<p class="ledger-status-error" role="alert">{errorMessage}</p>{/if}
-      </div>
-    {/if}
     <div class="management-calendar-nav">
       <button type="button" aria-label="上一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, -1))}>‹</button>
       <strong>{monthLabel(managementMonth)}</strong>

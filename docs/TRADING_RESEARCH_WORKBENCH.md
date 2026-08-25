@@ -27,7 +27,7 @@
 - `/trading-research/bond`：二级池周报。
 - `/trading-research/financing-model`：融资择时模型。
 
-原 `/bond` 与 `/financing-model` 入口保留，并与工作台子路径复用同一 Svelte 页面组件，不建立第二套业务、样式或请求实现。
+原 `/bond` 与 `/financing-model` 深链保留，并与工作台子路径复用同一 Svelte 页面组件，不建立第二套业务、样式或请求实现；首页不再重复展示两张入口卡。嵌入工作台时隐藏原页面标题区，日期、台账管理、导出和刷新按钮合并到工作台页头右侧。
 
 | 视图 | 当前展示 | 暂不包含 |
 | --- | --- | --- |
