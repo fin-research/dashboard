@@ -19,6 +19,7 @@
   let saving = false;
   let generatingResearch = false;
   let editingConclusion = false;
+  let futureWindowDetailsOpen = false;
   let errorMessage = "";
   let statusMessage = "";
   let editVerdict = "";
@@ -204,22 +205,35 @@
 <div class="financing-model-page">
   <a class="skip-link" href="#financing-model-report">跳至报告正文</a>
   <header class="model-header">
-    <a class="home-link" href="/" aria-label="返回市场研究首页">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="m4 11 8-7 8 7v9h-6v-6h-4v6H4z" />
-      </svg>
-      <span>市场研究</span>
-    </a>
-    <div class="header-title">
-      <h1>债券融资择时模型</h1>
-      {#if snapshot}<span>截至 {displayDate(snapshot.as_of_date)}</span>{/if}
+    <div class="model-title-block">
+      <a class="model-back" href="/" aria-label="返回市场研究门户">
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="m12.5 4-6 6 6 6" />
+        </svg>
+      </a>
+      <h1>
+        <span>资金管理部</span>
+        <span class="model-title-dot" aria-hidden="true">•</span>
+        <span class="model-title-subject">债券融资择时模型</span>
+      </h1>
     </div>
-    <button class="refresh-control" type="button" onclick={loadReport} disabled={loading}>
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.4-2.2L20 9M4 15l2.5 2.2A7 7 0 0 0 17.9 15" />
-      </svg>
-      {loading ? "刷新中" : "刷新数据"}
-    </button>
+    <div class="model-actions">
+      {#if snapshot}
+        <div class="model-as-of">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M4 6.5h12M6.5 3v3M13.5 3v3M4 4.5h12v12H4z" />
+          </svg>
+          <span>截至</span>
+          <time datetime={snapshot.as_of_date}>{displayDate(snapshot.as_of_date)}</time>
+        </div>
+      {/if}
+      <button class="refresh-control" type="button" onclick={loadReport} disabled={loading}>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.4-2.2L20 9M4 15l2.5 2.2A7 7 0 0 0 17.9 15" />
+        </svg>
+        {loading ? "刷新中" : "刷新数据"}
+      </button>
+    </div>
   </header>
 
   <div class="status-region" aria-live="polite">{statusMessage}</div>
@@ -330,11 +344,21 @@
       </section>
 
       <section class="analysis-section" aria-labelledby="window-title">
-        <div class="section-heading">
+        <div class="section-heading section-heading--window">
           <span class="section-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 19h16M5 16l4-5 4 3 6-8" /></svg>
           </span>
           <h2 id="window-title">未来发行窗口</h2>
+          <button
+            class="window-details-toggle"
+            type="button"
+            aria-label={futureWindowDetailsOpen ? "收起未来发行窗口明细" : "展开未来发行窗口明细"}
+            aria-expanded={futureWindowDetailsOpen}
+            aria-controls="forecast-window-details"
+            onclick={() => (futureWindowDetailsOpen = !futureWindowDetailsOpen)}
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
+          </button>
         </div>
         <div class="window-layout">
           <article class="panel chart-panel">
@@ -344,7 +368,11 @@
               ariaLabel="未来发行窗口预测偏离和相对成本变化图"
               className="forecast-chart"
             />
-            <div class="forecast-table-wrap">
+            <div
+              id="forecast-window-details"
+              class="forecast-table-wrap"
+              hidden={!futureWindowDetailsOpen}
+            >
               <table class="forecast-table">
                 <caption>未来发行窗口明细</caption>
                 <thead>
@@ -378,7 +406,6 @@
               <div><dt>推荐胜率</dt><dd>{validation ? `${(validation.timing_value.win_rate * 100).toFixed(1)}%` : "—"}</dd></div>
               <div><dt>历史节约</dt><dd>{validation ? `${formatSigned(validation.timing_value.cost_saving_bp, 2)} bp` : "—"}</dd></div>
             </dl>
-            <p>预测值用于窗口相对排序，不作为精确发行报价。</p>
           </article>
         </div>
       </section>
@@ -451,7 +478,7 @@
           </p>
         {:else}
           <div class="research-empty">
-            <p>尚未生成卖方观点。点击生成后，将按模型日期检索最近七个上海自然日的固收研报。</p>
+            <p>尚未生成卖方观点。</p>
           </div>
         {/if}
       </section>
@@ -478,7 +505,10 @@
   }
 
   .financing-model-page {
+    width: min(100%, 2100px);
     min-height: 100dvh;
+    margin-inline: auto;
+    padding: 12px 16px 28px;
     color: var(--text-1);
     background: var(--bg-page);
   }
@@ -503,20 +533,24 @@
   .report-stack,
   .loading-state,
   .error-state {
-    width: min(2100px, calc(100% - 32px));
-    margin-inline: auto;
+    width: 100%;
   }
 
   .model-header {
-    display: grid;
-    min-height: 82px;
-    grid-template-columns: 1fr auto 1fr;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    min-height: 64px;
     align-items: center;
-    gap: 20px;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 4px 2px 12px;
     border-bottom: 1px solid var(--border);
   }
 
-  .home-link,
+  .model-title-block,
+  .model-actions,
+  .model-as-of,
   .refresh-control,
   .section-heading,
   .section-heading > div,
@@ -528,15 +562,55 @@
     align-items: center;
   }
 
-  .home-link {
-    width: fit-content;
-    min-height: 44px;
-    gap: 8px;
-    color: var(--text-2);
-    text-decoration: none;
+  .model-title-block {
+    min-width: 0;
+    gap: 10px;
   }
 
-  .home-link svg,
+  .model-title-block h1 {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 9px;
+    margin: 0;
+    color: var(--text-2);
+    font-size: 1.5rem;
+    font-weight: bolder;
+    letter-spacing: -0.025em;
+  }
+
+  .model-title-dot {
+    color: color-mix(in srgb, var(--brand) 72%, var(--muted));
+  }
+
+  .model-title-subject {
+    color: var(--brand-deep);
+  }
+
+  .model-back {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    color: var(--brand-deep);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
+    text-decoration: none;
+    transition:
+      border-color 160ms ease,
+      background 160ms ease;
+  }
+
+  .model-back:hover {
+    border-color: var(--brand);
+    background: var(--brand-soft);
+  }
+
+  .model-back svg,
+  .model-as-of svg,
   .refresh-control svg,
   .section-icon svg {
     fill: none;
@@ -546,41 +620,43 @@
     stroke-width: 1.9;
   }
 
-  .home-link svg,
-  .refresh-control svg {
+  .model-back svg {
     width: 20px;
   }
 
-  .header-title {
-    text-align: center;
+  .model-actions {
+    flex: 0 0 auto;
+    gap: 8px;
   }
 
-  .header-title h1 {
-    margin: 0;
-    color: #173b78;
-    font-size: 1.5rem;
-    font-weight: bolder;
-    letter-spacing: -0.02em;
+  .model-as-of,
+  .refresh-control {
+    min-height: 44px;
+    gap: 7px;
+    padding: 0 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-control);
+    color: var(--text-2);
+    background: var(--surface);
+    box-shadow: var(--shadow-card);
   }
 
-  .header-title span {
-    display: block;
-    margin-top: 4px;
-    color: var(--text-3);
-    font-size: 0.8125rem;
+  .model-as-of svg,
+  .refresh-control svg {
+    width: 18px;
   }
 
   .refresh-control {
-    justify-self: end;
-    min-height: 44px;
-    gap: 8px;
-    padding: 0 14px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-control);
-    color: var(--color-primary);
-    background: var(--bg-card);
     cursor: pointer;
     font-weight: bold;
+    transition:
+      border-color 160ms ease,
+      background 160ms ease;
+  }
+
+  .refresh-control:hover:not(:disabled) {
+    border-color: var(--brand);
+    background: var(--brand-soft);
   }
 
   .refresh-control:disabled,
@@ -591,7 +667,7 @@
 
   .status-region {
     min-height: 24px;
-    padding: 4px 16px 0;
+    padding: 5px 4px 0;
     color: var(--text-3);
     text-align: center;
     font-size: 0.8125rem;
@@ -599,13 +675,12 @@
 
   .report-stack {
     display: grid;
-    gap: 14px;
-    padding-bottom: 24px;
+    gap: 16px;
   }
 
   .summary-section,
   .analysis-section {
-    padding: 16px;
+    padding: 18px;
     border: 1px solid var(--border);
     border-radius: var(--radius-card);
     background: var(--bg-card);
@@ -614,7 +689,8 @@
 
   .section-heading {
     gap: 10px;
-    margin-bottom: 14px;
+    min-height: 44px;
+    margin-bottom: 12px;
   }
 
   .section-heading h2 {
@@ -630,8 +706,8 @@
     height: 36px;
     place-items: center;
     border-radius: 8px;
-    color: #fff;
-    background: var(--color-primary);
+    color: var(--brand-deep);
+    background: var(--brand-soft);
   }
 
   .section-icon svg {
@@ -650,7 +726,7 @@
   .sell-side-card {
     border: 1px solid var(--border);
     border-radius: var(--radius-inner);
-    background: #fff;
+    background: var(--surface);
   }
 
   .insight-card {
@@ -659,17 +735,17 @@
   }
 
   .market-card {
-    border-color: #b9cef2;
-    background: #f8fbff;
+    border-color: color-mix(in srgb, var(--brand) 32%, var(--line));
+    background: color-mix(in srgb, var(--brand-soft) 38%, var(--surface));
   }
 
   .company-card {
-    border-color: #a7d8d2;
-    background: #f7fcfb;
+    border-color: color-mix(in srgb, #16a394 32%, var(--line));
+    background: color-mix(in srgb, #eafaf7 42%, var(--surface));
   }
 
   .conclusion-card {
-    border-color: #b9cef2;
+    border-color: color-mix(in srgb, var(--brand) 24%, var(--line));
   }
 
   .insight-card h3,
@@ -826,18 +902,20 @@
 
   .recommendation-band > div {
     display: flex;
-    min-height: 64px;
+    min-height: 68px;
     align-items: center;
     justify-content: space-between;
     gap: 20px;
-    padding: 0 20px;
+    padding: 10px 18px;
+    border: 1px solid color-mix(in srgb, var(--brand) 32%, var(--line));
     border-radius: 8px;
-    color: #fff;
-    background: #174da6;
+    color: var(--text-2);
+    background: color-mix(in srgb, var(--brand-soft) 66%, var(--surface));
   }
 
   .recommendation-band > div:last-child {
-    background: #087b72;
+    border-color: color-mix(in srgb, #16a394 34%, var(--line));
+    background: color-mix(in srgb, #eafaf7 68%, var(--surface));
   }
 
   .recommendation-band span {
@@ -845,29 +923,33 @@
   }
 
   .recommendation-band strong {
+    color: var(--brand-deep);
     font-size: 1.25rem;
     font-weight: bolder;
+    text-align: right;
+  }
+
+  .recommendation-band > div:last-child strong {
+    color: #087b72;
   }
 
   .metric-strip {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
     margin-top: 12px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-inner);
   }
 
   .metric-card {
     display: grid;
     min-width: 0;
     gap: 8px;
-    padding: 14px;
-    text-align: center;
-  }
-
-  .metric-card + .metric-card {
-    border-left: 1px solid var(--border);
+    align-content: center;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-inner);
+    background: color-mix(in srgb, var(--panel) 62%, var(--surface));
+    box-shadow: inset 3px 0 0 var(--brand);
   }
 
   .metric-card > span {
@@ -886,8 +968,17 @@
     color: #087b72;
   }
 
+  .metric-card--teal,
+  .metric-card--good {
+    box-shadow: inset 3px 0 0 #16a394;
+  }
+
   .metric-card--bad strong {
     color: #b42318;
+  }
+
+  .metric-card--bad {
+    box-shadow: inset 3px 0 0 #d92d20;
   }
 
   .metric-card small {
@@ -903,8 +994,44 @@
     gap: 12px;
   }
 
+  .section-heading--window {
+    width: fit-content;
+  }
+
+  .window-details-toggle {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    margin-left: -4px;
+    place-items: center;
+    border: 0;
+    border-radius: var(--radius-control);
+    color: var(--brand-deep);
+    background: transparent;
+    cursor: pointer;
+    transition: background 160ms ease;
+  }
+
+  .window-details-toggle:hover {
+    background: var(--brand-soft);
+  }
+
+  .window-details-toggle svg {
+    width: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    transition: transform 180ms ease;
+  }
+
+  .window-details-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+
   .panel {
-    padding: 14px;
+    padding: 16px;
   }
 
   :global(.forecast-chart) {
@@ -914,7 +1041,7 @@
 
   .forecast-table-wrap {
     max-width: 100%;
-    margin-top: 8px;
+    margin-top: 12px;
     overflow-x: auto;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -973,8 +1100,9 @@
 
   .confidence-grid div {
     padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
     border-radius: 8px;
-    background: #f4f7fb;
+    background: color-mix(in srgb, var(--panel) 72%, var(--surface));
   }
 
   .confidence-grid dt {
@@ -988,11 +1116,6 @@
     font-size: 1.25rem;
     font-weight: bolder;
     font-variant-numeric: tabular-nums;
-  }
-
-  .confidence-panel p {
-    margin: 0;
-    color: var(--text-3);
   }
 
   .driver-list {
@@ -1010,9 +1133,9 @@
     align-items: center;
     gap: 10px;
     padding: 6px 10px;
-    border: 1px solid #e6ebf2;
+    border: 1px solid var(--line);
     border-radius: 8px;
-    background: #fbfcfe;
+    background: color-mix(in srgb, var(--panel) 38%, var(--surface));
   }
 
   .driver-rank {
@@ -1021,8 +1144,8 @@
     height: 28px;
     place-items: center;
     border-radius: 6px;
-    color: #fff;
-    background: #174da6;
+    color: var(--brand-deep);
+    background: var(--brand-soft);
     font-weight: bold;
   }
 
@@ -1072,7 +1195,7 @@
     grid-template-columns: 150px minmax(0, 1fr);
     gap: 12px 18px;
     padding: 14px;
-    background: #f8fbff;
+    background: color-mix(in srgb, var(--brand-soft) 38%, var(--surface));
   }
 
   .cross-check-card > div {
@@ -1172,8 +1295,13 @@
     place-items: center;
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius-inner);
-    color: var(--text-3);
+    color: var(--text-2);
+    background: color-mix(in srgb, var(--panel) 42%, var(--surface));
     text-align: center;
+  }
+
+  .research-empty p {
+    margin: 0;
   }
 
   .source-footer {
@@ -1234,6 +1362,16 @@
   }
 
   @media (max-width: 1080px) {
+    .model-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .model-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+
     .summary-grid {
       grid-template-columns: 1fr 1fr;
     }
@@ -1246,53 +1384,29 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
-    .metric-card:nth-child(4) {
-      border-left: 0;
-      border-top: 1px solid var(--border);
-    }
-
-    .metric-card:nth-child(n + 5) {
-      border-top: 1px solid var(--border);
-    }
-
     .window-layout {
       grid-template-columns: 1fr;
     }
   }
 
   @media (max-width: 720px) {
-    .model-header,
-    .report-stack,
-    .loading-state,
-    .error-state {
-      width: min(100% - 24px, 2100px);
+    .financing-model-page {
+      padding: 8px max(10px, env(safe-area-inset-right, 0px)) 24px
+        max(10px, env(safe-area-inset-left, 0px));
     }
 
-    .model-header {
-      min-height: 72px;
-      grid-template-columns: auto 1fr auto;
-      gap: 10px;
-    }
-
-    .home-link span,
-    .refresh-control {
-      font-size: 0;
-    }
-
-    .home-link,
-    .refresh-control {
-      width: 44px;
-      justify-content: center;
-      padding: 0;
-    }
-
-    .home-link svg,
-    .refresh-control svg {
-      width: 21px;
-    }
-
-    .header-title h1 {
+    .model-title-block h1 {
       font-size: 1.125rem;
+    }
+
+    .model-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .model-as-of {
+      justify-content: center;
+      min-width: 0;
     }
 
     .summary-section,
@@ -1314,13 +1428,6 @@
     .recommendation-band > div {
       min-height: 58px;
       padding: 10px 14px;
-    }
-
-    .metric-card + .metric-card,
-    .metric-card:nth-child(4),
-    .metric-card:nth-child(n + 5) {
-      border-top: 1px solid var(--border);
-      border-left: 0;
     }
 
     .driver-list li {
@@ -1359,7 +1466,41 @@
     }
   }
 
+  @media (max-width: 520px) {
+    .model-as-of span {
+      display: none;
+    }
+
+    .refresh-control {
+      width: 44px;
+      justify-content: center;
+      padding: 0;
+      font-size: 0;
+    }
+
+    .refresh-control svg {
+      width: 20px;
+    }
+
+    .recommendation-band > div {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .recommendation-band strong {
+      text-align: left;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
+    .model-back,
+    .refresh-control,
+    .window-details-toggle,
+    .window-details-toggle svg {
+      transition: none;
+    }
+
     .spinner { animation: none; }
   }
 </style>
