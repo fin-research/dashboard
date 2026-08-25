@@ -48,7 +48,7 @@
 }
 
 html {
-  min-width: 1280px;
+  min-width: 0;
   background: var(--canvas);
   font-size: 16px;
 }
@@ -78,6 +78,7 @@ button {
 
 .page-shell {
   width: 100%;
+  min-width: 1280px;
   max-width: 2100px;
   height: 100vh;
   height: 100dvh;
@@ -1362,6 +1363,7 @@ h2 {
 
   .page-shell {
     width: 100%;
+    min-width: 0;
     max-width: none;
     height: auto;
     min-height: 100vh;

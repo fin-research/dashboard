@@ -22,7 +22,7 @@ test("根布局只挂载一个融资工作台式全局消息区域", async () =>
 
 test("二级池回退提示发布到全局消息而非上传状态栏", async () => {
   const page = await readFile(
-    new URL("../src/routes/bond/+page.svelte", import.meta.url),
+    new URL("../src/lib/pages/BondLedgerPage.svelte", import.meta.url),
     "utf8",
   );
 

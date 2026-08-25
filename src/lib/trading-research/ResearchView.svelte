@@ -1,38 +1,18 @@
 <script lang="ts">
   import ChartHost from "../../components/ChartHost.svelte";
-  import { setChart, type ChartOption } from "../../charts/charting";
-  import { workbenchChartTheme } from "./chart-theme";
+  import {
+    renderWorkbenchCurveChart,
+    renderWorkbenchHistoryChart,
+  } from "../../charts/trading-research";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import { demoMeta, researchSnapshot } from "./demo-data";
 
-  const chartOption: ChartOption = {
-    animationDuration: 240,
-    aria: {
-      enabled: true,
-      description: "2026年8月3日至8月14日DR007、R007与GC001利率走势",
-    },
-    color: [...workbenchChartTheme.series],
-    tooltip: { trigger: "axis", confine: true, valueFormatter: (value: unknown) => `${Number(value).toFixed(4)}%` },
-    legend: { top: 0, textStyle: { color: workbenchChartTheme.text, fontSize: 16 } },
-    grid: { left: 62, right: 22, top: 48, bottom: 42 },
-    xAxis: {
-      type: "category",
-      data: researchSnapshot.history.dates,
-      boundaryGap: false,
-      axisLabel: { color: workbenchChartTheme.muted, fontSize: 16 },
-      axisLine: { lineStyle: { color: workbenchChartTheme.border } },
-    },
-    yAxis: {
-      type: "value",
-      name: "%",
-      min: 0.9,
-      axisLabel: { color: workbenchChartTheme.muted, fontSize: 16 },
-      splitLine: { lineStyle: { color: workbenchChartTheme.grid } },
-    },
+  const historyChart = {
+    dates: researchSnapshot.history.dates,
     series: [
-      { name: "DR007", type: "line", smooth: true, symbolSize: 7, data: researchSnapshot.history.dr007 },
-      { name: "R007", type: "line", smooth: true, symbolSize: 7, data: researchSnapshot.history.r007 },
-      { name: "GC001", type: "line", smooth: true, symbolSize: 7, data: researchSnapshot.history.gc001 },
+      { name: "DR007", values: researchSnapshot.history.dr007 },
+      { name: "R007", values: researchSnapshot.history.r007 },
+      { name: "GC001", values: researchSnapshot.history.gc001 },
     ],
   };
 
@@ -83,8 +63,8 @@
       <span class="tr-badge tr-badge--neutral">最近10个有效观测日 · %</span>
     </div>
     <ChartHost
-      renderer={setChart}
-      args={[chartOption]}
+      renderer={renderWorkbenchHistoryChart}
+      args={[historyChart, "2026年8月3日至8月14日DR007、R007与GC001利率走势"]}
       ariaLabel="2026年8月3日至8月14日DR007、R007与GC001利率走势"
       className="tr-chart-host"
     />
@@ -106,26 +86,28 @@
   <div class="tr-two-column">
     <section class="tr-panel" aria-labelledby="cd-curve-title">
       <div class="tr-panel-heading"><div><h2 id="cd-curve-title">同业存单曲线</h2></div></div>
-      <div class="tr-curve-list">
-        {#each researchSnapshot.cdCurve as point}
-          <div><span>{point.tenor}</span><strong>{point.value.toFixed(4)}%</strong><small class={changeClass(point.changeBp)}>{changeText(point.changeBp)}</small></div>
-        {/each}
-      </div>
+      <ChartHost
+        renderer={renderWorkbenchCurveChart}
+        args={["同业存单", researchSnapshot.cdCurve, "同业存单各期限收益率曲线"]}
+        ariaLabel="同业存单各期限收益率曲线"
+        className="tr-chart-host tr-chart-host--curve"
+      />
     </section>
     <section class="tr-panel" aria-labelledby="gov-curve-title">
       <div class="tr-panel-heading"><div><h2 id="gov-curve-title">中债国债曲线</h2></div></div>
-      <div class="tr-curve-list">
-        {#each researchSnapshot.govCurve as point}
-          <div><span>{point.tenor}</span><strong>{point.value.toFixed(4)}%</strong><small class={changeClass(point.changeBp)}>{changeText(point.changeBp)}</small></div>
-        {/each}
-      </div>
+      <ChartHost
+        renderer={renderWorkbenchCurveChart}
+        args={["中债国债", researchSnapshot.govCurve, "中债国债各期限收益率曲线"]}
+        ariaLabel="中债国债各期限收益率曲线"
+        className="tr-chart-host tr-chart-host--curve"
+      />
     </section>
   </div>
 
   <section class="tr-panel" aria-labelledby="research-coverage-title">
     <div class="tr-panel-heading">
-      <div><h2 id="research-coverage-title">待接入数据范围</h2></div>
-      <span class="tr-badge tr-badge--neutral">5 项待接入</span>
+      <div><h2 id="research-coverage-title">当前缺失数据范围</h2></div>
+      <span class="tr-badge tr-badge--neutral">5 项缺失</span>
     </div>
     <div class="tr-unavailable-grid">
       {#each researchSnapshot.unavailable as item}

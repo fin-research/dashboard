@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ChartHost from "../../components/ChartHost.svelte";
+  import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import MetricCard from "./MetricCard.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import {
@@ -15,9 +17,26 @@
     { label: "交易快照", value: `${tradingSummary.tradeCount} 笔`, detail: demoMeta.tradingAsOf },
     { label: "授信快照", value: `${creditSummary.count} 条`, detail: demoMeta.creditAsOf },
     { label: "研究快照", value: "10 项校验", detail: `${demoMeta.researchStart}—${demoMeta.researchEnd}` },
-    { label: "流程演示", value: `${workflowDemos.length} 条`, detail: "只读演示任务" },
+    { label: "流程任务", value: `${workflowDemos.length} 条`, detail: "当前流程任务" },
   ];
   const dr007 = researchSnapshot.rates[1]!;
+  const structureBars = [
+    {
+      label: "同业拆借",
+      value: tradingSummary.interbankShare,
+      color: "#2f6fed",
+    },
+    {
+      label: "质押式回购",
+      value: 100 - tradingSummary.interbankShare,
+      color: "#f79009",
+    },
+    {
+      label: "授信额度已使用",
+      value: creditSummary.utilization,
+      color: "#16a394",
+    },
+  ];
 </script>
 
 <div class="tr-view-stack">
@@ -71,43 +90,20 @@
         <div>
           <h2 id="business-snapshot-title">交易与授信结构</h2>
         </div>
-        <span class="tr-badge tr-badge--info">演示快照</span>
+        <span class="tr-badge tr-badge--info">多基准日</span>
       </div>
-      <div class="tr-structure-list">
-        <div>
-          <div class="tr-structure-row">
-            <span>同业拆借（纯信用）</span>
-            <strong>{tradingSummary.interbankAmount.toFixed(1)} 亿元</strong>
-          </div>
-          <div class="tr-progress" aria-label={`同业拆借占比 ${tradingSummary.interbankShare.toFixed(1)}%`}>
-            <span style={`width: ${tradingSummary.interbankShare}%`}></span>
-          </div>
-        </div>
-        <div>
-          <div class="tr-structure-row">
-            <span>拆出（质押式回购）</span>
-            <strong>{tradingSummary.repoLendAmount.toFixed(1)} 亿元</strong>
-          </div>
-          <div class="tr-progress tr-progress--orange" aria-label={`质押式回购占比 ${(100 - tradingSummary.interbankShare).toFixed(1)}%`}>
-            <span style={`width: ${100 - tradingSummary.interbankShare}%`}></span>
-          </div>
-        </div>
-        <div>
-          <div class="tr-structure-row">
-            <span>授信额度已使用</span>
-            <strong>{creditSummary.used.toFixed(2)} 亿元</strong>
-          </div>
-          <div class="tr-progress tr-progress--green" aria-label={`授信使用率 ${creditSummary.utilization.toFixed(1)}%`}>
-            <span style={`width: ${creditSummary.utilization}%`}></span>
-          </div>
-        </div>
-      </div>
+      <ChartHost
+        renderer={renderWorkbenchBarChart}
+        args={[structureBars, "交易品种与授信使用率结构", "%", 100]}
+        ariaLabel="交易品种与授信使用率结构横向柱状图"
+        className="tr-chart-host tr-chart-host--compact"
+      />
     </section>
 
     <section class="tr-panel" aria-labelledby="coverage-title">
       <div class="tr-panel-heading">
         <div>
-          <h2 id="coverage-title">演示数据覆盖</h2>
+          <h2 id="coverage-title">数据覆盖</h2>
         </div>
         <span class="tr-status tr-status--success"><WorkbenchIcon name="check" />已校验</span>
       </div>

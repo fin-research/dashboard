@@ -27,7 +27,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 - `src/report-view.ts`、`src/primary-issues.ts`、`src/rows.ts` 将统一报告原始行派生为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
-- `/trading-research` 当前从 `src/lib/trading-research/demo-data.ts` 读取冻结演示数据，五个视图共享同一抽屉导航和数据口径；页面不读取 Excel、不访问数据库，也不产生流程写入。未来接入边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
+- `/trading-research` 当前从 `src/lib/trading-research/demo-data.ts` 读取冻结演示数据；总览、交易、授信、研究、流程、二级池和融资择时共享同一抽屉导航。二级池与融资择时复用原页面组件及既有数据链路，其余五个迁入视图不读取 Excel、不访问数据库，也不产生流程写入。未来接入边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 
 ## 服务端模块
 
@@ -59,7 +59,9 @@ quant pipeline → 本地结构化 JSON → Neon `financing_model.model_run` 追
 
 ### 交易研究工作台
 
-当前：迁入项目冻结快照 → `src/lib/trading-research/demo-data.ts` → `/trading-research` 五个只读视图。
+当前：迁入项目冻结快照 → `src/lib/trading-research/demo-data.ts` → `/trading-research` 五个只读业务视图；`/bond` 与 `/financing-model` 的同一页面组件同时装配到工作台子路径。
+
+工作台路由使用真实 path：`/trading-research`、`/trading-research/trading`、`/trading-research/credit`、`/trading-research/research`、`/trading-research/workflow`、`/trading-research/bond`、`/trading-research/financing-model`。不使用 `?view=`；原 `/bond`、`/financing-model` 保留。
 
 后续：业务数据库 → `api` 仓库 `/data/trading-research/*` → dashboard 浏览器。浏览器不得直连数据库；物理表和权限方案未确认前，不写入现有 `bond` 或 `financing_model` schema。
 

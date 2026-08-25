@@ -245,24 +245,6 @@
     box-sizing: border-box;
   }
 
-  :global(html) {
-    min-width: 0;
-    min-height: 100%;
-    background: #fffbf4;
-    color-scheme: light;
-  }
-
-  :global(body) {
-    min-width: 0;
-    min-height: 100%;
-    margin: 0;
-    background: #fffbf4;
-    color: #15243b;
-    font-family:
-      ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-      sans-serif;
-  }
-
   .home-page {
     --ink: #15243b;
     --background: #fffbf4;
@@ -369,13 +351,17 @@
 
   .tool-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 380px));
+    justify-content: center;
     gap: 24px;
   }
 
   .tool-card {
     position: relative;
     display: grid;
+    width: 100%;
+    min-width: 0;
+    max-width: 380px;
     min-height: 320px;
     grid-template-rows: auto 1fr auto;
     gap: 30px;
@@ -529,6 +515,7 @@
     font-weight: 780;
     line-height: 1.16;
     letter-spacing: -0.035em;
+    overflow-wrap: anywhere;
   }
 
   .tool-action {

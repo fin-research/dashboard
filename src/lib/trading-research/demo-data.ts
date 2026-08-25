@@ -3,7 +3,9 @@ export type WorkbenchViewId =
   | "trading"
   | "credit"
   | "research"
-  | "workflow";
+  | "workflow"
+  | "bond"
+  | "financing-model";
 
 export type WorkbenchIconName =
   | WorkbenchViewId
@@ -56,8 +58,22 @@ export const workbenchViews: Array<{
     id: "workflow",
     label: "流程中心",
     title: "流程中心",
-    context: "交易流程与授信周报流程的静态演示",
+    context: "交易流程与授信周报流程",
     icon: "workflow",
+  },
+  {
+    id: "bond",
+    label: "二级池周报",
+    title: "二级池周报",
+    context: "逐日收益、持仓结构与成交复盘",
+    icon: "bond",
+  },
+  {
+    id: "financing-model",
+    label: "融资择时模型",
+    title: "融资择时模型",
+    context: "融资成本、发行窗口与卖方观点",
+    icon: "financing-model",
   },
 ];
 
@@ -67,6 +83,12 @@ export function normalizeWorkbenchView(
   return workbenchViews.some((view) => view.id === value)
     ? (value as WorkbenchViewId)
     : "overview";
+}
+
+export function workbenchViewPath(view: WorkbenchViewId): string {
+  return view === "overview"
+    ? "/trading-research"
+    : `/trading-research/${view}`;
 }
 
 export const demoMeta = {

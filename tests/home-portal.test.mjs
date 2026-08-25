@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("首页提供六个业务入口并保持最小宽度自适应换行", async () => {
-  const page = await readFile(
-    new URL("../src/routes/+page.svelte", import.meta.url),
-    "utf8",
-  );
+test("首页提供六个业务入口并按卡片最大最小宽度自适应换行", async () => {
+  const [page, globalStyles] = await Promise.all([
+    readFile(new URL("../src/routes/+page.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
+  ]);
 
   assert.match(
     page,
@@ -19,7 +19,10 @@ test("首页提供六个业务入口并保持最小宽度自适应换行", async
   assert.equal((page.match(/class="tool-card /g) ?? []).length, 6);
   assert.match(
     page,
-    /grid-template-columns:\s*repeat\(auto-fill, minmax\(280px, 1fr\)\)/,
+    /grid-template-columns:\s*repeat\(auto-fit, minmax\(min\(100%, 280px\), 380px\)\)/,
   );
+  assert.match(page, /\.tool-card\s*\{[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*380px/);
+  assert.match(page, /\.tool-copy h2\s*\{[\s\S]*?overflow-wrap:\s*anywhere/);
   assert.doesNotMatch(page, /@media\s*\(max-width:\s*1080px\)/);
+  assert.match(globalStyles, /html\s*\{[\s\S]*?min-width:\s*0/);
 });

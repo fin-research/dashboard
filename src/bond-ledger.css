@@ -13,6 +13,25 @@
   background: var(--canvas);
 }
 
+.ledger-shell--embedded,
+.ledger-shell--embedded .ledger-report {
+  min-height: 0;
+}
+
+.ledger-shell--embedded .ledger-report {
+  padding: 0;
+}
+
+.ledger-shell--embedded .ledger-title-block {
+  display: none;
+}
+
+.ledger-shell--embedded .ledger-masthead {
+  min-height: 0;
+  justify-content: flex-end;
+  padding-top: 0;
+}
+
 .ledger-masthead {
   position: relative;
   z-index: 20;

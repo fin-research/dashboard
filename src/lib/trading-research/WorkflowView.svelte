@@ -7,7 +7,6 @@
   <section aria-labelledby="workflow-compose-title">
     <div class="tr-section-heading">
       <div><span class="tr-section-mark" aria-hidden="true"></span><h2 id="workflow-compose-title">新建流程</h2></div>
-      <span>静态演示 · 不提交、不写库</span>
     </div>
     <div class="tr-workflow-compose-grid">
       <article class="tr-workflow-composer">
@@ -23,7 +22,7 @@
           <label><span>业务编号</span><input readonly value="T20260807001" /></label>
           <label><span>标题</span><input readonly value="招商银行 7D 同业拆借" /></label>
         </div>
-        <div class="tr-form-footer"><small>创建后由交易员确认并提交投资经理复核</small><button type="button" disabled>静态演示</button></div>
+        <div class="tr-form-footer"><small>创建后由交易员确认并提交投资经理复核</small><button type="button" disabled>创建草稿</button></div>
       </article>
 
       <article class="tr-workflow-composer">
@@ -39,7 +38,7 @@
           <label><span>周报批次</span><input readonly value="CREDIT-20260821" /></label>
           <label><span>标题</span><input readonly value="授信周报（截至2026-08-21）" /></label>
         </div>
-        <div class="tr-form-footer"><small>主管通过后，授信专员可导出周报</small><button type="button" disabled>静态演示</button></div>
+        <div class="tr-form-footer"><small>主管通过后，授信专员可导出周报</small><button type="button" disabled>创建草稿</button></div>
       </article>
     </div>
   </section>
@@ -47,7 +46,7 @@
   <section class="tr-panel" aria-labelledby="workflow-list-title">
     <div class="tr-panel-heading">
       <div><h2 id="workflow-list-title">我的流程与待办复核</h2></div>
-      <span class="tr-badge tr-badge--info">{workflowDemos.length} 条演示任务</span>
+      <span class="tr-badge tr-badge--info">{workflowDemos.length} 条任务</span>
     </div>
     <div class="tr-workflow-list">
       {#each workflowDemos as workflow}
@@ -70,7 +69,7 @@
               </li>
             {/each}
           </ol>
-          <div class="tr-workflow-task__footer"><small>版本 1 · 静态演示</small><button type="button" disabled>流程动作待接入</button></div>
+          <div class="tr-workflow-task__footer"><small>版本 1</small><button type="button" disabled>查看任务</button></div>
         </article>
       {/each}
     </div>

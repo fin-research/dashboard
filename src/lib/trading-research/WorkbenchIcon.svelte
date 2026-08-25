@@ -21,6 +21,10 @@
   {:else if name === "workflow"}
     <rect x="5" y="3.5" width="14" height="17" rx="2.5" />
     <path d="M8.5 9h7M8.5 13h5M8.5 17h3" />
+  {:else if name === "bond"}
+    <path d="M4 4h16v16H4zM8 16v-4m4 4V8m4 8v-6" />
+  {:else if name === "financing-model"}
+    <path d="M4 19V9m5 10V5m5 14v-7m5 7V8M3 21h18" />
   {:else if name === "back"}
     <path d="m14.5 5-7 7 7 7" />
   {:else if name === "calendar"}

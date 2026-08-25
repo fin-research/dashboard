@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ChartHost from "../../components/ChartHost.svelte";
+  import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import MetricCard from "./MetricCard.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import { demoMeta, demoTrades, tradingSummary } from "./demo-data";
@@ -39,6 +41,19 @@
     .sort((left, right) => right.amount - left.amount)
     .slice(0, 5);
 
+  const productDistribution = [
+    {
+      label: "同业拆借",
+      value: tradingSummary.interbankAmount,
+      color: "#2f6fed",
+    },
+    {
+      label: "质押式回购",
+      value: tradingSummary.repoLendAmount,
+      color: "#f79009",
+    },
+  ];
+
   function productLabel(productName: string): string {
     return productName === "同业拆借" ? "同业拆借（纯信用）" : "拆出（质押式回购）";
   }
@@ -65,18 +80,12 @@
         <div><h2 id="product-structure-title">业务品种分布</h2></div>
         <span class="tr-badge tr-badge--neutral">按当日成交金额</span>
       </div>
-      <div class="tr-distribution-list">
-        <div>
-          <div><span>同业拆借（纯信用）</span><strong>{tradingSummary.interbankAmount.toFixed(1)} 亿元</strong></div>
-          <div class="tr-distribution-bar"><span style={`width: ${tradingSummary.interbankShare}%`}></span></div>
-          <small>{tradingSummary.interbankShare.toFixed(1)}%</small>
-        </div>
-        <div>
-          <div><span>拆出（质押式回购）</span><strong>{tradingSummary.repoLendAmount.toFixed(1)} 亿元</strong></div>
-          <div class="tr-distribution-bar tr-distribution-bar--orange"><span style={`width: ${100 - tradingSummary.interbankShare}%`}></span></div>
-          <small>{(100 - tradingSummary.interbankShare).toFixed(1)}%</small>
-        </div>
-      </div>
+      <ChartHost
+        renderer={renderWorkbenchBarChart}
+        args={[productDistribution, "按当日成交金额统计的业务品种分布", "亿元"]}
+        ariaLabel="按当日成交金额统计的业务品种分布横向柱状图"
+        className="tr-chart-host tr-chart-host--compact"
+      />
     </section>
 
     <section class="tr-panel" aria-labelledby="counterparty-title">
@@ -126,7 +135,7 @@
     </div>
     <div class="tr-table-scroll">
       <table class="tr-data-table">
-        <caption class="sr-only">交易研究工作台演示交易记录</caption>
+        <caption class="sr-only">交易研究工作台交易记录</caption>
         <thead>
           <tr><th>交易编号</th><th>时间</th><th>方向</th><th>业务类型</th><th>交易对手</th><th class="is-numeric">金额（亿元）</th><th>期限</th><th class="is-numeric">利率</th><th>质押券</th><th>状态</th></tr>
         </thead>

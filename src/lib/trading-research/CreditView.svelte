@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ChartHost from "../../components/ChartHost.svelte";
+  import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import MetricCard from "./MetricCard.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import {
@@ -27,6 +29,17 @@
       return matchesQuery && matchesRisk;
     });
   });
+
+  const highUtilizationLines = demoCreditLines.slice(0, 6).map((line) => ({
+    label: line.bank,
+    value: line.utilization,
+    color:
+      line.utilization >= 80
+        ? "#d92d20"
+        : line.utilization >= 60
+          ? "#f79009"
+          : "#2f6fed",
+  }));
 
   function utilizationTone(value: number): string {
     if (value >= 80) return "danger";
@@ -67,24 +80,14 @@
     <section class="tr-panel" aria-labelledby="credit-risk-title">
       <div class="tr-panel-heading">
         <div><h2 id="credit-risk-title">高使用率机构</h2></div>
-        <span class="tr-badge tr-badge--neutral">风险优先样例 · 12/120</span>
+        <span class="tr-badge tr-badge--neutral">高使用率优先 · 6/120</span>
       </div>
-      <div class="tr-usage-list">
-        {#each demoCreditLines.slice(0, 6) as line}
-          <div>
-            <div><span>{line.bank}</span><strong>{line.utilization.toFixed(1)}%</strong></div>
-            <div class="tr-usage-track" aria-label={`${line.bank}授信使用率 ${line.utilization.toFixed(1)}%`}>
-              <span class={`tr-usage-fill tr-usage-fill--${utilizationTone(line.utilization)}`} style={`width: ${line.utilization}%`}></span>
-              <i class="tr-threshold tr-threshold--attention" aria-hidden="true"></i>
-              <i class="tr-threshold tr-threshold--warning" aria-hidden="true"></i>
-            </div>
-          </div>
-        {/each}
-        <div class="tr-threshold-legend" aria-label="使用率阈值">
-          <span><i class="is-attention"></i>60% 关注</span>
-          <span><i class="is-warning"></i>80% 预警</span>
-        </div>
-      </div>
+      <ChartHost
+        renderer={renderWorkbenchBarChart}
+        args={[highUtilizationLines, "高使用率机构及百分之六十和百分之八十阈值", "%", 100, [60, 80]]}
+        ariaLabel="高使用率机构授信使用率横向柱状图，标注60%关注线和80%预警线"
+        className="tr-chart-host tr-chart-host--credit"
+      />
     </section>
 
     <section class="tr-panel" aria-labelledby="credit-alert-title">
@@ -125,7 +128,7 @@
     </div>
     <div class="tr-table-scroll">
       <table class="tr-data-table">
-        <caption class="sr-only">授信风险优先样例明细</caption>
+        <caption class="sr-only">授信明细</caption>
         <thead><tr><th>机构</th><th>性质</th><th>授信类型</th><th class="is-numeric">总额度</th><th class="is-numeric">已使用</th><th class="is-numeric">可用</th><th class="is-numeric">使用率</th><th>到期日</th></tr></thead>
         <tbody>
           {#each filteredLines as line (line.bank)}
@@ -149,6 +152,6 @@
 
   <section class="tr-empty-panel" aria-labelledby="credit-history-title">
     <WorkbenchIcon name="database" />
-    <div><h2 id="credit-history-title">暂无可核验的历史授信序列</h2><p>源工作簿只提供当前快照，接入数据库后再展示近12个月额度趋势。</p></div>
+    <div><h2 id="credit-history-title">暂无可核验的历史授信序列</h2></div>
   </section>
 </div>

@@ -453,24 +453,6 @@
     box-sizing: border-box;
   }
 
-  :global(html) {
-    min-width: 0;
-    min-height: 100%;
-    background: #071426;
-    color-scheme: dark;
-  }
-
-  :global(body) {
-    min-width: 0;
-    min-height: 100%;
-    margin: 0;
-    overflow: hidden;
-    background: #071426;
-    font-family:
-      ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-      sans-serif;
-  }
-
   :global(button),
   :global(input) {
     font: inherit;
@@ -481,9 +463,10 @@
     --muted: #91a6c5;
     --line: rgba(151, 177, 214, 0.2);
     --surface: rgba(11, 31, 56, 0.82);
-    position: relative;
-    width: 100vw;
-    height: 100dvh;
+    position: fixed;
+    inset: 0;
+    width: auto;
+    height: auto;
     min-height: 600px;
     overflow: hidden;
     color: var(--ink);
