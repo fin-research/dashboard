@@ -1,8 +1,15 @@
+function rootStyle(): CSSStyleDeclaration | null {
+  if (
+    typeof document === "undefined" ||
+    typeof getComputedStyle === "undefined"
+  ) {
+    return null;
+  }
+  return getComputedStyle(document.documentElement);
+}
+
 function cssColor(name: string, fallback: string): string {
-  return (
-    getComputedStyle(document.documentElement).getPropertyValue(name).trim() ||
-    fallback
-  );
+  return rootStyle()?.getPropertyValue(name).trim() || fallback;
 }
 
 export const colors = {
@@ -28,20 +35,16 @@ export const colors = {
 } as const;
 
 export const fontFamily =
-  getComputedStyle(document.documentElement).getPropertyValue("--font").trim() ||
+  rootStyle()?.getPropertyValue("--font").trim() ||
   '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
 
 export function rem(value: number): number {
-  const rootSize = Number.parseFloat(
-    getComputedStyle(document.documentElement).fontSize,
-  );
+  const rootSize = Number.parseFloat(rootStyle()?.fontSize ?? "");
   return value * (Number.isFinite(rootSize) ? rootSize : 16);
 }
 
 const configuredChartTextSize = Number.parseFloat(
-  getComputedStyle(document.documentElement).getPropertyValue(
-    "--chart-font-size",
-  ),
+  rootStyle()?.getPropertyValue("--chart-font-size") ?? "",
 );
 export const chartTextSize = Number.isFinite(configuredChartTextSize)
   ? configuredChartTextSize

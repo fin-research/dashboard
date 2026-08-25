@@ -40,15 +40,23 @@ type ChartInstance = ReturnType<typeof echarts.init>;
 export type ChartOption = Parameters<ChartInstance["setOption"]>[0];
 
 const instances = new Map<HTMLElement, ChartInstance>();
-const resizeObserver = new ResizeObserver((entries) => {
-  for (const entry of entries) {
-    const host = entry.target as HTMLElement;
-    const chart = instances.get(host);
-    if (!chart) continue;
-    chart.resize();
-    setChartBounds(host, chart);
-  }
-});
+let resizeObserver: ResizeObserver | null = null;
+
+function getResizeObserver(): ResizeObserver | null {
+  if (resizeObserver) return resizeObserver;
+  if (typeof ResizeObserver === "undefined") return null;
+
+  resizeObserver = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const host = entry.target as HTMLElement;
+      const chart = instances.get(host);
+      if (!chart) continue;
+      chart.resize();
+      setChartBounds(host, chart);
+    }
+  });
+  return resizeObserver;
+}
 
 export function setChart(host: HTMLElement, option: ChartOption): void {
   let chart = instances.get(host);
@@ -56,7 +64,7 @@ export function setChart(host: HTMLElement, option: ChartOption): void {
     host.replaceChildren();
     chart = echarts.init(host, undefined, { renderer: "svg" });
     instances.set(host, chart);
-    resizeObserver.observe(host);
+    getResizeObserver()?.observe(host);
   }
   const reduceMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
@@ -137,7 +145,7 @@ export function setEmpty(host: HTMLElement, message: string): void {
 export function disposeChart(host: HTMLElement): void {
   const chart = instances.get(host);
   if (!chart) return;
-  resizeObserver.unobserve(host);
+  resizeObserver?.unobserve(host);
   chart.dispose();
   instances.delete(host);
 }
