@@ -27,12 +27,18 @@ function responsesOutput(value, status = "completed") {
     id: "resp-test",
     object: "response",
     status,
-    store: true,
     prompt_cache_key: "probe:v1",
     usage: {
       input_tokens_details: { cached_tokens: 1_024, cache_write_tokens: 0 },
     },
     output: [
+      {
+        type: "reasoning",
+        summary: [
+          { type: "summary_text", text: "Reviewed the available evidence." },
+        ],
+        encrypted_content: "encrypted-reasoning",
+      },
       {
         type: "message",
         role: "assistant",
@@ -99,10 +105,9 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
   });
   assert.deepEqual(JSON.parse(calls[0].init.body), {
     model: "gpt-5.6-luna",
-    store: true,
     prompt_cache_key: "probe:v1",
     instructions: "system",
-    reasoning: { effort: "low" },
+    reasoning: { effort: "low", summary: "auto" },
     text: {
       format: {
         type: "json_schema",
@@ -121,11 +126,12 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
   assert.match(logs[0], /"provider":"custom-opencode"/);
   assert.match(logs[0], /"task_type":"summary"/);
   assert.match(logs[0], /"reasoning_effort":"low"/);
-  assert.match(logs[0], /"requested_store":true/);
-  assert.match(logs[0], /"response_store":true/);
+  assert.match(logs[0], /"requested_reasoning_summary":"auto"/);
+  assert.match(logs[0], /"reasoning_summary_count":1/);
+  assert.match(logs[0], /"reasoning_summary_text_length":32/);
   assert.match(logs[0], /"prompt_cache_key":"probe:v1"/);
   assert.match(logs[0], /"cached_input_tokens":1024/);
-  assert.match(logs[0], /"encrypted_reasoning_present":false/);
+  assert.match(logs[0], /"encrypted_reasoning_present":true/);
 });
 
 test("reasoning effort is fixed by task type", () => {
