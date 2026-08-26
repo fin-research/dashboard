@@ -37,7 +37,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。
 - `src/lib/server/market-briefing.ts` 从 `/data/market-briefing/news` 取材并生成今日聚焦。
-- `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器。
+- `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器，使用 provider-specific Responses API 固定执行 `custom-opencode` → `custom-codex` 顺序 fallback。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。

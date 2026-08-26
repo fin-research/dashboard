@@ -48,9 +48,11 @@ test("系统提示完整包含 market-briefing skill 的输出规范", () => {
   assert.match(MARKET_BRIEFING_SYSTEM, /## 输出前自检/);
 });
 
-test("生成流程从后端取数并通过 binding 调用 Responses 结构化输出", async () => {
+test("生成流程从后端取数并直连 provider-specific Responses 结构化输出", async () => {
   const originalFetch = globalThis.fetch;
+  const originalLog = console.log;
   const aiCalls = [];
+  console.log = () => {};
   globalThis.fetch = async (url, init) => {
     const target = String(url);
     if (target.includes("/data/market-briefing/news")) {
@@ -68,41 +70,37 @@ test("生成流程从后端取数并通过 binding 调用 Responses 结构化输
         { status: 200, headers: { "content-type": "application/json" } },
       );
     }
+    if (target.includes("/custom-opencode/responses")) {
+      aiCalls.push({ url: target, init });
+      return Response.json(
+        {
+          id: "resp-briefing",
+          object: "response",
+          status: "completed",
+          output: [
+            {
+              type: "message",
+              role: "assistant",
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    content: "1、股市结论。\n2、债市结论。",
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+        { headers: { "cf-aig-log-id": "log-briefing" } },
+      );
+    }
     throw new Error(`unexpected HTTP request: ${target}`);
   };
-  const ai = {
-    aiGatewayLogId: null,
-    gateway(gatewayId) {
-      return {
-        async run(request, options) {
-          aiCalls.push({ gatewayId, request, options });
-          ai.aiGatewayLogId = "log-briefing";
-          return Response.json({
-            id: "resp-briefing",
-            object: "response",
-            status: "completed",
-            output: [
-              {
-                type: "message",
-                role: "assistant",
-                content: [
-                  {
-                    type: "output_text",
-                    text: JSON.stringify({
-                      content: "1、股市结论。\n2、债市结论。",
-                    }),
-                  },
-                ],
-              },
-            ],
-          });
-        },
-      };
-    },
-  };
   const env = {
-    AI: ai,
+    CLOUDFLARE_ACCOUNT_ID: "account-id",
     AI_GATEWAY_ID: "default",
+    CF_AIG_TOKEN: "test-token",
     DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
   };
   try {
@@ -112,31 +110,36 @@ test("生成流程从后端取数并通过 binding 调用 Responses 结构化输
       content: "1、股市结论。\n2、债市结论。",
       news_count: 2,
     });
-    assert.equal(aiCalls[0].gatewayId, "default");
-    assert.equal(aiCalls[0].request.provider, "custom-opencode");
-    assert.equal(aiCalls[0].request.endpoint, "responses");
-    assert.equal(aiCalls[0].request.query.model, "gpt-5.6-luna");
-    assert.equal(aiCalls[0].request.query.reasoning.effort, "high");
-    assert.equal(aiCalls[0].request.query.text.format.type, "json_schema");
-    assert.equal(aiCalls[0].request.query.text.format.name, "market_briefing");
-    assert.equal(aiCalls[0].request.query.text.format.strict, true);
-    assert.deepEqual(aiCalls[0].request.query.text.format.schema.required, ["content"]);
-    assert.deepEqual(aiCalls[0].options.gateway.metadata, {
+    assert.equal(
+      aiCalls[0].url,
+      "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-opencode/responses",
+    );
+    const headers = new Headers(aiCalls[0].init.headers);
+    assert.equal(headers.get("cf-aig-authorization"), "Bearer test-token");
+    assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
       report_date: "2026-08-10",
       prompt_version: "market-briefing-v4-responses-schema",
       ai_model: "gpt-5.6-luna",
       ai_provider: "custom-opencode",
       ai_provider_attempt: "primary",
     });
-    assert.ok(aiCalls[0].options.signal instanceof AbortSignal);
-    assert.match(aiCalls[0].request.query.instructions, /^---\nname: market-briefing/);
-    assert.match(aiCalls[0].request.query.instructions, /响应 JSON 的 content 字段/);
+    const query = JSON.parse(aiCalls[0].init.body);
+    assert.equal(query.model, "gpt-5.6-luna");
+    assert.equal(query.reasoning.effort, "high");
+    assert.equal(query.text.format.type, "json_schema");
+    assert.equal(query.text.format.name, "market_briefing");
+    assert.equal(query.text.format.strict, true);
+    assert.deepEqual(query.text.format.schema.required, ["content"]);
+    assert.ok(aiCalls[0].init.signal instanceof AbortSignal);
+    assert.match(query.instructions, /^---\nname: market-briefing/);
+    assert.match(query.instructions, /响应 JSON 的 content 字段/);
     assert.match(
-      aiCalls[0].request.query.input[0].content,
+      query.input[0].content,
       /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
     );
-    assert.match(aiCalls[0].request.query.input[0].content, /【1】股市收盘正文/);
+    assert.match(query.input[0].content, /【1】股市收盘正文/);
   } finally {
     globalThis.fetch = originalFetch;
+    console.log = originalLog;
   }
 });

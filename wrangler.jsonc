@@ -5,11 +5,12 @@
   "compatibility_date": "2026-08-20",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "CLOUDFLARE_ACCOUNT_ID": "5cecc63c78acf8f5473f8745f4244448",
     "AI_GATEWAY_ID": "default",
     "DATA_API_BASE_URL": "https://eastmoney.hasbai.xyz/data"
   },
-  "ai": {
-    "binding": "AI"
+  "secrets": {
+    "required": ["CF_AIG_TOKEN"]
   },
   "assets": {
     "binding": "ASSETS",

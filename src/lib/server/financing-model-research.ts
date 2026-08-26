@@ -8,7 +8,7 @@ import {
 import {
   AI_GATEWAY_MODEL,
   generateAiGatewayObject,
-  type AiGatewayBinding,
+  type AiGatewayCredentials,
 } from "./ai-gateway.ts";
 
 const AI_SEARCH_MCP_URL = "https://search.hasbai.xyz/mcp";
@@ -76,8 +76,7 @@ export class FinancingModelResearchError extends Error {
 
 export async function generateFinancingModelResearch(
   snapshot: FinancingModelSnapshot,
-  ai: AiGatewayBinding,
-  gatewayId: string,
+  credentials: AiGatewayCredentials,
   fetcher: typeof fetch = fetch,
 ): Promise<SellSidePayload> {
   const period = aiSearchPeriod(snapshot.as_of_date);
@@ -110,8 +109,7 @@ export async function generateFinancingModelResearch(
   }
 
   const analysis = await generateAiGatewayObject(
-    ai,
-    gatewayId,
+    credentials,
     researchMessages(snapshot, documents),
     researchOutputSchema,
     "financing_model_sell_side",

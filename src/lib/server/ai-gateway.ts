@@ -7,30 +7,10 @@ export const AI_GATEWAY_MODEL = "gpt-5.6-luna" as const;
 export const AI_GATEWAY_PRIMARY_PROVIDER = "custom-opencode" as const;
 export const AI_GATEWAY_FALLBACK_PROVIDER = "custom-codex" as const;
 
-export interface AiGatewayRunRequest {
-  provider: string;
-  endpoint: string;
-  headers: Record<string, never>;
-  query: unknown;
-}
-
-export interface AiGatewayRunOptions {
-  gateway: {
-    id: string;
-    skipCache: boolean;
-    collectLog: boolean;
-    requestTimeoutMs: number;
-    retries: { maxAttempts: 1 };
-    metadata: Record<string, string | number | boolean>;
-  };
-  signal: AbortSignal;
-}
-
-export interface AiGatewayBinding {
-  aiGatewayLogId: string | null;
-  gateway(gatewayId: string): {
-    run(request: AiGatewayRunRequest, options: AiGatewayRunOptions): Promise<Response>;
-  };
+export interface AiGatewayCredentials {
+  accountId: string;
+  gatewayId: string;
+  token: string;
 }
 
 export interface AiGatewayMessage {
@@ -87,7 +67,17 @@ export class AiGatewayFallbackError extends Error {
   readonly failures: readonly AiGatewayAttemptFailure[];
 
   constructor(failures: readonly AiGatewayAttemptFailure[]) {
-    super(`AI Gateway providers failed: ${failures.map((failure) => failure.provider).join(", ")}`);
+    super(
+      "AI Gateway providers failed: " +
+        failures
+          .map(
+            (failure) =>
+              failure.provider +
+              (failure.status === null ? "" : ` HTTP ${failure.status}`) +
+              (failure.gatewayLogId ? ` log ${failure.gatewayLogId}` : ""),
+          )
+          .join("; "),
+    );
     this.name = "AiGatewayFallbackError";
     this.failures = failures;
   }
@@ -119,21 +109,21 @@ const responseEnvelopeSchema = z
   .passthrough();
 
 export async function generateAiGatewayObject<OUTPUT>(
-  ai: AiGatewayBinding,
-  gatewayId: string,
+  credentials: AiGatewayCredentials,
   messages: AiGatewayMessage[],
   schema: z.ZodType<OUTPUT>,
   schemaName: string,
   options: AiGatewayOptions,
+  fetcher: typeof fetch = fetch,
 ): Promise<OUTPUT> {
-  const normalizedGatewayId = requiredConfig("gateway ID", gatewayId);
+  const normalizedCredentials = validateCredentials(credentials);
   const normalizedSchemaName = requiredConfig("schema name", schemaName);
   validateRequestTimeout(options.requestTimeoutMs);
   const requestSchema = z.toJSONSchema(schema);
   delete requestSchema.$schema;
+
   const primary = await attemptProvider(
-    ai,
-    normalizedGatewayId,
+    normalizedCredentials,
     AI_GATEWAY_PRIMARY_PROVIDER,
     "primary",
     messages,
@@ -141,6 +131,7 @@ export async function generateAiGatewayObject<OUTPUT>(
     requestSchema,
     normalizedSchemaName,
     options,
+    fetcher,
   );
   if (primary.ok) return primary.value;
   if (!primary.error.retryable) throw primary.error;
@@ -156,8 +147,7 @@ export async function generateAiGatewayObject<OUTPUT>(
   );
 
   const fallback = await attemptProvider(
-    ai,
-    normalizedGatewayId,
+    normalizedCredentials,
     AI_GATEWAY_FALLBACK_PROVIDER,
     "fallback",
     messages,
@@ -165,6 +155,7 @@ export async function generateAiGatewayObject<OUTPUT>(
     requestSchema,
     normalizedSchemaName,
     options,
+    fetcher,
   );
   if (fallback.ok) return fallback.value;
   throw new AiGatewayFallbackError([
@@ -174,8 +165,7 @@ export async function generateAiGatewayObject<OUTPUT>(
 }
 
 async function attemptProvider<OUTPUT>(
-  ai: AiGatewayBinding,
-  gatewayId: string,
+  credentials: AiGatewayCredentials,
   provider: string,
   attempt: "primary" | "fallback",
   messages: AiGatewayMessage[],
@@ -183,6 +173,7 @@ async function attemptProvider<OUTPUT>(
   requestSchema: unknown,
   schemaName: string,
   options: AiGatewayOptions,
+  fetcher: typeof fetch,
 ): Promise<
   | { ok: true; value: OUTPUT }
   | { ok: false; error: AiGatewayResponseError }
@@ -191,8 +182,7 @@ async function attemptProvider<OUTPUT>(
     return {
       ok: true,
       value: await runProvider(
-        ai,
-        gatewayId,
+        credentials,
         provider,
         attempt,
         messages,
@@ -200,6 +190,7 @@ async function attemptProvider<OUTPUT>(
         requestSchema,
         schemaName,
         options,
+        fetcher,
       ),
     };
   } catch (error) {
@@ -211,7 +202,7 @@ async function attemptProvider<OUTPUT>(
           : new AiGatewayResponseError({
               provider,
               status: null,
-              gatewayLogId: ai.aiGatewayLogId ?? "",
+              gatewayLogId: "",
               retryable: true,
               message: error instanceof Error ? error.message : String(error),
             }),
@@ -220,8 +211,7 @@ async function attemptProvider<OUTPUT>(
 }
 
 async function runProvider<OUTPUT>(
-  ai: AiGatewayBinding,
-  gatewayId: string,
+  credentials: AiGatewayCredentials,
   provider: string,
   attempt: "primary" | "fallback",
   messages: AiGatewayMessage[],
@@ -229,63 +219,58 @@ async function runProvider<OUTPUT>(
   requestSchema: unknown,
   schemaName: string,
   options: AiGatewayOptions,
+  fetcher: typeof fetch,
 ): Promise<OUTPUT> {
   const prompt = splitInstructions(messages);
-  const signal = AbortSignal.timeout(options.requestTimeoutMs + 5_000);
-  const previousGatewayLogId = ai.aiGatewayLogId;
+  const url =
+    `https://gateway.ai.cloudflare.com/v1/${encodeURIComponent(credentials.accountId)}/` +
+    `${encodeURIComponent(credentials.gatewayId)}/${encodeURIComponent(provider)}/responses`;
+  const metadata = {
+    ...options.metadata,
+    ai_model: AI_GATEWAY_MODEL,
+    ai_provider: provider,
+    ai_provider_attempt: attempt,
+  };
+
   let response: Response;
   try {
-    response = await ai.gateway(gatewayId).run(
-      {
-        provider,
-        endpoint: "responses",
-        headers: {},
-        query: {
-          model: AI_GATEWAY_MODEL,
-          ...(prompt.instructions ? { instructions: prompt.instructions } : {}),
-          input: prompt.input,
-          reasoning: { effort: options.reasoningEffort },
-          text: {
-            format: {
-              type: "json_schema",
-              name: schemaName,
-              strict: true,
-              schema: requestSchema,
-            },
+    response = await fetcher(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "cf-aig-authorization": `Bearer ${credentials.token}`,
+        "cf-aig-skip-cache": "true",
+        "cf-aig-collect-log": "true",
+        "cf-aig-request-timeout": String(options.requestTimeoutMs),
+        "cf-aig-metadata": JSON.stringify(metadata),
+      },
+      body: JSON.stringify({
+        model: AI_GATEWAY_MODEL,
+        ...(prompt.instructions ? { instructions: prompt.instructions } : {}),
+        input: prompt.input,
+        reasoning: { effort: options.reasoningEffort },
+        text: {
+          format: {
+            type: "json_schema",
+            name: schemaName,
+            strict: true,
+            schema: requestSchema,
           },
         },
-      },
-      {
-        gateway: {
-          id: gatewayId,
-          skipCache: true,
-          collectLog: true,
-          requestTimeoutMs: options.requestTimeoutMs,
-          retries: { maxAttempts: 1 },
-          metadata: {
-            ...options.metadata,
-            ai_model: AI_GATEWAY_MODEL,
-            ai_provider: provider,
-            ai_provider_attempt: attempt,
-          },
-        },
-        signal,
-      },
-    );
+      }),
+      signal: AbortSignal.timeout(options.requestTimeoutMs + 5_000),
+    });
   } catch (error) {
     throw new AiGatewayResponseError({
       provider,
       status: null,
-      gatewayLogId: changedGatewayLogId(ai, previousGatewayLogId),
+      gatewayLogId: "",
       retryable: true,
       message: error instanceof Error ? error.message : String(error),
     });
   }
 
-  const gatewayLogId =
-    changedGatewayLogId(ai, previousGatewayLogId) ||
-    response.headers.get("cf-aig-log-id") ||
-    "";
+  const gatewayLogId = response.headers.get("cf-aig-log-id") ?? "";
   let responseText: string;
   try {
     responseText = await readTextBounded(response, MAX_AI_GATEWAY_RESPONSE_BYTES);
@@ -305,7 +290,7 @@ async function runProvider<OUTPUT>(
       gatewayLogId,
       retryable:
         response.status === 408 || response.status === 429 || response.status >= 500,
-      message: responseText.trim() || "empty error response",
+      message: summarizeErrorResponse(responseText),
     });
   }
 
@@ -321,7 +306,7 @@ async function runProvider<OUTPUT>(
       provider,
       response.status,
       gatewayLogId,
-      `invalid Responses envelope: ${z.prettifyError(envelope.error)}`,
+      `invalid Responses envelope: ${schemaErrorSummary(envelope.error)}`,
     );
   }
   if (envelope.data.status !== "completed") {
@@ -348,9 +333,19 @@ async function runProvider<OUTPUT>(
       provider,
       response.status,
       gatewayLogId,
-      `output failed business schema: ${z.prettifyError(validated.error)}`,
+      `output failed business schema: ${schemaErrorSummary(validated.error)}`,
     );
   }
+  console.log(
+    JSON.stringify({
+      event: "ai_gateway_provider_succeeded",
+      provider,
+      provider_attempt: attempt,
+      model: AI_GATEWAY_MODEL,
+      status: response.status,
+      gateway_log_id: gatewayLogId,
+    }),
+  );
   return validated.data;
 }
 
@@ -399,8 +394,40 @@ function outputError(
   });
 }
 
+function summarizeErrorResponse(text: string): string {
+  if (!text.trim()) return "empty error response";
+  try {
+    const payload = JSON.parse(text) as unknown;
+    if (!isObject(payload)) return "non-success response";
+    const error = payload.error;
+    if (typeof error === "string") return error.slice(0, 500);
+    if (isObject(error) && typeof error.message === "string") {
+      return error.message.slice(0, 500);
+    }
+    if (typeof payload.message === "string") return payload.message.slice(0, 500);
+  } catch {
+    return "non-JSON error response";
+  }
+  return "non-success response";
+}
+
+function schemaErrorSummary(error: z.ZodError): string {
+  return error.issues
+    .slice(0, 10)
+    .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
+    .join("; ");
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function validateCredentials(credentials: AiGatewayCredentials): AiGatewayCredentials {
+  return {
+    accountId: requiredConfig("account ID", credentials.accountId),
+    gatewayId: requiredConfig("gateway ID", credentials.gatewayId),
+    token: requiredConfig("authentication token", credentials.token),
+  };
 }
 
 function requiredConfig(label: string, value: string): string {
@@ -419,15 +446,6 @@ function validateRequestTimeout(value: number): void {
       `AI Gateway request timeout must be an integer between 1 and ${MAX_AI_GATEWAY_TIMEOUT_MS}`,
     );
   }
-}
-
-function changedGatewayLogId(
-  ai: AiGatewayBinding,
-  previousGatewayLogId: string | null,
-): string {
-  return ai.aiGatewayLogId && ai.aiGatewayLogId !== previousGatewayLogId
-    ? ai.aiGatewayLogId
-    : "";
 }
 
 async function readTextBounded(response: Response, maxBytes: number): Promise<string> {

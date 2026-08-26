@@ -208,8 +208,11 @@ export async function generateMarketBriefing(
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
   const output = await generateAiGatewayObject(
-    env.AI,
-    env.AI_GATEWAY_ID || "default",
+    {
+      accountId: env.CLOUDFLARE_ACCOUNT_ID,
+      gatewayId: env.AI_GATEWAY_ID || "default",
+      token: env.CF_AIG_TOKEN,
+    },
     [
       { role: "system", content: MARKET_BRIEFING_SYSTEM },
       { role: "system", content: MARKET_BRIEFING_TRANSPORT_INSTRUCTION },

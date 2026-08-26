@@ -16,5 +16,11 @@
     "noUncheckedIndexedAccess": true,
     "allowJs": true,
     "checkJs": true
-  }
+  },
+  "exclude": [
+    ".svelte-kit/output/**",
+    ".svelte-kit/cloudflare/**",
+    ".svelte-kit/cloudflare-tmp/**",
+    "worker/**/*.ts"
+  ]
 }

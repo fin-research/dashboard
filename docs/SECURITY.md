@@ -2,8 +2,8 @@
 
 ## Secret 与配置
 
-- 生成式 AI 只通过 Worker `AI` binding 进入 AI Gateway；Provider 密钥由 Gateway BYOK 的 `default` alias 管理，业务代码不读取 AI Gateway token、Cloudflare Account ID 或上游 API Key。
-- `AI_GATEWAY_ID` 和数据服务基址是非敏感配置，但仍应通过 Worker/Vite 配置读取。
+- 生成式 AI 只通过 `src/lib/server/ai-gateway.ts` 的固定 provider-specific URL 进入 AI Gateway；优先 `custom-opencode/responses`，可重试失败时回退 `custom-codex/responses`，不得使用会进入 Universal 适配层的 AI binding `run()`。Provider 密钥由 Gateway BYOK 的 `default` alias 管理，业务代码不读取上游 API Key。
+- `CF_AIG_TOKEN` 只通过 Worker Secret 注入；`CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID` 和数据服务基址是非敏感配置，但仍应通过 Worker/Vite 配置读取。
 - Neon 直连 `DATABASE_URL` 只供本地 migration 与回填脚本使用；本地 `pnpm dev` 通过未跟踪的 `.env.local` 注入 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`，生产 Worker 仍只读取 `HYPERDRIVE.connectionString`。
 - quant 在本机使用 `DATABASE_URL` 追加融资择时模型快照；连接串不得经 dashboard 页面或 API 暴露。
 - Neon 开发直连从 `.env.local.example` 创建未跟踪的 `.env.local`。不要提交该文件。
@@ -28,5 +28,5 @@
 ## 数据与日志
 
 - D1 不保存文章正文；热点只读取结构化摘要和关键词。
-- 日志记录事件、状态、范围和可公开错误，不记录 token、连接串、完整文章正文或 Excel 内容。
+- 日志记录事件、状态、范围、Provider 尝试次序和 Gateway log ID，不记录 token、连接串、完整 AI 输入输出、完整文章正文或 Excel 内容。
 - 对外 5xx 使用稳定的公开错误文案；详细堆栈只进入服务端日志。
