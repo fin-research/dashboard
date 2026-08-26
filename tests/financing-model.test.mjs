@@ -114,7 +114,7 @@ function sellSidePayload() {
     searchQuery: "债券市场",
     maxResults: 50,
     sourceDocuments: 8,
-    modelName: "dynamic/rag",
+    modelName: "gpt-5.6-luna",
     crossValidation: {
       alignment: "mixed",
       summary: "资金面判断一致，长端方向存在分歧。",

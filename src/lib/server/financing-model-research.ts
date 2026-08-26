@@ -6,9 +6,9 @@ import {
   type SellSidePayload,
 } from "../financing-model.ts";
 import {
-  DYNAMIC_ROUTE_MODEL,
-  generateDynamicRouteObject,
-  type AiGatewayCredentials,
+  AI_GATEWAY_MODEL,
+  generateAiGatewayObject,
+  type AiGatewayBinding,
 } from "./ai-gateway.ts";
 
 const AI_SEARCH_MCP_URL = "https://search.hasbai.xyz/mcp";
@@ -76,7 +76,8 @@ export class FinancingModelResearchError extends Error {
 
 export async function generateFinancingModelResearch(
   snapshot: FinancingModelSnapshot,
-  credentials: AiGatewayCredentials,
+  ai: AiGatewayBinding,
+  gatewayId: string,
   fetcher: typeof fetch = fetch,
 ): Promise<SellSidePayload> {
   const period = aiSearchPeriod(snapshot.as_of_date);
@@ -108,8 +109,9 @@ export async function generateFinancingModelResearch(
     );
   }
 
-  const analysis = await generateDynamicRouteObject(
-    credentials,
+  const analysis = await generateAiGatewayObject(
+    ai,
+    gatewayId,
     researchMessages(snapshot, documents),
     researchOutputSchema,
     "financing_model_sell_side",
@@ -121,11 +123,8 @@ export async function generateFinancingModelResearch(
         period_end: period.endDate,
       },
       requestTimeoutMs: 300_000,
-      maxRetries: 0,
       reasoningEffort: "high",
-      enableThinking: true,
     },
-    fetcher,
   );
   const views = resolveResearchViews(analysis, documents);
   return sellSidePayloadSchema.parse({
@@ -135,7 +134,7 @@ export async function generateFinancingModelResearch(
     searchQuery,
     maxResults: AI_SEARCH_MAX_RESULTS,
     sourceDocuments: documents.length,
-    modelName: DYNAMIC_ROUTE_MODEL,
+    modelName: AI_GATEWAY_MODEL,
     crossValidation: analysis.crossValidation,
     views,
   });

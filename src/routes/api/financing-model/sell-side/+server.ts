@@ -20,8 +20,8 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
     validateSameOrigin(request);
     const { runId } = requestSchema.parse(await request.json());
     const env = platform?.env;
-    if (!env?.CLOUDFLARE_ACCOUNT_ID || !env.CF_AIG_TOKEN) {
-      throw new FinancingModelResearchError(503, "AI Gateway 认证未配置");
+    if (!env?.AI) {
+      throw new FinancingModelResearchError(503, "AI Gateway binding 未配置");
     }
     const report = await withPostgres(
       env.HYPERDRIVE?.connectionString,
@@ -30,11 +30,8 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
     );
     const research = await generateFinancingModelResearch(
       report.snapshot,
-      {
-        accountId: env.CLOUDFLARE_ACCOUNT_ID,
-        gatewayId: env.AI_GATEWAY_ID || "default",
-        token: env.CF_AIG_TOKEN,
-      },
+      env.AI,
+      env.AI_GATEWAY_ID || "default",
     );
     const saved = await withPostgres(
       env.HYPERDRIVE?.connectionString,

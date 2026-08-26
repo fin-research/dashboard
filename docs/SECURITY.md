@@ -2,15 +2,15 @@
 
 ## Secret 与配置
 
-- `CF_AIG_TOKEN` 只通过 Worker Secret 注入，禁止写入源码、`wrangler.jsonc`、`.env.dev`、日志或文档。
-- `CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID` 和数据服务基址是非敏感配置，但仍应通过 Worker/Vite 配置读取。
+- 生成式 AI 只通过 Worker `AI` binding 进入 AI Gateway；Provider 密钥由 Gateway BYOK 的 `default` alias 管理，业务代码不读取 AI Gateway token、Cloudflare Account ID 或上游 API Key。
+- `AI_GATEWAY_ID` 和数据服务基址是非敏感配置，但仍应通过 Worker/Vite 配置读取。
 - Neon 直连 `DATABASE_URL` 只供本地 migration 与回填脚本使用；本地 `pnpm dev` 通过未跟踪的 `.env.local` 注入 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`，生产 Worker 仍只读取 `HYPERDRIVE.connectionString`。
 - quant 在本机使用 `DATABASE_URL` 追加融资择时模型快照；连接串不得经 dashboard 页面或 API 暴露。
-- 本地需要调用模型时从 `.dev.vars.example` 创建未跟踪的 `.dev.vars`；Neon 开发直连从 `.env.local.example` 创建未跟踪的 `.env.local`。不要提交这两个文件。
+- Neon 开发直连从 `.env.local.example` 创建未跟踪的 `.env.local`。不要提交该文件。
 
 ## 客户端与服务端边界
 
-- 浏览器不得取得 AI token、数据库连接字符串、D1/R2 binding 或完整二级池 Excel 数据缓存。
+- 浏览器不得取得 Provider 密钥、数据库连接字符串、D1/R2 binding 或完整二级池 Excel 数据缓存。
 - `$lib/server` 模块不得被客户端代码导入。
 - 生成式 AI 输出必须经 Zod Schema 或明确的文本协议校验后进入业务层。
 - 融资择时卖方观点先调用固定 AI Search MCP 公共端点，仅把限长、去重后的证据交给 AI Gateway；机构、标题、日期和源 key 由检索元数据回填，不接受模型自由生成。

@@ -52,7 +52,7 @@ test("首次访问按生成时间读取最新快照并采用快照内的证据�
         async first() {
           return {
             generated_at: "2026-08-21T08:00:00.000Z",
-            model: "dynamic/rag",
+            model: "gpt-5.6-luna",
             scope: JSON.stringify(rollingScope()),
             payload: payload(),
           };
@@ -78,7 +78,7 @@ test("快照证据范围与正文覆盖数不一致时拒绝返回", async () =>
         async first() {
           return {
             generated_at: "2026-08-21T08:00:00.000Z",
-            model: "dynamic/rag",
+            model: "gpt-5.6-luna",
             scope: JSON.stringify(rollingScope(1)),
             payload: payload(),
           };
@@ -113,7 +113,7 @@ test("每次生成使用纯 INSERT 追加完整快照", async () => {
   await saveHotspotSnapshot(database, {
     inputFingerprint: "fingerprint",
     generatedAt: "2026-08-21T08:00:00.000Z",
-    model: "dynamic/rag",
+    model: "gpt-5.6-luna",
     scope,
     payload: payload(),
   });

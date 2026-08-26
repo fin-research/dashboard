@@ -29,7 +29,7 @@
 - 热点首次访问只读最近成功快照；只有用户手动生成才调用模型并追加 `hotspot_snapshot`。旧快照的证据范围以快照自身为准。
 - 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。
 - D1 与 Neon migration 必须放入各自目录，不得混用。结构变化时检查写入方、读取方和回填脚本。
-- 所有生成式 AI 调用只通过 `src/lib/server/ai-gateway.ts`；Schema 由 Zod 定义并在应用端校验，密钥只读 Worker Secret。
+- 所有生成式 AI 调用只通过 `src/lib/server/ai-gateway.ts` 使用 Worker AI binding；默认按项目组 `AI.md` 直连 Responses API，Schema 由 Zod 定义并在应用端校验，Provider 密钥由 Gateway BYOK `default` alias 管理。
 - 融资择时模型原始快照只由 quant pipeline 追加；dashboard 只写人工结论修订和 AI Search 卖方观点快照，不覆盖 `model_run.payload`。
 - 融资择时卖方观点固定调用 `https://search.hasbai.xyz/mcp` 的 `search` 工具，检索参数和日期硬过滤遵循项目组 `AI.md`，不得读取 quant 旧 R2 研报脚本。
 - 不手动编辑生成文件 `worker-configuration.d.ts`；绑定变化使用 `pnpm worker:typegen`。

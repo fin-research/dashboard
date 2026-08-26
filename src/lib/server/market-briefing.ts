@@ -1,8 +1,15 @@
-import type { MarketBriefing } from "../../types";
-import { generateDynamicRouteText } from "./ai-gateway.ts";
+import { z } from "zod";
 
-const PROMPT_VERSION = "market-briefing-v3-dynamic-rag-thinking-filtered";
+import type { MarketBriefing } from "../../types";
+import { generateAiGatewayObject } from "./ai-gateway.ts";
+
+const PROMPT_VERSION = "market-briefing-v4-responses-schema";
 const DATA_TIMEOUT_MS = 60_000;
+const marketBriefingOutputSchema = z
+  .object({ content: z.string().min(1).describe("只包含两条市场聚焦正文") })
+  .strict();
+const MARKET_BRIEFING_TRANSPORT_INSTRUCTION =
+  "结构化传输要求：先按上述规范写出两条正文，再将完整正文原样放入响应 JSON 的 content 字段；content 内不要使用 Markdown 代码围栏。";
 const DISCARD_TITLE_PREFIXES = [
   "A股早盘收盘",
   "DMI外币资金日评",
@@ -200,14 +207,12 @@ export async function generateMarketBriefing(
   reportDate: string,
 ): Promise<MarketBriefing> {
   const news = await fetchBriefingNews(env, reportDate);
-  const content = await generateDynamicRouteText(
-    {
-      accountId: env.CLOUDFLARE_ACCOUNT_ID,
-      gatewayId: env.AI_GATEWAY_ID || "default",
-      token: env.CF_AIG_TOKEN,
-    },
+  const output = await generateAiGatewayObject(
+    env.AI,
+    env.AI_GATEWAY_ID || "default",
     [
       { role: "system", content: MARKET_BRIEFING_SYSTEM },
+      { role: "system", content: MARKET_BRIEFING_TRANSPORT_INSTRUCTION },
       {
         role: "user",
         content: buildMarketBriefingPrompt(
@@ -216,15 +221,15 @@ export async function generateMarketBriefing(
         ),
       },
     ],
+    marketBriefingOutputSchema,
+    "market_briefing",
     {
       requestTimeoutMs: 120_000,
-      maxRetries: 2,
       reasoningEffort: "high",
-      enableThinking: true,
       metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
     },
   );
-  const normalized = content.trim();
+  const normalized = output.content.trim();
   if (!normalized) {
     throw new MarketBriefingError(502, "模型未返回市场聚焦内容");
   }

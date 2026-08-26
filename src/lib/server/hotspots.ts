@@ -7,14 +7,14 @@ import {
   type HotspotScope,
 } from "$lib/hotspots";
 import {
-  DYNAMIC_ROUTE_MODEL,
-  generateDynamicRouteObject,
+  AI_GATEWAY_MODEL,
+  generateAiGatewayObject,
 } from "./ai-gateway.ts";
 import { saveHotspotSnapshot } from "./hotspot-snapshots.ts";
 
-const HOTSPOT_MODEL = DYNAMIC_ROUTE_MODEL;
+const HOTSPOT_MODEL = AI_GATEWAY_MODEL;
 const PROMPT_VERSION = "d1-hotspots-v10-unbounded-summary";
-const HOTSPOT_REQUEST_TIMEOUT_MS = 360_000;
+const HOTSPOT_REQUEST_TIMEOUT_MS = 300_000;
 const MAX_KEYWORDS_PER_CARD = 3;
 const MAX_TITLE_CHARS = 120;
 const MAX_SUMMARY_CHARS = 480;
@@ -94,20 +94,15 @@ export async function generateMarketHotspots(
   const scope = resolvedScope(requestScope, cards);
   const fingerprint = await createFingerprint(cards);
 
-  const output = await generateDynamicRouteObject(
-    {
-      accountId: env.CLOUDFLARE_ACCOUNT_ID,
-      gatewayId: env.AI_GATEWAY_ID || "default",
-      token: env.CF_AIG_TOKEN,
-    },
+  const output = await generateAiGatewayObject(
+    env.AI,
+    env.AI_GATEWAY_ID || "default",
     buildAggregateMessages(cards),
     hotspotOutputSchema,
     "market_hotspots",
     {
       requestTimeoutMs: HOTSPOT_REQUEST_TIMEOUT_MS,
-      maxRetries: 2,
       reasoningEffort: "low",
-      enableThinking: true,
       metadata: {
         date,
         evidence_scope: requestScopeLabel(requestScope),

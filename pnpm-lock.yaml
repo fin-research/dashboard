@@ -8,18 +8,12 @@ importers:
 
   .:
     dependencies:
-      '@ai-sdk/openai-compatible':
-        specifier: 3.0.31
-        version: 3.0.31(zod@4.4.3)
       '@sveltejs/adapter-cloudflare':
         specifier: ^7.2.9
         version: 7.2.9(@sveltejs/kit@2.70.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)))(svelte@5.56.8)(typescript@5.9.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)))(wrangler@4.125.0(@cloudflare/workers-types@5.20260823.1))
       '@sveltejs/kit':
         specifier: ^2.70.2
         version: 2.70.2(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)))(svelte@5.56.8)(typescript@5.9.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0))
-      ai:
-        specifier: 7.0.68
-        version: 7.0.68(zod@4.4.3)
       d3-cloud:
         specifier: ^1.2.9
         version: 1.2.9
@@ -80,28 +74,6 @@ importers:
         version: 4.125.0(@cloudflare/workers-types@5.20260823.1)
 
 packages:
-
-  '@ai-sdk/gateway@4.0.54':
-    resolution: {integrity: sha512-x4fAXDqCtYzB/M5vsIQLYcyrzpJuaRgcIwDSw+lpTMMbgH19fU3ds75GSlHNLzfx6Z5yL4Z9+EMr0GJcqVy9QA==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/openai-compatible@3.0.31':
-    resolution: {integrity: sha512-g6kbWJzI1mfHoZp2vXPyb/fiMrK8pNRU2dbum8rBHxemx+ryBJWFAwTndBaVefm+gx9A6fK7J/hSrdfRdVJlQQ==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/provider-utils@5.0.27':
-    resolution: {integrity: sha512-EzAn4pdgG5g0xXtH6lE2zyNmfjDQIDjATkfqzuidEI35g++hh4+07vnjzkT/RmGmIClPZiRj/Q2GMPV2V7mkHw==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/provider@4.0.7':
-    resolution: {integrity: sha512-6or44XprPzKbr8zkmzosowSE0pxkvJcoojBL+mCZvPUt3kvXp3XSNqeVun9golb1acEfSo6yaEBRT18h2VU+1Q==}
-    engines: {node: '>=22'}
 
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
@@ -817,23 +789,10 @@ packages:
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
-  '@vercel/oidc@3.2.0':
-    resolution: {integrity: sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug==}
-    engines: {node: '>= 20'}
-
-  '@workflow/serde@4.1.0':
-    resolution: {integrity: sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ==}
-
   acorn@8.18.0:
     resolution: {integrity: sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ==}
     engines: {node: '>=0.4.0'}
     hasBin: true
-
-  ai@7.0.68:
-    resolution: {integrity: sha512-9QuZOT77wzoxxUC0NcueXhCo3HUHA/1pApIJ9VRyE+9/K+3Innkq4kVhrd9aEnwIviJz2Nga063m+UTsPSdOyw==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
 
   aria-query@5.3.1:
     resolution: {integrity: sha512-Z/ZeOgVl7bcSYZ/u/rh0fOpvEpq//LZmdbkXyc7syVzjPAhfOa9ebsdTSjEBDU4vs5nC98Kfduj1uFo0qyET3g==}
@@ -908,10 +867,6 @@ packages:
       '@typescript-eslint/types':
         optional: true
 
-  eventsource-parser@3.1.1:
-    resolution: {integrity: sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ==}
-    engines: {node: '>=18.0.0'}
-
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
     engines: {node: '>=12.0.0'}
@@ -938,9 +893,6 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
-
-  json-schema@0.4.0:
-    resolution: {integrity: sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA==}
 
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
@@ -1312,32 +1264,6 @@ packages:
     resolution: {integrity: sha512-oEGMDB6pOP2S6OwRR4PdVv610zrjnA3Bh+JnSG12fYJlBKjtNAoEb5fSUoCOOINlH96I2fU38/A2UpRKs67xYQ==}
 
 snapshots:
-
-  '@ai-sdk/gateway@4.0.54(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@4.4.3)
-      '@vercel/oidc': 3.2.0
-      zod: 4.4.3
-
-  '@ai-sdk/openai-compatible@3.0.31(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@4.4.3)
-      zod: 4.4.3
-
-  '@ai-sdk/provider-utils@5.0.27(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.7
-      '@standard-schema/spec': 1.1.0
-      '@workflow/serde': 4.1.0
-      eventsource-parser: 3.1.1
-      undici: 7.29.0
-      zod: 4.4.3
-
-  '@ai-sdk/provider@4.0.7':
-    dependencies:
-      json-schema: 0.4.0
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
@@ -1818,18 +1744,7 @@ snapshots:
 
   '@types/trusted-types@2.0.7': {}
 
-  '@vercel/oidc@3.2.0': {}
-
-  '@workflow/serde@4.1.0': {}
-
   acorn@8.18.0: {}
-
-  ai@7.0.68(zod@4.4.3):
-    dependencies:
-      '@ai-sdk/gateway': 4.0.54(zod@4.4.3)
-      '@ai-sdk/provider': 4.0.7
-      '@ai-sdk/provider-utils': 5.0.27(zod@4.4.3)
-      zod: 4.4.3
 
   aria-query@5.3.1: {}
 
@@ -1908,8 +1823,6 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  eventsource-parser@3.1.1: {}
-
   fdir@6.5.0(picomatch@4.0.5):
     optionalDependencies:
       picomatch: 4.0.5
@@ -1926,8 +1839,6 @@ snapshots:
       '@types/estree': 1.0.9
 
   jiti@2.7.0: {}
-
-  json-schema@0.4.0: {}
 
   kleur@4.1.5: {}
 

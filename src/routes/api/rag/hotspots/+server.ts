@@ -41,11 +41,10 @@ export const GET: RequestHandler = async ({ platform }) => {
 export const POST: RequestHandler = async ({ platform, request }) => {
   if (
     !platform?.env.DB ||
-    !platform.env.CLOUDFLARE_ACCOUNT_ID ||
-    !platform.env.CF_AIG_TOKEN
+    !platform.env.AI
   ) {
     return Response.json(
-      { error: "D1 或 AI Gateway 认证未配置" },
+      { error: "D1 或 AI Gateway binding 未配置" },
       { status: 503 },
     );
   }
