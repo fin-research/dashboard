@@ -104,8 +104,9 @@ export async function generateMarketHotspots(
     hotspotOutputSchema,
     "market_hotspots",
     {
+      promptCacheKey: `market-hotspots:${PROMPT_VERSION}`,
       requestTimeoutMs: HOTSPOT_REQUEST_TIMEOUT_MS,
-      reasoningEffort: "low",
+      taskType: "generation",
       metadata: {
         date,
         evidence_scope: requestScopeLabel(requestScope),

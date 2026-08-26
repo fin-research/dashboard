@@ -16,6 +16,7 @@ const AI_SEARCH_MAX_RESULTS = 50 as const;
 const MAX_MCP_RESPONSE_BYTES = 6 * 1024 * 1024;
 const MAX_SOURCE_DOCUMENTS = 24;
 const MAX_DOCUMENT_TEXT = 2_400;
+const PROMPT_CACHE_KEY = "financing-model-sell-side:v1";
 
 const researchOutputSchema = z
   .object({
@@ -114,6 +115,7 @@ export async function generateFinancingModelResearch(
     researchOutputSchema,
     "financing_model_sell_side",
     {
+      promptCacheKey: PROMPT_CACHE_KEY,
       metadata: {
         tags: "financing-model,sell-side,ai-search",
         run_id: snapshot.run_id,
@@ -121,7 +123,7 @@ export async function generateFinancingModelResearch(
         period_end: period.endDate,
       },
       requestTimeoutMs: 300_000,
-      reasoningEffort: "high",
+      taskType: "analysis",
     },
   );
   const views = resolveResearchViews(analysis, documents);

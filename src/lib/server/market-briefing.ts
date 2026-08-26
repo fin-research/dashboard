@@ -227,8 +227,9 @@ export async function generateMarketBriefing(
     marketBriefingOutputSchema,
     "market_briefing",
     {
+      promptCacheKey: `market-briefing:${PROMPT_VERSION}`,
       requestTimeoutMs: 120_000,
-      reasoningEffort: "high",
+      taskType: "generation",
       metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
     },
   );

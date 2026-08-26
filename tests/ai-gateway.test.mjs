@@ -3,6 +3,7 @@ import test from "node:test";
 import { z } from "zod";
 
 import {
+  AI_GATEWAY_REASONING_EFFORT_BY_TASK,
   AiGatewayFallbackError,
   AiGatewayResponseError,
   generateAiGatewayObject,
@@ -15,8 +16,9 @@ const credentials = {
 };
 
 const options = {
+  promptCacheKey: "probe:v1",
   requestTimeoutMs: 120_000,
-  reasoningEffort: "low",
+  taskType: "summary",
   metadata: { prompt_version: "test-v1" },
 };
 
@@ -25,6 +27,11 @@ function responsesOutput(value, status = "completed") {
     id: "resp-test",
     object: "response",
     status,
+    store: true,
+    prompt_cache_key: "probe:v1",
+    usage: {
+      input_tokens_details: { cached_tokens: 1_024, cache_write_tokens: 0 },
+    },
     output: [
       {
         type: "message",
@@ -92,8 +99,9 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
   });
   assert.deepEqual(JSON.parse(calls[0].init.body), {
     model: "gpt-5.6-luna",
+    store: true,
+    prompt_cache_key: "probe:v1",
     instructions: "system",
-    input: [{ role: "user", content: "test" }],
     reasoning: { effort: "low" },
     text: {
       format: {
@@ -108,8 +116,24 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
         },
       },
     },
+    input: [{ role: "user", content: "test" }],
   });
   assert.match(logs[0], /"provider":"custom-opencode"/);
+  assert.match(logs[0], /"task_type":"summary"/);
+  assert.match(logs[0], /"reasoning_effort":"low"/);
+  assert.match(logs[0], /"requested_store":true/);
+  assert.match(logs[0], /"response_store":true/);
+  assert.match(logs[0], /"prompt_cache_key":"probe:v1"/);
+  assert.match(logs[0], /"cached_input_tokens":1024/);
+  assert.match(logs[0], /"encrypted_reasoning_present":false/);
+});
+
+test("reasoning effort is fixed by task type", () => {
+  assert.deepEqual(AI_GATEWAY_REASONING_EFFORT_BY_TASK, {
+    generation: "high",
+    analysis: "high",
+    summary: "low",
+  });
 });
 
 test("retryable primary failure falls back once to direct custom-codex", async () => {

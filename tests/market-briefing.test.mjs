@@ -125,6 +125,11 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     });
     const query = JSON.parse(aiCalls[0].init.body);
     assert.equal(query.model, "gpt-5.6-luna");
+    assert.equal(query.store, true);
+    assert.equal(
+      query.prompt_cache_key,
+      "market-briefing:market-briefing-v4-responses-schema",
+    );
     assert.equal(query.reasoning.effort, "high");
     assert.equal(query.text.format.type, "json_schema");
     assert.equal(query.text.format.name, "market_briefing");
@@ -133,6 +138,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.ok(aiCalls[0].init.signal instanceof AbortSignal);
     assert.match(query.instructions, /^---\nname: market-briefing/);
     assert.match(query.instructions, /响应 JSON 的 content 字段/);
+    assert.doesNotMatch(query.instructions, /2026-08-10|股市收盘正文/);
     assert.match(
       query.input[0].content,
       /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
