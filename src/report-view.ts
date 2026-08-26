@@ -1,4 +1,4 @@
-// Derive the visual report's view objects from the unified /report raw rows.
+// Derive the visual report's view objects from marketReport GraphQL raw rows.
 // Both the visual panels and the text-report replica read the same fields;
 // this layer only projects what the visual charts and tables need.
 

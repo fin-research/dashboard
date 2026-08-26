@@ -47,7 +47,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 
 ### 市场点评
 
-`/data/report` → 浏览器数据客户端 → 共享派生层 → 视觉组件 / 文字报告。前端不读取 Python 归档文本。
+`POST /data/graphql` 的 `marketReport` → 浏览器数据客户端 → 共享派生层 → 视觉组件 / 文字报告。视觉版与文字版共享同一次完整字段映射，前端不读取 Python 归档文本。
 
 ### 市场热点
 

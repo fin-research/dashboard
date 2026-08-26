@@ -7,12 +7,28 @@
 浏览器只通过同源路径访问：
 
 - `GET /data/config`：默认报告配置。
-- `GET /data/report?date=YYYY-MM-DD&refresh=0|1`：统一完整报告数据。
+- `POST /data/graphql`：复杂、多资源选择查询；市场点评使用 `marketReport(date:, refresh:)`。
 - `POST /data/market-briefing/news?date=YYYY-MM-DD`：供 Worker 使用的新闻素材。
 
 本地 Vite 完整保留 `/data` 前缀并代理到 `DATA_PROXY_TARGET`。线上由独立数据服务处理，Dashboard Worker 不注册这些路由。
 
-`/data/report` 的字段变化必须与 `src/api.ts`、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要为视觉版或文字版增加单独的裁剪响应。
+`marketReport` 的字段变化必须与 `src/api.ts`、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/report`，也不要为视觉版或文字版增加单独的数据源。
+
+浏览器请求示例：
+
+```graphql
+query MarketReport($date: Date!, $refresh: Boolean!) {
+  marketReport(date: $date, refresh: $refresh) {
+    reportDate
+    rates
+    equities { name close changePct }
+    industries { name changePct marketCapYuan }
+    primarySummary { currentAmount changeAmount }
+  }
+}
+```
+
+单一资源和写操作继续使用 REST：今日聚焦素材、热点快照、融资择时模型、二级池台账和资金日报都各自属于一个明确业务资源。当前不为这些路由建立第二套 GraphQL 服务。
 
 ## Dashboard Worker `/api/*`
 
