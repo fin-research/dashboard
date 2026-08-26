@@ -3,6 +3,13 @@ const COMPACT_REPORT_SUFFIX = /(\d{4})(\d{2})(\d{2})\.html$/i;
 
 export const MAX_FUND_REPORT_BYTES = 20 * 1024 * 1024;
 
+export interface FundReportListItem {
+  date: string;
+  url: string;
+  size: number;
+  uploadedAt: string;
+}
+
 export function fundReportDateFromFileName(fileName: string): string | null {
   const normalizedName = fileName.trim();
   const match =

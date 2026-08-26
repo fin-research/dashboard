@@ -3,6 +3,7 @@ import {
   fundReportFileName,
   fundReportObjectKey,
   MAX_FUND_REPORT_BYTES,
+  type FundReportListItem,
 } from "../fund-report.ts";
 import {
   BondLedgerUploadError,
@@ -101,6 +102,38 @@ export async function getFundReport(
     throw new FundReportError(404, `${date} 的资金日报尚未上传`);
   }
   return object;
+}
+
+export async function listFundReports(
+  bucket: FundReportBucket | undefined,
+): Promise<FundReportListItem[]> {
+  const storage = requireFundReportBucket(bucket);
+  const reports = new Map<string, FundReportListItem>();
+  let cursor: string | undefined;
+
+  do {
+    const result = await storage.list({
+      prefix: "fund-reports/",
+      cursor,
+    });
+    for (const object of result.objects) {
+      const fileName = object.key.slice("fund-reports/".length);
+      const date = fundReportDateFromFileName(fileName);
+      if (!date || object.key !== fundReportObjectKey(date)) continue;
+
+      reports.set(date, {
+        date,
+        url: `/fund-report/${fundReportFileName(date)}`,
+        size: object.size,
+        uploadedAt: object.uploaded.toISOString(),
+      });
+    }
+    cursor = result.truncated ? result.cursor : undefined;
+  } while (cursor);
+
+  return [...reports.values()].sort((left, right) =>
+    right.date.localeCompare(left.date),
+  );
 }
 
 export function fundReportHeaders(

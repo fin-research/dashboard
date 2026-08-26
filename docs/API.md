@@ -33,7 +33,7 @@
 - `POST /api/fund-report`：上传单个 UTF-8 HTML，文件名末尾必须为 `YYYYMMDD.html` 或 `YYYY-MM-DD.html`；成功为 201。
 - 请求体为原始 HTML 文件，`X-Fund-Report-Filename` 传 URL 编码的原文件名，`X-Fund-Report-Size` 传文件字节数。
 - Worker 将文件保存为 R2 `fund-reports/YYYY-MM-DD.html`；同日报告再次上传会覆盖并在响应中返回 `replaced: true`。
-- `GET /fund-report`：以 `302` 和 `Cache-Control: no-store` 跳转上海时区当天的 `/fund-report/YYYY-MM-DD.html`。
+- `GET /fund-report`：以 `Cache-Control: no-store` 返回按日期倒序排列的历史资金日报列表。
 - `GET /fund-report/YYYY-MM-DD.html`：从 R2 返回 HTML；无该日报为 404。
 
 ### 二级池台账

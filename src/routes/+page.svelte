@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
+  import { currentReportDate } from "../report-date";
   import {
     readPreferences,
     savePreferences,
@@ -9,6 +10,7 @@
 
   let settingsDialog: HTMLDialogElement;
   let marketColorConvention: MarketColorConvention = "red-up-green-down";
+  const todayFundReportUrl = `/fund-report/${currentReportDate()}.html`;
 
   onMount(() => {
     marketColorConvention = readPreferences().marketColorConvention;
@@ -49,7 +51,7 @@
   <main>
     <h1 class="sr-only">市场研究</h1>
     <nav class="tool-grid" aria-label="市场研究内容">
-      <a class="tool-card tool-card--fund-report" href="/fund-report">
+      <article class="tool-card tool-card--fund-report">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M4 4h16v16H4zM7 8h10M7 12h4M7 16h6" />
@@ -69,13 +71,21 @@
         <span class="tool-copy">
           <h2>资金日报</h2>
         </span>
-        <span class="tool-action">
-          打开今日资金日报
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 12h14m-5-5 5 5-5 5" />
-          </svg>
+        <span class="tool-actions tool-actions--fund-report">
+          <a class="tool-action" href={todayFundReportUrl}>
+            今日资金日报
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14m-5-5 5 5-5 5" />
+            </svg>
+          </a>
+          <a class="tool-action" href="/fund-report">
+            历史资金日报
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14m-5-5 5 5-5 5" />
+            </svg>
+          </a>
         </span>
-      </a>
+      </article>
 
       <a class="tool-card tool-card--briefing" href="/market-briefing">
         <span class="tool-icon" aria-hidden="true">
@@ -440,6 +450,7 @@
   }
 
   .tool-card:focus-visible,
+  .tool-action:focus-visible,
   .site-header a:focus-visible {
     outline: 3px solid #1d4ed8;
     outline-offset: 4px;
@@ -534,6 +545,20 @@
     box-shadow: 0 7px 18px rgba(21, 36, 59, 0.08);
     font-size: 0.9rem;
     font-weight: 700;
+    text-decoration: none;
+  }
+
+  .tool-actions {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tool-actions .tool-action {
+    gap: 8px;
+    padding-inline: 12px;
   }
 
   .tool-action svg {

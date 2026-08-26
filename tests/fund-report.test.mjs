@@ -11,9 +11,8 @@ import {
   FundReportError,
   fundReportHeaders,
   getFundReport,
+  listFundReports,
 } from "../src/lib/server/fund-report.ts";
-import { GET as redirectCurrentFundReport } from "../src/routes/fund-report/+server.ts";
-import { currentReportDate } from "../src/report-date.ts";
 
 test("资金日报文件名日期统一为 ISO 文件名和 R2 前缀", () => {
   assert.equal(
@@ -219,15 +218,72 @@ test("资金日报读取只使用日期派生 key 并添加隔离响应头", asy
   assert.equal(headers.get("ETag"), '"etag-read"');
 });
 
-test("资金日报入口临时跳转上海当天且不缓存", async () => {
-  const response = await redirectCurrentFundReport();
-  assert.equal(response.status, 302);
-  assert.equal(
-    response.headers.get("Location"),
-    `/fund-report/${currentReportDate()}.html`,
+test("历史资金日报枚举固定前缀、过滤非法对象并按日期倒序", async () => {
+  const calls = [];
+  const bucket = {
+    async list(options) {
+      calls.push(options);
+      if (!options.cursor) {
+        return {
+          objects: [
+            reportObject("fund-reports/2026-08-22.html", 2200),
+            reportObject("fund-reports/readme.html", 100),
+            reportObject("fund-reports/archive/2026-08-23.html", 2300),
+          ],
+          delimitedPrefixes: [],
+          truncated: true,
+          cursor: "next-page",
+        };
+      }
+      return {
+        objects: [reportObject("fund-reports/2026-08-25.html", 2500)],
+        delimitedPrefixes: [],
+        truncated: false,
+      };
+    },
+  };
+
+  const reports = await listFundReports(bucket);
+  assert.deepEqual(calls, [
+    { prefix: "fund-reports/", cursor: undefined },
+    { prefix: "fund-reports/", cursor: "next-page" },
+  ]);
+  assert.deepEqual(
+    reports.map(({ date, url, size }) => ({ date, url, size })),
+    [
+      {
+        date: "2026-08-25",
+        url: "/fund-report/2026-08-25.html",
+        size: 2500,
+      },
+      {
+        date: "2026-08-22",
+        url: "/fund-report/2026-08-22.html",
+        size: 2200,
+      },
+    ],
   );
-  assert.equal(response.headers.get("Cache-Control"), "no-store");
 });
+
+test("资金日报列表页呈现历史入口、空状态和读取失败状态", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const page = await readFile(
+    new URL("../src/routes/fund-report/+page.svelte", import.meta.url),
+    "utf8",
+  );
+  assert.match(page, /<h2 id="fund-report-list-title">历史资金日报<\/h2>/);
+  assert.match(page, /href=\{report\.url\}/);
+  assert.match(page, /暂无历史资金日报/);
+  assert.match(page, /资金日报列表暂时无法读取|data\.loadError/);
+});
+
+function reportObject(key, size) {
+  return {
+    key,
+    size,
+    uploaded: new Date("2026-08-25T08:00:00.000Z"),
+  };
+}
 
 function uploadRequest(body, fileName, extraHeaders = {}) {
   return new Request("https://eastmoney.hasbai.xyz/api/fund-report", {

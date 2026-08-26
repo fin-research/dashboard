@@ -39,7 +39,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 - `src/lib/server/market-briefing.ts` 从 `/data/market-briefing/news` 取材并生成今日聚焦。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
-- `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，按确定性的日期 key 从 R2 读取。
+- `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。
 - `src/lib/server/financing-model-repository.ts` 读取 quant 快照并追加人工结论和卖方观点；`src/lib/server/financing-model-research.ts` 按 `AI.md` 调用 AI Search MCP，再通过统一 AI Gateway 生成结构化交叉验证。
 
@@ -59,7 +59,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 
 ### 资金日报
 
-管理页上传完整 HTML → Worker 校验文件名日期、大小、编码和 HTML 文档头 → R2 `fund-reports/YYYY-MM-DD.html`。`/fund-report` 按上海时区临时跳转当天 `/fund-report/YYYY-MM-DD.html`；日期页只解析确定性的对象 key，不接受任意 R2 路径。
+管理页上传完整 HTML → Worker 校验文件名日期、大小、编码和 HTML 文档头 → R2 `fund-reports/YYYY-MM-DD.html`。`/fund-report` 枚举固定前缀并按日期倒序展示历史列表；日期页只解析确定性的对象 key，不接受任意 R2 路径。
 
 ### 融资择时模型
 

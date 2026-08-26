@@ -10,7 +10,15 @@ test("首页按指定顺序提供六个业务入口并自适应换行", async ()
 
   assert.match(
     page,
-    /<a class="tool-card tool-card--fund-report" href="\/fund-report">[\s\S]*?<h2>资金日报<\/h2>/,
+    /<article class="tool-card tool-card--fund-report">[\s\S]*?<h2>资金日报<\/h2>/,
+  );
+  assert.match(
+    page,
+    /href=\{todayFundReportUrl\}>[\s\S]*?今日资金日报[\s\S]*?href="\/fund-report">[\s\S]*?历史资金日报/,
+  );
+  assert.match(
+    page,
+    /const todayFundReportUrl = `\/fund-report\/\$\{currentReportDate\(\)\}\.html`/,
   );
   assert.match(
     page,

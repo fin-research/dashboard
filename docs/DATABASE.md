@@ -43,7 +43,7 @@ Worker 通过 `HYPERDRIVE` 访问 `bond` schema：
 - `BOND_LEDGER`：`uploads/<uuid>.xlsx` 原始 Excel 归档，用于 Workflow 输入和下载。页面统计不得通过下载 R2 文件重新计算；删除数据库报表日不会删除原始对象。
 - `FUND_REPORTS`：`fund-reports/YYYY-MM-DD.html` 资金日报。日期 key 为确定性名称，同一天再次上传会替换该日报；读取路由不得接受任意对象 key。
 
-资金日报当前不需要 D1/Neon 索引：上传文件名已经提供日期，公开 URL 和 R2 key 都可由日期直接确定。需要列表、审批或版本历史时再增加独立元数据模型。
+资金日报当前不需要 D1/Neon 索引：上传文件名已经提供日期，公开 URL 和 R2 key 都可由日期直接确定；历史列表只枚举 `fund-reports/` 固定前缀并过滤严格日期文件名。需要审批或同日报告的版本历史时再增加独立元数据模型。
 
 ## Neon：融资择时模型
 
