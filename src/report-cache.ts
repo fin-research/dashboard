@@ -11,6 +11,11 @@ export interface ReportCacheStorage {
   setItem(key: string, value: string): void;
 }
 
+type ReportFetcher = (
+  reportDate: string,
+  refresh: boolean,
+) => Promise<ReportData>;
+
 export function readCachedReport(
   storage: ReportCacheStorage,
   reportDate: string,
@@ -43,6 +48,50 @@ export function writeCachedReport(
   } catch {
     // Quota and privacy-mode failures must not block a successful report load.
   }
+}
+
+export async function resolveReportData(
+  storage: ReportCacheStorage | null,
+  reportDate: string,
+  currentDate: string,
+  refresh: boolean,
+  fetcher: ReportFetcher,
+): Promise<ReportData> {
+  const isCurrentDate = reportDate === currentDate;
+  const cachedReport = refresh || !storage
+    ? null
+    : readCachedReport(storage, reportDate);
+
+  if (
+    cachedReport &&
+    (!isCurrentDate || reportHasDataForDate(cachedReport, reportDate))
+  ) {
+    return cachedReport;
+  }
+
+  let refreshed = refresh || (isCurrentDate && cachedReport !== null);
+  let report = await fetcher(reportDate, refreshed);
+
+  if (
+    isCurrentDate &&
+    !refreshed &&
+    !reportHasDataForDate(report, reportDate)
+  ) {
+    refreshed = true;
+    report = await fetcher(reportDate, true);
+  }
+
+  if (storage) writeCachedReport(storage, report);
+  return report;
+}
+
+export function reportHasDataForDate(
+  report: ReportData,
+  reportDate: string,
+): boolean {
+  return (
+    report.report_date === reportDate && report.industry_data_date === reportDate
+  );
 }
 
 function makeRoomForReport(

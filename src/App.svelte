@@ -23,9 +23,8 @@
   import { chineseDateParts } from "./formatters";
   import { deriveReport, type ReportDerived } from "./report-view";
   import {
-    readCachedReport,
+    resolveReportData,
     type ReportCacheStorage,
-    writeCachedReport,
   } from "./report-cache";
   import { currentReportDate } from "./report-date";
   import {
@@ -104,18 +103,21 @@
     activeRequest = request;
     const requestedDate = selectedDate;
     const storage = browserReportStorage();
-    const cachedReport = refresh || !storage
-      ? null
-      : readCachedReport(storage, requestedDate);
     loading = true;
     errorMessage = "";
     try {
       const [report, chartModule] = await Promise.all([
-        cachedReport ?? fetchReport(requestedDate, refresh, request.signal),
+        resolveReportData(
+          storage,
+          requestedDate,
+          currentReportDate(),
+          refresh,
+          (reportDate, shouldRefresh) =>
+            fetchReport(reportDate, shouldRefresh, request.signal),
+        ),
         import("./charts"),
       ]);
       if (request.signal.aborted || selectedDate !== requestedDate) return;
-      if (!cachedReport && storage) writeCachedReport(storage, report);
       data = report;
       focusText = loadStoredFocusText(report.report_date);
       charts = chartModule;
