@@ -38,10 +38,11 @@ Worker 通过 `HYPERDRIVE` 访问 `bond` schema：
 
 ## R2
 
-同一个私有 R2 bucket 通过两个语义 binding 和固定前缀隔离对象：
+Worker 只绑定私有 `eastmoney` R2 bucket，并通过固定小写前缀隔离对象：
 
-- `BOND_LEDGER`：`uploads/<uuid>.xlsx` 原始 Excel 归档，用于 Workflow 输入和下载。页面统计不得通过下载 R2 文件重新计算；删除数据库报表日不会删除原始对象。
-- `FUND_REPORTS`：`fund-reports/YYYY-MM-DD.html` 资金日报。日期 key 为确定性名称，同一天再次上传会替换该日报；读取路由不得接受任意对象 key。
+- `bond-ledger/YYYY-MM-DD.xlsx`：二级池台账定稿。同日重新上传覆盖当天对象；上传解析阶段暂存于 `bond-ledger/.pending/<uuid>.xlsx`，Workflow 成功后归档并删除临时对象。页面统计不得通过下载 R2 文件重新计算。
+- `market-briefing/YYYY-MM-DD.json`：市场点评完整快照，包含最小规范报告字段与人工定稿的今日聚焦；刷新或保存覆盖当天对象。
+- `fund-reports/YYYY-MM-DD.html`：资金日报。同一天再次上传会替换该日报；读取路由不得接受任意对象 key。
 
 资金日报当前不需要 D1/Neon 索引：上传文件名已经提供日期，公开 URL 和 R2 key 都可由日期直接确定；历史列表只枚举 `fund-reports/` 固定前缀并过滤严格日期文件名。需要审批或同日报告的版本历史时再增加独立元数据模型。
 

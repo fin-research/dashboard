@@ -643,6 +643,44 @@ h2 {
   white-space: nowrap;
 }
 
+.focus-save-button {
+  display: inline-grid;
+  width: 32px;
+  min-width: 32px;
+  min-height: 28px;
+  place-items: center;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, var(--line));
+  border-radius: var(--radius-inner);
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, #fff);
+  cursor: pointer;
+}
+
+.focus-save-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-primary) 13%, #fff);
+}
+
+.focus-save-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.focus-save-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.focus-save-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
 .focus-generate-button:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-primary) 13%, #fff);
 }
@@ -682,6 +720,7 @@ h2 {
 }
 
 .is-export-capture .focus-generate-button,
+.is-export-capture .focus-save-button,
 .is-export-capture .focus-generation-error,
 .is-export-capture .titlebar-actions {
   display: none;
@@ -1431,6 +1470,7 @@ h2 {
   .hero-date,
   .view-toggle button,
   .focus-generate-button,
+  .focus-save-button,
   .error-state button {
     min-height: 44px;
     touch-action: manipulation;

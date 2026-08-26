@@ -9,6 +9,7 @@ Worker Assets 只承载随应用版本一起构建、发布的前端资源。资
 ```text
 Browser
 ├→ Svelte pages / components / charts
+├→ /api/market-report ──→ R2 市场点评 JSON / Data API GraphQL
 ├→ /fund-report/* ──────→ R2 HTML 日报
 ├→ /data/* ─────────────→ Python data service
 └→ /api/* ──────────────→ SvelteKit Worker routes
@@ -26,8 +27,8 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 
 - `src/routes/` 负责页面装配、路由参数和 HTTP 边界，不承载复杂业务计算。
 - `src/App.svelte` 保留市场点评的整体报告装配。
-- `src/api.ts` 只访问同源 `/data/*`。
-- `src/report-view.ts`、`src/primary-issues.ts`、`src/rows.ts` 将统一报告原始行派生为视觉数据。
+- `src/api.ts` 只访问同源 Dashboard `/api/*`。
+- `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
 - `/trading-research` 当前从 `src/lib/trading-research/demo-data.ts` 读取冻结演示数据；总览、交易、授信、研究、流程、二级池和融资择时共享同一抽屉导航。二级池与融资择时复用原页面组件及既有数据链路，其余五个迁入视图不读取 Excel、不访问数据库，也不产生流程写入。未来接入边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
@@ -37,6 +38,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。
 - `src/lib/server/market-briefing.ts` 从 `/data/market-briefing/news` 取材并生成今日聚焦。
+- `src/lib/server/market-report.ts` 负责精准 GraphQL 查询、按日 R2 快照和人工定稿覆盖。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器，使用 provider-specific Responses API 固定执行 `custom-opencode` → `custom-codex` 顺序 fallback。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
@@ -47,7 +49,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 
 ### 市场点评
 
-`POST /data/graphql` 的 `marketReport` → 浏览器数据客户端 → 共享派生层 → 视觉组件 / 文字报告。视觉版与文字版共享同一次完整字段映射，前端不读取 Python 归档文本。
+浏览器 `GET /api/market-report?date=` → Dashboard Worker → `market-briefing/YYYY-MM-DD.json`。R2 未命中或显式刷新时，Worker 才用精准 GraphQL 查询 Data API 的强类型根字段并覆盖当天快照。视觉版与文字版共享同一最小规范契约；`PUT /api/market-report` 保存完整报告和人工定稿的今日聚焦。
 
 ### 市场热点
 
@@ -55,7 +57,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 
 ### 二级池
 
-浏览器上传 Excel → Worker 流式写入不可变 R2 key → 创建 Workflow → Worker 内解析 → Neon 单事务更新 → 页面按日期区间查询数据库生成周报。
+浏览器上传 Excel → Worker 写入 `bond-ledger/.pending/<uuid>.xlsx` → 创建 Workflow → Worker 内解析 → Neon 单事务更新 → 覆盖 `bond-ledger/YYYY-MM-DD.xlsx` 并删除临时对象 → 页面按日期区间查询数据库生成周报。
 
 ### 资金日报
 

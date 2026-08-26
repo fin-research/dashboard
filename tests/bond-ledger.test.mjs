@@ -19,7 +19,9 @@ import {
 } from "../src/lib/bond-ledger/parser.ts";
 import {
   archiveBondLedgerRequest,
+  bondLedgerObjectKey,
   BondLedgerUploadError,
+  finalizeBondLedgerObject,
   workflowStatus,
 } from "../src/lib/server/bond-ledger.ts";
 import {
@@ -180,7 +182,7 @@ test("业务收益率按交易日单日收益率算术平均乘 252 年化", () 
   });
 });
 
-test("上传先写入不可变 R2 key，再启动 Workflow", async () => {
+test("上传先写入 bond-ledger 临时 key，再启动 Workflow", async () => {
   const body = new Blob(["xlsx-bytes"], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
@@ -218,13 +220,43 @@ test("上传先写入不可变 R2 key，再启动 Workflow", async () => {
     workflow,
   );
   assert.equal(production.accepted, true);
-  assert.match(production.key, /^uploads\/[0-9a-f-]{36}\.xlsx$/);
+  assert.match(
+    production.key,
+    /^bond-ledger\/\.pending\/[0-9a-f-]{36}\.xlsx$/,
+  );
   assert.equal(calls[0].value, requestBody);
   assert.equal(calls[0].bytes, body.size);
   assert.equal(calls[0].options.customMetadata.originalName, "二级资金池台账20260820.xlsx");
   assert.equal(workflows[0].id, production.workflowId);
   assert.equal(workflows[0].params.r2Key, production.key);
   assert.equal(workflows[0].locationHint, "apac");
+});
+
+test("解析成功后按 YYYY-MM-DD 覆盖定稿并删除临时对象", async () => {
+  const deleted = [];
+  const stored = [];
+  const bucket = {
+    async get(key) {
+      assert.match(key, /^bond-ledger\/\.pending\//);
+      return {
+        etag: "pending-etag",
+        httpMetadata: { contentType: "application/octet-stream" },
+        customMetadata: { originalName: "台账.xlsx" },
+        async arrayBuffer() { return new TextEncoder().encode("xlsx").buffer; },
+      };
+    },
+    async put(key, value, options) {
+      stored.push({ key, bytes: value.byteLength, options });
+      return { key, etag: "final-etag" };
+    },
+    async delete(key) { deleted.push(key); },
+  };
+  const pendingKey = "bond-ledger/.pending/00000000-0000-4000-8000-000000000000.xlsx";
+  const key = await finalizeBondLedgerObject(bucket, pendingKey, "pending-etag", "2026-08-20");
+  assert.equal(key, "bond-ledger/2026-08-20.xlsx");
+  assert.equal(bondLedgerObjectKey("2026-08-20"), key);
+  assert.equal(stored[0].key, key);
+  assert.deepEqual(deleted, [pendingKey]);
 });
 
 test("上传接口要求可信的请求体长度", async () => {

@@ -8,7 +8,7 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
   try {
     const result = await archiveFundReportRequest(
       request,
-      platform?.env.FUND_REPORTS,
+      platform?.env.EASTMONEY,
     );
     return Response.json(result, {
       status: 201,

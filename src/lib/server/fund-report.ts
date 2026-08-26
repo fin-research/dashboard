@@ -34,7 +34,7 @@ export interface FundReportUploadResponse {
   replaced: boolean;
 }
 
-type FundReportBucket = Env["FUND_REPORTS"];
+type FundReportBucket = Env["EASTMONEY"];
 type StoredFundReport = Exclude<
   Awaited<ReturnType<FundReportBucket["get"]>>,
   null

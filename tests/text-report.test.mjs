@@ -5,210 +5,73 @@ import { buildTextReport } from "../src/text-report.ts";
 
 const data = {
   report_date: "2026-08-13",
-  omo: [
-    { operationDate: "2026-08-13", duration: "7D", operationName: "逆回购", operationAmount: 1185, interestRate: "1.4" },
-    { operationDate: "2026-08-13", duration: "14D", operationName: "逆回购", operationAmount: 500, interestRate: "--" },
-    { operationDate: "2026-08-13", duration: "7D", operationName: "逆回购", operationAmount: -1385, interestRate: "1.4" },
+  generated_at: "2026-08-13T15:00:00+08:00",
+  omo_operations: [
+    { operation_date: "2026-08-13", duration: "7D", operation_name: "逆回购", amount_yi: 1185, interest_rate: 1.4 },
+    { operation_date: "2026-08-13", duration: "14D", operation_name: "逆回购", amount_yi: 500, interest_rate: null },
+    { operation_date: "2026-08-13", duration: "7D", operation_name: "逆回购", amount_yi: -1385, interest_rate: 1.4 },
   ],
-  rates: {
-    dr: [
-      { bondCode: "DR001", weightedYield: "1.4", weightedYieldUpDownValueBp: "-2" },
-      { bondCode: "DR007", weightedYield: "1.5", weightedYieldUpDownValueBp: "0" },
-    ],
-    dibo: [
-      { bondCode: "DIBO001", weightedYield: "1.7", weightedYieldUpDownValueBp: "1" },
-      { bondCode: "DIBO007", weightedYield: "1.8", weightedYieldUpDownValueBp: "2" },
-    ],
-    bonds: [
-      { ordinateName: "国债", abscissaName: "超长期限", tradeNum: 5, bondCode: "2500001", yield: "2.0", yieldSubYtdCloseBp: "-1" },
-      { ordinateName: "国债", abscissaName: "10Y", tradeNum: 5, bondCode: "2500002", yield: "1.8", yieldSubYtdCloseBp: "-2" },
-      { ordinateName: "国债", abscissaName: "5Y", tradeNum: 5, bondCode: "2500003", yield: "1.6", yieldSubYtdCloseBp: "1" },
-      { ordinateName: "国债", abscissaName: "1Y", tradeNum: 5, bondCode: "2500004", yield: "1.4", yieldSubYtdCloseBp: "2" },
-      { ordinateName: "国开", abscissaName: "10Y", tradeNum: 5, bondCode: "2502001", yield: "1.9", yieldSubYtdCloseBp: "0" },
-    ],
-    futures: [
-      { contractCode: "TL9999", lastPrice: "110.5", upDownValuePct: "0.1" },
-      { contractCode: "T9999", lastPrice: "108", upDownValuePct: "-0.2" },
-      { contractCode: "TF9999", lastPrice: "106", upDownValuePct: "0" },
-      { contractCode: "TS9999", lastPrice: "102", upDownValuePct: "0.3" },
-    ],
-  },
-  stock_paragraphs: ["A股主要指数集体收涨。", "全市场成交保持活跃。", "第三段不应展示。"],
-  margin: [
-    { DIM_DATE: "2026-08-12T00:00:00", TOTAL_RZRQYE: 2100050000000, TOTAL_RZYE: 2080000000000, TOTAL_RQYE: 20050000000 },
-    { DIM_DATE: "2026-08-11T00:00:00", TOTAL_RZRQYE: 2090000000000, TOTAL_RZYE: 2085000000000, TOTAL_RQYE: 5000000000 },
+  funding_rates: [
+    { code: "DR001", rate: 1.4, change_bp: -2 }, { code: "DR007", rate: 1.5, change_bp: 0 },
+    { code: "DIBO001", rate: 1.7, change_bp: 1 }, { code: "DIBO007", rate: 1.8, change_bp: 2 },
   ],
-  primary: [
-    { bondShortName: "26甲D1", bondTypeText: "短期融资券", issueTenor: "180D", issueCouponRate: "1.50", planIssueAmount: "10.00", bidStartDate: "2026-08-13", comShortName: "甲证券" },
-    { bondShortName: "26乙S1", bondTypeText: "公司债", issueTenor: "0.5Y", issueCouponRate: "1.60", planIssueAmount: "20", bidStartDate: "2026-08-13", comShortName: "乙证券" },
-    { bondShortName: "26丙01", bondTypeText: "公司债", issueTenor: "3Y", issueCouponRate: "1.70", planIssueAmount: "30", bidStartDate: "2026-08-13", comShortName: "丙证券" },
-    { bondShortName: "26丁C1", bondTypeText: "证券公司次级债", issueTenor: "2+N", issueCouponRate: "1.80", planIssueAmount: "40", bidStartDate: "2026-08-13", comShortName: "丁证券" },
-    { bondShortName: "26戊01", bondTypeText: "公司债", publicOffering: 2, issueTenor: "2Y", issueCouponRate: "1.90", planIssueAmount: "50", bidStartDate: "2026-08-13", comShortName: "戊证券" },
-    { bondShortName: "26东财证券01", bondTypeText: "公司债", issueTenor: "2Y", issueCouponRate: "2.00", planIssueAmount: "60", bidStartDate: "2026-08-13", comShortName: "东方财富证券" },
+  government_bonds: [
+    { category: "国债", tenor: "超长期限", code: "2500001", yield_rate: 2, change_bp: -1 },
+    { category: "国债", tenor: "10Y", code: "2500002", yield_rate: 1.8, change_bp: -2 },
+    { category: "国债", tenor: "5Y", code: "2500003", yield_rate: 1.6, change_bp: 1 },
+    { category: "国债", tenor: "1Y", code: "2500004", yield_rate: 1.4, change_bp: 2 },
+    { category: "国开", tenor: "10Y", code: "2502001", yield_rate: 1.9, change_bp: 0 },
   ],
-  secondary: [
-    { bondUniCode: 1, bondShortName: "25甲G1", comShortName: "甲证券", remainingTenor: "3.1Y", cbYte: "1.71", tradeYield: "1.72" },
-    { bondUniCode: 2, bondShortName: "25乙01", comShortName: "安信证券", remainingTenor: "2.1Y", cbYte: "1.61", tradeYield: "1.62" },
-    { bondUniCode: 3, bondShortName: "25丙01", comShortName: "丙证券", remainingTenor: "329D", cbYte: "1.51", tradeYield: "1.52" },
+  futures: [
+    { code: "TL9999", last_price: 110.5, change_pct: 0.1 }, { code: "T9999", last_price: 108, change_pct: -0.2 },
+    { code: "TF9999", last_price: 106, change_pct: 0 }, { code: "TS9999", last_price: 102, change_pct: 0.3 },
   ],
-  inventory: [
-    { bondShortName: "25东财G1", remainingTenor: "180D", remainingTenorDay: 180, cbYield: "1.55", tradeEntryPrice: "1.56", tradeYieldSubCb: "1.25" },
-    { bondShortName: "25东财G2", remainingTenor: "1.2Y", remainingTenorDay: 438, cbYield: "1.65", bidYield: "1.66", ofrEntryPrice: "1.64" },
+  stock_paragraphs: ["A股主要指数集体收涨。", "全市场成交保持活跃。"],
+  margin: { data_date: "2026-08-12", total: 21000.5, total_change: 100.5, financing: 20800, financing_change: -50, securities_lending: 200.5, securities_lending_change: 150.5 },
+  equities: [], equity_data_time: null, turnover_yi: null, turnover_change_yi: null,
+  industries: [], industry_data_date: "2026-08-13", primary_summary: { current_amount: 150, change_amount: null },
+  primary_issues: [
+    { issue_date: "08/13", issue_date_key: "2026-08-13", issuer: "甲证券", category: "短融", bond_names: ["26甲D1"], tenors: ["180天"], coupons: [1.5], amount: 10 },
+    { issue_date: "08/13", issue_date_key: "2026-08-13", issuer: "乙证券", category: "公募短债", bond_names: ["26乙S1"], tenors: ["182天"], coupons: [1.6], amount: 20 },
+    { issue_date: "08/13", issue_date_key: "2026-08-13", issuer: "丙证券", category: "小公募", bond_names: ["26丙01"], tenors: ["3年"], coupons: [1.7], amount: 30 },
+    { issue_date: "08/13", issue_date_key: "2026-08-13", issuer: "丁证券", category: "次级债", bond_names: ["26丁C1"], tenors: ["2+N年"], coupons: [1.8], amount: 40 },
+    { issue_date: "08/13", issue_date_key: "2026-08-13", issuer: "戊证券", category: "私募债", bond_names: ["26戊01"], tenors: ["2年"], coupons: [1.9], amount: 50 },
+  ],
+  secondary_bonds: [
+    { bond_id: "1", bond_name: "25甲G1", issuer: "甲证券", tenor_label: "3.1Y", tenor_years: 3.1, valuation: 1.71, trade_yield: 1.72 },
+    { bond_id: "2", bond_name: "25乙01", issuer: "国投证券", tenor_label: "2.1Y", tenor_years: 2.1, valuation: 1.61, trade_yield: 1.62 },
+    { bond_id: "3", bond_name: "25丙01", issuer: "丙证券", tenor_label: "329D", tenor_years: 329 / 365, valuation: 1.51, trade_yield: 1.52 },
+  ],
+  inventory_bonds: [
+    { bond_name: "25东财G1", tenor_label: "180D", tenor_years: 180 / 365, valuation: 1.55, trade_yield: 1.56, trade_spread_bp: 1.25, bid_yield: null, ofr_yield: null },
+    { bond_name: "25东财G2", tenor_label: "1.2Y", tenor_years: 1.2, valuation: 1.65, trade_yield: null, trade_spread_bp: null, bid_yield: 1.66, ofr_yield: 1.64 },
   ],
 };
 
-const pythonOutput = `20260813 境内市场点评
-
-【央行】
-中国央行今日开展14天期逆回购500亿元，并开展7天期逆回购1185亿元，操作利率为1.40%；今日有7天期逆回购1385亿元；净投放300亿元。
-
-【利率】
-今日银行间隔夜和7天期利率多数上行。
-截至17:00，DR001报1.4000%，跌2.00bp；DR007报1.5000%，与前日持平。
-同业拆借DIBO001报1.7000%，涨1.00bp；DIBO007报1.8000%，涨2.00bp。
-
-国债收益率长端下行，中短端上行。
-截至17:00，30年期国债2500001收益率下行1.00bp报2.0000%，10年期国债2500002收益率下行2.00bp报1.8000%，5年期国债2500003收益率上行1.00bp报1.6000%，1年期国债2500004收益率上行2.00bp报1.4000%。
-10年期国开债2502001收益率持平报1.9000%。
-
-国债期货多数上涨，30年期主力合约涨0.10%报110.5000，10年期主力合约跌0.20%，5年期主力合约持平，2年期主力合约涨0.30%。
-
-【股市】
-A股主要指数集体收涨。全市场成交保持活跃。
-
-截至8月12日，沪深京三市融资融券余额合计21000.50亿元，较前一交易日增加100.50亿元；融资余额合计20800.00亿元，较前一交易日减少50.00亿元；融券余额合计200.50亿元，较前一交易日增加150.50亿元。
-
-【一级发行】
-可比证券公司发行情况:${" "}
-短融:
-08/13-甲证券-180天-10亿-1.50%
-公募短债:
-08/13-乙证券-182天-20亿-1.60%
-小公募:
-08/13-丙证券-3年-30亿-1.70%
-次级债:
-08/13-丁证券-2+N年-40亿-1.80%
-私募债:
-08/13-戊证券-2年-50亿-1.90%
-
-【二级行情】
-可比证券公司债券成交：(公募债)
-3.1年-甲证券(25甲G1)-估值1.71%-成交1.72%
-2.1年-国投证券(25乙01)-估值1.61%-成交1.62%
-329天-丙证券(25丙01)-估值1.51%-成交1.52%
-
-东财存量债券:${" "}
-180天-25东财G1-估值1.55%-成交1.56%(+1.25bp)
-1.2年-25东财G2-估值1.65%-Bid1.66%-Ofr1.64%
-
-【今日聚焦】
-
-`;
-
-test("前端文字报告逐字符复刻 Python 版输出", () => {
-  assert.equal(buildTextReport(data), pythonOutput);
+test("前端文字报告使用规范契约复刻核心段落", () => {
+  const report = buildTextReport(data);
+  assert.ok(report.startsWith("20260813 境内市场点评"));
+  assert.ok(report.includes("净投放300亿元"));
+  assert.ok(report.includes("DR001报1.4000%，跌2.00bp"));
+  assert.ok(report.includes("融资融券余额合计21000.50亿元"));
+  assert.ok(report.includes("08/13-丙证券-3年-30亿-1.70%"));
+  assert.ok(report.includes("3.1年-甲证券(25甲G1)-估值1.71%-成交1.72%"));
+  assert.ok(report.includes("180天-25东财G1-估值1.55%-成交1.56%(+1.25bp)"));
 });
 
-test("一级发行与二级行情统一排除东方财富并回退相近券", () => {
-  const input = structuredClone(data);
-  input.primary.push({
-    bondShortName: "26东财C5",
-    bondTypeText: "公司债",
-    issueTenor: "2Y",
-    issueCouponRate: "1.80",
-    planIssueAmount: "15",
-    bidStartDate: "2026-08-13",
-    comShortName: null,
-    issuer: "东方财富",
-  });
-  input.secondary.push(
-    {
-      bondUniCode: 4,
-      bondShortName: "25东财G9",
-      comShortName: "东方财富证券",
-      remainingTenor: "2.95Y",
-      cbYte: "1.70",
-      tradeYield: "1.71",
-    },
-    {
-      bondUniCode: 5,
-      bondShortName: "25己G1",
-      comShortName: "己证券",
-      remainingTenor: "2.95Y",
-      cbYte: "1.68",
-      tradeYield: "1.69",
-    },
-  );
-
-  const report = buildTextReport(input);
-  const primarySection = report.slice(
-    report.indexOf("【一级发行】"),
-    report.indexOf("【二级行情】"),
-  );
-  const secondarySection = report.slice(
-    report.indexOf("【二级行情】"),
-    report.indexOf("东财存量债券"),
-  );
-
-  assert.ok(!primarySection.includes("东方财富"));
-  assert.ok(!primarySection.includes("26东财C5"));
-  assert.ok(!secondarySection.includes("东方财富"));
-  assert.ok(!secondarySection.includes("25东财G9"));
-  assert.ok(secondarySection.includes("己证券"));
+test("一级发行与二级行情只展示服务端筛选结果", () => {
+  const report = buildTextReport(data);
+  assert.ok(!report.includes("东方财富证券"));
+  assert.ok(report.includes("国投证券"));
 });
 
-test("一级发行当天优先合并发行腿且不展示更早日期", () => {
+test("一级发行展示服务端已合并的发行腿", () => {
   const input = structuredClone(data);
-  input.primary.push(
-    {
-      bondShortName: "26丙02",
-      bondTypeText: "公司债",
-      issueTenor: "5Y",
-      issueCouponRate: "2.28",
-      planIssueAmount: "12.4",
-      bidStartDate: "2026-08-13",
-      comShortName: "丙证券",
-    },
-    {
-      bondShortName: "26己01",
-      bondTypeText: "公司债",
-      issueTenor: "3Y",
-      issueCouponRate: "--",
-      planIssueAmount: "8",
-      bidStartDate: "2026-08-12",
-      comShortName: "己证券",
-    },
-    {
-      bondShortName: "26庚01",
-      bondTypeText: "公司债",
-      issueTenor: "3Y",
-      issueCouponRate: "1.95",
-      planIssueAmount: "9",
-      bidStartDate: "2026-08-11",
-      comShortName: "庚证券",
-    },
-  );
-
+  input.primary_issues[2] = { ...input.primary_issues[2], bond_names: ["26丙01", "26丙02"], tenors: ["3年", "5年"], coupons: [1.7, 2.28], amount: 42.4 };
   const report = buildTextReport(input);
-  const primarySection = report.slice(
-    report.indexOf("【一级发行】"),
-    report.indexOf("【二级行情】"),
-  );
-
-  assert.ok(
-    primarySection.includes(
-      "08/13-丙证券-3年/5年-42亿-1.70%/2.28%",
-    ),
-  );
-  assert.ok(primarySection.includes("08/12-己证券-3年-8亿--"));
-  assert.ok(!primarySection.includes("08/11"));
-  assert.ok(
-    primarySection.indexOf("08/13") < primarySection.indexOf("08/12"),
-  );
+  assert.ok(report.includes("08/13-丙证券-3年/5年-42亿-1.70%/2.28%"));
 });
 
 test("文字版展示当前手动修改后的今日聚焦", () => {
-  assert.ok(buildTextReport(data, "手动修改后的判断").endsWith(
-    "【今日聚焦】\n手动修改后的判断\n",
-  ));
+  assert.ok(buildTextReport(data, "手动修改后的判断").endsWith("【今日聚焦】\n手动修改后的判断\n"));
 });

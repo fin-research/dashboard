@@ -1,17 +1,6 @@
-// Derive the visual report's view objects from marketReport GraphQL raw rows.
-// Both the visual panels and the text-report replica read the same fields;
-// this layer only projects what the visual charts and tables need.
+// Project the API's normalized market-report contract into visual view objects.
 
-import {
-  isEastmoneyText,
-  isPublicBond,
-  median,
-  normalizeCompany,
-  number,
-  secondaryTenorYears,
-  string,
-} from "./rows.ts";
-import { primaryIssueDetails } from "./primary-issues.ts";
+import { median } from "./rows.ts";
 import type {
   ComparablePoint,
   InventoryPoint,
@@ -20,7 +9,6 @@ import type {
   OmoPoint,
   PrimaryIssueDetail,
   ReportData,
-  Row,
 } from "./types";
 
 export interface ReportDerived {
@@ -35,22 +23,24 @@ export interface ReportDerived {
 
 export function deriveReport(data: ReportData): ReportDerived {
   return {
-    omoHistory: omoHistoryPoints(data.omo),
-    funds: fundMetrics(data.rates),
-    governmentBonds: governmentBondMetrics(data.rates.bonds),
-    margin: marginSnapshot(data.margin),
-    primary: primaryPoints(data.primary, data.report_date),
-    comparable: comparablePoints(data.secondary),
-    inventory: inventoryPoints(data.inventory),
+    omoHistory: omoHistoryPoints(data.omo_operations),
+    funds: fundMetrics(data.funding_rates),
+    governmentBonds: governmentBondMetrics(data.government_bonds),
+    margin: data.margin,
+    primary: data.primary_issues,
+    comparable: comparablePoints(data.secondary_bonds),
+    inventory: [...data.inventory_bonds].sort(
+      (left, right) => left.tenor_years - right.tenor_years,
+    ),
   };
 }
 
-export function omoHistoryPoints(rows: Row[]): OmoPoint[] {
+export function omoHistoryPoints(rows: ReportData["omo_operations"]): OmoPoint[] {
   const totals = new Map<string, number>();
   for (const row of rows) {
-    const day = string(row.operationDate).slice(0, 10);
+    const day = row.operation_date;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
-    const amount = number(row.operationAmount);
+    const amount = row.amount_yi;
     if (amount === null) continue;
     totals.set(day, (totals.get(day) ?? 0) + amount);
   }
@@ -60,28 +50,21 @@ export function omoHistoryPoints(rows: Row[]): OmoPoint[] {
     .map(([day, net_amount]) => ({ day, net_amount }));
 }
 
-export function fundMetrics(rates: ReportData["rates"]): MarketMetric[] {
-  const picks: Array<[string, Row[]]> = [
-    ["DR001", rates.dr],
-    ["DR007", rates.dr],
-    ["DIBO001", rates.dibo],
-    ["DIBO007", rates.dibo],
-  ];
-  return picks.map(([label, rows]) => {
-    const row =
-      rows.find(
-        (item) => item.bondCode === label || item.bondShortName === label,
-      ) ?? {};
+export function fundMetrics(rates: ReportData["funding_rates"]): MarketMetric[] {
+  return ["DR001", "DR007", "DIBO001", "DIBO007"].map((label) => {
+    const row = rates.find((item) => item.code === label);
     return {
       label,
-      value: number(row.weightedYield),
-      change: number(row.weightedYieldUpDownValueBp),
+      value: row?.rate ?? null,
+      change: row?.change_bp ?? null,
       unit: "%",
     };
   });
 }
 
-export function governmentBondMetrics(rows: Row[]): MarketMetric[] {
+export function governmentBondMetrics(
+  rows: ReportData["government_bonds"],
+): MarketMetric[] {
   const picks: Array<[string, string]> = [
     ["1Y国债", "1Y"],
     ["5Y国债", "5Y"],
@@ -89,60 +72,35 @@ export function governmentBondMetrics(rows: Row[]): MarketMetric[] {
     ["30Y国债", "超长期限"],
   ];
   return picks.map(([label, axis]) => {
-    const row = pickTopCase(rows, "国债", axis) ?? {};
+    const row = rows.find(
+      (item) => item.category === "国债" && item.tenor === axis,
+    );
     return {
       label,
-      value: number(row.yield),
-      change: number(row.yieldSubYtdCloseBp),
+      value: row?.yield_rate ?? null,
+      change: row?.change_bp ?? null,
       unit: "%",
     };
   });
 }
 
-export function marginSnapshot(rows: Row[]): MarginSnapshot {
-  if (!rows.length) return { data_date: null, total: null, total_change: null };
-  const current = rows[0]!;
-  const previous = rows[1];
-  const currentTotal = number(current.TOTAL_RZRQYE);
-  const previousTotal = previous ? number(previous.TOTAL_RZRQYE) : null;
-  const text = string(current.DIM_DATE).slice(0, 10);
-  return {
-    data_date: /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null,
-    total: currentTotal === null ? null : currentTotal / 1e8,
-    total_change:
-      currentTotal !== null && previousTotal !== null
-        ? (currentTotal - previousTotal) / 1e8
-        : null,
-  };
+export function marginSnapshot(value: MarginSnapshot): MarginSnapshot {
+  return value;
 }
 
-export function primaryPoints(
-  rows: Row[],
-  reportDate: string,
-): PrimaryIssueDetail[] {
-  return primaryIssueDetails(rows, reportDate);
+export function primaryPoints(rows: PrimaryIssueDetail[]): PrimaryIssueDetail[] {
+  return rows;
 }
 
-export function comparablePoints(rows: Row[]): ComparablePoint[] {
-  const points: ComparablePoint[] = [];
-  for (const row of rows) {
-    const bond_name = string(row.bondShortName).trim().split(" ")[0] ?? "";
-    const issuer =
-      normalizeCompany(row.comShortName) || bond_name.slice(2, 4) || "未知";
-    const trade_yield = number(row.tradeYield);
-    const tenor_years = secondaryTenorYears(row.remainingTenor);
-    if (
-      isEastmoneyText(issuer) ||
-      isEastmoneyText(bond_name) ||
-      !isPublicBond(bond_name) ||
-      trade_yield === null ||
-      tenor_years === null ||
-      tenor_years > 5
-    ) {
-      continue;
-    }
-    points.push({ issuer, bond_name, tenor_years, trade_yield });
-  }
+export function comparablePoints(
+  rows: ReportData["secondary_bonds"],
+): ComparablePoint[] {
+  const points = rows.map(({ issuer, bond_name, tenor_years, trade_yield }) => ({
+    issuer,
+    bond_name,
+    tenor_years,
+    trade_yield,
+  }));
   return filterComparableOutliers(points).sort(
     (left, right) =>
       left.tenor_years - right.tenor_years ||
@@ -150,38 +108,8 @@ export function comparablePoints(rows: Row[]): ComparablePoint[] {
   );
 }
 
-export function inventoryPoints(rows: Row[]): InventoryPoint[] {
-  const points: InventoryPoint[] = [];
-  for (const row of rows) {
-    const tenor_years = number(row.tenor_years);
-    const valuation = number(row.valuation);
-    if (tenor_years === null || valuation === null) continue;
-    points.push({
-      bond_name: string(row.bondShortName) || "--",
-      tenor_years,
-      valuation,
-      trade_yield: number(row.trade_yield),
-      bid_yield: number(row.bid_yield),
-      ofr_yield: number(row.ofr_yield),
-    });
-  }
-  return points.sort((left, right) => left.tenor_years - right.tenor_years);
-}
-
-function pickTopCase(
-  rows: Row[],
-  ordinate: string,
-  abscissa: string,
-): Row | undefined {
-  return rows
-    .filter(
-      (row) =>
-        row.ordinateName === ordinate && row.abscissaName === abscissa,
-    )
-    .sort(
-      (left, right) =>
-        (number(right.tradeNum) ?? 0) - (number(left.tradeNum) ?? 0),
-    )[0];
+export function inventoryPoints(rows: InventoryPoint[]): InventoryPoint[] {
+  return [...rows].sort((left, right) => left.tenor_years - right.tenor_years);
 }
 
 function filterComparableOutliers(

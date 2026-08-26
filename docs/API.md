@@ -4,33 +4,36 @@
 
 ## 外部数据服务 `/data/*`
 
-浏览器只通过同源路径访问：
+Dashboard Worker 通过同源代理访问：
 
 - `GET /data/config`：默认报告配置。
-- `POST /data/graphql`：复杂、多资源选择查询；市场点评使用 `marketReport(date:, refresh:)`。
+- `POST /data/graphql`：复杂、多资源选择查询；市场点评使用带 `request` 参数的强类型根字段。
 - `POST /data/market-briefing/news?date=YYYY-MM-DD`：供 Worker 使用的新闻素材。
 
 本地 Vite 完整保留 `/data` 前缀并代理到 `DATA_PROXY_TARGET`。线上由独立数据服务处理，Dashboard Worker 不注册这些路由。
 
-`marketReport` 的字段变化必须与 `src/api.ts`、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/report`，也不要为视觉版或文字版增加单独的数据源。
+市场点评根字段的变化必须与 Worker 映射、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/report`，也不要为视觉版或文字版增加单独的数据源。
 
-浏览器请求示例：
+Worker 精准查询示例：
 
 ```graphql
-query MarketReport($date: Date!, $refresh: Boolean!) {
-  marketReport(date: $date, refresh: $refresh) {
-    reportDate
-    rates
-    equities { name close changePct }
-    industries { name changePct marketCapYuan }
-    primarySummary { currentAmount changeAmount }
-  }
+query MarketReport($request: MarketReportInput!) {
+  reportDate(request: $request)
+  fundingRates(request: $request) { code rate changeBp }
+  equities(request: $request) { name close changePct }
+  industries(request: $request) { name changePct marketCapYuan }
+  primarySummary(request: $request) { currentAmount changeAmount }
 }
 ```
 
-单一资源和写操作继续使用 REST：今日聚焦素材、热点快照、融资择时模型、二级池台账和资金日报都各自属于一个明确业务资源。当前不为这些路由建立第二套 GraphQL 服务。
+浏览器只通过 Dashboard REST 读取或保存市场点评；今日聚焦素材、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
 
 ## Dashboard Worker `/api/*`
+
+### 市场点评
+
+- `GET /api/market-report?date=YYYY-MM-DD[&refresh=true]`：优先返回 R2 日快照；缺失或刷新时请求 Data API 并覆盖 `market-briefing/YYYY-MM-DD.json`。
+- `PUT /api/market-report?date=YYYY-MM-DD`：同源保存完整规范报告与今日聚焦定稿，覆盖当天对象。
 
 ### 市场热点
 
@@ -58,7 +61,7 @@ query MarketReport($date: Date!, $refresh: Boolean!) {
 - `GET ?start=YYYY-MM-DD&end=YYYY-MM-DD`：区间周报。
 - `GET ?date=YYYY-MM-DD`：下载该日报表对应的原始 Excel。
 - `GET ?workflow=<id>`：查询导入 Workflow 状态。
-- `POST`：上传 Excel，成功归档并启动 Workflow 后返回 202。
+- `POST`：上传 Excel 到 `bond-ledger/.pending/` 并启动 Workflow，返回 202；导入成功后覆盖 `bond-ledger/YYYY-MM-DD.xlsx` 并删除临时对象。
 - `DELETE ?date=YYYY-MM-DD`：删除该日数据库业务数据，保留 R2 归档。
 
 ### 融资择时模型

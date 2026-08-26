@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ platform, setHeaders }) => {
 
   try {
     return {
-      reports: await listFundReports(platform?.env.FUND_REPORTS),
+      reports: await listFundReports(platform?.env.EASTMONEY),
       today: currentReportDate(),
       loadError: null,
     };

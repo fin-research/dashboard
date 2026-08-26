@@ -19,7 +19,7 @@ export const GET: RequestHandler = async ({ params, platform, url }) => {
   }
 
   try {
-    const object = await getFundReport(platform?.env.FUND_REPORTS, date);
+    const object = await getFundReport(platform?.env.EASTMONEY, date);
     return new Response(object.body as BodyInit, {
       headers: fundReportHeaders(object, date),
     });

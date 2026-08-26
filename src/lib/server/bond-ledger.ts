@@ -1,8 +1,9 @@
-import type { BondLedgerImportParams } from "$lib/bond-ledger/types";
-import type { RemoteBondLedgerFile } from "$lib/server/bond-ledger-repository";
+import type { BondLedgerImportParams } from "../bond-ledger/types.ts";
+import type { RemoteBondLedgerFile } from "./bond-ledger-repository.ts";
 
 const MAX_LEDGER_BYTES = 12 * 1024 * 1024;
-const LEDGER_PREFIX = "uploads/";
+const PENDING_LEDGER_PREFIX = "bond-ledger/.pending/";
+const LEDGER_PREFIX = "bond-ledger/";
 const XLSX_CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -27,13 +28,13 @@ export interface BondLedgerArchiveResponse {
 }
 
 type StoredBondLedger = Exclude<
-  Awaited<ReturnType<Env["BOND_LEDGER"]["get"]>>,
+  Awaited<ReturnType<Env["EASTMONEY"]["get"]>>,
   null
 >;
 
 export async function archiveBondLedgerRequest(
   request: Request,
-  bucket: Env["BOND_LEDGER"] | undefined,
+  bucket: Env["EASTMONEY"] | undefined,
   workflow: Env["BOND_LEDGER_IMPORT"] | undefined,
 ): Promise<BondLedgerArchiveResponse> {
   const metadata = validateUploadRequest(request);
@@ -44,7 +45,7 @@ export async function archiveBondLedgerRequest(
   }
   const uploadId = crypto.randomUUID();
   const uploadedAt = new Date().toISOString();
-  const key = `${LEDGER_PREFIX}${uploadId}.xlsx`;
+  const key = `${PENDING_LEDGER_PREFIX}${uploadId}.xlsx`;
   const object = await storage.put(key, request.body, {
     httpMetadata: {
       contentType: XLSX_CONTENT_TYPE,
@@ -101,10 +102,10 @@ export async function archiveBondLedgerRequest(
 }
 
 export async function getBondLedgerFile(
-  bucket: Env["BOND_LEDGER"] | undefined,
+  bucket: Env["EASTMONEY"] | undefined,
   file: RemoteBondLedgerFile,
 ): Promise<StoredBondLedger> {
-  const object = await requireBucket(bucket).get(file.key);
+  const object = await requireBucket(bucket).get(bondLedgerObjectKey(file.date));
   if (!object) {
     throw new BondLedgerUploadError(404, `${file.date} 的 R2 原始台账不存在`);
   }
@@ -177,6 +178,48 @@ export function validateLedgerDate(date: string): void {
   }
 }
 
+export function bondLedgerObjectKey(reportDate: string): string {
+  validateLedgerDate(reportDate);
+  return `${LEDGER_PREFIX}${reportDate}.xlsx`;
+}
+
+export async function finalizeBondLedgerObject(
+  bucket: Env["EASTMONEY"] | undefined,
+  pendingKey: string,
+  pendingEtag: string | null,
+  reportDate: string,
+): Promise<string> {
+  const storage = requireBucket(bucket);
+  if (!pendingKey.startsWith(PENDING_LEDGER_PREFIX)) {
+    throw new BondLedgerUploadError(400, "待归档台账路径无效");
+  }
+  const pending = await storage.get(pendingKey);
+  if (!pending) throw new BondLedgerUploadError(404, "待归档台账不存在");
+  if (pendingEtag && pending.etag !== pendingEtag) {
+    throw new BondLedgerUploadError(409, "待归档台账版本已变化");
+  }
+  const key = bondLedgerObjectKey(reportDate);
+  const stored = await storage.put(key, await pending.arrayBuffer(), {
+    httpMetadata: pending.httpMetadata,
+    customMetadata: {
+      ...pending.customMetadata,
+      reportDate,
+      archivedAt: new Date().toISOString(),
+    },
+  });
+  if (!stored) throw new BondLedgerUploadError(503, "台账定稿写入 R2 失败");
+  await storage.delete(pendingKey);
+  return key;
+}
+
+export async function deletePendingBondLedgerObject(
+  bucket: Env["EASTMONEY"] | undefined,
+  key: string,
+): Promise<void> {
+  if (!key.startsWith(PENDING_LEDGER_PREFIX)) return;
+  await requireBucket(bucket).delete(key);
+}
+
 function validateUploadRequest(request: Request): {
   fileName: string;
   size: number;
@@ -232,8 +275,8 @@ function validateUploadRequest(request: Request): {
 }
 
 function requireBucket(
-  bucket: Env["BOND_LEDGER"] | undefined,
-): Env["BOND_LEDGER"] {
+  bucket: Env["EASTMONEY"] | undefined,
+): Env["EASTMONEY"] {
   if (!bucket) {
     throw new BondLedgerUploadError(503, "R2 台账存储未配置");
   }

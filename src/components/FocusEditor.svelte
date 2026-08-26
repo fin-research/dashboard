@@ -11,19 +11,24 @@
 
   export let reportDate: string;
   export let generatedBriefing: MarketBriefing | null = null;
+  export let initialText = "";
+  export let finalizedAt: string | null = null;
   export let onTextChange: (value: string) => void = () => {};
   export let onBriefingApplied: (value: MarketBriefing) => void = () => {};
 
   const PLACEHOLDER =
     "1. 输入流动性、固收或权益市场的关键判断\n2. 每条聚焦一个结论，建议保留 2–3 条";
   let editor: HTMLDivElement;
-  let loadedDate = "";
+  let loadedSource = "";
   let html = "";
   let empty = true;
   let appliedBriefing: MarketBriefing | null = null;
 
-  $: if (reportDate && reportDate !== loadedDate) {
-    loadedDate = reportDate;
+  $: if (
+    reportDate &&
+    `${reportDate}:${finalizedAt ?? "draft"}` !== loadedSource
+  ) {
+    loadedSource = `${reportDate}:${finalizedAt ?? "draft"}`;
     try {
       const saved = window.localStorage.getItem(
         `${FOCUS_STORAGE_PREFIX}${reportDate}`,
@@ -31,9 +36,11 @@
       const legacy = window.localStorage.getItem(
         `${LEGACY_FOCUS_STORAGE_PREFIX}${reportDate}`,
       );
-      html = saved
-        ? migrateLegacyEmphasis(saved)
-        : plainTextToFocusHtml(legacy ?? "");
+      html = finalizedAt
+        ? plainTextToFocusHtml(initialText)
+        : saved
+          ? migrateLegacyEmphasis(saved)
+          : plainTextToFocusHtml(legacy ?? "");
       if (saved && html !== saved) {
         window.localStorage.setItem(
           `${FOCUS_STORAGE_PREFIX}${reportDate}`,

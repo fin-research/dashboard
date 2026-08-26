@@ -54,7 +54,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
         "eastmoney-bond-download",
         (client) => findBondLedgerFile(client, date),
       );
-      const object = await getBondLedgerFile(platform?.env.BOND_LEDGER, file);
+      const object = await getBondLedgerFile(platform?.env.EASTMONEY, file);
       return new Response(object.body as BodyInit, {
         headers: ledgerDownloadHeaders(object, file.fileName),
       });
@@ -76,7 +76,7 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
   try {
     const result = await archiveBondLedgerRequest(
       request,
-      platform?.env.BOND_LEDGER,
+      platform?.env.EASTMONEY,
       platform?.env.BOND_LEDGER_IMPORT,
     );
     return Response.json(result, {

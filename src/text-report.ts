@@ -1,20 +1,18 @@
-import {
-  isEastmoneyText,
-  isPublicBond,
-  normalizeCompany,
-  number,
-  parseTenorDays,
-  secondaryTenorYears,
-  strictNumber,
-  string,
-  type Row,
-} from "./rows.ts";
+import { number } from "./rows.ts";
 import {
   formatPrimaryAmount,
   formatPrimaryCoupons,
-  primaryIssueDetails,
 } from "./primary-issues.ts";
-import type { ReportData } from "./types";
+import type {
+  FundingRate,
+  GovernmentBond,
+  InventoryPoint,
+  MarginSnapshot,
+  OmoOperation,
+  PrimaryIssueDetail,
+  ReportData,
+  SecondaryBond,
+} from "./types";
 
 const FUTURES = [
   ["TL9999", "30年期主力合约", true],
@@ -27,10 +25,10 @@ export function buildTextReport(data: ReportData, focusText = ""): string {
   return `${data.report_date.replaceAll("-", "")} 境内市场点评
 
 【央行】
-${briefOmo(data.omo, data.report_date)}
+${briefOmo(data.omo_operations, data.report_date)}
 
 【利率】
-${bondMarket(data.rates)}
+${bondMarket(data)}
 
 【股市】
 ${stockMarket(data.stock_paragraphs)}
@@ -39,72 +37,73 @@ ${marginTrading(data.margin)}
 
 【一级发行】
 可比证券公司发行情况:${" "}
-${primaryIssue(data.primary, data.report_date)}
+${primaryIssue(data.primary_issues)}
 
 【二级行情】
 可比证券公司债券成交：(公募债)
-${secondaryMarket(data.secondary)}
+${secondaryMarket(data.secondary_bonds)}
 
 东财存量债券:${" "}
-${emBonds(data.inventory)}
+${emBonds(data.inventory_bonds)}
 
 【今日聚焦】
 ${focusText}
 `;
 }
 
-export function briefOmo(rows: Row[], reportDate: string): string {
+export function briefOmo(rows: OmoOperation[], reportDate: string): string {
   const dayRows = rows.filter(
-    (row) => string(row.operationDate).slice(0, 10) === reportDate,
+    (row) => row.operation_date === reportDate,
   );
   const inject = dayRows
-    .filter((row) => number(row.operationAmount)! > 0)
-    .sort((left, right) => number(left.operationAmount)! - number(right.operationAmount)!);
+    .filter((row) => (row.amount_yi ?? 0) > 0)
+    .sort((left, right) => left.amount_yi! - right.amount_yi!);
   const drain = dayRows
-    .filter((row) => number(row.operationAmount)! < 0)
-    .sort((left, right) => number(right.operationAmount)! - number(left.operationAmount)!);
+    .filter((row) => (row.amount_yi ?? 0) < 0)
+    .sort((left, right) => right.amount_yi! - left.amount_yi!);
   let text = "中国央行今日开展";
   inject.forEach((row, index) => {
     if (index === 1) text += "，并开展";
     else if (index > 1) text += "、";
-    text += `${string(row.duration).replaceAll("D", "天").replaceAll("M", "月").replaceAll("Y", "年")}期${string(row.operationName)}${compact(Math.abs(number(row.operationAmount)!))}亿元`;
-    const interest = strictNumber(row.interestRate);
+    text += `${row.duration.replaceAll("D", "天").replaceAll("M", "月").replaceAll("Y", "年")}期${row.operation_name}${compact(Math.abs(row.amount_yi!))}亿元`;
+    const interest = row.interest_rate;
     if (interest !== null) text += `，操作利率为${fixed(interest, 2)}%`;
   });
   text += `；今日${drain.length ? "有" : "无逆回购到期"}`;
   drain.forEach((row, index) => {
     if (index > 0) text += "、";
-    text += `${string(row.duration).replaceAll("D", "天").replaceAll("M", "月").replaceAll("Y", "年")}期${string(row.operationName)}${compact(Math.abs(number(row.operationAmount)!))}亿元`;
+    text += `${row.duration.replaceAll("D", "天").replaceAll("M", "月").replaceAll("Y", "年")}期${row.operation_name}${compact(Math.abs(row.amount_yi!))}亿元`;
   });
-  const net = dayRows.reduce((sum, row) => sum + number(row.operationAmount)!, 0);
+  const net = dayRows.reduce((sum, row) => sum + (row.amount_yi ?? 0), 0);
   if (net > 0) text += `；净投放${compact(net)}亿元。`;
   else if (net < 0) text += `；净回笼${compact(Math.abs(net))}亿元。`;
   else text += "；净投放为零。";
   return text;
 }
 
-function bondMarket(rates: ReportData["rates"]): string {
-  return [capitalBrief(rates.dr, rates.dibo), bondBrief(rates.bonds), futuresBrief(rates.futures)].join("\n\n");
+function bondMarket(data: ReportData): string {
+  return [capitalBrief(data.funding_rates), bondBrief(data.government_bonds), futuresBrief(data.futures)].join("\n\n");
 }
 
-function capitalBrief(dr: Row[], dibo: Row[]): string {
-  const funds = [findCode(dr, "DR001"), findCode(dr, "DR007"), findCode(dibo, "DIBO001"), findCode(dibo, "DIBO007")];
-  const summary = directionSummary(funds.map((row) => number(row.weightedYieldUpDownValueBp) ?? 0), "上行", "下行");
+function capitalBrief(rows: FundingRate[]): string {
+  const funds = ["DR001", "DR007", "DIBO001", "DIBO007"].map((code) => rows.find((row) => row.code === code) ?? { code, rate: null, change_bp: null });
+  const summary = directionSummary(funds.map((row) => row.change_bp ?? 0), "上行", "下行");
   return `今日银行间隔夜和7天期利率${summary}。\n截至17:00，${fundText(funds[0]!)}；${fundText(funds[1]!)}。\n同业拆借${fundText(funds[2]!)}；${fundText(funds[3]!)}。`;
 }
 
-function fundText(row: Row): string {
-  return `${string(row.bondCode || row.bondShortName)}报${formatNumber(row.weightedYield, 4)}%，${formatChange(row.weightedYieldUpDownValueBp, "涨", "跌", "与前日持平", "bp")}`;
+function fundText(row: FundingRate): string {
+  return `${row.code}报${formatNumber(row.rate, 4)}%，${formatChange(row.change_bp, "涨", "跌", "与前日持平", "bp")}`;
 }
 
-function bondBrief(rows: Row[]): string {
-  const items: Record<string, Row | undefined> = {
-    gov30: topCase(rows, "国债", "超长期限"), gov10: topCase(rows, "国债", "10Y"),
-    gov5: topCase(rows, "国债", "5Y"), gov1: topCase(rows, "国债", "1Y"),
-    cdb10: topCase(rows, "国开", "10Y"),
+function bondBrief(rows: GovernmentBond[]): string {
+  const find = (category: string, tenor: string) => rows.find((row) => row.category === category && row.tenor === tenor);
+  const items: Record<string, GovernmentBond | undefined> = {
+    gov30: find("国债", "超长期限"), gov10: find("国债", "10Y"),
+    gov5: find("国债", "5Y"), gov1: find("国债", "1Y"),
+    cdb10: find("国开", "10Y"),
   };
   const govLines = [["30年期国债", items.gov30], ["10年期国债", items.gov10], ["5年期国债", items.gov5], ["1年期国债", items.gov1]]
-    .flatMap(([label, row]) => row ? [bondText(label as string, row as Row)] : []);
+    .flatMap(([label, row]) => row ? [bondText(label as string, row as GovernmentBond)] : []);
   const cdbLine = items.cdb10 ? bondText("10年期国开债", items.cdb10) : "";
   if (!govLines.length && !cdbLine) return "今日利率债成交数据暂缺。";
   const parts = [`国债收益率${curveSummary(items)}。`];
@@ -113,13 +112,13 @@ function bondBrief(rows: Row[]): string {
   return parts.join("\n");
 }
 
-function bondText(label: string, row: Row): string {
-  return `${label}${string(row.bondCode || "--")}收益率${formatChange(row.yieldSubYtdCloseBp, "上行", "下行", "持平", "bp")}报${formatNumber(row.yield, 4)}%`;
+function bondText(label: string, row: GovernmentBond): string {
+  return `${label}${row.code || "--"}收益率${formatChange(row.change_bp, "上行", "下行", "持平", "bp")}报${formatNumber(row.yield_rate, 4)}%`;
 }
 
-function curveSummary(items: Record<string, Row | undefined>): string {
+function curveSummary(items: Record<string, GovernmentBond | undefined>): string {
   const order = ["gov30", "gov10", "gov5", "gov1"];
-  const signs = new Map(order.filter((key) => items[key]).map((key) => [key, sign(number(items[key]!.yieldSubYtdCloseBp) ?? 0)]));
+  const signs = new Map(order.filter((key) => items[key]).map((key) => [key, sign(items[key]!.change_bp ?? 0)]));
   const values = [...signs.values()];
   if (!values.length) return "成交数据暂缺";
   if (values.every((value) => value >= 0)) return "全面上行";
@@ -143,15 +142,15 @@ function curveSummary(items: Record<string, Row | undefined>): string {
   return parts.join("，") || "涨跌不一";
 }
 
-function futuresBrief(rows: Row[]): string {
+function futuresBrief(rows: ReportData["futures"]): string {
   const selected = FUTURES.flatMap(([code, label, includePrice]) => {
-    const row = rows.find((item) => item.contractCode === code);
+    const row = rows.find((item) => item.code === code);
     return row ? [{ row, label, includePrice }] : [];
   });
   if (!selected.length) return "国债期货成交数据暂缺。";
-  const values = selected.map(({ row }) => number(row.upDownValuePct) ?? 0);
+  const values = selected.map(({ row }) => row.change_pct ?? 0);
   const summary = directionSummary(values, "上涨", "下跌");
-  const lines = selected.map(({ row, label, includePrice }) => `${label}${formatChange(row.upDownValuePct, "涨", "跌", "持平", "%")}${includePrice ? `报${formatNumber(row.lastPrice, 4)}` : ""}`);
+  const lines = selected.map(({ row, label, includePrice }) => `${label}${formatChange(row.change_pct, "涨", "跌", "持平", "%")}${includePrice ? `报${formatNumber(row.last_price, 4)}` : ""}`);
   return `国债期货${summary}，${lines.join("，")}。`;
 }
 
@@ -159,17 +158,14 @@ function stockMarket(paragraphs: string[]): string {
   return paragraphs.length ? paragraphs.slice(0, 2).join("").trim() : "未找到今日收盘行情";
 }
 
-function marginTrading(rows: Row[]): string {
-  const today = marginRow(rows[0]!); const yesterday = marginRow(rows[1]!);
-  const change = (current: number, previous: number) => `${current >= previous ? "增加" : "减少"}${fixed(Math.abs(current - previous), 2)}亿元`;
-  const date = new Date(`${today.date.slice(0, 10)}T00:00:00`);
-  return `截至${date.getMonth() + 1}月${date.getDate()}日，沪深京三市融资融券余额合计${fixed(today.total, 2)}亿元，较前一交易日${change(today.total, yesterday.total)}；融资余额合计${fixed(today.financing, 2)}亿元，较前一交易日${change(today.financing, yesterday.financing)}；融券余额合计${fixed(today.lending, 2)}亿元，较前一交易日${change(today.lending, yesterday.lending)}。`;
+function marginTrading(snapshot: MarginSnapshot): string {
+  if (!snapshot.data_date || snapshot.total === null) return "融资融券数据暂缺。";
+  const change = (value: number | null) => value === null ? "数据暂缺" : `${value >= 0 ? "增加" : "减少"}${fixed(Math.abs(value), 2)}亿元`;
+  const date = new Date(`${snapshot.data_date}T00:00:00`);
+  return `截至${date.getMonth() + 1}月${date.getDate()}日，沪深京三市融资融券余额合计${fixed(snapshot.total, 2)}亿元，较前一交易日${change(snapshot.total_change)}；融资余额合计${formatNumber(snapshot.financing, 2)}亿元，较前一交易日${change(snapshot.financing_change)}；融券余额合计${formatNumber(snapshot.securities_lending, 2)}亿元，较前一交易日${change(snapshot.securities_lending_change)}。`;
 }
 
-function marginRow(row: Row) { return { date: string(row.DIM_DATE), total: number(row.TOTAL_RZRQYE)! / 1e8, financing: number(row.TOTAL_RZYE)! / 1e8, lending: number(row.TOTAL_RQYE)! / 1e8 }; }
-
-function primaryIssue(rows: Row[], reportDate: string): string {
-  const issues = primaryIssueDetails(rows, reportDate);
+function primaryIssue(issues: PrimaryIssueDetail[]): string {
   const lines: string[] = [];
   let section = "";
   for (const issue of issues) {
@@ -186,54 +182,43 @@ function primaryIssue(rows: Row[], reportDate: string): string {
   return lines.length ? lines.join("\n") : "今日暂无。";
 }
 
-function secondaryMarket(rows: Row[]): string {
-  const candidates = rows.flatMap((row) => {
-    const bond = string(row.bondShortName).trim().split(" ")[0] ?? "";
-    const valuation = number(row.cbYte); const trade = number(row.tradeYield); const tenor = secondaryTenorYears(row.remainingTenor);
-    return isPublicBond(bond) && !isEastmoneyText(row.comShortName) && !isEastmoneyText(row.bondShortName) && valuation !== null && trade !== null && tenor !== null ? [{ row, bondShortName: bond, cbYte: valuation, tradeYield: trade, tenorYears: tenor }] : [];
-  });
-  const selected: unknown[] = [];
+function secondaryMarket(rows: SecondaryBond[]): string {
+  const candidates = rows.filter((row) => row.valuation !== null);
+  const selected: string[] = [];
   for (const target of [3, 2, 1]) {
-    const remaining = candidates.filter((item) => !selected.includes(item.row.bondUniCode));
+    const remaining = candidates.filter((item) => !selected.includes(item.bond_id));
     if (!remaining.length) break;
-    const nearest = remaining.reduce((best, row) => Math.abs(row.tenorYears - target) < Math.abs(best.tenorYears - target) ? row : best);
-    selected.push(nearest.row.bondUniCode);
+    const nearest = remaining.reduce((best, row) => Math.abs(row.tenor_years - target) < Math.abs(best.tenor_years - target) ? row : best);
+    selected.push(nearest.bond_id);
   }
-  const lines = selected.map((code) => candidates.find((item) => item.row.bondUniCode === code)!).map((item) => {
-    const issuer = normalizeCompany(item.row.comShortName) || string(item.bondShortName).slice(2, 4) || "未知";
-    return `${formatSecondaryTenor(item.row.remainingTenor)}-${issuer}(${item.bondShortName})-估值${compact(item.cbYte)}%-成交${compact(item.tradeYield)}%`;
+  const lines = selected.map((code) => candidates.find((item) => item.bond_id === code)!).map((item) => {
+    return `${item.tenor_label.replaceAll("D", "天").replaceAll("Y", "年")}-${item.issuer}(${item.bond_name})-估值${compact(item.valuation!)}%-成交${compact(item.trade_yield)}%`;
   });
   if (lines.length === 1) lines.push("今日暂无。");
   return lines.join("\n");
 }
 
-function emBonds(rows: Row[]): string {
-  const candidates = rows.flatMap((row) => {
-    const valuation = number(row.cbYield); if (valuation === null) return [];
-    return [{ row, cbYield: valuation, tenorDays: number(row.remainingTenorDay) || parseTenorDays(row.remainingTenor) }];
-  }).sort((left, right) => left.tenorDays - right.tenorDays);
+function emBonds(rows: InventoryPoint[]): string {
+  const candidates = [...rows].sort((left, right) => left.tenor_years - right.tenor_years);
   const lines = candidates.map((item) => {
-    let line = `${string(item.row.remainingTenor || "--").replaceAll("D", "天").replaceAll("Y", "年")}-${string(item.row.bondShortName).trim() || "--"}-估值${compact(item.cbYield)}%`;
-    const trade = emTradeText(item.row); if (trade) line += `-${trade}`; return line;
+    let line = `${item.tenor_label.replaceAll("D", "天").replaceAll("Y", "年")}-${item.bond_name || "--"}-估值${compact(item.valuation)}%`;
+    const trade = emTradeText(item); if (trade) line += `-${trade}`; return line;
   });
   if (lines.length === 1) lines.push("今日暂无。");
   return lines.join("\n");
 }
 
-function emTradeText(row: Row): string {
-  const trade = number(row.tradeEntryPrice);
-  if (trade !== null) { const bp = number(row.tradeYieldSubCb); return `成交${compact(trade)}%${bp === null ? "" : `(${bp >= 0 ? "+" : ""}${fixed(bp, 2)}bp)`}`; }
-  const bid = number(row.bidYield) ?? number(row.bidEntryPrice); const ofr = number(row.ofrYield) ?? number(row.ofrEntryPrice);
+function emTradeText(row: InventoryPoint): string {
+  const trade = row.trade_yield;
+  if (trade !== null) { const bp = row.trade_spread_bp; return `成交${compact(trade)}%${bp === null ? "" : `(${bp >= 0 ? "+" : ""}${fixed(bp, 2)}bp)`}`; }
+  const bid = row.bid_yield ?? null; const ofr = row.ofr_yield ?? null;
   return [bid === null ? "" : `Bid${compact(bid)}%`, ofr === null ? "" : `Ofr${compact(ofr)}%`].filter(Boolean).join("-");
 }
 
-function topCase(rows: Row[], ordinate: string, abscissa: string): Row | undefined { return rows.filter((row) => row.ordinateName === ordinate && row.abscissaName === abscissa).sort((a, b) => number(b.tradeNum || 0)! - number(a.tradeNum || 0)!)[0]; }
-function findCode(rows: Row[], code: string): Row { const row = rows.find((item) => item.bondCode === code || item.bondShortName === code); if (!row) throw new Error(`Missing capital row: ${code}`); return row; }
 function directionSummary(values: number[], upWord: string, downWord: string): string { if (!values.length) return "数据暂缺"; if (values.every((v) => v >= 0)) return `全面${upWord}`; if (values.every((v) => v <= 0)) return `全面${downWord}`; const up = values.filter((v) => v > 0).length; const down = values.filter((v) => v < 0).length; return up > down ? `多数${upWord}` : down > up ? `多数${downWord}` : "涨跌不一"; }
 function formatChange(value: unknown, up: string, down: string, unchanged: string, unit: "bp" | "%"): string { const parsed = number(value); if (parsed === null || parsed === 0) return unchanged; return `${parsed < 0 ? down : up}${fixed(Math.abs(parsed), 2)}${unit}`; }
 function groupDirection(signs: Map<string, number>, keys: string[]): string { const values = keys.flatMap((key) => signs.has(key) ? [signs.get(key)!] : []); if (!values.length) return ""; if (values.some((v) => v > 0) && values.some((v) => v < 0)) return "分化"; if (values.some((v) => v > 0)) return "上行"; if (values.some((v) => v < 0)) return "下行"; return "持平"; }
 function curvePart(label: string, direction: string): string { return direction === "分化" ? `${label}分化` : `${label}${direction}`; }
-function formatSecondaryTenor(value: unknown): string { const years = secondaryTenorYears(value); return years === null ? string(value || "--") : years >= 1 ? `${fixed(years, 1)}年` : `${fixed(years * 365, 0)}天`; }
 function formatNumber(value: unknown, digits: number): string { const parsed = number(value); return parsed === null ? "--" : fixed(parsed, digits); }
 function fixed(value: number, digits: number): string {
   const fraction = floatFraction(value);

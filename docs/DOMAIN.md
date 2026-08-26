@@ -5,10 +5,11 @@
 ### 市场点评
 
 - 报告日期按 `Asia/Shanghai` 解释；开盘前默认日期逻辑由 `src/report-date.ts` 统一维护。
-- `/data/graphql` 的 `marketReport` 返回页面选择的各区块完整原始行和必要派生列。视觉版与文字版是同一业务报告的两种表达，不是两套口径。
-- OMO 文字输出按报告日过滤 `operationDate`；其他筛选、排序、分组和数字格式应与 `api/scripts/report_cli.py` 保持一致。
-- 一级发行只使用报告日和上一交易日数据。同日、同类型、同发行人的多期限合并展示；期限有序，金额取合计，缺票息显示 `-`。视觉与文字版必须共用 `src/primary-issues.ts`。
-- 二级成交从全量原始行中筛选公募风格债名、五年以内期限并剔除东方财富证券，再使用 Theil-Sen / MAD 残差过滤不可比成交。实现以 `src/report-view.ts` 为准。
+- Dashboard Worker 通过 `/data/graphql` 选择市场点评强类型根字段；响应字段直接位于 GraphQL `data` 下。Data API 负责上游编码、单位和业务筛选的规范化，不向 Dashboard 透传原始行。
+- Worker 按报告日读取 `market-briefing/YYYY-MM-DD.json`：命中直接返回，缺失才请求 Data API 并写入；显式刷新覆盖当天数据。视觉版与文字版读取同一快照，不是两套口径。
+- OMO 文字输出按报告日过滤规范字段 `operation_date`；排序和数字格式应与 `api/scripts/report_cli.py` 保持一致。
+- 一级发行只使用报告日和上一交易日数据。同日、同类型、同发行人的多期限合并、东财排除和缺失票息规范由 Data API 完成；视觉与文字版直接消费 `primary_issues`。
+- 二级成交的公募债名、五年期限和东财排除由 Data API 完成；Dashboard 仅继续使用 Theil-Sen / MAD 残差过滤不可比成交。
 
 ### 市场热点
 

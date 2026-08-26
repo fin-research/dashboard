@@ -7,6 +7,7 @@
   import {
     fetchReport,
     generateMarketBriefing,
+    saveMarketReport,
   } from "./api";
   import ChartHost from "./components/ChartHost.svelte";
   import CoreMetrics from "./components/CoreMetrics.svelte";
@@ -19,13 +20,9 @@
   import FocusEditor from "./components/FocusEditor.svelte";
   import TextReport from "./components/TextReport.svelte";
   import { exportReportImage } from "./export";
-  import { loadStoredFocusText } from "./focus-editor";
   import { chineseDateParts } from "./formatters";
+  import { globalMessages } from "./lib/global-messages";
   import { deriveReport, type ReportDerived } from "./report-view";
-  import {
-    resolveReportData,
-    type ReportCacheStorage,
-  } from "./report-cache";
   import { currentReportDate } from "./report-date";
   import {
     pathnameForReportView,
@@ -46,7 +43,15 @@
     omoHistory: [],
     funds: [],
     governmentBonds: [],
-    margin: { data_date: null, total: null, total_change: null },
+    margin: {
+      data_date: null,
+      total: null,
+      total_change: null,
+      financing: null,
+      financing_change: null,
+      securities_lending: null,
+      securities_lending_change: null,
+    },
     primary: [],
     comparable: [],
     inventory: [],
@@ -68,6 +73,9 @@
   let exportTimer: number | null = null;
   let activeView: ReportView = "visual";
   let focusText = "";
+  let savedFocusText = "";
+  let focusFinalizedAt: string | null = null;
+  let savingFocus = false;
 
   $: derived = data ? deriveReport(data) : EMPTY_DERIVED;
   $: dateParts = data
@@ -102,24 +110,18 @@
     const request = new AbortController();
     activeRequest = request;
     const requestedDate = selectedDate;
-    const storage = browserReportStorage();
     loading = true;
     errorMessage = "";
     try {
       const [report, chartModule] = await Promise.all([
-        resolveReportData(
-          storage,
-          requestedDate,
-          currentReportDate(),
-          refresh,
-          (reportDate, shouldRefresh) =>
-            fetchReport(reportDate, shouldRefresh, request.signal),
-        ),
+        fetchReport(requestedDate, refresh, request.signal),
         import("./charts"),
       ]);
       if (request.signal.aborted || selectedDate !== requestedDate) return;
       data = report;
-      focusText = loadStoredFocusText(report.report_date);
+      focusText = report.focus_text;
+      savedFocusText = report.focus_text;
+      focusFinalizedAt = report.finalized_at;
       charts = chartModule;
       loading = false;
     } catch (error) {
@@ -153,6 +155,27 @@
     if (generatedBriefing === briefing) generatedBriefing = null;
   }
 
+  async function saveFocus(): Promise<void> {
+    if (!data || savingFocus) return;
+    savingFocus = true;
+    try {
+      const snapshot = await saveMarketReport(data, focusText);
+      data = snapshot;
+      savedFocusText = snapshot.focus_text;
+      focusFinalizedAt = snapshot.finalized_at;
+      globalMessages.success(`${snapshot.report_date} 市场点评定稿已保存`, {
+        key: "market-report-save",
+      });
+    } catch (error) {
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "market-report-save" },
+      );
+    } finally {
+      savingFocus = false;
+    }
+  }
+
   function openDatePicker(): void {
     try {
       dateInput.showPicker?.();
@@ -184,14 +207,6 @@
   function showError(error: unknown): void {
     loading = false;
     errorMessage = error instanceof Error ? error.message : String(error);
-  }
-
-  function browserReportStorage(): ReportCacheStorage | null {
-    try {
-      return window.localStorage;
-    } catch {
-      return null;
-    }
   }
 
   function selectView(view: ReportView): void {
@@ -347,6 +362,20 @@
               </svg>
               <span>{briefingLoading ? "生成中" : "生成聚焦"}</span>
             </button>
+            <button
+              class:is-loading={savingFocus}
+              class="focus-save-button"
+              type="button"
+              disabled={savingFocus}
+              aria-label="保存当天市场点评定稿"
+              title="保存定稿"
+              onclick={saveFocus}
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M4 3.5h10.5L17 6v10.5H4z" />
+                <path d="M7 3.5v4h6v-4M7 16.5v-5h6v5" />
+              </svg>
+            </button>
           </header>
           {#if briefingError}
             <p class="focus-generation-error" role="alert">{briefingError}</p>
@@ -354,6 +383,8 @@
           <FocusEditor
             reportDate={data.report_date}
             {generatedBriefing}
+            initialText={savedFocusText}
+            finalizedAt={focusFinalizedAt}
             onTextChange={(value) => (focusText = value)}
             onBriefingApplied={handleBriefingApplied}
           />

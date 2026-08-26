@@ -1,5 +1,5 @@
 // Shared row parsing helpers used by the text-report replica and the visual
-// Report derivation layer. Values come from marketReport GraphQL raw rows.
+// Shared numeric and text helpers retained by report formatting and legacy parsers.
 
 export type Row = Record<string, unknown>;
 

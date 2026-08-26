@@ -10,6 +10,10 @@ import {
   type FailedBondLedgerInput,
 } from "../src/lib/server/bond-ledger-repository.ts";
 import { withPostgres } from "../src/lib/server/postgres.ts";
+import {
+  deletePendingBondLedgerObject,
+  finalizeBondLedgerObject,
+} from "../src/lib/server/bond-ledger.ts";
 
 const MAX_PERSISTED_PARSE_BYTES = 900 * 1024;
 
@@ -27,6 +31,7 @@ export class BondLedgerImportWorkflow extends WorkflowEntrypoint<
     transactionCount: number;
   }> {
     const params = event.payload;
+    let persisted = false;
     try {
       const parsed = await step.do(
         "parse Excel from R2",
@@ -35,7 +40,7 @@ export class BondLedgerImportWorkflow extends WorkflowEntrypoint<
           timeout: "2 minutes",
         },
         async () => {
-          const object = await this.env.BOND_LEDGER.get(params.r2Key);
+          const object = await this.env.EASTMONEY.get(params.r2Key);
           if (!object) {
             throw new NonRetryableError("R2 中找不到待解析的 Excel 文件");
           }
@@ -70,7 +75,7 @@ export class BondLedgerImportWorkflow extends WorkflowEntrypoint<
         },
       );
 
-      return await step.do(
+      const result = await step.do(
         "update Neon bond tables",
         {
           retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
@@ -88,6 +93,22 @@ export class BondLedgerImportWorkflow extends WorkflowEntrypoint<
               }),
           ),
       );
+      persisted = true;
+      await step.do(
+        "archive Excel by report date",
+        {
+          retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
+          timeout: "1 minute",
+        },
+        () =>
+          finalizeBondLedgerObject(
+            this.env.EASTMONEY,
+            params.r2Key,
+            params.r2Etag,
+            result.reportDate,
+          ),
+      );
+      return result;
     } catch (error) {
       const failure: FailedBondLedgerInput = {
         ...params,
@@ -116,6 +137,12 @@ export class BondLedgerImportWorkflow extends WorkflowEntrypoint<
             error: errorMessage(recordError),
           }),
         );
+      }
+      if (!persisted) {
+        await deletePendingBondLedgerObject(
+          this.env.EASTMONEY,
+          params.r2Key,
+        ).catch(() => undefined);
       }
       throw error;
     }

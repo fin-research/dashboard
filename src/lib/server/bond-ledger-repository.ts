@@ -14,6 +14,7 @@ import type {
   ParsedBondLedger,
 } from "../bond-ledger/types";
 import type { BondDatabaseClient } from "./postgres";
+import { bondLedgerObjectKey } from "./bond-ledger.ts";
 
 export type LedgerUploadStatus =
   | "processing"
@@ -306,7 +307,7 @@ export async function listBondLedgerInventory(
   const files = filesResult.rows.map((row) => ({
     date: row.date,
     fileName: row.file_name,
-    key: row.r2_key,
+    key: bondLedgerObjectKey(row.date),
     size: toFiniteNumber(row.file_size),
     etag: row.r2_etag,
     uploadedAt: row.uploaded_at,
@@ -341,7 +342,7 @@ export async function findBondLedgerFile(
   return {
     date: row.date,
     fileName: row.file_name,
-    key: row.r2_key,
+    key: bondLedgerObjectKey(row.date),
     size: toFiniteNumber(row.file_size),
     etag: row.r2_etag,
     uploadedAt: row.uploaded_at,

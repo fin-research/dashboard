@@ -10,6 +10,34 @@ export interface OmoPoint {
   net_amount: number;
 }
 
+export interface OmoOperation {
+  operation_date: string;
+  operation_name: string;
+  duration: string;
+  amount_yi: number | null;
+  interest_rate: number | null;
+}
+
+export interface FundingRate {
+  code: string;
+  rate: number | null;
+  change_bp: number | null;
+}
+
+export interface GovernmentBond {
+  category: string;
+  tenor: string;
+  code: string;
+  yield_rate: number | null;
+  change_bp: number | null;
+}
+
+export interface BondFuture {
+  code: string;
+  last_price: number | null;
+  change_pct: number | null;
+}
+
 export interface EquityPoint {
   name: string;
   close: number;
@@ -47,31 +75,40 @@ export interface ComparablePoint {
 
 export interface InventoryPoint {
   bond_name: string;
+  tenor_label: string;
   tenor_years: number;
   valuation: number;
   trade_yield: number | null;
+  trade_spread_bp: number | null;
   bid_yield?: number | null;
   ofr_yield?: number | null;
+}
+
+export interface SecondaryBond extends ComparablePoint {
+  bond_id: string;
+  tenor_label: string;
+  valuation: number | null;
 }
 
 export interface MarginSnapshot {
   data_date: string | null;
   total: number | null;
   total_change: number | null;
+  financing: number | null;
+  financing_change: number | null;
+  securities_lending: number | null;
+  securities_lending_change: number | null;
 }
 
 export interface ReportData {
   report_date: string;
   generated_at: string;
-  omo: Row[];
-  rates: {
-    dr: Row[];
-    dibo: Row[];
-    bonds: Row[];
-    futures: Row[];
-  };
+  omo_operations: OmoOperation[];
+  funding_rates: FundingRate[];
+  government_bonds: GovernmentBond[];
+  futures: BondFuture[];
   stock_paragraphs: string[];
-  margin: Row[];
+  margin: MarginSnapshot;
   equities: EquityPoint[];
   equity_data_time: string | null;
   turnover_yi: number | null;
@@ -79,9 +116,15 @@ export interface ReportData {
   industries: IndustryPoint[];
   industry_data_date: string;
   primary_summary: PrimarySummary;
-  primary: Row[];
-  secondary: Row[];
-  inventory: Row[];
+  primary_issues: PrimaryIssueDetail[];
+  secondary_bonds: SecondaryBond[];
+  inventory_bonds: InventoryPoint[];
+}
+
+export interface MarketReportSnapshot extends ReportData {
+  focus_text: string;
+  cached_at: string;
+  finalized_at: string | null;
 }
 
 export interface MarketBriefing {

@@ -35,13 +35,8 @@
   ],
   "r2_buckets": [
     {
-      "binding": "BOND_LEDGER",
-      "bucket_name": "bond-ledger",
-      "remote": true
-    },
-    {
-      "binding": "FUND_REPORTS",
-      "bucket_name": "bond-ledger",
+      "binding": "EASTMONEY",
+      "bucket_name": "eastmoney",
       "remote": true
     }
   ],
