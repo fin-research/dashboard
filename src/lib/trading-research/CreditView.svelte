@@ -107,19 +107,6 @@
     </div>
   </section>
 
-  <section class="tr-reconciliation" aria-labelledby="reconciliation-title">
-    <div class="tr-reconciliation__status">
-      <span aria-hidden="true"><WorkbenchIcon name="check" /></span>
-      <div><h2 id="reconciliation-title">授信口径校验通过</h2></div>
-    </div>
-    <dl>
-      <div><dt>周报发布口径</dt><dd>{creditSummary.total.toFixed(2)} <small>亿元</small></dd></div>
-      <div><dt>主表有效记录</dt><dd>{creditSummary.mainTableTotal.toFixed(2)} <small>亿元</small></dd></div>
-      <div><dt>范围调整</dt><dd>{creditSummary.scopeAdjustment.toFixed(2)} <small>亿元</small></dd></div>
-    </dl>
-    <p>已排除当前授信周报名单外的历史或合并机构记录 2.00 亿元。</p>
-  </section>
-
   <div class="tr-two-column tr-two-column--credit">
     <section class="tr-panel" aria-labelledby="credit-risk-title">
       <PanelHeading id="credit-risk-title" title="高使用率机构">

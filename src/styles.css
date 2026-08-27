@@ -369,37 +369,6 @@ h1 {
   border-right: 0;
 }
 
-.core-card {
-  padding: 8px clamp(8px, 0.8vw, 14px);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-}
-
-.core-card:nth-child(1) {
-  background: color-mix(in srgb, var(--color-down) 5%, var(--surface));
-}
-
-.core-card:nth-child(2) {
-  background: color-mix(in srgb, var(--color-primary) 5%, var(--surface));
-}
-
-.core-card:nth-child(3) {
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--surface));
-}
-
-.core-card:nth-child(4) {
-  background: color-mix(in srgb, var(--color-up) 5%, var(--surface));
-}
-
-.core-card:nth-child(5) {
-  background: color-mix(in srgb, #7669cf 5%, var(--surface));
-}
-
-.core-card:nth-child(6) {
-  background: color-mix(in srgb, #2b8196 5%, var(--surface));
-}
-
 .card__content {
   display: flex;
   min-width: 0;
@@ -449,7 +418,6 @@ h1 {
   white-space: nowrap;
 }
 
-.core-icon,
 .stat-icon {
   width: 3rem;
   height: 3rem;
@@ -463,46 +431,14 @@ h1 {
   stroke-width: 2.5;
 }
 
-.core-card .card__value {
-  font-size: 1.5rem;
-}
-
-.card__balance {
-  width: 3rem;
-  height: 3rem;
-  flex: 0 0 auto;
-}
-
-.core-icon--bank {
-  color: var(--green);
-  background: #e7f6f0;
-}
-
-.core-icon--liquidity,
 .stat-icon--margin {
   color: var(--blue);
   background: #eaf1fd;
 }
 
-.core-icon--bond,
 .stat-icon--turnover {
   color: #c66a23;
   background: #fff1e7;
-}
-
-.core-icon--equity {
-  color: var(--red);
-  background: #fceceb;
-}
-
-.core-icon--issuance {
-  color: #6f63c6;
-  background: #efedfb;
-}
-
-.core-icon--trade {
-  color: #277b91;
-  background: #e9f5f8;
 }
 
 .card--up .card__detail,
@@ -1291,11 +1227,6 @@ h2 {
     gap: 8px;
   }
 
-  .core-card {
-    padding-top: 6px;
-    padding-bottom: 6px;
-  }
-
   .panel-heading {
     min-height: 36px;
     padding-top: 3px;
@@ -1500,32 +1431,6 @@ h2 {
     gap: 8px;
   }
 
-  .core-card {
-    min-height: 82px;
-    justify-content: flex-start;
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .core-card .core-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
-
-  .core-card .card__balance {
-    display: none;
-  }
-
-  .core-card .card__label,
-  .core-card .card__detail,
-  .core-card .card__list-value {
-    font-size: 0.875rem;
-  }
-
-  .core-card .card__value {
-    font-size: 1.25rem;
-  }
-
   .report-content {
     display: grid;
     min-height: 0;
@@ -1726,26 +1631,6 @@ h2 {
     width: 19px;
   }
 
-  .core-card {
-    min-height: 78px;
-    gap: 6px;
-    padding: 7px 6px;
-  }
-
-  .core-card .core-icon {
-    width: 2.25rem;
-    height: 2.25rem;
-  }
-
-  .core-card .card__label,
-  .core-card .card__detail,
-  .core-card .card__list-value {
-    font-size: 0.8125rem;
-  }
-
-  .core-card .card__value {
-    font-size: 1.125rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

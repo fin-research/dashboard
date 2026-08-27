@@ -33,19 +33,6 @@
 </script>
 
 <div class="tr-view-stack">
-  <section class="tr-evidence-strip" aria-labelledby="research-evidence-title">
-    <span class="tr-evidence-strip__icon" aria-hidden="true"><WorkbenchIcon name="check" /></span>
-    <div>
-      <h2 id="research-evidence-title">研究快照校验通过</h2>
-    </div>
-    <dl>
-      <div><dt>校验结果</dt><dd>{researchSnapshot.validation.passedChecks}/10 通过</dd></div>
-      <div><dt>生成方式</dt><dd>{researchSnapshot.validation.mode}</dd></div>
-      <div><dt>规则版本</dt><dd>{researchSnapshot.validation.ruleVersion}</dd></div>
-      <div><dt>复核状态</dt><dd>{researchSnapshot.validation.reviewStatus}</dd></div>
-    </dl>
-  </section>
-
   <section aria-labelledby="market-rates-title">
     <SectionHeading
       id="market-rates-title"

@@ -69,6 +69,7 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
   assert.match(page, /aria-controls="tr-workbench-drawer"/);
   assert.match(page, /class="tr-sidebar-toggle"[\s\S]*?<WorkbenchIcon name="sidebar"/);
   assert.match(page, /class="tr-portal-link" href="\/"[\s\S]*?东方财富证券 · 资金管理部/);
+  assert.match(page, /class="tr-breadcrumb"[\s\S]*?交易研究工作台[\s\S]*?activeView\?\.label/);
   assert.doesNotMatch(page, /tr-brand|tr-back-link|tr-drawer__collapse/);
   assert.match(page, /href=\{workbenchViewPath\(view\.id\)\}/);
   assert.match(page, /<BondLedgerPage embedded \/>/);
@@ -78,6 +79,9 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
   assert.match(styles, /\.tr-table-scroll\s*\{[\s\S]*?overflow-x:\s*auto/);
   assert.match(styles, /grid-template-areas:\s*\n\s*"topbar topbar"\s*\n\s*"drawer workspace"/);
   assert.match(styles, /\.tr-workspace\s*\{[\s\S]*?overflow-y:\s*auto/);
+  assert.match(styles, /:root:has\(\.tr-workbench\)\s*\{[\s\S]*?overflow:\s*hidden/);
+  assert.match(styles, /body:has\(\.tr-workbench\)\s*\{[\s\S]*?overflow:\s*hidden/);
+  assert.match(styles, /\.tr-portal-link\s*\{[\s\S]*?font-size:\s*1rem/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(document, /浏览器不得直连数据库/);
   assert.match(document, /\/data\/trading-research\/trades/);
@@ -109,7 +113,7 @@ test("工作台数据图表统一通过 ChartHost 和 ECharts renderer", async (
   assert.doesNotMatch(styles, /\.tr-(progress|distribution-bar|usage-fill|curve-list)\b/);
 });
 
-test("工作台与并入模块复用统一指标卡和结构组件", async () => {
+test("市场点评、工作台与并入模块复用统一指标卡和结构组件", async () => {
   const viewUrls = [
     "../src/lib/trading-research/OverviewView.svelte",
     "../src/lib/trading-research/TradingView.svelte",
@@ -117,8 +121,10 @@ test("工作台与并入模块复用统一指标卡和结构组件", async () =>
     "../src/lib/trading-research/ResearchView.svelte",
     "../src/lib/trading-research/WorkflowView.svelte",
   ];
-  const [metricCard, panelHeading, workbenchPage, bond, financing, styles, design, ...views] = await Promise.all([
+  const [metricCard, coreMetrics, metricIcon, panelHeading, workbenchPage, bond, financing, styles, design, ...views] = await Promise.all([
     readFile(new URL("../src/components/MetricCard.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/CoreMetrics.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/MetricIcon.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/PanelHeading.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/WorkbenchPage.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/pages/BondLedgerPage.svelte", import.meta.url), "utf8"),
@@ -144,7 +150,13 @@ test("工作台与并入模块复用统一指标卡和结构组件", async () =>
   assert.match(metricCard, /iconPosition/);
   assert.match(metricCard, /iconPosition = "start"/);
   assert.match(metricCard, /color:\s*var\(--metric-accent\)/);
+  assert.match(metricCard, /border-radius:\s*50%/);
+  assert.match(metricCard, /stroke-width:\s*2\.5/);
   assert.doesNotMatch(metricCard, /text-overflow:\s*ellipsis/);
+  assert.match(coreMetrics, /MetricCard from "\.\/MetricCard\.svelte"/);
+  assert.match(coreMetrics, /<MetricCard/);
+  assert.doesNotMatch(coreMetrics, /core-card|card__balance/);
+  assert.match(metricIcon, /class=\{`metric-icon metric-icon--\$\{icon\}`\}/);
   assert.match(panelHeading, /tr-panel-heading__controls/);
   assert.match(styles, /\.tr-panel-heading\s*\{[\s\S]*?display:\s*grid/);
   assert.match(styles, /\.tr-panel-heading--wrap \.tr-table-controls\s*\{[\s\S]*?flex-wrap:\s*nowrap/);
@@ -159,4 +171,21 @@ test("工作台与并入模块复用统一指标卡和结构组件", async () =>
   assert.match(design, /共享组件归属与复用顺序/);
   assert.match(design, /src\/components\/MetricCard\.svelte/);
   assert.match(design, /禁止先在页面内实现/);
+});
+
+test("工作台不再展示数据覆盖与校验状态模块", async () => {
+  const [overview, credit, research, workflow, demoData, styles] = await Promise.all([
+    readFile(new URL("../src/lib/trading-research/OverviewView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/CreditView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/ResearchView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/WorkflowView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/demo-data.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/workbench.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.doesNotMatch(overview, /数据覆盖|tr-coverage-grid|已校验/);
+  assert.doesNotMatch(credit, /授信口径校验通过|tr-reconciliation/);
+  assert.doesNotMatch(research, /研究快照校验通过|tr-evidence-strip/);
+  assert.doesNotMatch(`${workflow}\n${demoData}`, /发布口径校验通过/);
+  assert.doesNotMatch(styles, /tr-(coverage-grid|reconciliation|evidence-strip)/);
 });

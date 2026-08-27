@@ -33,7 +33,7 @@
         </div>
         <label>
           <span>自然语言描述</span>
-          <textarea readonly rows="4">截至2026年8月21日，授信总额度3448.35亿元，已使用1022.5955亿元，发布口径校验通过。</textarea>
+          <textarea readonly rows="4">截至2026年8月21日，授信总额度3448.35亿元，已使用1022.5955亿元，可用额度2425.7545亿元。</textarea>
         </label>
         <div class="tr-form-row">
           <label><span>周报批次</span><input readonly value="CREDIT-20260821" /></label>

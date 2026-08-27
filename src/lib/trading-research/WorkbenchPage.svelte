@@ -104,7 +104,13 @@
         <a class="tr-portal-link" href="/" aria-label="返回市场研究门户">
           东方财富证券 · 资金管理部
         </a>
-        <h1>{activeView?.label}</h1>
+        <nav class="tr-breadcrumb" aria-label="当前位置">
+          <ol>
+            <li><a href="/trading-research">交易研究工作台</a></li>
+            <li class="tr-breadcrumb__separator" aria-hidden="true">/</li>
+            <li aria-current="page"><h1>{activeView?.label}</h1></li>
+          </ol>
+        </nav>
       </div>
     </div>
     <div class="tr-topbar__meta">

@@ -5,7 +5,7 @@
 </script>
 
 <svg
-  class={`core-icon core-icon--${icon}`}
+  class={`metric-icon metric-icon--${icon}`}
   viewBox="0 0 32 32"
   aria-hidden="true"
   focusable="false"

@@ -2,30 +2,42 @@
   import type { ReportDerived } from "../report-view";
   import type { ReportData } from "../types";
   import { coreMetricCards } from "../view-model";
+  import MetricCard from "./MetricCard.svelte";
   import MetricIcon from "./MetricIcon.svelte";
 
   export let data: ReportData;
   export let derived: ReportDerived;
 
   $: cards = coreMetricCards(data, derived);
+
+  const metricToneByIcon = {
+    bank: "green",
+    liquidity: "blue",
+    bond: "orange",
+    equity: "red",
+    issuance: "purple",
+    trade: "cyan",
+    leverage: "blue",
+    profit: "green",
+  } as const;
+
+  function detailTone(valueTone: string): string {
+    if (valueTone === "up") return "tone-up";
+    if (valueTone === "down") return "tone-down";
+    if (valueTone === "inject") return "tone-inject";
+    if (valueTone === "withdraw") return "tone-withdraw";
+    return "tone-flat";
+  }
 </script>
 
 {#each cards as item (item.label)}
-  <article
-    class={`card card--segmented core-card card--${item.valueTone}${item.lines ? " card--list" : ""}`}
-  >
-    <MetricIcon icon={item.icon} />
-    <div class="card__content">
-      <span class="card__label">{item.label}</span>
-      {#if item.lines}
-        {#each item.lines as line}
-          <span class="card__list-value">{line}</span>
-        {/each}
-      {:else}
-        <strong class="card__value">{item.value ?? "—"}</strong>
-        <small class="card__detail">{item.detail ?? ""}</small>
-      {/if}
-    </div>
-    <span class="card__balance" aria-hidden="true"></span>
-  </article>
+  <MetricCard
+    label={item.label}
+    value={item.value ?? "—"}
+    detail={item.detail ?? ""}
+    detailTone={detailTone(item.valueTone)}
+    tone={metricToneByIcon[item.icon]}
+    iconComponent={MetricIcon}
+    iconProps={{ icon: item.icon }}
+  />
 {/each}

@@ -52,6 +52,8 @@
     <span class="research-metric-card__icon" aria-hidden="true">
       <IconComponent {...iconProps} />
     </span>
+  {:else if IconComponent}
+    <span class="research-metric-card__balance" aria-hidden="true"></span>
   {/if}
 
   <div class="research-metric-card__content">
@@ -73,6 +75,8 @@
     <span class="research-metric-card__icon" aria-hidden="true">
       <IconComponent {...iconProps} />
     </span>
+  {:else if IconComponent}
+    <span class="research-metric-card__balance" aria-hidden="true"></span>
   {/if}
 </article>
 
@@ -81,11 +85,14 @@
     --metric-accent: var(--color-primary, #2f6fd6);
     --metric-soft: var(--color-primary-soft, #eaf1fd);
     display: flex;
+    width: 100%;
+    height: 100%;
     min-width: 0;
-    min-height: 98px;
+    min-height: 0;
     align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
+    justify-content: space-evenly;
+    gap: 8px;
+    padding: 8px clamp(8px, 0.8vw, 14px);
     border: 1px solid var(--border, #d8e2f0);
     border-radius: var(--radius-card, 10px);
     color: var(--text-1, #172033);
@@ -94,47 +101,45 @@
   }
 
   .research-metric-card--icon-end {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    flex-direction: row;
   }
 
   .research-metric-card--compact {
-    min-height: 86px;
-    padding: 12px 14px;
+    padding-block: 6px;
   }
 
   .research-metric-card--blue,
   .research-metric-card--primary {
-    --metric-accent: #2f6fed;
+    --metric-accent: #2f6fd6;
     --metric-soft: #eaf1fd;
   }
 
   .research-metric-card--cyan {
-    --metric-accent: #0ba5ec;
-    --metric-soft: #f0f9ff;
+    --metric-accent: #277b91;
+    --metric-soft: #e9f5f8;
   }
 
   .research-metric-card--teal,
   .research-metric-card--green,
   .research-metric-card--good {
-    --metric-accent: #16a394;
-    --metric-soft: #e8f7f0;
+    --metric-accent: #12a873;
+    --metric-soft: #e7f6f0;
   }
 
   .research-metric-card--orange {
-    --metric-accent: #f79009;
-    --metric-soft: #fff2e8;
+    --metric-accent: #c66a23;
+    --metric-soft: #fff1e7;
   }
 
   .research-metric-card--purple {
-    --metric-accent: #6941c6;
-    --metric-soft: #f2edff;
+    --metric-accent: #6f63c6;
+    --metric-soft: #efedfb;
   }
 
   .research-metric-card--red,
   .research-metric-card--bad {
     --metric-accent: #d92d20;
-    --metric-soft: #fff0ef;
+    --metric-soft: #fceceb;
   }
 
   .research-metric-card--neutral {
@@ -143,18 +148,18 @@
   }
 
   .research-metric-card__content {
-    display: grid;
+    display: flex;
     min-width: 0;
     flex: 1;
-    gap: 4px;
-    align-content: center;
+    justify-content: center;
+    flex-direction: column;
   }
 
   .research-metric-card__label {
     color: var(--text-3, #667085);
-    font-size: 0.875rem;
+    font-size: 1rem;
     font-weight: bold;
-    line-height: 1.3;
+    line-height: 1.2;
   }
 
   .research-metric-card__value {
@@ -169,16 +174,16 @@
   .research-metric-card__value strong {
     min-width: 0;
     color: var(--text-1, #172033);
-    font-size: clamp(1.25rem, 2vw, 1.5rem);
+    font-size: 1.5rem;
     font-weight: bolder;
     letter-spacing: -0.025em;
-    line-height: 1.2;
+    line-height: 1.5;
     overflow-wrap: anywhere;
   }
 
   .research-metric-card__value span {
     color: var(--text-3, #667085);
-    font-size: 0.875rem;
+    font-size: 1rem;
   }
 
   .research-metric-card__detail {
@@ -186,7 +191,7 @@
     color: var(--metric-accent);
     font-size: 1rem;
     font-weight: normal;
-    line-height: 1.3;
+    line-height: 1.2;
     overflow-wrap: anywhere;
   }
 
@@ -194,20 +199,34 @@
     font-weight: bold;
   }
 
+  .research-metric-card__detail :global(.tone-inject) {
+    color: #12805c;
+  }
+
+  .research-metric-card__detail :global(.tone-withdraw) {
+    color: #d92d20;
+  }
+
   .research-metric-card__icon {
     display: grid;
-    width: 42px;
-    height: 42px;
-    flex: 0 0 42px;
+    width: 3rem;
+    height: 3rem;
+    flex: 0 0 3rem;
     place-items: center;
-    border-radius: var(--radius-control, 8px);
+    border-radius: 50%;
     color: var(--metric-accent);
     background: var(--metric-soft);
   }
 
+  .research-metric-card__balance {
+    width: 3rem;
+    height: 3rem;
+    flex: 0 0 3rem;
+  }
+
   .research-metric-card__icon :global(svg) {
-    width: 22px;
-    height: 22px;
+    width: 3rem;
+    height: 3rem;
     padding: 0;
     color: inherit;
     background: transparent;
@@ -215,19 +234,66 @@
     stroke: currentColor;
     stroke-linecap: round;
     stroke-linejoin: round;
-    stroke-width: 1.8;
+    stroke-width: 2.5;
   }
 
-  @media (max-width: 520px) {
+  @media (max-width: 900px) {
     .research-metric-card {
-      min-height: 90px;
-      padding: 12px;
+      min-height: 82px;
+      justify-content: flex-start;
+      padding: 8px;
+    }
+
+    .research-metric-card__icon,
+    .research-metric-card__icon :global(svg) {
+      width: 2.5rem;
+      height: 2.5rem;
     }
 
     .research-metric-card__icon {
-      width: 38px;
-      height: 38px;
-      flex-basis: 38px;
+      flex-basis: 2.5rem;
+    }
+
+    .research-metric-card__balance {
+      display: none;
+    }
+
+    .research-metric-card__label,
+    .research-metric-card__detail,
+    .research-metric-card__value span {
+      font-size: 0.875rem;
+    }
+
+    .research-metric-card__value strong {
+      font-size: 1.25rem;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .research-metric-card {
+      min-height: 78px;
+      gap: 6px;
+      padding: 7px 6px;
+    }
+
+    .research-metric-card__icon,
+    .research-metric-card__icon :global(svg) {
+      width: 2.25rem;
+      height: 2.25rem;
+    }
+
+    .research-metric-card__icon {
+      flex-basis: 2.25rem;
+    }
+
+    .research-metric-card__label,
+    .research-metric-card__detail,
+    .research-metric-card__value span {
+      font-size: 0.8125rem;
+    }
+
+    .research-metric-card__value strong {
+      font-size: 1.125rem;
     }
   }
 </style>

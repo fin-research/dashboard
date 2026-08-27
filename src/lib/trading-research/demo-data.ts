@@ -50,7 +50,7 @@ export const workbenchViews: Array<{
     id: "research",
     label: "研究辅助",
     title: "研究辅助",
-    context: "已校验的货币市场、存单与国债曲线快照",
+    context: "货币市场、存单与国债曲线快照",
     icon: "research",
   },
   {
@@ -289,7 +289,7 @@ export const workflowDemos = [
     type: "授信周报",
     title: "授信周报（截至2026-08-21）",
     businessKey: "CREDIT-20260821",
-    detail: "授信总额度3448.35亿元，已使用1022.5955亿元，发布口径校验通过。",
+    detail: "授信总额度3448.35亿元，已使用1022.5955亿元，可用额度2425.7545亿元。",
     state: "授信主管复核",
     currentStep: 1,
     steps: ["授信专员提交", "授信主管复核", "周报待导出", "已导出"],
