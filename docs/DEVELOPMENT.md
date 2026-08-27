@@ -30,6 +30,7 @@ git diff --check
 - 报告口径：运行 `report-view`、`text-report`、`primary-issues` 相关测试，并核对视觉/文字共用字段。
 - 热点：运行热点、快照、AI Gateway 测试；必要时在本地 D1 请求 GET/POST。
 - 二级池：运行 `bond-ledger` 测试；解析或事务变化先使用 `pnpm bond:db:backfill` 只读盘点。
+- 授信：运行 `tests/credit.test.mjs`，并对实际 Excel 执行 `pnpm credit:import -- --file <xlsx> --date YYYY-MM-DD --dry-run`，核对一览表和周报两套口径后再写入。
 - Worker binding：运行 `pnpm worker:typegen` 后检查生成差异，再运行 `pnpm build`。
 
 ## 数据库
@@ -38,6 +39,8 @@ git diff --check
 - D1 远端 migration：`pnpm db:migrate:remote`；只在明确的 schema 交付任务中执行。
 - Neon migration：配置直连 `DATABASE_URL` 后运行 `pnpm bond:db:migrate`。
 - 融资择时 schema：配置同一 Neon `DATABASE_URL` 后运行 `pnpm financing-model:db:migrate`。
+- 授信 schema：配置同一 Neon `DATABASE_URL` 后运行 `pnpm credit:db:migrate`。
+- 授信导入：先运行 `pnpm credit:import -- --file <xlsx> --date YYYY-MM-DD --dry-run`；确认报告日、目标数据库和汇总后，去掉 `--dry-run` 写入。再次导入同一日期会在单事务内替换当日记录，不产生导入审计历史。
 - 台账回填默认只读；`--apply` 会写数据库，必须先确认目标环境和授权。
 
 ## 发布

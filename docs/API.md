@@ -71,6 +71,14 @@ query MarketReport($request: MarketReportInput!) {
 - `PATCH /api/financing-model/conclusion`：追加人工整体结论修订；请求含 `runId`、`verdict`、`preferredWindow`、`narrative`。
 - `POST /api/financing-model/sell-side`：按 `runId` 使用 AI Search 与 AI Gateway 生成并追加卖方观点，成功为 201。
 
+### 授信管理
+
+- `GET /api/credit`：读取最新授信报告日。
+- `GET /api/credit?date=YYYY-MM-DD`：读取指定报告日；无该日期记录返回 404，无数据库连接返回 503，无效日期返回 400。
+- 响应同时返回一览表口径 `summary`、周报名单口径 `weeklySummary`、各自的上一报告日汇总、机构和分项、授信额度变动、使用额度变动、预警及当前数据质量提示。
+- 周环比基准是小于当前日期的上一可用报告日，不要求恰好相隔七天。授信额度变动和使用额度变动分开计算，新增但使用额为零的机构不进入使用额度变动。
+- 该资源只读并使用 `Cache-Control: no-store`；Excel 解析和数据库写入只由本地命令执行。
+
 ## 通用约定
 
 - JSON 错误使用 `{ "error": "可公开信息" }`；服务端日志可记录诊断信息，但不得包含 Secret 或完整敏感输入。

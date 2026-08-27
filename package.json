@@ -17,6 +17,8 @@
     "bond:db:migrate": "node scripts/apply-bond-migrations.mjs",
     "bond:db:backfill": "node scripts/backfill-bond-ledgers.mjs",
     "financing-model:db:migrate": "node scripts/apply-financing-model-migrations.mjs",
+    "credit:db:migrate": "node scripts/apply-credit-migrations.mjs",
+    "credit:import": "node --experimental-strip-types scripts/import-credit-workbook.ts",
     "db:sync:remote": "node scripts/sync-remote-d1.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",

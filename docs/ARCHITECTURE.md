@@ -16,11 +16,14 @@ Browser
                           ├→ D1
                           ├→ AI Gateway
                           ├→ R2
-                          └→ Workflow → Hyperdrive → Neon bond
+                          ├→ Workflow → Hyperdrive → Neon bond
+                          └→ Hyperdrive → Neon credit
 
 quant pipeline ──────────→ Neon financing_model
 Browser /financing-model → Worker → Hyperdrive → financing_model
                                   └→ AI Search MCP → AI Gateway
+
+Local credit Excel ──────→ local parser → Neon credit
 ```
 
 ## 页面与派生层
@@ -31,7 +34,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
-- `/trading-research` 当前从 `src/lib/trading-research/demo-data.ts` 读取冻结演示数据；总览、交易、授信、研究、流程、二级池和融资择时共享同一抽屉导航。二级池与融资择时复用原页面组件及既有数据链路，其余五个迁入视图不读取 Excel、不访问数据库，也不产生流程写入。未来接入边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
+- `/trading-research` 的授信管理通过 `/api/credit` 读取 Neon `credit` 日报；总览复用其最新可用额度。交易、研究和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 
 ## 服务端模块
 
@@ -43,6 +46,7 @@ Browser /financing-model → Worker → Hyperdrive → financing_model
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。
+- `src/lib/server/credit-repository.ts` 封装 `credit` schema 的日报写入、历史日期读取和相邻报告日比较；Worker 读取仍复用短生命周期 PostgreSQL 连接。
 - `src/lib/server/financing-model-repository.ts` 读取 quant 快照并追加人工结论和卖方观点；`src/lib/server/financing-model-research.ts` 按 `AI.md` 调用 AI Search MCP，再通过统一 AI Gateway 生成结构化交叉验证。
 
 ## 核心数据流
@@ -69,11 +73,13 @@ quant pipeline → 本地结构化 JSON → Neon `financing_model.model_run` 追
 
 ### 交易研究工作台
 
-当前：迁入项目冻结快照 → `src/lib/trading-research/demo-data.ts` → `/trading-research` 五个只读业务视图；`/bond` 与 `/financing-model` 的同一页面组件同时装配到工作台子路径。
+授信链路：本地 Excel → `scripts/import-credit-workbook.ts` 解析“授信一览表”和“授信周报” → Neon `credit` 日报表；浏览器 `/trading-research/credit` → `/api/credit` → Hyperdrive → Neon。周报比较当前报告日与上一可用报告日，不在前端重算数据库事实。
+
+其他迁入模块当前仍由冻结数据 → `src/lib/trading-research/demo-data.ts` → 对应只读视图；`/bond` 与 `/financing-model` 的同一页面组件同时装配到工作台子路径。
 
 工作台路由使用真实 path：`/trading-research`、`/trading-research/trading`、`/trading-research/credit`、`/trading-research/research`、`/trading-research/workflow`、`/trading-research/bond`、`/trading-research/financing-model`。不使用 `?view=`；原 `/bond`、`/financing-model` 保留。
 
-后续：业务数据库 → `api` 仓库 `/data/trading-research/*` → dashboard 浏览器。浏览器不得直连数据库；物理表和权限方案未确认前，不写入现有 `bond` 或 `financing_model` schema。
+后续：交易、研究与流程业务数据库 → 服务端接口 → dashboard 浏览器。浏览器不得直连数据库；所有授信数据只写 `credit` schema，不交叉写入 `bond` 或 `financing_model`。
 
 ## 依赖规则
 

@@ -1,6 +1,7 @@
 import { Client } from "pg";
 
-export type BondDatabaseClient = Pick<Client, "query">;
+export type DatabaseClient = Pick<Client, "query">;
+export type BondDatabaseClient = DatabaseClient;
 
 export async function withPostgres<T>(
   connectionString: string | undefined,

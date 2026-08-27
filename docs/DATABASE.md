@@ -46,6 +46,22 @@ Worker 只绑定私有 `eastmoney` R2 bucket，并通过固定小写前缀隔离
 
 资金日报当前不需要 D1/Neon 索引：上传文件名已经提供日期，公开 URL 和 R2 key 都可由日期直接确定；历史列表只枚举 `fund-reports/` 固定前缀并过滤严格日期文件名。需要审批或同日报告的版本历史时再增加独立元数据模型。
 
+## Neon：授信管理
+
+Worker 通过 `HYPERDRIVE` 访问 `credit` schema；本地导入脚本使用直连 `DATABASE_URL`：
+
+- `daily_summary`：以 `report_date` 为主键，保存一览表口径、周报名单口径、当前源文件说明和数据质量提示。
+- `institution_daily`：以 `(report_date, institution_name)` 为主键，保存机构授信、使用、期限、经办信息及是否纳入周报名单。
+- `item_daily`：以 `(report_date, institution_name, item_type)` 为主键，保存标准化分项额度、已使用和可用余额。
+
+规则：
+
+- migration 只放 `credit-migrations/`，配置直连 `DATABASE_URL` 后运行 `pnpm credit:db:migrate`。
+- Excel 只在本地解析；导入必须显式指定报告日期，并先使用 `--dry-run` 核对机构数、两套汇总和质量提示。
+- 不建立业务导入审计表，也不保存导入批次历史。同一报告日期在全局锁、日期锁和单事务内替换三张日报表记录，其他日期保持不变。
+- 一览表口径与周报名单口径分别由机构集合聚合，不允许使用固定差额修正。
+- Worker API 只读；浏览器不接收 Excel、不直连 Neon，也不写授信表。
+
 ## Neon：融资择时模型
 
 Worker 通过同一 `HYPERDRIVE` 访问 `financing_model` schema：
@@ -65,4 +81,5 @@ Worker 通过同一 `HYPERDRIVE` 访问 `financing_model` schema：
 
 - D1：本地应用 migration，运行热点快照和证据测试。
 - Neon：在 PostgreSQL 兼容环境应用对应 schema migration，检查约束、索引、事务回滚和追加顺序。
-- 导入解析变化：先运行只读回填盘点；只有明确授权并使用 `--apply` 才写入。
+- 二级池导入解析变化：先运行只读回填盘点；只有明确授权并使用 `--apply` 才写入。
+- 授信导入解析变化：先运行 `pnpm credit:import -- --file <xlsx> --date YYYY-MM-DD --dry-run`；确认目标环境后去掉 `--dry-run` 写入。

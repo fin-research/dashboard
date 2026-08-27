@@ -1,14 +1,16 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
+  import { fetchCreditReport } from "../credit/client.ts";
+  import type { CreditReportResponse } from "../credit/types.ts";
   import Badge from "./Badge.svelte";
   import PanelHeading from "./PanelHeading.svelte";
   import SectionHeading from "./SectionHeading.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import {
-    creditSummary,
-    demoMeta,
     fundingOverview,
     overviewAlerts,
     researchSnapshot,
@@ -16,23 +18,32 @@
   } from "./demo-data";
 
   const dr007 = researchSnapshot.rates[1]!;
-  const structureBars = [
-    {
-      label: "同业拆借",
-      value: tradingSummary.interbankShare,
-      color: "#2f6fed",
-    },
-    {
-      label: "质押式回购",
-      value: 100 - tradingSummary.interbankShare,
-      color: "#f79009",
-    },
-    {
-      label: "授信额度已使用",
-      value: creditSummary.utilization,
-      color: "#16a394",
-    },
-  ];
+  let creditReport = $state<CreditReportResponse | null>(null);
+  const structureBars = $derived.by(() => [
+      {
+        label: "同业拆借",
+        value: tradingSummary.interbankShare,
+        color: "#2f6fed",
+      },
+      {
+        label: "质押式回购",
+        value: 100 - tradingSummary.interbankShare,
+        color: "#f79009",
+      },
+      ...(creditReport
+        ? [{
+            label: "授信额度已使用",
+            value: creditReport.summary.utilization,
+            color: "#16a394",
+          }]
+        : []),
+    ]);
+
+  onMount(() => {
+    void fetchCreditReport().then((report) => {
+      creditReport = report;
+    }).catch(() => undefined);
+  });
 </script>
 
 <div class="tr-view-stack">
@@ -63,9 +74,9 @@
       />
       <MetricCard
         label="可用授信额度"
-        value={creditSummary.available.toFixed(2)}
+        value={creditReport ? creditReport.summary.totalAvailable.toFixed(2) : "—"}
         unit="亿元"
-        detail={`总体使用率 ${creditSummary.utilization.toFixed(1)}%`}
+        detail={creditReport ? `截至 ${creditReport.summary.reportDate} · 使用率 ${creditReport.summary.utilization.toFixed(1)}%` : "进入授信管理查看最新记录"}
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "credit" }}
         tone="green"

@@ -30,7 +30,6 @@
   );
   const activeDate = $derived.by(() => {
     if (activeViewId === "trading") return demoMeta.tradingAsOf;
-    if (activeViewId === "credit") return demoMeta.creditAsOf;
     if (activeViewId === "research") {
       return `${demoMeta.researchStart}—${demoMeta.researchEnd}`;
     }

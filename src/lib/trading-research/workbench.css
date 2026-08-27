@@ -885,6 +885,200 @@ body:has(.tr-workbench) {
   height: 300px;
 }
 
+.tr-credit-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px;
+  border: 1px solid var(--tr-border);
+  border-radius: var(--tr-radius-card);
+  background: var(--tr-surface);
+  box-shadow: var(--tr-shadow);
+}
+
+.tr-credit-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--tr-radius-control);
+  background: var(--tr-surface-muted);
+}
+
+.tr-credit-tabs button,
+.tr-credit-print,
+.tr-credit-retry,
+.tr-credit-detail-toggle {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: var(--tr-radius-control);
+  color: var(--tr-text-2);
+  background: transparent;
+  cursor: pointer;
+}
+
+.tr-credit-tabs button {
+  padding: 7px 16px;
+  font-weight: bold;
+}
+
+.tr-credit-tabs button.active {
+  border-color: var(--tr-border);
+  color: var(--tr-primary-deep);
+  background: var(--tr-surface);
+  box-shadow: 0 1px 3px rgba(23, 32, 51, 0.08);
+}
+
+.tr-credit-toolbar__actions {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+
+.tr-credit-toolbar__actions label {
+  display: grid;
+  gap: 3px;
+  color: var(--tr-muted);
+  font-size: 0.75rem;
+}
+
+.tr-credit-toolbar__actions select {
+  min-height: 40px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--tr-border-strong);
+  border-radius: var(--tr-radius-control);
+  color: var(--tr-text-2);
+  background: var(--tr-surface);
+}
+
+.tr-credit-print,
+.tr-credit-retry,
+.tr-credit-detail-toggle {
+  border-color: color-mix(in srgb, var(--tr-primary) 35%, var(--tr-border));
+  color: var(--tr-primary-deep);
+  background: var(--tr-primary-soft);
+  font-weight: bold;
+}
+
+.tr-credit-print,
+.tr-credit-retry {
+  padding-inline: 14px;
+}
+
+.tr-credit-detail-toggle {
+  min-height: 32px;
+  padding-inline: 10px;
+  font-size: 0.75rem;
+}
+
+.tr-credit-table {
+  min-width: 1280px;
+}
+
+.tr-credit-detail-row > td {
+  height: auto;
+  padding: 0 !important;
+  white-space: normal !important;
+}
+
+.tr-credit-detail {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--tr-primary-soft) 30%, var(--tr-surface));
+}
+
+.tr-credit-item-grid,
+.tr-credit-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.tr-credit-item-grid article {
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border: 1px solid var(--tr-border);
+  border-radius: var(--tr-radius-control);
+  background: var(--tr-surface);
+}
+
+.tr-credit-item-grid strong,
+.tr-credit-item-grid span,
+.tr-credit-item-grid small {
+  font-size: 0.75rem;
+}
+
+.tr-credit-item-grid small {
+  color: var(--tr-muted);
+  white-space: pre-wrap;
+}
+
+.tr-credit-meta-grid {
+  margin: 0;
+}
+
+.tr-credit-meta-grid > div {
+  min-width: 0;
+}
+
+.tr-credit-meta-grid .is-wide {
+  grid-column: 1 / -1;
+}
+
+.tr-credit-meta-grid dt {
+  color: var(--tr-muted);
+  font-size: 0.75rem;
+}
+
+.tr-credit-meta-grid dd {
+  margin: 2px 0 0;
+  color: var(--tr-text-2);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+}
+
+.tr-credit-muted {
+  margin: 0;
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+}
+
+.tr-credit-quality ul,
+.tr-credit-news-list {
+  margin: 0;
+  padding-left: 1.3rem;
+  color: var(--tr-text-2);
+  font-size: 0.875rem;
+}
+
+.tr-credit-quality li + li,
+.tr-credit-news-list li + li {
+  margin-top: 7px;
+}
+
+.tr-credit-weekly-report {
+  display: grid;
+  gap: 22px;
+}
+
+.tr-credit-change-table {
+  min-width: 1020px;
+}
+
+.tr-credit-change-details {
+  min-width: 360px;
+  max-width: 720px;
+  white-space: normal !important;
+}
+
+.tr-credit-report-source {
+  color: var(--tr-muted);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
 .tr-chart-host--curve {
   height: 260px;
 }
@@ -1291,6 +1485,22 @@ body:has(.tr-workbench) {
   .tr-chart-host {
     height: 280px;
   }
+
+  .tr-credit-toolbar,
+  .tr-credit-toolbar__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tr-credit-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tr-credit-toolbar__actions select,
+  .tr-credit-print {
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1338,5 +1548,47 @@ body:has(.tr-workbench) {
   .tr-workbench a {
     scroll-behavior: auto;
     transition: none !important;
+  }
+}
+
+@media print {
+  body:has(.tr-credit-weekly-report) {
+    overflow: visible;
+    background: #ffffff;
+  }
+
+  body:has(.tr-credit-weekly-report) .tr-topbar,
+  body:has(.tr-credit-weekly-report) .tr-drawer,
+  body:has(.tr-credit-weekly-report) .tr-drawer-backdrop,
+  body:has(.tr-credit-weekly-report) .tr-credit-toolbar {
+    display: none !important;
+  }
+
+  body:has(.tr-credit-weekly-report) .tr-shell,
+  body:has(.tr-credit-weekly-report) .tr-workspace {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+
+  body:has(.tr-credit-weekly-report) #tr-workbench-main {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+
+  body:has(.tr-credit-weekly-report) .tr-panel,
+  body:has(.tr-credit-weekly-report) .research-metric-card {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+
+  body:has(.tr-credit-weekly-report) .tr-table-scroll {
+    overflow: visible;
+  }
+
+  body:has(.tr-credit-weekly-report) .tr-data-table {
+    min-width: 0;
+    font-size: 9pt;
   }
 }
