@@ -507,6 +507,244 @@ body:has(.tr-workbench) {
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
+.tr-economic-view {
+  gap: 16px;
+}
+
+.tr-economic-intro {
+  max-width: 760px;
+  margin: -4px 0 0 13px;
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+}
+
+.tr-economic-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--tr-border);
+  border-radius: var(--tr-radius-card);
+  background: color-mix(in srgb, var(--tr-economic-accent) 2%, var(--tr-surface));
+  box-shadow: 0 4px 14px rgba(23, 32, 51, 0.035);
+}
+
+.tr-economic-group__header,
+.tr-economic-group__header > div {
+  display: flex;
+  align-items: center;
+}
+
+.tr-economic-group__header {
+  min-height: 28px;
+  justify-content: space-between;
+  gap: 12px;
+  padding-inline: 2px;
+}
+
+.tr-economic-group__header > div {
+  gap: 9px;
+}
+
+.tr-economic-group__header > div > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tr-economic-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tr-economic-accent) 13%, transparent);
+}
+
+.tr-economic-group__header h2 {
+  margin: 0;
+  color: var(--tr-text);
+  font-size: 0.9375rem;
+  font-weight: bolder;
+  letter-spacing: 0.01em;
+}
+
+.tr-economic-group__header > span {
+  color: var(--tr-muted);
+  font-size: 0.75rem;
+}
+
+.tr-economic-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tr-economic-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 198px;
+  grid-template-rows: auto auto minmax(76px, 1fr) auto;
+  gap: 5px;
+  padding: 14px 14px 11px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tr-economic-accent) 12%, var(--tr-border));
+  border-radius: calc(var(--tr-radius-card) - 3px);
+  background: var(--tr-surface);
+  box-shadow: 0 1px 4px rgba(23, 32, 51, 0.045);
+  transition: border-color var(--tr-motion), box-shadow var(--tr-motion), transform var(--tr-motion);
+}
+
+.tr-economic-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--tr-economic-accent);
+  content: "";
+  opacity: 0.8;
+}
+
+.tr-economic-card:hover {
+  border-color: color-mix(in srgb, var(--tr-economic-accent) 30%, var(--tr-border));
+  box-shadow: 0 8px 22px rgba(23, 32, 51, 0.08);
+  transform: translateY(-1px);
+}
+
+.tr-economic-card__header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tr-economic-card__header h3 {
+  min-height: 2.5em;
+  margin: 0;
+  color: var(--tr-text-2);
+  font-size: 0.875rem;
+  font-weight: bold;
+  line-height: 1.25;
+}
+
+.tr-economic-card__header span {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 6px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--tr-economic-accent) 20%, transparent), transparent),
+    var(--tr-primary-soft);
+}
+
+.tr-economic-card__value {
+  display: flex;
+  min-height: 36px;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-economic-card__value strong {
+  color: var(--tr-text);
+  font-size: clamp(1.45rem, 1.4vw, 1.85rem);
+  font-weight: bolder;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.tr-economic-card__value > span:not(.tr-economic-skeleton) {
+  color: var(--tr-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.tr-economic-card__trend {
+  min-height: 76px;
+}
+
+.tr-economic-chart {
+  width: 100%;
+  height: 76px;
+}
+
+.tr-economic-card__empty {
+  display: grid;
+  height: 76px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--tr-muted);
+  background: var(--tr-surface-muted);
+  font-size: 0.75rem;
+}
+
+.tr-economic-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--tr-border);
+  color: var(--tr-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-economic-card footer span:last-child {
+  color: color-mix(in srgb, var(--tr-economic-accent) 75%, var(--tr-muted));
+}
+
+.tr-economic-skeleton {
+  display: block;
+  border-radius: 7px;
+  background: linear-gradient(90deg, var(--tr-surface-muted), #ffffff, var(--tr-surface-muted));
+  background-size: 220% 100%;
+  animation: tr-economic-loading 1.4s ease-in-out infinite;
+}
+
+.tr-economic-skeleton--value {
+  width: 52%;
+  height: 28px;
+}
+
+.tr-economic-skeleton--chart {
+  width: 100%;
+  height: 76px;
+}
+
+.tr-economic-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--tr-red) 24%, var(--tr-border));
+  border-radius: var(--tr-radius-card);
+  color: var(--tr-red);
+  background: var(--tr-red-soft);
+}
+
+.tr-economic-error > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tr-economic-error strong,
+.tr-economic-error span {
+  font-size: 0.8125rem;
+}
+
+.tr-economic-error button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--tr-red) 35%, var(--tr-border));
+  border-radius: var(--tr-radius-control);
+  color: var(--tr-red);
+  background: var(--tr-surface);
+  cursor: pointer;
+}
+
+@keyframes tr-economic-loading {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
 .tr-panel,
 .tr-workflow-composer,
 .tr-empty-panel {
@@ -1555,6 +1793,10 @@ body:has(.tr-workbench) {
     grid-template-columns: 1fr;
   }
 
+  .tr-economic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
 }
 
 @media (max-width: 900px) {
@@ -1719,6 +1961,15 @@ body:has(.tr-workbench) {
   .tr-credit-notes-grid {
     grid-template-columns: 1fr;
   }
+
+  .tr-economic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tr-economic-error {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1771,6 +2022,10 @@ body:has(.tr-workbench) {
   .tr-workbench a {
     scroll-behavior: auto;
     transition: none !important;
+  }
+
+  .tr-economic-skeleton {
+    animation: none;
   }
 }
 

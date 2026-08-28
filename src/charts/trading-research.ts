@@ -30,6 +30,11 @@ export type WorkbenchCurvePoint = {
   value: number;
 };
 
+export type EconomicIndicatorTrendPoint = {
+  date: string;
+  value: number;
+};
+
 type WorkbenchHistory = {
   dates: readonly string[];
   series: Array<{ name: string; values: readonly number[] }>;
@@ -211,6 +216,67 @@ export function renderWorkbenchCurveChart(
         lineStyle: { width: 2.5 },
         areaStyle: { color: "rgba(47, 111, 237, 0.08)" },
         data: points.map((point) => point.value),
+      },
+    ],
+  };
+  setChart(host, option);
+}
+
+export function renderEconomicIndicatorTrend(
+  host: HTMLElement,
+  points: readonly EconomicIndicatorTrendPoint[],
+  description: string,
+  unit: string,
+  decimals: number,
+  color: string,
+): void {
+  const values = points.map((point) => point.value);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const crossesZero = minimum < 0 && maximum > 0;
+  const option: ChartOption = {
+    animationDuration: 220,
+    aria: { enabled: true, description },
+    color: [color],
+    tooltip: {
+      ...tooltip,
+      trigger: "axis",
+      valueFormatter: (value: unknown) =>
+        `${Number(value).toLocaleString("zh-CN", {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        })}${unit ? ` ${unit}` : ""}`,
+    },
+    grid: { left: 2, right: 2, top: 8, bottom: 2 },
+    xAxis: {
+      type: "category",
+      data: points.map((point) => point.date),
+      boundaryGap: false,
+      show: false,
+    },
+    yAxis: {
+      type: "value",
+      scale: true,
+      show: false,
+    },
+    series: [
+      {
+        name: description,
+        type: "line",
+        smooth: 0.3,
+        showSymbol: false,
+        lineStyle: { width: 2.25, cap: "round" },
+        areaStyle: { color: `${color}18` },
+        data: values,
+        markLine: crossesZero
+          ? {
+              silent: true,
+              symbol: "none",
+              data: [{ yAxis: 0 }],
+              label: { show: false },
+              lineStyle: { color: colors.zero, type: "dashed", width: 1 },
+            }
+          : undefined,
       },
     ],
   };

@@ -9,6 +9,11 @@ import {
   workbenchViewPath,
   workbenchViews,
 } from "../src/lib/trading-research/demo-data.ts";
+import {
+  ECONOMIC_INDICATOR_GROUPS,
+  economicIndicatorRange,
+  mapEconomicIndicatorRows,
+} from "../src/lib/trading-research/economic-indicators.ts";
 
 test("交易研究工作台提供七个 path 标签页并保留稳定深链", () => {
   assert.deepEqual(
@@ -55,6 +60,46 @@ test("演示交易汇总严格由迁入的十笔交易派生", () => {
   assert.equal(summary.repoLendAmount, 17.5);
   assert.equal(summary.pendingCount, 2);
   assert.equal(Number(summary.weightedRate.toFixed(4)), 1.8358);
+});
+
+test("经济指标按九类四项配置并应用必要口径换算", () => {
+  assert.equal(ECONOMIC_INDICATOR_GROUPS.length, 9);
+  assert.ok(
+    ECONOMIC_INDICATOR_GROUPS.every((group) => group.indicators.length === 4),
+  );
+  assert.equal(
+    new Set(
+      ECONOMIC_INDICATOR_GROUPS.flatMap((group) =>
+        group.indicators.map((indicator) => indicator.code),
+      ),
+    ).size,
+    36,
+  );
+  assert.deepEqual(
+    ECONOMIC_INDICATOR_GROUPS.map((group) => group.type),
+    [
+      "增长与景气",
+      "需求",
+      "价格",
+      "货币与信用",
+      "高频指标",
+      "海外基本面",
+      "海外利率",
+      "汇率与商品",
+      "全球风险资产",
+    ],
+  );
+
+  const groups = mapEconomicIndicatorRows([
+    { code: "EMI01737210", date: "2026-07-31", RESULT: 101.8 },
+    { code: "EMG01339436", date: "2026-08-27", RESULT: -0.12 },
+  ]);
+  assert.equal(Number(groups[2].indicators[1].points[0].value.toFixed(1)), 1.8);
+  assert.equal(groups[6].indicators[3].points[0].value, -12);
+  assert.deepEqual(economicIndicatorRange(new Date("2026-08-28T08:00:00Z")), {
+    startDate: "2025-02-01",
+    endDate: "2026-08-28",
+  });
 });
 
 test("工作台使用抽屉 path 导航、复用页面组件且不展示实现边界文案", async () => {
@@ -111,14 +156,16 @@ test("工作台数据图表统一通过 ChartHost 和 ECharts renderer", async (
     readFile(new URL("../src/lib/trading-research/WorkbenchIcon.svelte", import.meta.url), "utf8"),
   ]);
 
-  for (const view of [overview, trading, research]) {
+  for (const view of [overview, trading]) {
     assert.match(view, /<ChartHost/);
   }
+  assert.match(research, /<EconomicIndicatorCard/);
   assert.doesNotMatch(credit, /<ChartHost/);
   assert.match(credit, /tr-credit-calendar/);
   assert.match(charts, /renderWorkbenchBarChart/);
   assert.match(charts, /renderWorkbenchHistoryChart/);
   assert.match(charts, /renderWorkbenchCurveChart/);
+  assert.match(charts, /renderEconomicIndicatorTrend/);
   assert.match(charts, /markLine/);
   assert.match(common, /fontWeight:\s*"normal"/);
   assert.doesNotMatch(styles, /\.tr-workbench\s+svg\s*\{/);
@@ -150,12 +197,16 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
 
   for (const view of views) {
     assert.match(view, /SectionHeading from "\.\/SectionHeading\.svelte"/);
+  }
+  for (const view of [...views.slice(0, 3), views[4]]) {
     assert.match(view, /PanelHeading from "\.\/PanelHeading\.svelte"/);
     assert.match(view, /Badge from "\.\/Badge\.svelte"/);
   }
-  for (const view of views.slice(0, 4)) {
+  for (const view of views.slice(0, 3)) {
     assert.match(view, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
   }
+  assert.match(views[3], /EconomicIndicatorCard from "\.\/EconomicIndicatorCard\.svelte"/);
+  assert.doesNotMatch(views[3], /MetricCard/);
   for (const integratedPage of [bond, financing]) {
     assert.match(integratedPage, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
     assert.match(integratedPage, /<MetricCard/);
@@ -185,6 +236,25 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(design, /共享组件归属与复用顺序/);
   assert.match(design, /src\/components\/MetricCard\.svelte/);
   assert.match(design, /禁止先在页面内实现/);
+});
+
+test("研究辅助由浏览器直连 Data API GraphQL 并使用专用走势卡", async () => {
+  const [research, card, dataClient, styles] = await Promise.all([
+    readFile(new URL("../src/lib/trading-research/ResearchView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/EconomicIndicatorCard.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/economic-indicators.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/workbench.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(research, /经济数据走势/);
+  assert.match(research, /group\.type/);
+  assert.match(card, /indicator\.name/);
+  assert.match(card, /latest\?\.date/);
+  assert.match(card, /<ChartHost/);
+  assert.match(dataClient, /fetch\("\/data\/graphql"/);
+  assert.match(dataClient, /choiceEdb/);
+  assert.doesNotMatch(dataClient, /fetch\("\/api\//);
+  assert.match(styles, /\.tr-economic-grid\s*\{[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/);
 });
 
 test("工作台不再展示数据覆盖与校验状态模块", async () => {

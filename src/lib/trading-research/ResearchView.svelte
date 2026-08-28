@@ -1,118 +1,84 @@
 <script lang="ts">
-  import ChartHost from "../../components/ChartHost.svelte";
-  import MetricCard from "../../components/MetricCard.svelte";
-  import {
-    renderWorkbenchCurveChart,
-    renderWorkbenchHistoryChart,
-  } from "../../charts/trading-research";
-  import Badge from "./Badge.svelte";
-  import PanelHeading from "./PanelHeading.svelte";
+  import { onMount } from "svelte";
+
+  import EconomicIndicatorCard from "./EconomicIndicatorCard.svelte";
   import SectionHeading from "./SectionHeading.svelte";
-  import WorkbenchIcon from "./WorkbenchIcon.svelte";
-  import { demoMeta, researchSnapshot } from "./demo-data";
+  import {
+    emptyEconomicIndicatorGroups,
+    fetchEconomicIndicatorGroups,
+  } from "./economic-indicators";
 
-  const historyChart = {
-    dates: researchSnapshot.history.dates,
-    series: [
-      { name: "DR007", values: researchSnapshot.history.dr007 },
-      { name: "R007", values: researchSnapshot.history.r007 },
-      { name: "GC001", values: researchSnapshot.history.gc001 },
-    ],
-  };
-  const rateTones = ["blue", "orange", "purple", "green"] as const;
+  let groups = $state(emptyEconomicIndicatorGroups());
+  let loading = $state(true);
+  let error = $state("");
+  let controller: AbortController | undefined;
 
-  function changeText(value: number): string {
-    return `${value > 0 ? "+" : ""}${value.toFixed(2)} bp`;
+  async function loadIndicators(): Promise<void> {
+    controller?.abort();
+    const requestController = new AbortController();
+    controller = requestController;
+    loading = true;
+    error = "";
+    try {
+      groups = await fetchEconomicIndicatorGroups(requestController.signal);
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "AbortError") return;
+      error = cause instanceof Error ? cause.message : "经济指标加载失败";
+    } finally {
+      if (!requestController.signal.aborted) loading = false;
+    }
   }
 
-  function changeClass(value: number): string {
-    if (value > 0) return "tr-change tr-change--up";
-    if (value < 0) return "tr-change tr-change--down";
-    return "tr-change";
-  }
+  onMount(() => {
+    void loadIndicators();
+    return () => controller?.abort();
+  });
 </script>
 
-<div class="tr-view-stack">
-  <section aria-labelledby="market-rates-title">
+<div class="tr-view-stack tr-economic-view">
+  <section aria-labelledby="economic-indicators-title">
     <SectionHeading
-      id="market-rates-title"
-      title="核心市场利率"
-      meta={`${demoMeta.researchStart}—${demoMeta.researchEnd}`}
+      id="economic-indicators-title"
+      title="经济数据走势"
+      meta="36项指标 · 近18个月"
     />
-    <div class="tr-metric-grid">
-      {#each researchSnapshot.rates as rate, index}
-        <MetricCard
-          label={rate.label}
-          value={rate.value.toFixed(4)}
-          unit="%"
-          detail={changeText(rate.changeBp)}
-          detailPrefix="较前值 "
-          detailTone={changeClass(rate.changeBp)}
-          iconComponent={WorkbenchIcon}
-          iconProps={{ name: "research" }}
-          tone={rateTones[index] ?? "blue"}
-        />
-      {/each}
-    </div>
+    <p class="tr-economic-intro">
+      覆盖国内增长、需求、价格、货币信用，以及海外基本面、利率和全球风险资产。
+    </p>
   </section>
 
-  <section class="tr-panel" aria-labelledby="rate-trend-title">
-    <PanelHeading id="rate-trend-title" title="核心利率走势">
-      <Badge>最近10个有效观测日 · %</Badge>
-    </PanelHeading>
-    <ChartHost
-      renderer={renderWorkbenchHistoryChart}
-      args={[historyChart, "2026年8月3日至8月14日DR007、R007与GC001利率走势"]}
-      ariaLabel="2026年8月3日至8月14日DR007、R007与GC001利率走势"
-      className="tr-chart-host"
-    />
-    <details class="tr-chart-data">
-      <summary>查看图表数据</summary>
-      <div class="tr-table-scroll">
-        <table class="tr-data-table">
-          <thead><tr><th>日期</th><th class="is-numeric">DR007</th><th class="is-numeric">R007</th><th class="is-numeric">GC001</th></tr></thead>
-          <tbody>
-            {#each researchSnapshot.history.dates as date, index}
-              <tr><th scope="row">{date}</th><td class="is-numeric">{researchSnapshot.history.dr007[index]?.toFixed(4)}</td><td class="is-numeric">{researchSnapshot.history.r007[index]?.toFixed(4)}</td><td class="is-numeric">{researchSnapshot.history.gc001[index]?.toFixed(4)}</td></tr>
-            {/each}
-          </tbody>
-        </table>
+  {#if error}
+    <div class="tr-economic-error" role="alert">
+      <div>
+        <strong>经济指标暂时无法加载</strong>
+        <span>{error}</span>
       </div>
-    </details>
-  </section>
-
-  <div class="tr-two-column">
-    <section class="tr-panel" aria-labelledby="cd-curve-title">
-      <PanelHeading id="cd-curve-title" title="同业存单曲线" />
-      <ChartHost
-        renderer={renderWorkbenchCurveChart}
-        args={["同业存单", researchSnapshot.cdCurve, "同业存单各期限收益率曲线"]}
-        ariaLabel="同业存单各期限收益率曲线"
-        className="tr-chart-host tr-chart-host--curve"
-      />
-    </section>
-    <section class="tr-panel" aria-labelledby="gov-curve-title">
-      <PanelHeading id="gov-curve-title" title="中债国债曲线" />
-      <ChartHost
-        renderer={renderWorkbenchCurveChart}
-        args={["中债国债", researchSnapshot.govCurve, "中债国债各期限收益率曲线"]}
-        ariaLabel="中债国债各期限收益率曲线"
-        className="tr-chart-host tr-chart-host--curve"
-      />
-    </section>
-  </div>
-
-  <section class="tr-panel" aria-labelledby="research-coverage-title">
-    <PanelHeading id="research-coverage-title" title="当前缺失数据范围">
-      <Badge>5 项缺失</Badge>
-    </PanelHeading>
-    <div class="tr-unavailable-grid">
-      {#each researchSnapshot.unavailable as item}
-        <article>
-          <span aria-hidden="true"><WorkbenchIcon name="database" /></span>
-          <div><h3>{item.label}</h3><p>{item.reason}</p></div>
-        </article>
-      {/each}
+      <button type="button" onclick={loadIndicators}>重新加载</button>
     </div>
-  </section>
+  {/if}
+
+  {#each groups as group, groupIndex}
+    <section
+      class="tr-economic-group"
+      style={`--tr-economic-accent: ${group.accent}`}
+      aria-labelledby={`economic-group-${groupIndex}`}
+    >
+      <header class="tr-economic-group__header">
+        <div>
+          <span aria-hidden="true"></span>
+          <h2 id={`economic-group-${groupIndex}`}>{group.type}</h2>
+        </div>
+        <span>4项指标</span>
+      </header>
+      <div class="tr-economic-grid">
+        {#each group.indicators as indicator (indicator.key)}
+          <EconomicIndicatorCard
+            {indicator}
+            accent={group.accent}
+            {loading}
+          />
+        {/each}
+      </div>
+    </section>
+  {/each}
 </div>

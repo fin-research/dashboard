@@ -50,7 +50,7 @@ export const workbenchViews: Array<{
     id: "research",
     label: "研究辅助",
     title: "研究辅助",
-    context: "货币市场、存单与国债曲线快照",
+    context: "国内宏观、海外利率与全球风险资产走势",
     icon: "research",
   },
   {
@@ -93,9 +93,6 @@ export function workbenchViewPath(view: WorkbenchViewId): string {
 export const demoMeta = {
   importedAt: "2026-08-25",
   tradingAsOf: "2026-08-07 15:00",
-  researchStart: "2026-08-10",
-  researchEnd: "2026-08-14",
-  researchSnapshotId: "market-20260814-ebd1924910cc",
 } as const;
 
 export type DemoTrade = {

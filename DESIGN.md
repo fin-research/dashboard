@@ -51,7 +51,7 @@
 ### 共享组件归属与复用顺序
 
 - 复用决策固定为：先搜索现有组件和样式；能直接使用则直接使用；信息结构相同但有轻微差异时扩展 props 或 modifier；只有确认没有可复用基础后才允许新增共享组件。禁止先在页面内实现，再以“后续统一”为由保留平行版本。
-- `src/components/MetricCard.svelte` 是市场点评、交易研究工作台、二级池周报和融资择时模型的唯一指标卡基础。名称、主值、单位、第三行变动、圆形图标容器、图标线宽、语义色、浅色卡片底、边框、圆角、阴影和文字换行均由该组件负责；业务页只配置 `tone`、`iconPosition`、`compact` 与业务数据，不得再定义页面级 `.core-card`、`.metric-card`、`.ledger-metric` 或同义结构。
+- `src/components/MetricCard.svelte` 是市场点评、交易研究工作台普通快照指标、二级池周报和融资择时模型的唯一指标卡基础。名称、主值、单位、第三行变动、圆形图标容器、图标线宽、语义色、浅色卡片底、边框、圆角、阴影和文字换行均由该组件负责；业务页只配置 `tone`、`iconPosition`、`compact` 与业务数据，不得再定义页面级 `.core-card`、`.metric-card`、`.ledger-metric` 或同义结构。研究辅助的经济数据走势矩阵因每卡同时承载日期和 ECharts 趋势图，统一使用专用 `EconomicIndicatorCard.svelte`，不作为普通指标卡的替代实现。
 - `src/lib/trading-research/SectionHeading.svelte`、`PanelHeading.svelte` 和 `Badge.svelte` 分别负责工作台模块标题、面板标题和状态标签。所有工作台标签页必须复用它们；`PanelHeading` 固定为上方小标题、下方控件行，筛选框在桌面端保持一字排开，不复制标题 DOM。
 - 市场点评和二级池周报的通用内容面板继续复用 `.dashboard-panel` 与 `.panel-heading`；工作台内容面板统一复用 `.tr-panel`，不得仅因标签页不同而改变边框、圆角、阴影和标题层级。
 - `src/components/ChartHost.svelte` 负责图表生命周期、容器尺寸与可访问名称，`src/charts/` 负责同类图表 option。业务模块不得另建图表容器或内联独立视觉配置。

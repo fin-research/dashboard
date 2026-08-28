@@ -14,6 +14,10 @@ Dashboard Worker 通过同源代理访问：
 
 市场点评根字段的变化必须与 Worker 映射、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/report`，也不要为视觉版或文字版增加单独的数据源。
 
+研究辅助由浏览器直接 `POST /data/graphql`，使用 `choiceEdb(edbIds, startDate,
+endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `function + fields + rows`
+表格结构。该请求不经过 Dashboard `/api/*`，也不由 Dashboard Worker 代理拼装业务数据。
+
 Worker 精准查询示例：
 
 ```graphql
@@ -26,7 +30,7 @@ query MarketReport($request: MarketReportInput!) {
 }
 ```
 
-浏览器只通过 Dashboard REST 读取或保存市场点评；今日聚焦素材、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
+浏览器通过 Dashboard REST 读取或保存市场点评；研究辅助是明确例外，直接使用既有 Data API GraphQL。今日聚焦素材、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
 
 ## Dashboard Worker `/api/*`
 
