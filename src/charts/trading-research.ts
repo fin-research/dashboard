@@ -7,6 +7,7 @@ import {
   gridLine,
   tooltip,
 } from "./common";
+import { formatEconomicIndicatorTooltip } from "../lib/trading-research/economic-indicators";
 
 export const WORKBENCH_CHART_PALETTE = [
   "#2f6fed",
@@ -241,11 +242,8 @@ export function renderEconomicIndicatorTrend(
     tooltip: {
       ...tooltip,
       trigger: "axis",
-      valueFormatter: (value: unknown) =>
-        `${Number(value).toLocaleString("zh-CN", {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals,
-        })}${unit ? ` ${unit}` : ""}`,
+      formatter: (params: unknown) =>
+        formatEconomicIndicatorTooltip(params, unit, decimals),
     },
     grid: { left: 2, right: 2, top: 8, bottom: 2 },
     xAxis: {

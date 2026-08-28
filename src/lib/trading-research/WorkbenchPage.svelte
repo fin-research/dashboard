@@ -30,13 +30,9 @@
   );
   const activeDate = $derived.by(() => {
     if (activeViewId === "trading") return demoMeta.tradingAsOf;
-    if (activeViewId === "research") return "见各指标卡";
     if (activeViewId === "overview") return "多基准日";
     return null;
   });
-  const activeDateLabel = $derived(
-    activeViewId === "research" ? "观测日期" : "数据截至",
-  );
 
   afterNavigate(() => {
     mobileDrawerOpen = false;
@@ -115,7 +111,7 @@
     </div>
     <div class="tr-topbar__meta">
       {#if activeDate}
-        <span class="tr-as-of"><WorkbenchIcon name="calendar" /><span>{activeDateLabel}</span><strong>{activeDate}</strong></span>
+        <span class="tr-as-of"><WorkbenchIcon name="calendar" /><span>数据截至</span><strong>{activeDate}</strong></span>
       {/if}
       <div id="tr-topbar-actions" class="tr-topbar__actions"></div>
     </div>

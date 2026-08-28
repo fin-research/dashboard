@@ -6,6 +6,7 @@ export type EconomicIndicatorDefinition = {
   code: string;
   unit: string;
   decimals: number;
+  frequency: "日频" | "月频" | "季频" | "不定期";
   factor?: number;
   offset?: number;
 };
@@ -32,95 +33,100 @@ export type EconomicIndicatorSeriesGroup = Omit<
   indicators: EconomicIndicatorSeries[];
 };
 
+export type EconomicIndicatorSnapshot = {
+  syncedAt: string;
+  groups: EconomicIndicatorSeriesGroup[];
+};
+
 export const ECONOMIC_INDICATOR_GROUPS: EconomicIndicatorGroup[] = [
   {
     type: "增长与景气",
     accent: "#2f6fed",
     indicators: [
-      indicator("gdp-real-yoy", "GDP不变价同比", "EMM00000012", "%", 1),
-      indicator("manufacturing-pmi", "制造业PMI", "EMM00121996", "%", 1),
-      indicator("industrial-output-yoy", "工业增加值同比", "EMM00008445", "%", 1),
-      indicator("industrial-profit-yoy", "工业企业利润总额同比", "EMM00641328", "%", 1),
+      indicator("gdp-real-yoy", "GDP不变价同比", "EMM00000012", "%", 1, "季频"),
+      indicator("manufacturing-pmi", "制造业PMI", "EMM00121996", "%", 1, "月频"),
+      indicator("industrial-output-yoy", "工业增加值同比", "EMM00008445", "%", 1, "月频"),
+      indicator("industrial-profit-yoy", "工业企业利润总额同比", "EMM00641328", "%", 1, "月频"),
     ],
   },
   {
     type: "需求",
     accent: "#0e9384",
     indicators: [
-      indicator("retail-sales-yoy", "社零同比", "EMI00135328", "%", 1),
-      indicator("fixed-asset-investment-yoy", "固定资产投资同比", "EMM00590832", "%", 1),
-      indicator("property-investment-yoy", "房地产开发投资同比", "EMI00120220", "%", 1),
-      indicator("exports-yoy", "出口金额同比", "EMM00053058", "%", 1),
+      indicator("retail-sales-yoy", "社零同比", "EMI00135328", "%", 1, "月频"),
+      indicator("fixed-asset-investment-yoy", "固定资产投资同比", "EMM00590832", "%", 1, "月频"),
+      indicator("property-investment-yoy", "房地产开发投资同比", "EMI00120220", "%", 1, "月频"),
+      indicator("exports-yoy", "出口金额同比", "EMM00053058", "%", 1, "月频"),
     ],
   },
   {
     type: "价格",
     accent: "#7f56d9",
     indicators: [
-      indicator("china-cpi-yoy", "CPI同比", "EMM00072301", "%", 1),
-      indicator("china-core-cpi-yoy", "核心CPI同比", "EMI01737210", "%", 1, 1, -100),
-      indicator("china-ppi-yoy", "PPI同比", "EMM00073348", "%", 1),
-      indicator("gdp-deflator-yoy", "GDP平减指数同比", "EMM01607812", "%", 1),
+      indicator("china-cpi-yoy", "CPI同比", "EMM00072301", "%", 1, "月频"),
+      indicator("china-core-cpi-yoy", "核心CPI同比", "EMI01737210", "%", 1, "月频", 1, -100),
+      indicator("china-ppi-yoy", "PPI同比", "EMM00073348", "%", 1, "月频"),
+      indicator("gdp-deflator-yoy", "GDP平减指数同比", "EMM01607812", "%", 1, "季频"),
     ],
   },
   {
     type: "货币与信用",
     accent: "#dc6803",
     indicators: [
-      indicator("m1-yoy", "M1同比", "EMM00087084", "%", 1),
-      indicator("m2-yoy", "M2同比", "EMM00087086", "%", 1),
-      indicator("tsf-stock-yoy", "社融存量同比", "EMM00634721", "%", 1),
-      indicator("rmb-loans-yoy", "人民币贷款同比", "EMM00087129", "%", 1),
+      indicator("m1-yoy", "M1同比", "EMM00087084", "%", 1, "月频"),
+      indicator("m2-yoy", "M2同比", "EMM00087086", "%", 1, "月频"),
+      indicator("tsf-stock-yoy", "社融存量同比", "EMM00634721", "%", 1, "月频"),
+      indicator("rmb-loans-yoy", "人民币贷款同比", "EMM00087129", "%", 1, "月频"),
     ],
   },
   {
     type: "高频指标",
     accent: "#079455",
     indicators: [
-      indicator("home-sales-30-city", "30城商品房成交", "EMI01778636", "万平方米", 1),
-      indicator("nanhua-industrials", "南华工业品指数", "EMI00227697", "点", 1),
-      indicator("rebar-spot", "螺纹钢现货", "EMI01733174", "元/吨", 0),
-      indicator("cement-price-index", "水泥价格指数", "EMI01670402", "点", 1),
+      indicator("home-sales-30-city", "30城商品房成交", "EMI01778636", "万平方米", 1, "日频"),
+      indicator("nanhua-industrials", "南华工业品指数", "EMI00227697", "点", 1, "日频"),
+      indicator("rebar-spot", "螺纹钢现货", "EMI01733174", "元/吨", 0, "日频"),
+      indicator("cement-price-index", "水泥价格指数", "EMI01670402", "点", 1, "日频"),
     ],
   },
   {
     type: "海外基本面",
     accent: "#1570ef",
     indicators: [
-      indicator("us-cpi-yoy", "美国CPI同比", "EMG00000733", "%", 1),
-      indicator("us-core-pce-yoy", "核心PCE同比", "EMG00157776", "%", 1),
-      indicator("us-nonfarm-payroll", "新增非农就业", "EMG00152118", "千人", 0),
-      indicator("us-unemployment", "失业率", "EMG00001039", "%", 1),
+      indicator("us-cpi-yoy", "美国CPI同比", "EMG00000733", "%", 1, "月频"),
+      indicator("us-core-pce-yoy", "核心PCE同比", "EMG00157776", "%", 1, "月频"),
+      indicator("us-nonfarm-payroll", "新增非农就业", "EMG00152118", "千人", 0, "月频"),
+      indicator("us-unemployment", "失业率", "EMG00001039", "%", 1, "月频"),
     ],
   },
   {
     type: "海外利率",
     accent: "#c4320a",
     indicators: [
-      indicator("fed-funds-target", "联邦基金目标利率", "EMG00146415", "%", 2),
-      indicator("ust-2y", "美债2Y", "EMG00001306", "%", 2),
-      indicator("ust-10y", "美债10Y", "EMG00001310", "%", 2),
-      indicator("ust-10y-2y", "10Y-2Y期限利差", "EMG01339436", "bp", 0, 100),
+      indicator("fed-funds-target", "联邦基金目标利率", "EMG00146415", "%", 2, "不定期"),
+      indicator("ust-2y", "美债2Y", "EMG00001306", "%", 2, "日频"),
+      indicator("ust-10y", "美债10Y", "EMG00001310", "%", 2, "日频"),
+      indicator("ust-10y-2y", "10Y-2Y期限利差", "EMG01339436", "bp", 0, "日频", 100),
     ],
   },
   {
     type: "汇率与商品",
     accent: "#b54708",
     indicators: [
-      indicator("dxy", "美元指数 DXY", "EMG00001435", "点", 2),
-      indicator("usd-cnh", "USD/CNH", "EMM00618963", "", 4),
-      indicator("wti", "WTI原油", "EMI00531920", "美元/桶", 2),
-      indicator("gold", "黄金", "EMI00224675", "美元/盎司", 1),
+      indicator("dxy", "美元指数 DXY", "EMG00001435", "点", 2, "日频"),
+      indicator("usd-cnh", "USD/CNH", "EMM00618963", "", 4, "日频"),
+      indicator("wti", "WTI原油", "EMI00531920", "美元/桶", 2, "日频"),
+      indicator("gold", "黄金", "EMI00224675", "美元/盎司", 1, "日频"),
     ],
   },
   {
     type: "全球风险资产",
     accent: "#6938ef",
     indicators: [
-      indicator("sp-500", "标普500", "EMG00002593", "点", 1),
-      indicator("nasdaq", "纳斯达克", "EMG00002594", "点", 1),
-      indicator("msci-em", "MSCI新兴市场指数", "EMG01582711", "点", 1),
-      indicator("vix", "VIX", "EMG00002651", "点", 2),
+      indicator("sp-500", "标普500", "EMG00002593", "点", 1, "日频"),
+      indicator("nasdaq", "纳斯达克", "EMG00002594", "点", 1, "日频"),
+      indicator("msci-em", "MSCI新兴市场指数", "EMG01582711", "点", 1, "日频"),
+      indicator("vix", "VIX", "EMG00002651", "点", 2, "日频"),
     ],
   },
 ];
@@ -145,10 +151,11 @@ function indicator(
   code: string,
   unit: string,
   decimals: number,
+  frequency: EconomicIndicatorDefinition["frequency"],
   factor?: number,
   offset?: number,
 ): EconomicIndicatorDefinition {
-  return { key, name, code, unit, decimals, factor, offset };
+  return { key, name, code, unit, decimals, frequency, factor, offset };
 }
 
 export function economicIndicatorRange(now = new Date()): {
@@ -203,9 +210,9 @@ export function mapEconomicIndicatorRows(
   }));
 }
 
-export async function fetchEconomicIndicatorGroups(
+export async function fetchEconomicIndicatorSnapshot(
   signal?: AbortSignal,
-): Promise<EconomicIndicatorSeriesGroup[]> {
+): Promise<EconomicIndicatorSnapshot> {
   const response = await fetch("/api/economic-indicators", {
     headers: {
       Accept: "application/json",
@@ -217,7 +224,73 @@ export async function fetchEconomicIndicatorGroups(
     throw new Error(`经济指标请求失败（HTTP ${response.status}）`);
   }
   const payload = responseSchema.parse(await response.json());
-  return mapEconomicIndicatorRows(payload.rows);
+  return {
+    syncedAt: payload.syncedAt,
+    groups: mapEconomicIndicatorRows(payload.rows),
+  };
+}
+
+export function formatEconomicDataRefresh(syncedAt: string): string {
+  const value = new Date(syncedAt);
+  if (Number.isNaN(value.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
+}
+
+export function economicIndicatorChange(
+  points: readonly EconomicIndicatorPoint[],
+): number | null {
+  if (points.length < 2) return null;
+  return points.at(-1)!.value - points.at(-2)!.value;
+}
+
+export function formatEconomicIndicatorChange(
+  change: number | null,
+  decimals: number,
+): string {
+  if (change === null || !Number.isFinite(change)) return "—";
+  const normalized = Math.abs(change) < 10 ** (-decimals) / 2 ? 0 : change;
+  const formatted = Math.abs(normalized).toLocaleString("zh-CN", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  if (normalized > 0) return `+${formatted}`;
+  if (normalized < 0) return `-${formatted}`;
+  return formatted;
+}
+
+export function formatEconomicIndicatorTooltip(
+  params: unknown,
+  unit: string,
+  decimals: number,
+): string {
+  const first = Array.isArray(params) ? params[0] : params;
+  if (!first || typeof first !== "object") return "";
+  const item = first as {
+    axisValue?: unknown;
+    axisValueLabel?: unknown;
+    data?: unknown;
+    value?: unknown;
+  };
+  const date = item.axisValueLabel ?? item.axisValue ?? "";
+  const rawValue = item.data ?? item.value;
+  const value = Number(rawValue);
+  if (!Number.isFinite(value)) return escapeTooltipHtml(date);
+  const formatted = value.toLocaleString("zh-CN", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `<div>${escapeTooltipHtml(date)}</div><div>${escapeTooltipHtml(formatted)}${unit ? ` ${escapeTooltipHtml(unit)}` : ""}</div>`;
 }
 
 function downsample(points: EconomicIndicatorPoint[]): EconomicIndicatorPoint[] {
@@ -231,4 +304,13 @@ function downsample(points: EconomicIndicatorPoint[]): EconomicIndicatorPoint[] 
 
 function isoDate(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function escapeTooltipHtml(value: unknown): string {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }

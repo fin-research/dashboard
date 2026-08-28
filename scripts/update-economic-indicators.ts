@@ -27,6 +27,16 @@ const dataApiBaseUrl = resolveDataApiBaseUrl();
 const definitions = ECONOMIC_INDICATOR_GROUPS.flatMap(
   (group) => group.indicators,
 );
+const definitionsByCode = new Map(
+  definitions.map((definition) => [definition.code, definition]),
+);
+const publishDateProxyByCode = new Map<string, string>([
+  ["EMM00590832", "EMM00008445"], // NBS monthly activity release
+  ["EMI01737210", "EMM00072301"], // NBS CPI release
+  ["EMM01607812", "EMM00000012"], // NBS quarterly GDP release
+  ["EMM00634721", "EMM00087086"], // PBOC money and credit release
+  ["EMM00087129", "EMM00087086"], // PBOC money and credit release
+]);
 const codes = definitions.map((indicator) => indicator.code);
 if (new Set(codes).size !== 36) {
   throw new Error(`Expected 36 unique EDB indicators, received ${new Set(codes).size}`);
@@ -66,17 +76,49 @@ const edb = await fetchChoiceTable(
     edbIds: codes.join(","),
     startDate,
     endDate,
-    options: "IsPublishDate=0,FixDate=0",
+    options: "IsPublishDate=1,FixDate=0",
   }),
 );
 if (edb.function !== "EDB") {
   throw new Error(`Unexpected Choice function: ${edb.function}`);
 }
-const rows = edb.rows.map((row) => ({
-  code: stringField(row, "code"),
-  date: stringField(row, "date"),
-  value: numericField(row, "RESULT"),
-}));
+const publishedDatesBySeriesPeriod = new Map<string, string>();
+for (const row of edb.rows) {
+  const publishedDate = choicePublishedDate(row.PUBLISHDATE);
+  if (!publishedDate || publishedDate > endDate) continue;
+  publishedDatesBySeriesPeriod.set(
+    seriesPeriodKey(stringField(row, "code"), stringField(row, "date")),
+    publishedDate,
+  );
+}
+const rows = edb.rows.flatMap((row) => {
+  const code = stringField(row, "code");
+  const definition = definitionsByCode.get(code);
+  if (!definition) return [];
+  const observationDate = stringField(row, "date");
+  const proxyCode = publishDateProxyByCode.get(code);
+  const publishedDate =
+    choicePublishedDate(row.PUBLISHDATE) ??
+    (proxyCode
+      ? publishedDatesBySeriesPeriod.get(
+          seriesPeriodKey(proxyCode, observationDate),
+        )
+      : null);
+  const fallbackDate =
+    definition.frequency === "日频" || definition.frequency === "不定期"
+      ? observationDate
+      : null;
+  const date = publishedDate ?? fallbackDate;
+  if (!date || date > endDate) return [];
+  return [
+    {
+      code,
+      observationDate,
+      date,
+      value: numericField(row, "RESULT"),
+    },
+  ];
+});
 const returnedCodes = new Set(rows.map((row) => row.code));
 const missingCodes = codes.filter((code) => !returnedCodes.has(code));
 if (missingCodes.length) {
@@ -165,4 +207,17 @@ function numericField(row: Record<string, unknown>, field: string): number {
     throw new Error(`Choice response field ${field} is invalid`);
   }
   return value;
+}
+
+function choicePublishedDate(value: unknown): string | null {
+  const normalized = String(value ?? "").trim();
+  if (/^\d{8}$/.test(normalized)) {
+    return `${normalized.slice(0, 4)}-${normalized.slice(4, 6)}-${normalized.slice(6, 8)}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return normalized;
+  return null;
+}
+
+function seriesPeriodKey(code: string, observationDate: string): string {
+  return `${code}:${observationDate}`;
 }

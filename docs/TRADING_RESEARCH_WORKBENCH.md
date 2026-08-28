@@ -109,7 +109,7 @@
 研究辅助已实现接口：
 
 - `GET /api/economic-indicators`：由 dashboard Worker 通过 Hyperdrive 读取 Neon `public.edb`，返回 `asOf`、`syncedAt` 和近 18 个月的 `rows`。
-- 人工更新命令先调用 Data API `GET /choice/data-statistics` 检查 `EM_EDB` 当前周余量，再调用一次 `GET /choice/edb` 读取全部 36 个指标；固定使用 `IsPublishDate=0,FixDate=0`。
+- 人工更新命令先调用 Data API `GET /choice/data-statistics` 检查 `EM_EDB` 当前周余量，再调用一次 `GET /choice/edb` 读取全部 36 个指标；固定使用 `IsPublishDate=1,FixDate=0`，优先读取 Choice `PUBLISHDATE` 作为真实发布日期。Choice 未提供发布日期的日频与不定期指标以原始数据日期作为更新日；缺少发布日期的固定资产投资、核心 CPI、GDP 平减指数、社融存量和人民币贷款，按同观测期分别沿用工业增加值、CPI、GDP、M2 的同批发布日期，避免把未发布的 `0` 占位值当成最新数据。
 - Choice 原始“核心 CPI（上年同月=100）”在前端减 100 展示同比；10Y-2Y 原始百分点在前端乘 100 展示 bp。其他指标不做口径换算。
 - Choice EDB 按指标代码计次，不按批量 HTTP 请求计次；一次同步 36 个指标消耗 36 次，页面挂载、刷新和重试均消耗 0 次 Choice EDB 额度。
 
@@ -120,7 +120,7 @@ pnpm edb:db:migrate
 pnpm edb:update -- --apply
 ```
 
-`edb:update` 默认使用生产 Data API，可通过 `DATA_API_BASE_URL` 或 `DATA_PROXY_TARGET` 覆盖；命令不自动重试，缺少 `--apply` 会在网络和数据库操作前退出，避免误耗付费额度。命令一次 upsert 当前 36 项指标的近 18 个月原始观测；页面展示换算仍由前端统一完成。
+`edb:update` 默认使用生产 Data API，可通过 `DATA_API_BASE_URL` 或 `DATA_PROXY_TARGET` 覆盖；命令不自动重试，缺少 `--apply` 会在网络和数据库操作前退出，避免误耗付费额度。命令在单事务内替换当前 36 项指标的近 18 个月序列；数据库以指标与观测期作为记录主键，同时保存真实发布日期供页面展示。页面数值换算仍由前端统一完成。
 
 尚未接入模块的首期接口建议：
 

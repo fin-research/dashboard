@@ -1,7 +1,11 @@
 <script lang="ts">
   import ChartHost from "../../components/ChartHost.svelte";
   import { renderEconomicIndicatorTrend } from "../../charts/trading-research";
-  import type { EconomicIndicatorSeries } from "./economic-indicators";
+  import {
+    economicIndicatorChange,
+    formatEconomicIndicatorChange,
+    type EconomicIndicatorSeries,
+  } from "./economic-indicators";
 
   let {
     indicator,
@@ -14,6 +18,10 @@
   } = $props();
 
   const latest = $derived(indicator.points.at(-1));
+  const change = $derived(economicIndicatorChange(indicator.points));
+  const displayChange = $derived(
+    formatEconomicIndicatorChange(change, indicator.decimals),
+  );
   const displayValue = $derived(
     latest
       ? latest.value.toLocaleString("zh-CN", {
@@ -23,7 +31,7 @@
       : "—",
   );
   const chartLabel = $derived(
-    `${indicator.name}近18个月走势${indicator.unit ? `，单位${indicator.unit}` : ""}`,
+    `${indicator.name}${indicator.frequency}走势${indicator.unit ? `，单位${indicator.unit}` : ""}`,
   );
 </script>
 
@@ -34,15 +42,25 @@
 >
   <header class="tr-economic-card__header">
     <h3>{indicator.name}</h3>
-    <span aria-hidden="true"></span>
   </header>
 
   <div class="tr-economic-card__value" aria-live="polite">
     {#if loading}
       <span class="tr-economic-skeleton tr-economic-skeleton--value"></span>
     {:else}
-      <strong>{displayValue}</strong>
-      {#if indicator.unit}<span>{indicator.unit}</span>{/if}
+      <div class="tr-economic-card__primary">
+        <strong>{displayValue}</strong>
+        {#if indicator.unit}<span>{indicator.unit}</span>{/if}
+      </div>
+      <span
+        class:tr-economic-card__change--up={change !== null && change > 0}
+        class:tr-economic-card__change--down={change !== null && change < 0}
+        class="tr-economic-card__change"
+        aria-label={`较上一期变化 ${displayChange}${indicator.unit ? ` ${indicator.unit}` : ""}`}
+        title="较上一期变化"
+      >
+        {displayChange}{#if change !== null && indicator.unit}<small>{indicator.unit}</small>{/if}
+      </span>
     {/if}
   </div>
 
@@ -68,7 +86,7 @@
   </div>
 
   <footer>
-    <span>{loading ? "数据加载中" : latest?.date ?? "日期待更新"}</span>
-    <span>近18个月</span>
+    <span>{loading ? "数据加载中" : latest ? `更新于 ${latest.date}` : "日期待更新"}</span>
+    <span>{indicator.frequency}</span>
   </footer>
 </article>

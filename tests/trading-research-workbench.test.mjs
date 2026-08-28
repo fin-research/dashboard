@@ -11,7 +11,11 @@ import {
 } from "../src/lib/trading-research/demo-data.ts";
 import {
   ECONOMIC_INDICATOR_GROUPS,
+  economicIndicatorChange,
   economicIndicatorRange,
+  formatEconomicDataRefresh,
+  formatEconomicIndicatorChange,
+  formatEconomicIndicatorTooltip,
   mapEconomicIndicatorRows,
 } from "../src/lib/trading-research/economic-indicators.ts";
 
@@ -100,6 +104,35 @@ test("经济指标按九类四项配置并应用必要口径换算", () => {
     startDate: "2025-02-01",
     endDate: "2026-08-28",
   });
+  assert.equal(ECONOMIC_INDICATOR_GROUPS[0].indicators[0].frequency, "季频");
+  assert.equal(ECONOMIC_INDICATOR_GROUPS[0].indicators[1].frequency, "月频");
+  assert.equal(ECONOMIC_INDICATOR_GROUPS[4].indicators[0].frequency, "日频");
+  assert.equal(ECONOMIC_INDICATOR_GROUPS[6].indicators[0].frequency, "不定期");
+  assert.equal(
+    formatEconomicDataRefresh("2026-08-28T07:56:59.532Z"),
+    "2026-08-28 15:56",
+  );
+  assert.equal(
+    economicIndicatorChange([
+      { date: "2026-07-01", value: 2.4 },
+      { date: "2026-08-01", value: 2.7 },
+    ]),
+    0.30000000000000027,
+  );
+  assert.equal(formatEconomicIndicatorChange(0.30000000000000027, 1), "+0.3");
+  assert.equal(formatEconomicIndicatorChange(-12, 0), "-12");
+  assert.equal(formatEconomicIndicatorChange(null, 1), "—");
+});
+
+test("经济指标 tooltip 只显示发布日期和数值", () => {
+  const tooltip = formatEconomicIndicatorTooltip(
+    [{ axisValueLabel: "2026-08-28", data: 4.2, seriesName: "GDP不变价同比" }],
+    "%",
+    1,
+  );
+  assert.match(tooltip, /2026-08-28/);
+  assert.match(tooltip, /4\.2 %/);
+  assert.doesNotMatch(tooltip, /GDP不变价同比/);
 });
 
 test("工作台使用抽屉 path 导航、复用页面组件且不展示实现边界文案", async () => {
@@ -226,6 +259,7 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(styles, /\.tr-panel-heading\s*\{[\s\S]*?display:\s*grid/);
   assert.match(styles, /\.tr-panel-heading--wrap \.tr-table-controls\s*\{[\s\S]*?flex-wrap:\s*nowrap/);
   assert.match(workbenchPage, /id="tr-topbar-actions"/);
+  assert.doesNotMatch(workbenchPage, /观测日期|见各指标卡/);
   assert.match(bond, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
   assert.match(financing, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
   assert.match(bond, /globalMessages\.(success|error|info)/);
@@ -248,12 +282,21 @@ test("研究辅助从 Dashboard API 读取 Neon 并使用专用走势卡", async
 
   assert.match(research, /经济数据走势/);
   assert.match(research, /group\.type/);
+  assert.match(research, /use:portal=\{"#tr-topbar-actions"\}/);
+  assert.match(research, /<span>数据更新<\/span>/);
+  assert.doesNotMatch(research, /36项指标|近18个月|覆盖国内增长|4项指标/);
   assert.match(card, /indicator\.name/);
-  assert.match(card, /latest\?\.date/);
+  assert.match(card, /更新于 \$\{latest\.date\}/);
+  assert.match(card, /indicator\.frequency/);
+  assert.match(card, /displayChange/);
+  assert.doesNotMatch(card, /tr-economic-card__header[\s\S]*?aria-hidden="true"/);
   assert.match(card, /<ChartHost/);
   assert.match(dataClient, /fetch\("\/api\/economic-indicators"/);
   assert.doesNotMatch(dataClient, /\/data\/graphql|choiceEdb/);
   assert.match(styles, /\.tr-economic-grid\s*\{[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.tr-economic-card__change--up\s*\{[\s\S]*?var\(--color-up\)/);
+  assert.match(styles, /\.tr-economic-card__change--down\s*\{[\s\S]*?var\(--color-down\)/);
+  assert.doesNotMatch(styles, /\.tr-economic-card footer\s*\{[^}]*border-top/);
 });
 
 test("工作台不再展示数据覆盖与校验状态模块", async () => {

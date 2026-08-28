@@ -1,14 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
+  import { portal } from "../portal";
   import EconomicIndicatorCard from "./EconomicIndicatorCard.svelte";
   import SectionHeading from "./SectionHeading.svelte";
+  import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import {
     emptyEconomicIndicatorGroups,
-    fetchEconomicIndicatorGroups,
+    fetchEconomicIndicatorSnapshot,
+    formatEconomicDataRefresh,
   } from "./economic-indicators";
 
   let groups = $state(emptyEconomicIndicatorGroups());
+  let syncedAt = $state("");
   let loading = $state(true);
   let error = $state("");
   let controller: AbortController | undefined;
@@ -20,7 +24,11 @@
     loading = true;
     error = "";
     try {
-      groups = await fetchEconomicIndicatorGroups(requestController.signal);
+      const snapshot = await fetchEconomicIndicatorSnapshot(
+        requestController.signal,
+      );
+      groups = snapshot.groups;
+      syncedAt = snapshot.syncedAt;
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
       error = cause instanceof Error ? cause.message : "经济指标加载失败";
@@ -35,16 +43,17 @@
   });
 </script>
 
+{#if syncedAt}
+  <span class="tr-as-of" use:portal={"#tr-topbar-actions"}>
+    <WorkbenchIcon name="calendar" />
+    <span>数据更新</span>
+    <strong>{formatEconomicDataRefresh(syncedAt)}</strong>
+  </span>
+{/if}
+
 <div class="tr-view-stack tr-economic-view">
   <section aria-labelledby="economic-indicators-title">
-    <SectionHeading
-      id="economic-indicators-title"
-      title="经济数据走势"
-      meta="36项指标 · 近18个月"
-    />
-    <p class="tr-economic-intro">
-      覆盖国内增长、需求、价格、货币信用，以及海外基本面、利率和全球风险资产。
-    </p>
+    <SectionHeading id="economic-indicators-title" title="经济数据走势" />
   </section>
 
   {#if error}
@@ -68,7 +77,6 @@
           <span aria-hidden="true"></span>
           <h2 id={`economic-group-${groupIndex}`}>{group.type}</h2>
         </div>
-        <span>4项指标</span>
       </header>
       <div class="tr-economic-grid">
         {#each group.indicators as indicator (indicator.key)}

@@ -511,13 +511,6 @@ body:has(.tr-workbench) {
   gap: 16px;
 }
 
-.tr-economic-intro {
-  max-width: 760px;
-  margin: -4px 0 0 13px;
-  color: var(--tr-muted);
-  font-size: 0.875rem;
-}
-
 .tr-economic-group {
   display: grid;
   gap: 10px;
@@ -537,7 +530,6 @@ body:has(.tr-workbench) {
 
 .tr-economic-group__header {
   min-height: 28px;
-  justify-content: space-between;
   gap: 12px;
   padding-inline: 2px;
 }
@@ -560,11 +552,6 @@ body:has(.tr-workbench) {
   font-size: 0.9375rem;
   font-weight: bolder;
   letter-spacing: 0.01em;
-}
-
-.tr-economic-group__header > span {
-  color: var(--tr-muted);
-  font-size: 0.75rem;
 }
 
 .tr-economic-grid {
@@ -607,11 +594,7 @@ body:has(.tr-workbench) {
 }
 
 .tr-economic-card__header {
-  display: flex;
   min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 .tr-economic-card__header h3 {
@@ -623,25 +606,23 @@ body:has(.tr-workbench) {
   line-height: 1.25;
 }
 
-.tr-economic-card__header span {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-  border-radius: 6px;
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--tr-economic-accent) 20%, transparent), transparent),
-    var(--tr-primary-soft);
-}
-
 .tr-economic-card__value {
   display: flex;
   min-height: 36px;
   align-items: baseline;
+  justify-content: space-between;
   gap: 6px;
   font-variant-numeric: tabular-nums;
 }
 
-.tr-economic-card__value strong {
+.tr-economic-card__primary {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tr-economic-card__primary strong {
   color: var(--tr-text);
   font-size: clamp(1.45rem, 1.4vw, 1.85rem);
   font-weight: bolder;
@@ -649,10 +630,32 @@ body:has(.tr-workbench) {
   line-height: 1.05;
 }
 
-.tr-economic-card__value > span:not(.tr-economic-skeleton) {
+.tr-economic-card__primary span {
   color: var(--tr-muted);
   font-size: 0.75rem;
   white-space: nowrap;
+}
+
+.tr-economic-card__change {
+  margin-left: auto;
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.tr-economic-card__change small {
+  margin-left: 3px;
+  font-size: 0.75rem;
+  font-weight: normal;
+}
+
+.tr-economic-card__change--up {
+  color: var(--color-up);
+}
+
+.tr-economic-card__change--down {
+  color: var(--color-down);
 }
 
 .tr-economic-card__trend {
@@ -679,8 +682,7 @@ body:has(.tr-workbench) {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 7px;
-  border-top: 1px solid var(--tr-border);
+  padding-top: 2px;
   color: var(--tr-muted);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
