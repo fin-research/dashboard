@@ -382,36 +382,35 @@
             <h3>公司业务指标</h3>
             {#if company}
               <p>{companyBusinessNarrative(company)}</p>
-              <dl class="company-business-metrics">
-                <div>
-                  <dt>LCR六十日分位</dt>
-                  <dd class="business-value business-value--liquidity">
+              <ol class="market-driver-list" aria-label="公司业务指标">
+                <li>
+                  <span>LCR六十日分位</span>
+                  <strong class="business-value--liquidity">
                     {formatPercent(company.ef_lcr_pctile_60d)}
-                  </dd>
-                </div>
-                <div>
-                  <dt>NSFR六十日分位</dt>
-                  <dd class="business-value business-value--stability">
+                  </strong>
+                </li>
+                <li>
+                  <span>NSFR六十日分位</span>
+                  <strong class="business-value--stability">
                     {formatPercent(company.ef_nsfr_pctile_60d)}
-                  </dd>
-                </div>
-                <div>
-                  <dt>资金缺口</dt>
-                  <dd
-                    class="business-value"
+                  </strong>
+                </li>
+                <li>
+                  <span>资金缺口</span>
+                  <strong
                     class:business-value--positive={company.ef_funding_gap !== null && company.ef_funding_gap >= 0}
                     class:business-value--negative={company.ef_funding_gap !== null && company.ef_funding_gap < 0}
                   >
                     {formatSignedNullable(company.ef_funding_gap, 1)} 亿元
-                  </dd>
-                </div>
-                <div>
-                  <dt>主体利差</dt>
-                  <dd class="business-value business-value--spread">
+                  </strong>
+                </li>
+                <li>
+                  <span>主体利差</span>
+                  <strong class="business-value--spread">
                     {formatNullable(company.ef_subject_spread_bp, 2)} bp
-                  </dd>
-                </div>
-              </dl>
+                  </strong>
+                </li>
+              </ol>
             {:else}
               <p>暂无可用公司业务指标，本次仅使用市场择时信号。</p>
             {/if}
@@ -865,32 +864,6 @@
 
   .insight-card p strong {
     color: var(--color-primary);
-  }
-
-  .insight-card dl {
-    display: grid;
-    gap: 8px;
-    margin: 0;
-  }
-
-  .insight-card dl div {
-    display: flex;
-    justify-content: space-between;
-    gap: 14px;
-  }
-
-  .insight-card dt {
-    color: var(--text-3);
-  }
-
-  .insight-card dd {
-    margin: 0;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .company-business-metrics .business-value {
-    font-weight: bold;
   }
 
   .business-value--liquidity {

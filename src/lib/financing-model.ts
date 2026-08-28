@@ -244,15 +244,18 @@ export function companyBusinessNarrative(
   metrics: FinancingModelCompanyMetrics,
 ): string {
   const readiness = metrics.readiness_label.trim().replace(/^流动性/, "");
-  const liquidityClause = readiness
+  const hasReadiness = readiness !== "" && readiness !== "数据不足";
+  const liquidityClause = hasReadiness
     ? `流动性整体${readiness}`
     : "流动性状态暂缺";
   const fundingClause =
     metrics.ef_funding_gap === null
       ? "资金缺口信息暂缺"
-      : metrics.ef_funding_gap >= 0
-        ? "资金缺口表现为净余量"
-        : "资金缺口仍为净缺口";
+      : metrics.ef_funding_gap < -100
+        ? "资金缺口较大"
+        : metrics.ef_funding_gap > 50
+          ? "资金缺口较小"
+          : "资金缺口适中";
   const spreadClause =
     metrics.ef_subject_spread_bp === null
       ? "主体利差信息暂缺"
@@ -263,7 +266,18 @@ export function companyBusinessNarrative(
           : metrics.ef_subject_spread_pctile >= 0.67
             ? "主体利差处于相对高位"
             : "主体利差处于常态区间";
-  return `${liquidityClause}；${fundingClause}；${spreadClause}。`;
+  const demandClause =
+    readiness === "偏紧" ||
+    (metrics.ef_funding_gap !== null && metrics.ef_funding_gap < -100)
+      ? "公司融资需求较为迫切，建议尽快完成发行"
+      : readiness === "宽裕" &&
+          metrics.ef_funding_gap !== null &&
+          metrics.ef_funding_gap > 50
+        ? "公司融资需求暂不迫切，建议等待成本较优窗口择机完成发行"
+        : metrics.ef_funding_gap === null && !hasReadiness
+          ? "公司融资需求尚待确认，建议补充业务指标后安排发行"
+          : "公司融资需求总体适中，建议结合市场窗口择机完成发行";
+  return `${liquidityClause}；${fundingClause}；${spreadClause}；${demandClause}。`;
 }
 
 export function sellSideSummaryBody(

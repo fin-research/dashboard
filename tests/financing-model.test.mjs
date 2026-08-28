@@ -155,14 +155,29 @@ test("融资择时报告契约接受模型、人工结论和卖方观点", () =>
   assert.match(report.sellSide.logicSummary, /长端利率方向/);
 });
 
-test("公司业务指标结论固定为三个无数字分句", () => {
+test("公司业务指标结论包含三个状态分句和发行节奏建议", () => {
   const narrative = companyBusinessNarrative(snapshot().company_metrics);
 
   assert.equal(
     narrative,
-    "流动性整体宽裕；资金缺口仍为净缺口；主体利差处于相对低位。",
+    "流动性整体宽裕；资金缺口较大；主体利差处于相对低位；公司融资需求较为迫切，建议尽快完成发行。",
   );
   assert.doesNotMatch(narrative, /\d/);
+
+  const unhurried = companyBusinessNarrative({
+    ...snapshot().company_metrics,
+    ef_funding_gap: 60,
+  });
+  assert.match(unhurried, /资金缺口较小/);
+  assert.match(unhurried, /公司融资需求暂不迫切，建议等待成本较优窗口择机完成发行/);
+
+  const moderate = companyBusinessNarrative({
+    ...snapshot().company_metrics,
+    readiness_label: "适中",
+    ef_funding_gap: -50,
+  });
+  assert.match(moderate, /资金缺口适中/);
+  assert.match(moderate, /公司融资需求总体适中，建议结合市场窗口择机完成发行/);
 });
 
 test("卖方观点正文移除机构研报和发布日期引导句", () => {
@@ -335,6 +350,7 @@ test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模�
   assert.match(page, /class=\{`sell-side-grid sell-side-grid--\$\{/);
   assert.match(page, /report\.sellSide\.views as view/);
   assert.match(page, /companyBusinessNarrative\(company\)/);
+  assert.match(page, /<ol class="market-driver-list" aria-label="公司业务指标">/);
   assert.match(page, /LCR六十日分位/);
   assert.match(page, /NSFR六十日分位/);
   assert.match(page, /company\.ef_funding_gap/);
