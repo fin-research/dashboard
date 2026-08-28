@@ -130,7 +130,7 @@ export async function loadCreditReport(
          notes,
          bond_preference,
          usage_details,
-         to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at
+         to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at
        FROM credit.institution
        WHERE report_date = ANY($1::date[])
        ORDER BY report_date, source_row`,
@@ -223,46 +223,97 @@ export async function saveCreditInstitution(
 ): Promise<CreditInstitutionUpdateResponse> {
   await client.query("BEGIN");
   try {
-    const institution = input.institution;
-    const updated = await client.query(
-      `UPDATE credit.institution
-       SET institution_type = $4,
-           confidentiality_status = $5::credit.confidentiality_status,
-           status = $6::credit.credit_status,
-           included_in_weekly_report = $7,
-           total_limit = $8,
-           total_used = $9,
-           effective_date = $10::date,
-           expiry_date = $11::date,
-           bank_office = $12,
-           applying_department = $13,
-           handler = $14,
-           notes = $15,
-           bond_preference = $16,
-           usage_details = $17,
+    const institutionChanges = input.changes.institution ?? {};
+    const itemChanges = input.changes.items ?? [];
+    const updated = await client.query<{
+      effective_date: string | null;
+      expiry_date: string | null;
+    }>(
+      `WITH patch AS (SELECT $4::jsonb AS data)
+       UPDATE credit.institution AS institution
+       SET institution_type = CASE
+             WHEN patch.data ? 'institutionType'
+               THEN patch.data ->> 'institutionType'
+             ELSE institution.institution_type
+           END,
+           confidentiality_status = CASE
+             WHEN patch.data ? 'confidentialityStatus'
+               THEN (patch.data ->> 'confidentialityStatus')::credit.confidentiality_status
+             ELSE institution.confidentiality_status
+           END,
+           status = CASE
+             WHEN patch.data ? 'status'
+               THEN (patch.data ->> 'status')::credit.credit_status
+             ELSE institution.status
+           END,
+           included_in_weekly_report = CASE
+             WHEN patch.data ? 'includedInWeeklyReport'
+               THEN (patch.data ->> 'includedInWeeklyReport')::boolean
+             ELSE institution.included_in_weekly_report
+           END,
+           total_limit = CASE
+             WHEN patch.data ? 'totalLimit'
+               THEN (patch.data ->> 'totalLimit')::numeric
+             ELSE institution.total_limit
+           END,
+           total_used = CASE
+             WHEN patch.data ? 'totalUsed'
+               THEN (patch.data ->> 'totalUsed')::numeric
+             ELSE institution.total_used
+           END,
+           effective_date = CASE
+             WHEN patch.data ? 'effectiveDate'
+               THEN (patch.data ->> 'effectiveDate')::date
+             ELSE institution.effective_date
+           END,
+           expiry_date = CASE
+             WHEN patch.data ? 'expiryDate'
+               THEN (patch.data ->> 'expiryDate')::date
+             ELSE institution.expiry_date
+           END,
+           bank_office = CASE
+             WHEN patch.data ? 'bankOffice'
+               THEN patch.data ->> 'bankOffice'
+             ELSE institution.bank_office
+           END,
+           applying_department = CASE
+             WHEN patch.data ? 'applyingDepartment'
+               THEN patch.data ->> 'applyingDepartment'
+             ELSE institution.applying_department
+           END,
+           handler = CASE
+             WHEN patch.data ? 'handler'
+               THEN patch.data ->> 'handler'
+             ELSE institution.handler
+           END,
+           notes = CASE
+             WHEN patch.data ? 'notes'
+               THEN patch.data ->> 'notes'
+             ELSE institution.notes
+           END,
+           bond_preference = CASE
+             WHEN patch.data ? 'bondPreference'
+               THEN patch.data ->> 'bondPreference'
+             ELSE institution.bond_preference
+           END,
+           usage_details = CASE
+             WHEN patch.data ? 'usageDetails'
+               THEN patch.data ->> 'usageDetails'
+             ELSE institution.usage_details
+           END,
            updated_at = clock_timestamp()
-       WHERE report_date = $1::date
-         AND institution_name = $2
-         AND updated_at = $3::timestamptz
-       RETURNING updated_at`,
+       FROM patch
+       WHERE institution.report_date = $1::date
+         AND institution.institution_name = $2
+         AND institution.updated_at = $3::timestamptz
+       RETURNING
+         to_char(institution.effective_date, 'YYYY-MM-DD') AS effective_date,
+         to_char(institution.expiry_date, 'YYYY-MM-DD') AS expiry_date`,
       [
         input.reportDate,
         input.institutionName,
         input.expectedUpdatedAt,
-        institution.institutionType,
-        institution.confidentialityStatus,
-        institution.status,
-        institution.includedInWeeklyReport,
-        institution.totalLimit,
-        institution.totalUsed,
-        institution.effectiveDate,
-        institution.expiryDate,
-        institution.bankOffice,
-        institution.applyingDepartment,
-        institution.handler,
-        institution.notes,
-        institution.bondPreference,
-        institution.usageDetails,
+        JSON.stringify(institutionChanges),
       ],
     );
     if (!updated.rowCount) {
@@ -278,38 +329,48 @@ export async function saveCreditInstitution(
           : "该授信记录不存在",
       );
     }
+    const updatedDates = updated.rows[0]!;
+    if (
+      updatedDates.effective_date &&
+      updatedDates.expiry_date &&
+      updatedDates.effective_date > updatedDates.expiry_date
+    ) {
+      throw new CreditDatabaseError(400, "授信到期日不能早于生效日");
+    }
 
-    await client.query(
-      `INSERT INTO credit.item (
-         report_date, institution_name, item_type,
-         limit_amount, used_amount, details, updated_at
-       )
-       SELECT
-         $1::date, $2, row.item_type::credit.item_type,
-         row.limit_amount, row.used_amount, row.details, clock_timestamp()
-       FROM jsonb_to_recordset($3::jsonb) AS row(
-         item_type text,
-         limit_amount numeric,
-         used_amount numeric,
-         details text
-       )
-       ON CONFLICT (report_date, institution_name, item_type)
-       DO UPDATE SET
-         limit_amount = EXCLUDED.limit_amount,
-         used_amount = EXCLUDED.used_amount,
-         details = EXCLUDED.details,
-         updated_at = clock_timestamp()`,
-      [
-        input.reportDate,
-        input.institutionName,
-        JSON.stringify(institution.items.map((item) => ({
-          item_type: item.type,
-          limit_amount: item.limitAmount,
-          used_amount: item.usedAmount,
-          details: item.details,
-        }))),
-      ],
-    );
+    if (itemChanges.length) {
+      const itemsUpdated = await client.query(
+        `WITH changes AS (
+           SELECT value AS patch
+           FROM jsonb_array_elements($3::jsonb)
+         )
+         UPDATE credit.item AS item
+         SET limit_amount = CASE
+               WHEN changes.patch ? 'limitAmount'
+                 THEN (changes.patch ->> 'limitAmount')::numeric
+               ELSE item.limit_amount
+             END,
+             used_amount = CASE
+               WHEN changes.patch ? 'usedAmount'
+                 THEN (changes.patch ->> 'usedAmount')::numeric
+               ELSE item.used_amount
+             END,
+             details = CASE
+               WHEN changes.patch ? 'details'
+                 THEN changes.patch ->> 'details'
+               ELSE item.details
+             END,
+             updated_at = clock_timestamp()
+         FROM changes
+         WHERE item.report_date = $1::date
+           AND item.institution_name = $2
+           AND item.item_type = (changes.patch ->> 'type')::credit.item_type`,
+        [input.reportDate, input.institutionName, JSON.stringify(itemChanges)],
+      );
+      if (itemsUpdated.rowCount !== itemChanges.length) {
+        throw new CreditDatabaseError(404, "授信分项记录不存在");
+      }
+    }
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);

@@ -12,10 +12,15 @@
     type CreditAmountChange,
     type CreditCalendarEvent,
     type CreditInstitutionView,
+    type CreditItemType,
     type CreditReportResponse,
     type CreditStatus,
   } from "../credit/types.ts";
-  import type { CreditInstitutionUpdateInput } from "../credit/update.ts";
+  import type {
+    CreditInstitutionChanges,
+    CreditInstitutionUpdateInput,
+    CreditItemChanges,
+  } from "../credit/update.ts";
   import Badge from "./Badge.svelte";
   import PanelHeading from "./PanelHeading.svelte";
   import SectionHeading from "./SectionHeading.svelte";
@@ -53,6 +58,8 @@
   let saveMessage = $state("");
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let saveInFlight = false;
+  let pendingInstitutionChanges: CreditInstitutionChanges = {};
+  let pendingItemChanges = new Map<CreditItemType, CreditItemChanges>();
   let sortKey = $state<SortKey>("sourceRow");
   let sortDirection = $state<"ascending" | "descending">("ascending");
   let calendarFilter = $state<CalendarFilter>("all");
@@ -161,8 +168,10 @@
       editorSession += 1;
       expandedInstitution = null;
       editor = null;
+      resetPendingChanges();
       return;
     }
+    if (editor && editorVersion > savedEditorVersion) void flushEditor();
     if (saveTimer) clearTimeout(saveTimer);
     editorSession += 1;
     expandedInstitution = institution.institutionName;
@@ -171,6 +180,7 @@
     savedEditorVersion = 0;
     saveState = "idle";
     saveMessage = "";
+    resetPendingChanges();
   }
 
   function clearEditor(): void {
@@ -183,6 +193,7 @@
     savedEditorVersion = 0;
     saveState = "idle";
     saveMessage = "";
+    resetPendingChanges();
   }
 
   function scheduleEditorSave(immediate = false): void {
@@ -203,10 +214,15 @@
   }
 
   async function flushEditor(): Promise<void> {
-    if (saveInFlight || !editor || editorVersion === savedEditorVersion) return;
+    if (saveInFlight || !editor || !hasPendingChanges()) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = null;
-    const snapshot = cloneInstitution(editor);
+    const target = {
+      reportDate: editor.reportDate,
+      institutionName: editor.institutionName,
+      expectedUpdatedAt: editor.updatedAt,
+    };
+    const changes = takePendingChanges();
     const version = editorVersion;
     const session = editorSession;
     saveInFlight = true;
@@ -215,31 +231,8 @@
     let failed = false;
     try {
       const input: CreditInstitutionUpdateInput = {
-        reportDate: snapshot.reportDate,
-        institutionName: snapshot.institutionName,
-        expectedUpdatedAt: snapshot.updatedAt,
-        institution: {
-          institutionType: snapshot.institutionType,
-          confidentialityStatus: snapshot.confidentialityStatus,
-          status: snapshot.status,
-          includedInWeeklyReport: snapshot.includedInWeeklyReport,
-          totalLimit: snapshot.totalLimit,
-          totalUsed: snapshot.totalUsed,
-          effectiveDate: snapshot.effectiveDate,
-          expiryDate: snapshot.expiryDate,
-          bankOffice: snapshot.bankOffice,
-          applyingDepartment: snapshot.applyingDepartment,
-          handler: snapshot.handler,
-          notes: snapshot.notes,
-          bondPreference: snapshot.bondPreference,
-          usageDetails: snapshot.usageDetails,
-          items: snapshot.items.map((item) => ({
-            type: item.type,
-            limitAmount: item.limitAmount,
-            usedAmount: item.usedAmount,
-            details: item.details,
-          })),
-        },
+        ...target,
+        changes,
       };
       const result = await updateCreditInstitution(input);
       if (report) {
@@ -272,6 +265,7 @@
     } catch (error) {
       failed = true;
       if (editorSession === session) {
+        requeueChanges(changes);
         saveState = "error";
         saveMessage = error instanceof Error ? error.message : "保存失败";
       }
@@ -279,7 +273,7 @@
       saveInFlight = false;
       if (
         editor &&
-        editorVersion > savedEditorVersion &&
+        hasPendingChanges() &&
         (!failed || editorSession !== session)
       ) {
         void flushEditor();
@@ -295,6 +289,7 @@
     const value = (event.currentTarget as HTMLInputElement | HTMLTextAreaElement).value;
     if (field === "institutionType") editor[field] = value;
     else editor[field] = value === "" ? null : value;
+    queueInstitutionChange(field, editor[field]);
     scheduleEditorSave();
   }
 
@@ -304,6 +299,7 @@
   ): void {
     if (!editor) return;
     editor[field] = inputAmount(event);
+    queueInstitutionChange(field, editor[field]);
     scheduleEditorSave();
   }
 
@@ -313,12 +309,14 @@
   ): void {
     if (!editor) return;
     editor[field] = (event.currentTarget as HTMLInputElement).value || null;
+    queueInstitutionChange(field, editor[field]);
     scheduleEditorSave(true);
   }
 
   function setEditorStatus(event: Event): void {
     if (!editor) return;
     editor.status = (event.currentTarget as HTMLSelectElement).value as CreditStatus;
+    queueInstitutionChange("status", editor.status);
     scheduleEditorSave(true);
   }
 
@@ -326,12 +324,17 @@
     if (!editor) return;
     editor.confidentialityStatus = (event.currentTarget as HTMLSelectElement)
       .value as CreditInstitutionView["confidentialityStatus"];
+    queueInstitutionChange("confidentialityStatus", editor.confidentialityStatus);
     scheduleEditorSave(true);
   }
 
   function setEditorWeekly(event: Event): void {
     if (!editor) return;
     editor.includedInWeeklyReport = (event.currentTarget as HTMLInputElement).checked;
+    queueInstitutionChange(
+      "includedInWeeklyReport",
+      editor.includedInWeeklyReport,
+    );
     scheduleEditorSave(true);
   }
 
@@ -342,6 +345,7 @@
   ): void {
     if (!editor?.items[index]) return;
     editor.items[index][field] = inputAmount(event);
+    queueItemChange(index, field);
     scheduleEditorSave();
   }
 
@@ -349,7 +353,70 @@
     if (!editor?.items[index]) return;
     const value = (event.currentTarget as HTMLInputElement).value;
     editor.items[index].details = value === "" ? null : value;
+    queueItemChange(index, "details");
     scheduleEditorSave();
+  }
+
+  function queueInstitutionChange<K extends keyof CreditInstitutionChanges>(
+    field: K,
+    value: CreditInstitutionChanges[K],
+  ): void {
+    pendingInstitutionChanges = {
+      ...pendingInstitutionChanges,
+      [field]: value,
+    };
+  }
+
+  function queueItemChange(
+    index: number,
+    field: "limitAmount" | "usedAmount" | "details",
+  ): void {
+    const item = editor?.items[index];
+    if (!item) return;
+    pendingItemChanges.set(item.type, {
+      ...pendingItemChanges.get(item.type),
+      type: item.type,
+      [field]: item[field],
+    });
+  }
+
+  function hasPendingChanges(): boolean {
+    return (
+      Object.keys(pendingInstitutionChanges).length > 0 ||
+      pendingItemChanges.size > 0
+    );
+  }
+
+  function takePendingChanges(): CreditInstitutionUpdateInput["changes"] {
+    const institution = { ...pendingInstitutionChanges };
+    const items = [...pendingItemChanges.values()].map((item) => ({ ...item }));
+    resetPendingChanges();
+    return {
+      ...(Object.keys(institution).length ? { institution } : {}),
+      ...(items.length ? { items } : {}),
+    };
+  }
+
+  function requeueChanges(
+    changes: CreditInstitutionUpdateInput["changes"],
+  ): void {
+    pendingInstitutionChanges = {
+      ...(changes.institution ?? {}),
+      ...pendingInstitutionChanges,
+    };
+    for (const item of changes.items ?? []) {
+      const current = pendingItemChanges.get(item.type);
+      pendingItemChanges.set(item.type, {
+        ...item,
+        ...current,
+        type: item.type,
+      });
+    }
+  }
+
+  function resetPendingChanges(): void {
+    pendingInstitutionChanges = {};
+    pendingItemChanges = new Map();
   }
 
   function inputAmount(event: Event): number | null {

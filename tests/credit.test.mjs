@@ -8,6 +8,7 @@ import {
   CreditWorkbookParseError,
   parseCreditWorkbook,
 } from "../src/lib/credit/workbook.ts";
+import { creditInstitutionUpdateSchema } from "../src/lib/credit/update.ts";
 import {
   compareCreditSnapshots,
   loadCreditReport,
@@ -202,12 +203,14 @@ test("同日报表导入只替换机构和分项表，不建立汇总或导入�
   assert.equal(calls.at(-1).sql, "COMMIT");
 });
 
-test("授信详情更新使用 updated_at 并发检查并返回服务端确认实体", async () => {
+test("授信详情只更新机构增量字段并使用完整 updated_at 并发检查", async () => {
   const calls = [];
   const client = {
     async query(sql, parameters) {
       calls.push({ sql, parameters });
-      if (/UPDATE credit\.institution/.test(sql)) return { rows: [{ updated_at: "new" }], rowCount: 1 };
+      if (/UPDATE credit\.institution/.test(sql)) {
+        return { rows: [{ effective_date: null, expiry_date: null }], rowCount: 1 };
+      }
       if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
         return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
       }
@@ -224,30 +227,73 @@ test("授信详情更新使用 updated_at 并发检查并返回服务端确认�
     reportDate: current.reportDate,
     institutionName: current.institutionName,
     expectedUpdatedAt: current.updatedAt,
-    institution: {
-      institutionType: current.institutionType,
-      confidentialityStatus: current.confidentialityStatus,
-      status: current.status,
-      includedInWeeklyReport: current.includedInWeeklyReport,
-      totalLimit: current.totalLimit,
-      totalUsed: current.totalUsed,
-      effectiveDate: current.effectiveDate,
-      expiryDate: current.expiryDate,
-      bankOffice: current.bankOffice,
-      applyingDepartment: current.applyingDepartment,
-      handler: current.handler,
-      notes: "已更新",
-      bondPreference: current.bondPreference,
-      usageDetails: current.usageDetails,
-      items: current.items.map(({ type, limitAmount, usedAmount, details }) => ({ type, limitAmount, usedAmount, details })),
+    changes: {
+      institution: { notes: "已更新" },
     },
   });
   const sql = calls.map((call) => call.sql).join("\n");
+  const updateCall = calls.find((call) => /UPDATE credit\.institution/.test(call.sql));
 
-  assert.match(sql, /AND updated_at = \$3::timestamptz/);
-  assert.match(sql, /ON CONFLICT \(report_date, institution_name, item_type\)/);
+  assert.match(sql, /institution\.updated_at = \$3::timestamptz/);
+  assert.match(sql, /patch\.data \? 'notes'/);
+  assert.doesNotMatch(sql, /jsonb_array_elements/);
+  assert.deepEqual(JSON.parse(updateCall.parameters[3]), { notes: "已更新" });
   assert.equal(result.institution.notes, "已更新");
   assert.equal(result.institution.updatedAt, "2026-08-21T10:00:00.000Z");
+});
+
+test("授信详情只更新发生变化的单个分项字段", async () => {
+  const calls = [];
+  const client = {
+    async query(sql, parameters) {
+      calls.push({ sql, parameters });
+      if (/UPDATE credit\.institution/.test(sql)) {
+        return { rows: [{ effective_date: null, expiry_date: null }], rowCount: 1 };
+      }
+      if (/UPDATE credit\.item/.test(sql)) return { rows: [], rowCount: 1 };
+      if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
+        return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
+      }
+      if (/FROM credit\.institution[\s\S]*WHERE report_date/.test(sql)) {
+        return { rows: [institutionRow()], rowCount: 1 };
+      }
+      if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };
+      return { rows: [], rowCount: 0 };
+    },
+  };
+  const current = institution("甲银行", 10, 3, 4, 1);
+
+  await saveCreditInstitution(client, {
+    reportDate: current.reportDate,
+    institutionName: current.institutionName,
+    expectedUpdatedAt: "2026-08-21T10:00:00.123456Z",
+    changes: {
+      items: [{ type: "bond_investment", usedAmount: 2 }],
+    },
+  });
+  const itemUpdate = calls.find((call) => /UPDATE credit\.item/.test(call.sql));
+
+  assert.match(itemUpdate.sql, /changes\.patch \? 'usedAmount'/);
+  assert.deepEqual(JSON.parse(itemUpdate.parameters[2]), [
+    { type: "bond_investment", usedAmount: 2 },
+  ]);
+});
+
+test("授信增量 PATCH 接受微秒版本且拒绝空变更", () => {
+  const base = {
+    reportDate: "2026-08-21",
+    institutionName: "甲银行",
+    expectedUpdatedAt: "2026-08-28T02:00:39.506354Z",
+  };
+
+  assert.equal(creditInstitutionUpdateSchema.safeParse({
+    ...base,
+    changes: { institution: { status: "approved" } },
+  }).success, true);
+  assert.equal(creditInstitutionUpdateSchema.safeParse({
+    ...base,
+    changes: {},
+  }).success, false);
 });
 
 test("授信最终 schema、API 与页面使用规范表、日历和自动保存契约", async () => {
@@ -264,6 +310,9 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.match(migration, /RENAME TO item/);
   assert.match(migration, /DROP TABLE credit\.daily_summary/);
   assert.doesNotMatch(repository, /daily_summary|institution_daily|item_daily|import_run|_snapshot/);
+  assert.match(repository, /SS\.US/);
+  assert.doesNotMatch(repository, /SS\.MS/);
+  assert.match(repository, /jsonb_array_elements/);
   assert.match(route, /HYPERDRIVE/);
   assert.match(route, /export const PATCH/);
   assert.match(route, /creditInstitutionUpdateSchema/);
@@ -271,6 +320,8 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.match(view, /授信日历/);
   assert.match(view, /授信周报/);
   assert.match(view, /updateCreditInstitution/);
+  assert.match(view, /pendingInstitutionChanges/);
+  assert.match(view, /pendingItemChanges/);
   assert.match(view, /toggleSort/);
   assert.match(view, /function cloneInstitution/);
   assert.doesNotMatch(view, /structuredClone/);

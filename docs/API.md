@@ -82,7 +82,7 @@ query MarketReport($request: MarketReportInput!) {
 - `GET /api/credit?date=YYYY-MM-DD`：读取指定报告日；无该日期记录返回 404，无数据库连接返回 503，无效日期返回 400。
 - 响应同时返回一览表口径 `summary`、周报名单口径 `weeklySummary`、上一报告日汇总、机构和分项、授信额度变动、使用额度变动及日历事件。
 - 周环比基准是小于当前日期的上一可用报告日，不要求恰好相隔七天。授信额度变动和使用额度变动分开计算，新增但使用额为零的机构不进入使用额度变动。
-- `PATCH /api/credit`：以 `(reportDate, institutionName, expectedUpdatedAt)` 定位一条机构记录，保存详情字段和完整分项，使用 `updated_at` 防止旧响应覆盖新数据；成功只返回变更机构及受影响的服务端派生汇总。
+- `PATCH /api/credit`：以 `(reportDate, institutionName, expectedUpdatedAt)` 定位一条机构记录，`changes.institution` 仅传发生变化的主体字段，`changes.items` 仅传发生变化的分项及字段；`updated_at` 以 UTC 微秒精度作为乐观并发版本，防止旧响应覆盖新数据。成功只返回变更机构及受影响的服务端派生汇总；版本确有冲突返回 409，空增量或非法字段返回 400。
 - GET 与 PATCH 均使用 `Cache-Control: no-store`。Excel 解析仍只由本地命令执行，浏览器不上传源文件。
 
 ## 通用约定
