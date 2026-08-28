@@ -272,6 +272,8 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.match(view, /授信周报/);
   assert.match(view, /updateCreditInstitution/);
   assert.match(view, /toggleSort/);
+  assert.match(view, /function cloneInstitution/);
+  assert.doesNotMatch(view, /structuredClone/);
   assert.match(view, /授信额度变动/);
   assert.match(view, /使用额度变动/);
   assert.match(view, /打印 \/ 导出 PDF/);

@@ -166,7 +166,7 @@
     if (saveTimer) clearTimeout(saveTimer);
     editorSession += 1;
     expandedInstitution = institution.institutionName;
-    editor = structuredClone(institution);
+    editor = cloneInstitution(institution);
     editorVersion = 0;
     savedEditorVersion = 0;
     saveState = "idle";
@@ -206,7 +206,7 @@
     if (saveInFlight || !editor || editorVersion === savedEditorVersion) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = null;
-    const snapshot = structuredClone(editor);
+    const snapshot = cloneInstitution(editor);
     const version = editorVersion;
     const session = editorSession;
     saveInFlight = true;
@@ -264,7 +264,7 @@
         editorSession === session &&
         editor?.institutionName === result.institution.institutionName
       ) {
-        if (editorVersion === version) editor = structuredClone(result.institution);
+        if (editorVersion === version) editor = cloneInstitution(result.institution);
         else editor.updatedAt = result.institution.updatedAt;
         saveState = editorVersion === version ? "saved" : "pending";
         saveMessage = editorVersion === version ? "已保存" : "待保存";
@@ -431,6 +431,15 @@
 
   function formatAmount(value: number | null | undefined): string {
     return value == null ? "—" : value.toFixed(2);
+  }
+
+  function cloneInstitution(
+    institution: CreditInstitutionView,
+  ): CreditInstitutionView {
+    return {
+      ...institution,
+      items: institution.items.map((item) => ({ ...item })),
+    };
   }
 
   function formatDelta(value: number): string {
