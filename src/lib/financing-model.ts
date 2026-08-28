@@ -223,6 +223,9 @@ export const financingModelReportSchema = z
 export type FinancingModelSnapshot = z.infer<
   typeof financingModelSnapshotSchema
 >;
+export type FinancingModelCompanyMetrics = NonNullable<
+  FinancingModelSnapshot["company_metrics"]
+>;
 export type FinancingModelConclusion = z.infer<typeof conclusionSchema>;
 export type FinancingModelConclusionUpdate = z.infer<
   typeof conclusionUpdateSchema
@@ -235,6 +238,32 @@ export type FinancingModelReport = z.infer<typeof financingModelReportSchema>;
 
 export function parseFinancingModelReport(value: unknown): FinancingModelReport {
   return financingModelReportSchema.parse(value);
+}
+
+export function companyBusinessNarrative(
+  metrics: FinancingModelCompanyMetrics,
+): string {
+  const readiness = metrics.readiness_label.trim().replace(/^流动性/, "");
+  const liquidityClause = readiness
+    ? `流动性整体${readiness}`
+    : "流动性状态暂缺";
+  const fundingClause =
+    metrics.ef_funding_gap === null
+      ? "资金缺口信息暂缺"
+      : metrics.ef_funding_gap >= 0
+        ? "资金缺口表现为净余量"
+        : "资金缺口仍为净缺口";
+  const spreadClause =
+    metrics.ef_subject_spread_bp === null
+      ? "主体利差信息暂缺"
+      : metrics.ef_subject_spread_pctile === null
+        ? "主体利差已有可用定价参考"
+        : metrics.ef_subject_spread_pctile <= 0.33
+          ? "主体利差处于相对低位"
+          : metrics.ef_subject_spread_pctile >= 0.67
+            ? "主体利差处于相对高位"
+            : "主体利差处于常态区间";
+  return `${liquidityClause}；${fundingClause}；${spreadClause}。`;
 }
 
 function mergeLegacySellSideSummary(

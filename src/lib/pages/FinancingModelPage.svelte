@@ -11,6 +11,7 @@
   import MetricCard from "../../components/MetricCard.svelte";
   import MetricIcon from "../../components/MetricIcon.svelte";
   import {
+    companyBusinessNarrative,
     conclusionSchema,
     parseFinancingModelReport,
     sellSidePayloadSchema,
@@ -288,13 +289,6 @@
     return `${year}年${Number(month)}月${Number(day)}日`;
   }
 
-  function stanceLabel(value: "supports" | "mixed" | "challenges"): string {
-    return {
-      supports: "支持模型",
-      mixed: "部分一致",
-      challenges: "存在分歧",
-    }[value];
-  }
 </script>
 
 <svelte:head>
@@ -386,10 +380,36 @@
           <article class="insight-card company-card">
             <h3>公司业务指标</h3>
             {#if company}
-              <p>{company.interpretation}</p>
-              <dl>
-                <div><dt>指标日期</dt><dd>{displayDate(company.date)}</dd></div>
-                <div><dt>公司流动性</dt><dd>{company.readiness_label}</dd></div>
+              <p>{companyBusinessNarrative(company)}</p>
+              <dl class="company-business-metrics">
+                <div>
+                  <dt>LCR六十日分位</dt>
+                  <dd class="business-value business-value--liquidity">
+                    {formatPercent(company.ef_lcr_pctile_60d)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>NSFR六十日分位</dt>
+                  <dd class="business-value business-value--stability">
+                    {formatPercent(company.ef_nsfr_pctile_60d)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>资金缺口</dt>
+                  <dd
+                    class="business-value"
+                    class:business-value--positive={company.ef_funding_gap !== null && company.ef_funding_gap >= 0}
+                    class:business-value--negative={company.ef_funding_gap !== null && company.ef_funding_gap < 0}
+                  >
+                    {formatSignedNullable(company.ef_funding_gap, 1)} 亿元
+                  </dd>
+                </div>
+                <div>
+                  <dt>主体利差</dt>
+                  <dd class="business-value business-value--spread">
+                    {formatNullable(company.ef_subject_spread_bp, 2)} bp
+                  </dd>
+                </div>
               </dl>
             {:else}
               <p>暂无可用公司业务指标，本次仅使用市场择时信号。</p>
@@ -558,22 +578,13 @@
           </div>
           <div class="sell-side-grid">
             {#each report.sellSide.views as view}
-              <article class={`sell-side-card sell-side-card--${view.stance}`}>
-                <div class="sell-side-meta">
-                  <strong>{view.institution}</strong>
-                  <span>{stanceLabel(view.stance)}</span>
-                </div>
-                <h3>{view.title}</h3>
-                <time datetime={view.publishedAt}>{displayDate(view.publishedAt)}</time>
+              <article class="sell-side-card">
+                <strong class="sell-side-institution">{view.institution}</strong>
                 <p>{view.summary}</p>
                 <div class="implication"><strong>对发行的含义</strong><span>{view.implication}</span></div>
               </article>
             {/each}
           </div>
-          <p class="research-meta">
-            AI Search 检索区间 {displayDate(report.sellSide.periodStart)} 至 {displayDate(report.sellSide.periodEnd)}，
-            最多返回 {report.sellSide.maxResults} 条，实际归并 {report.sellSide.sourceDocuments} 篇文档。
-          </p>
         {:else}
           <div class="research-empty">
             <p>尚未生成卖方观点。</p>
@@ -581,11 +592,6 @@
         {/if}
       </section>
 
-      <footer class="source-footer">
-        <span>模型运行 {snapshot.run_id}</span>
-        <span>市场数据 {displayDate(snapshot.source_freshness.market_data_date)}</span>
-        <span>生成时间 {new Date(snapshot.generated_at).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}</span>
-      </footer>
     </main>
   {/if}
 </div>
@@ -658,8 +664,7 @@
   .card-title-row,
   .card-title-actions,
   .editor-actions,
-  .section-actions,
-  .sell-side-meta {
+  .section-actions {
     display: flex;
     align-items: center;
   }
@@ -843,8 +848,7 @@
   }
 
   .insight-card h3,
-  .panel h3,
-  .sell-side-card h3 {
+  .panel h3 {
     margin: 0;
     font-size: 1.125rem;
     font-weight: bold;
@@ -881,10 +885,33 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .company-business-metrics .business-value {
+    font-weight: bold;
+  }
+
+  .business-value--liquidity {
+    color: #087b72;
+  }
+
+  .business-value--stability {
+    color: #175cd3;
+  }
+
+  .business-value--positive {
+    color: #067647;
+  }
+
+  .business-value--negative {
+    color: #b42318;
+  }
+
+  .business-value--spread {
+    color: #6941c6;
+  }
+
   .card-title-row,
   .card-title-actions,
-  .section-actions,
-  .sell-side-meta {
+  .section-actions {
     justify-content: space-between;
     gap: 10px;
   }
@@ -1220,45 +1247,25 @@
   }
 
   .sell-side-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    display: flex;
+    align-items: stretch;
+    flex-wrap: wrap;
     gap: 10px;
     margin-top: 12px;
   }
 
   .sell-side-card {
-    display: grid;
-    align-content: start;
+    display: flex;
+    min-width: min(280px, 100%);
+    flex: 1 1 320px;
+    flex-direction: column;
     gap: 9px;
     padding: 14px;
     border-top: 3px solid var(--color-primary);
   }
 
-  .sell-side-card--supports {
-    border-top-color: #12a873;
-  }
-
-  .sell-side-card--challenges {
-    border-top-color: #d92d20;
-  }
-
-  .sell-side-meta > span {
-    padding: 3px 7px;
-    border-radius: 5px;
-    color: var(--text-2);
-    background: #f1f4f8;
-    font-size: 0.75rem;
-    font-weight: bold;
-  }
-
-  .sell-side-card h3 {
-    font-size: 1rem;
-    line-height: 1.45;
-  }
-
-  .sell-side-card time {
-    color: var(--text-3);
-    font-size: 0.8125rem;
+  .sell-side-institution {
+    color: var(--text-1);
   }
 
   .sell-side-card p {
@@ -1269,7 +1276,7 @@
   .implication {
     display: grid;
     gap: 5px;
-    margin-top: 2px;
+    margin-top: auto;
     padding-top: 10px;
     border-top: 1px solid var(--border);
     color: var(--text-2);
@@ -1278,12 +1285,6 @@
   .implication strong {
     color: #173b78;
     font-size: 0.875rem;
-  }
-
-  .research-meta {
-    margin: 10px 0 0;
-    color: var(--text-3);
-    font-size: 0.8125rem;
   }
 
   .research-empty {
@@ -1299,15 +1300,6 @@
 
   .research-empty p {
     margin: 0;
-  }
-
-  .source-footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 20px;
-    padding: 2px 4px;
-    color: var(--text-3);
-    font-size: 0.75rem;
   }
 
   .loading-state,

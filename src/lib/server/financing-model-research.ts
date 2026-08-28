@@ -16,7 +16,7 @@ const AI_SEARCH_MAX_RESULTS = 50 as const;
 const MAX_MCP_RESPONSE_BYTES = 6 * 1024 * 1024;
 const MAX_SOURCE_DOCUMENTS = 24;
 const MAX_DOCUMENT_TEXT = 2_400;
-const PROMPT_CACHE_KEY = "financing-model-sell-side:v3";
+const PROMPT_CACHE_KEY = "financing-model-sell-side:v5";
 
 const researchOutputSchema = z
   .object({
@@ -26,7 +26,6 @@ const researchOutputSchema = z
         z
           .object({
             sourceId: z.string().min(1).max(20),
-            stance: z.enum(["supports", "mixed", "challenges"]),
             summary: z.string().min(1).max(1200),
             implication: z.string().min(1).max(800),
           })
@@ -302,7 +301,7 @@ function resolveResearchViews(
       institution: document.institution,
       title: document.title,
       publishedAt: document.publishedAt,
-      stance: view.stance,
+      stance: "mixed" as const,
       summary: view.summary,
       implication: view.implication,
       sourceKey: document.sourceKey,
@@ -328,7 +327,7 @@ function researchMessages(
         "你是债券融资择时研究员。只能使用提供的 AI Search 证据，筛选4至5家直接讨论资金面、利率债、信用利差或一级发行环境的机构。" +
         "不得补充外部知识，不得把量化、转债或权益主题凑数。logicSummary 必须把卖方共识、分歧及其影响融资成本的传导逻辑整合成一个连贯自然段，" +
         "不得使用项目符号、小标题、交叉验证或支持模型等表述。views 必须保留4至5家机构各自的核心判断和对发行的含义，" +
-        "每家机构的 stance 按其与模型相对融资成本判断的关系填写。" +
+        "每条 summary 直接从市场判断起笔，只写观点正文，不得重复机构名、研报标题、发布日期、来源或使用引导性小标题；implication 只写对发行成本与时点的含义。" +
         "每条观点只引用一个 sourceId；不得改写机构、标题、日期或 sourceId。",
     },
     {
