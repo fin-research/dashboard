@@ -27,7 +27,7 @@
 ### 二级池周报
 
 - 原始 Excel 是归档输入，不是页面运行时数据源。周报只查询 Neon `bond` schema。
-- `daily_statistics` 对应 Sheet1；`daily_position` 对应 Sheet2；`transaction_record` 由持仓的买入量、卖出量和到期量派生。
+- `daily_statistics` 对应 Sheet1；`daily_position` 按表名合并“当日交易户数据”和“当日可供户数据”；`transaction_record` 由两类账户持仓的买入量、卖出量和到期量统一派生。
 - 台账日“有/无”以 `bond.daily_position` 是否存在为准；`ledger_upload` 只补充文件和 Workflow 状态。
 - 所选日期范围没有台账时，只回退到本周 `daily_position` 已有数据的首末日期；本周也没有数据时保持空状态，不得扩展到历史全区间。
 - 同一报表日导入在事务内替换持仓与成交，统计按来源日期幂等更新。较旧报表不得覆盖由较新报表提供的历史统计。

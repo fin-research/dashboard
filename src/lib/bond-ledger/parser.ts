@@ -42,6 +42,16 @@ const REQUIRED_POSITION_HEADERS = [
   "全价成本",
 ] as const;
 
+const AVAILABLE_POSITION_OPTIONAL_HEADERS = new Set([
+  "收益率变动(BP)",
+  "今日估值收益率",
+  "DV01",
+]);
+
+const PERFORMANCE_SHEET_NAME = "二级池累计收益";
+const TRANSACTION_POSITION_SHEET_NAME = "当日交易户数据";
+const AVAILABLE_POSITION_SHEET_NAME = "当日可供户数据";
+
 type Matrix = unknown[][];
 
 export class BondLedgerParseError extends Error {
@@ -59,7 +69,6 @@ export async function parseBondLedgerFile(file: File): Promise<ParsedBondLedger>
   return parseBondLedgerWorkbook(read(await file.arrayBuffer(), {
     cellDates: true,
     cellFormula: false,
-    sheets: [0, 1],
   }), utils);
 }
 
@@ -70,7 +79,6 @@ export async function parseBondLedgerBuffer(
   return parseBondLedgerWorkbook(read(buffer, {
     cellDates: true,
     cellFormula: false,
-    sheets: [0, 1],
   }), utils);
 }
 
@@ -81,34 +89,66 @@ function parseBondLedgerWorkbook(
   if (workbook.SheetNames.length < 2) {
     throw new BondLedgerParseError("台账至少需要前两张工作表");
   }
-  const performanceSheet = workbook.Sheets[workbook.SheetNames[0] ?? ""];
-  const positionSheet = workbook.Sheets[workbook.SheetNames[1] ?? ""];
-  if (!performanceSheet || !positionSheet) {
+  const performanceSheet = findWorkbookSheet(
+    workbook,
+    PERFORMANCE_SHEET_NAME,
+  ) ?? workbook.Sheets[workbook.SheetNames[0] ?? ""];
+  const transactionPositionSheet = findWorkbookSheet(
+    workbook,
+    TRANSACTION_POSITION_SHEET_NAME,
+  ) ?? workbook.Sheets[workbook.SheetNames[1] ?? ""];
+  const availablePositionSheet = findWorkbookSheet(
+    workbook,
+    AVAILABLE_POSITION_SHEET_NAME,
+  );
+  if (!performanceSheet || !transactionPositionSheet) {
     throw new BondLedgerParseError("无法读取台账前两张工作表");
   }
   const matrixOptions = { header: 1 as const, raw: true, defval: null };
   return parseBondLedgerMatrices(
     utils.sheet_to_json(performanceSheet, matrixOptions) as Matrix,
-    utils.sheet_to_json(positionSheet, matrixOptions) as Matrix,
+    utils.sheet_to_json(transactionPositionSheet, matrixOptions) as Matrix,
+    availablePositionSheet
+      ? [utils.sheet_to_json(availablePositionSheet, matrixOptions) as Matrix]
+      : [],
   );
 }
 
 export function parseBondLedgerMatrices(
   performanceMatrix: Matrix,
   positionMatrix: Matrix,
+  additionalPositionMatrices: Matrix[] = [],
 ): ParsedBondLedger {
   validatePerformanceHeader(performanceMatrix);
   const performance = parsePerformanceRows(performanceMatrix.slice(2));
-  const positions = parsePositionRows(positionMatrix);
+  const positions: LedgerPositionRow[] = [];
+  let rowNumberOffset = 0;
+  const positionMatrices = [positionMatrix, ...additionalPositionMatrices];
+  for (const [index, matrix] of positionMatrices.entries()) {
+    const parsedPositions = parsePositionRows(matrix, {
+      rowNumberOffset,
+      sheetLabel:
+        index === 0
+          ? TRANSACTION_POSITION_SHEET_NAME
+          : AVAILABLE_POSITION_SHEET_NAME,
+      optionalHeaders:
+        index === 0 ? undefined : AVAILABLE_POSITION_OPTIONAL_HEADERS,
+    });
+    positions.push(...parsedPositions);
+    rowNumberOffset = Math.max(
+      rowNumberOffset,
+      ...parsedPositions.map((row) => row.rowNumber),
+    );
+  }
   if (!performance.length) {
     throw new BondLedgerParseError("第一张表没有可用的逐日收益数据");
   }
   if (!positions.length) {
-    throw new BondLedgerParseError("第二张表没有可用的当日持仓数据");
+    throw new BondLedgerParseError("持仓表没有可用的当日持仓数据");
   }
   const dates = new Set(positions.map((row) => row.reportDate));
   if (dates.size !== 1) {
-    throw new BondLedgerParseError("第二张表必须只包含一个报表日期");
+    throw new BondLedgerParseError("交易户和可供户必须只包含一个报表日期");
   }
   const date = positions[0]?.reportDate ?? "";
   if (!performance.some((row) => row.date === date)) {
@@ -168,62 +208,83 @@ function parsePerformanceRows(rows: Matrix): LedgerPerformanceRow[] {
   return parsed.sort((left, right) => left.date.localeCompare(right.date));
 }
 
-function parsePositionRows(matrix: Matrix): LedgerPositionRow[] {
+function parsePositionRows(
+  matrix: Matrix,
+  options: {
+    rowNumberOffset: number;
+    sheetLabel: string;
+    optionalHeaders?: ReadonlySet<string>;
+  },
+): LedgerPositionRow[] {
   const headers = matrix[0] ?? [];
   const columns = new Map<string, number>();
   headers.forEach((header, index) => columns.set(normalizeHeader(header), index));
   for (const expected of REQUIRED_POSITION_HEADERS) {
-    if (!columns.has(normalizeHeader(expected))) {
-      throw new BondLedgerParseError(`第二张表缺少标准列“${expected}”`);
+    if (
+      !columns.has(normalizeHeader(expected)) &&
+      !options.optionalHeaders?.has(expected)
+    ) {
+      throw new BondLedgerParseError(
+        `${options.sheetLabel}缺少标准列“${expected}”`,
+      );
     }
   }
-  const column = (name: (typeof REQUIRED_POSITION_HEADERS)[number]) =>
-    columns.get(normalizeHeader(name)) as number;
-  const optionalColumn = (name: string) => columns.get(normalizeHeader(name));
-  const realizedProfitColumn = optionalColumn("资本利得");
+  const column = (name: string) => columns.get(normalizeHeader(name));
+  const value = (row: unknown[], name: string) => row[column(name) ?? -1];
+  const realizedProfitColumn = column("资本利得");
   const result: LedgerPositionRow[] = [];
   for (const [index, row] of matrix.slice(1).entries()) {
-    const reportDate = toIsoDate(row[column("报表日期")]);
-    const code = toText(row[column("债券代码")]);
-    const name = toText(row[column("债券名称")]);
+    const reportDate = toIsoDate(value(row, "报表日期"));
+    const code = toText(value(row, "债券代码"));
+    const name = toText(value(row, "债券名称"));
     if (!reportDate || (!code && !name)) continue;
     result.push({
       reportDate,
-      rowNumber: index + 1,
-      team: toText(row[optionalColumn("团队") ?? -1]),
-      investmentManager: toText(row[optionalColumn("投资经理") ?? -1]),
-      account: toText(row[optionalColumn("账户") ?? -1]),
+      rowNumber: options.rowNumberOffset + index + 1,
+      team: toText(value(row, "团队")),
+      investmentManager: toText(value(row, "投资经理")),
+      account: toText(value(row, "账户")),
       code,
-      market: toText(row[column("交易市场")]),
+      market: toText(value(row, "交易市场")),
       name,
-      category: toText(row[column("债券分类")]) || "未分类",
-      yieldChangeBp: toNumber(row[column("收益率变动(BP)")]),
-      remainingYears: toNumber(row[column("剩余期限（年）")]),
-      interestStartDate: toIsoDate(row[optionalColumn("起息日") ?? -1]),
-      maturityDate: toIsoDate(row[column("到期日")]),
-      currentQuantity: toNumber(row[column("今日持仓量")]) ?? 0,
-      previousQuantity: toNumber(row[column("昨日持仓量")]) ?? 0,
-      buyQuantity: toNumber(row[column("当日买量")]) ?? 0,
-      sellQuantity: toNumber(row[column("当日卖量")]) ?? 0,
-      maturityQuantity: toNumber(row[column("当日到期量")]) ?? 0,
-      couponRate: toNumber(row[column("票面利率")]),
-      valuationYield: toNumber(row[column("今日估值收益率")]),
-      reportYield: toNumber(row[column("含免税报表收益率")]),
-      fullPrice: toNumber(row[column("估值全价")]),
-      dv01: toNumber(row[column("DV01")]) ?? 0,
-      marketValue: toNumber(row[column("全价市值")]) ?? 0,
-      couponIncome: toNumber(row[optionalColumn("票息收入") ?? -1]) ?? 0,
-      taxExemptIncome: toNumber(row[optionalColumn("免税收入") ?? -1]) ?? 0,
+      category: toText(value(row, "债券分类")) || "未分类",
+      yieldChangeBp: toNumber(value(row, "收益率变动(BP)")),
+      remainingYears: toNumber(value(row, "剩余期限（年）")),
+      interestStartDate: toIsoDate(value(row, "起息日")),
+      maturityDate: toIsoDate(value(row, "到期日")),
+      currentQuantity: toNumber(value(row, "今日持仓量")) ?? 0,
+      previousQuantity: toNumber(value(row, "昨日持仓量")) ?? 0,
+      buyQuantity: toNumber(value(row, "当日买量")) ?? 0,
+      sellQuantity: toNumber(value(row, "当日卖量")) ?? 0,
+      maturityQuantity: toNumber(value(row, "当日到期量")) ?? 0,
+      couponRate: toNumber(value(row, "票面利率")),
+      valuationYield: toNumber(value(row, "今日估值收益率")),
+      reportYield: toNumber(value(row, "含免税报表收益率")),
+      fullPrice: toNumber(value(row, "估值全价")),
+      dv01: toNumber(value(row, "DV01")) ?? 0,
+      marketValue: toNumber(value(row, "全价市值")) ?? 0,
+      couponIncome: toNumber(value(row, "票息收入")) ?? 0,
+      taxExemptIncome: toNumber(value(row, "免税收入")) ?? 0,
       realizedProfit:
         realizedProfitColumn === undefined
           ? null
           : toNumber(row[realizedProfitColumn]),
-      dailyProfit: toNumber(row[column("当日损益")]) ?? 0,
-      ytdProfit: toNumber(row[column("全年损益")]) ?? 0,
-      fullPriceCost: toNumber(row[column("全价成本")]) ?? 0,
+      dailyProfit: toNumber(value(row, "当日损益")) ?? 0,
+      ytdProfit: toNumber(value(row, "全年损益")) ?? 0,
+      fullPriceCost: toNumber(value(row, "全价成本")) ?? 0,
     });
   }
   return result;
+}
+
+function findWorkbookSheet(
+  workbook: import("xlsx").WorkBook,
+  expectedName: string,
+): import("xlsx").WorkSheet | undefined {
+  const sheetName = workbook.SheetNames.find(
+    (name) => normalizeHeader(name) === normalizeHeader(expectedName),
+  );
+  return sheetName ? workbook.Sheets[sheetName] : undefined;
 }
 
 function normalizeHeader(value: unknown): string {

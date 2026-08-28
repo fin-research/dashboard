@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { utils, write } from "xlsx";
+
 import {
   buildBondLedgerAnalytics,
   calculateBusinessAnnualizedReturn,
@@ -15,6 +17,7 @@ import {
 } from "../src/lib/bond-ledger/calendar.ts";
 import {
   BondLedgerParseError,
+  parseBondLedgerBuffer,
   parseBondLedgerMatrices,
 } from "../src/lib/bond-ledger/parser.ts";
 import {
@@ -115,6 +118,117 @@ test("解析标准台账前两张表并统一日期与数值", () => {
   assert.equal(result.positions[0].buyQuantity, 11_000_000);
   assert.equal(result.positions[0].reportYield, 1.43);
   assert.equal(result.positions[0].realizedProfit, -3400.000000000342);
+});
+
+test("按表名合并交易户和可供户并统一派生成交", async () => {
+  const performanceHeader = Array(47).fill(null);
+  performanceHeader[0] = "日期";
+  performanceHeader[2] = "业务本金";
+  performanceHeader[9] = "持仓规模";
+  performanceHeader[12] = "杠杆率";
+  performanceHeader[19] = "修正久期";
+  const performance = Array(47).fill(null);
+  performance[0] = "2026/08/27";
+  performance[2] = 652_023_900;
+  performance[5] = 652_023_900;
+  performance[9] = 632_695_500;
+  performance[12] = 1;
+  performance[19] = 1.5;
+
+  const transactionPosition = positionMatrixRow(POSITION_HEADERS, {
+    报表日期: "2026/08/27",
+    账户: "财务资金-交易户",
+    债券代码: "260306.IB",
+    交易市场: "银行间",
+    债券名称: "26进出06",
+    债券分类: "政策性银行债",
+    "收益率变动(BP)": 0,
+    "剩余期限（年）": 2.3,
+    到期日: "2028/12/1",
+    今日持仓量: 1_000_000,
+    昨日持仓量: 1_000_000,
+    当日买量: 0,
+    当日卖量: 0,
+    当日到期量: 0,
+    票面利率: 2,
+    今日估值收益率: 1.4,
+    含免税报表收益率: 1.4,
+    估值全价: 100,
+    DV01: 10_000,
+    全价市值: 100_000_000,
+    当日损益: 0,
+    全年损益: 0,
+    全价成本: 100,
+  });
+  const availableHeaders = POSITION_HEADERS.filter(
+    (header) =>
+      !["收益率变动(BP)", "今日估值收益率", "DV01"].includes(header),
+  );
+  const availablePosition = positionMatrixRow(availableHeaders, {
+    报表日期: "2026/08/27",
+    账户: "财务资金-可供户",
+    债券代码: "220021.IB",
+    交易市场: "银行间",
+    债券名称: "22附息国债21",
+    债券分类: "国债",
+    "剩余期限（年）": 3.0795,
+    到期日: "2029/9/25",
+    今日持仓量: 5_000_000,
+    昨日持仓量: 0,
+    当日买量: 5_000_000,
+    当日卖量: 0,
+    当日到期量: 0,
+    票面利率: 2.62,
+    含免税报表收益率: 1.63446753122,
+    估值全价: 106.5319,
+    全价市值: 532_695_500,
+    当日损益: -151_360.9688839832,
+    全年损益: -151_360.9688839832,
+    全价成本: 106.570435616,
+  });
+  const workbook = utils.book_new();
+  utils.book_append_sheet(
+    workbook,
+    utils.aoa_to_sheet([
+      performanceHeader,
+      Array(47).fill(null),
+      performance,
+    ]),
+    "二级池累计收益",
+  );
+  utils.book_append_sheet(
+    workbook,
+    utils.aoa_to_sheet([POSITION_HEADERS, transactionPosition]),
+    "当日交易户数据",
+  );
+  utils.book_append_sheet(
+    workbook,
+    utils.aoa_to_sheet([availableHeaders, availablePosition]),
+    "当日可供户数据 ",
+  );
+
+  const parsed = await parseBondLedgerBuffer(
+    write(workbook, { type: "buffer", bookType: "xlsx" }),
+  );
+  const analytics = buildBondLedgerAnalytics(
+    [parsed],
+    "2026-08-27",
+    "2026-08-27",
+  );
+
+  assert.equal(parsed.positions.length, 2);
+  assert.deepEqual(parsed.positions.map((row) => row.rowNumber), [1, 2]);
+  assert.deepEqual(parsed.positions.map((row) => row.account), [
+    "财务资金-交易户",
+    "财务资金-可供户",
+  ]);
+  assert.equal(parsed.positions[1].buyQuantity, 5_000_000);
+  assert.equal(parsed.positions[1].yieldChangeBp, null);
+  assert.equal(parsed.positions[1].valuationYield, null);
+  assert.equal(parsed.positions[1].dv01, 0);
+  assert.equal(analytics.transactionTotals.买入, 500_000_000);
+  assert.equal(analytics.detailMarketValue, 632_695_500);
+  assert.equal(analytics.reconciliationGap, 0);
 });
 
 test("拒绝缺少标准字段的台账", () => {
@@ -496,6 +610,10 @@ function performanceRow(date, cumulativeProfit, principal) {
     ytdAnnualizedReturn: null,
     ytdExTaxAnnualizedReturn: null,
   };
+}
+
+function positionMatrixRow(headers, values) {
+  return headers.map((header) => values[header] ?? null);
 }
 
 function positionRow(overrides = {}) {

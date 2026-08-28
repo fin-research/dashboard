@@ -25,8 +25,8 @@ Worker 通过 `HYPERDRIVE` 访问 `bond` schema：
 
 - `ledger_upload`：不可变 R2 对象、Workflow 状态和导入计数。
 - `daily_statistics`：Sheet1 的逐日统计。
-- `daily_position`：Sheet2 的报表日持仓明细，主键 `(report_date, row_number)`。
-- `transaction_record`：由持仓数量字段派生，主键 `(report_date, position_row_number, side)`。
+- `daily_position`：按工作表名称合并交易户与可供户的报表日持仓明细，导入时统一重排行号，主键 `(report_date, row_number)`。
+- `transaction_record`：由两类账户持仓数量字段统一派生，主键 `(report_date, position_row_number, side)`。
 
 规则：
 
