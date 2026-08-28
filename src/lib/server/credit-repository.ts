@@ -221,6 +221,8 @@ export async function saveCreditInstitution(
   client: DatabaseClient,
   input: CreditInstitutionUpdateInput,
 ): Promise<CreditInstitutionUpdateResponse> {
+  let report: CreditReportResponse | null = null;
+  let confirmedUpdatedAt = "";
   await client.query("BEGIN");
   try {
     const institutionChanges = input.changes.institution ?? {};
@@ -228,6 +230,7 @@ export async function saveCreditInstitution(
     const updated = await client.query<{
       effective_date: string | null;
       expiry_date: string | null;
+      updated_at: string;
     }>(
       `WITH patch AS (SELECT $4::jsonb AS data)
        UPDATE credit.institution AS institution
@@ -308,7 +311,11 @@ export async function saveCreditInstitution(
          AND institution.updated_at = $3::timestamptz
        RETURNING
          to_char(institution.effective_date, 'YYYY-MM-DD') AS effective_date,
-         to_char(institution.expiry_date, 'YYYY-MM-DD') AS expiry_date`,
+         to_char(institution.expiry_date, 'YYYY-MM-DD') AS expiry_date,
+         to_char(
+           institution.updated_at AT TIME ZONE 'UTC',
+           'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+         ) AS updated_at`,
       [
         input.reportDate,
         input.institutionName,
@@ -330,6 +337,7 @@ export async function saveCreditInstitution(
       );
     }
     const updatedDates = updated.rows[0]!;
+    confirmedUpdatedAt = updatedDates.updated_at;
     if (
       updatedDates.effective_date &&
       updatedDates.expiry_date &&
@@ -371,19 +379,25 @@ export async function saveCreditInstitution(
         throw new CreditDatabaseError(404, "授信分项记录不存在");
       }
     }
+    report = await loadCreditReport(client, input.reportDate);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
   }
 
-  const report = await loadCreditReport(client, input.reportDate);
+  if (!report || !confirmedUpdatedAt) {
+    throw new CreditDatabaseError(503, "授信更新结果读取失败");
+  }
   const institution = report.institutions.find(
     (item) => item.institutionName === input.institutionName,
   );
   if (!institution) throw new CreditDatabaseError(404, "该授信记录不存在");
+  const confirmedInstitution = institution.updatedAt === confirmedUpdatedAt
+    ? institution
+    : { ...institution, updatedAt: confirmedUpdatedAt };
   return {
-    institution,
+    institution: confirmedInstitution,
     summary: report.summary,
     weeklySummary: report.weeklySummary,
     limitChanges: report.limitChanges,

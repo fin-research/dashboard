@@ -209,7 +209,14 @@ test("授信详情只更新机构增量字段并使用完整 updated_at 并发�
     async query(sql, parameters) {
       calls.push({ sql, parameters });
       if (/UPDATE credit\.institution/.test(sql)) {
-        return { rows: [{ effective_date: null, expiry_date: null }], rowCount: 1 };
+        return {
+          rows: [{
+            effective_date: null,
+            expiry_date: null,
+            updated_at: "2026-08-21T10:00:00.123456Z",
+          }],
+          rowCount: 1,
+        };
       }
       if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
         return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
@@ -239,7 +246,11 @@ test("授信详情只更新机构增量字段并使用完整 updated_at 并发�
   assert.doesNotMatch(sql, /jsonb_array_elements/);
   assert.deepEqual(JSON.parse(updateCall.parameters[3]), { notes: "已更新" });
   assert.equal(result.institution.notes, "已更新");
-  assert.equal(result.institution.updatedAt, "2026-08-21T10:00:00.000Z");
+  assert.equal(result.institution.updatedAt, "2026-08-21T10:00:00.123456Z");
+  assert.ok(
+    calls.findIndex((call) => /SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(call.sql)) <
+      calls.findIndex((call) => call.sql === "COMMIT"),
+  );
 });
 
 test("授信详情只更新发生变化的单个分项字段", async () => {
@@ -248,7 +259,14 @@ test("授信详情只更新发生变化的单个分项字段", async () => {
     async query(sql, parameters) {
       calls.push({ sql, parameters });
       if (/UPDATE credit\.institution/.test(sql)) {
-        return { rows: [{ effective_date: null, expiry_date: null }], rowCount: 1 };
+        return {
+          rows: [{
+            effective_date: null,
+            expiry_date: null,
+            updated_at: "2026-08-21T10:00:00.123456Z",
+          }],
+          rowCount: 1,
+        };
       }
       if (/UPDATE credit\.item/.test(sql)) return { rows: [], rowCount: 1 };
       if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
@@ -313,6 +331,10 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.match(repository, /SS\.US/);
   assert.doesNotMatch(repository, /SS\.MS/);
   assert.match(repository, /jsonb_array_elements/);
+  assert.match(
+    repository,
+    /report = await loadCreditReport\(client, input\.reportDate\);\s+await client\.query\("COMMIT"\)/,
+  );
   assert.match(route, /HYPERDRIVE/);
   assert.match(route, /export const PATCH/);
   assert.match(route, /creditInstitutionUpdateSchema/);
