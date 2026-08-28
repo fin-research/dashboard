@@ -266,6 +266,26 @@ export function companyBusinessNarrative(
   return `${liquidityClause}；${fundingClause}；${spreadClause}。`;
 }
 
+export function sellSideSummaryBody(
+  summary: string,
+  institution: string,
+): string {
+  const body = summary.trim();
+  const escapedInstitution = escapeRegExp(institution.trim());
+  if (!escapedInstitution) return body;
+
+  const attributionPrefix = new RegExp(
+    `^${escapedInstitution}[^《]{0,40}《[^》]{1,500}》\\s*` +
+      `(?:[（(]\\s*(?:\\d{4}-\\d{1,2}-\\d{1,2}|\\d{4}年\\d{1,2}月\\d{1,2}日)\\s*[）)])?\\s*` +
+      `(?:中\\s*)?(?:指出|认为|表示|判断|提出|称)\\s*[：:，,。；;]*\\s*`,
+  );
+  return body.replace(attributionPrefix, "").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function mergeLegacySellSideSummary(
   summary: string,
   disagreements: string[],

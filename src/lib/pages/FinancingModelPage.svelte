@@ -14,6 +14,7 @@
     companyBusinessNarrative,
     conclusionSchema,
     parseFinancingModelReport,
+    sellSideSummaryBody,
     sellSidePayloadSchema,
     type FinancingModelConclusion,
     type FinancingModelReport,
@@ -576,12 +577,15 @@
               <p>{report.sellSide.logicSummary}</p>
             {/if}
           </div>
-          <div class="sell-side-grid">
+          <div class={`sell-side-grid sell-side-grid--${report.sellSide.views.length}`}>
             {#each report.sellSide.views as view}
               <article class="sell-side-card">
                 <strong class="sell-side-institution">{view.institution}</strong>
-                <p>{view.summary}</p>
-                <div class="implication"><strong>对发行的含义</strong><span>{view.implication}</span></div>
+                <p>{sellSideSummaryBody(view.summary, view.institution)}</p>
+                <div class="implication">
+                  <strong>对发行的含义</strong>
+                  <span>{view.implication}</span>
+                </div>
               </article>
             {/each}
           </div>
@@ -1232,14 +1236,15 @@
   }
 
   .sell-side-summary-card {
-    padding: 16px;
-    background: color-mix(in srgb, var(--brand-soft) 38%, var(--surface));
+    padding: 18px;
+    border-color: color-mix(in srgb, var(--brand) 24%, var(--line));
+    background: color-mix(in srgb, var(--brand-soft) 32%, var(--surface));
   }
 
   .sell-side-summary-card p {
+    width: 100%;
     margin: 0;
-    max-width: 1100px;
-    line-height: 1.6;
+    line-height: 1.65;
   }
 
   .sell-side-summary-card form {
@@ -1247,39 +1252,60 @@
   }
 
   .sell-side-grid {
-    display: flex;
-    align-items: stretch;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(var(--sell-side-columns), minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .sell-side-grid--3 {
+    --sell-side-columns: 3;
+  }
+
+  .sell-side-grid--4 {
+    --sell-side-columns: 4;
+  }
+
+  .sell-side-grid--5 {
+    --sell-side-columns: 5;
   }
 
   .sell-side-card {
-    display: flex;
-    min-width: min(280px, 100%);
-    flex: 1 1 320px;
-    flex-direction: column;
-    gap: 9px;
-    padding: 14px;
-    border-top: 3px solid var(--color-primary);
+    display: grid;
+    min-width: 0;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    gap: 0;
+    overflow: hidden;
+    border-color: color-mix(in srgb, var(--brand) 22%, var(--line));
+    box-shadow: var(--shadow-card);
   }
 
   .sell-side-institution {
-    color: var(--text-1);
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid color-mix(in srgb, var(--brand) 16%, var(--line));
+    color: var(--brand-deep);
+    background: color-mix(in srgb, var(--brand-soft) 52%, var(--surface));
+    font-size: 1rem;
   }
 
   .sell-side-card p {
     margin: 0;
+    padding: 15px 16px 16px;
     line-height: 1.65;
   }
 
   .implication {
     display: grid;
+    align-content: start;
     gap: 5px;
-    margin-top: auto;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
+    padding: 13px 16px 15px;
+    border-top: 1px solid color-mix(in srgb, var(--brand) 14%, var(--line));
     color: var(--text-2);
+    background: color-mix(in srgb, var(--panel) 54%, var(--surface));
   }
 
   .implication strong {
@@ -1348,6 +1374,23 @@
 
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+
+  @supports not (grid-template-rows: subgrid) {
+    .sell-side-card {
+      grid-template-rows: auto 1fr auto;
+    }
+  }
+
+  @media (max-width: 1500px) {
+    .sell-side-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .sell-side-grid--3 .sell-side-card:last-child,
+    .sell-side-grid--5 .sell-side-card:last-child {
+      grid-column: 1 / -1;
+    }
   }
 
   @media (max-width: 1080px) {
@@ -1420,6 +1463,14 @@
     .research-button {
       min-width: 0;
       padding-inline: 12px;
+    }
+
+    .sell-side-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .sell-side-grid .sell-side-card:last-child {
+      grid-column: auto;
     }
 
     :global(.forecast-chart) {

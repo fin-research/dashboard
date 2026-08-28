@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import {
   companyBusinessNarrative,
   parseFinancingModelReport,
+  sellSideSummaryBody,
 } from "../src/lib/financing-model.ts";
 import {
   loadFinancingModelReport,
@@ -164,6 +165,20 @@ test("公司业务指标结论固定为三个无数字分句", () => {
   assert.doesNotMatch(narrative, /\d/);
 });
 
+test("卖方观点正文移除机构研报和发布日期引导句", () => {
+  const summary =
+    "德邦资管固收在《德邦资管固收投资周报0817-0821： 债市大概率以震荡整固为主， 警惕税期和政府债缴款对于资金面扰动和长端利率风险》（2026-08-24）指出。资金面均衡偏松格局未变。";
+
+  assert.equal(
+    sellSideSummaryBody(summary, "德邦资管固收"),
+    "资金面均衡偏松格局未变。",
+  );
+  assert.equal(
+    sellSideSummaryBody("资金面保持平稳。", "兴业固收"),
+    "资金面保持平稳。",
+  );
+});
+
 test("历史卖方交叉验证快照读取时整合为单段逻辑汇总", () => {
   const legacy = sellSidePayload();
   delete legacy.logicSummary;
@@ -317,7 +332,7 @@ test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模�
   assert.match(page, /aria-label="编辑整体结论"/);
   assert.match(page, /aria-label="编辑卖方逻辑汇总"/);
   assert.match(page, /report\.sellSide\.logicSummary/);
-  assert.match(page, /class="sell-side-grid"/);
+  assert.match(page, /class=\{`sell-side-grid sell-side-grid--\$\{/);
   assert.match(page, /report\.sellSide\.views as view/);
   assert.match(page, /companyBusinessNarrative\(company\)/);
   assert.match(page, /LCR六十日分位/);
@@ -326,9 +341,12 @@ test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模�
   assert.match(page, /company\.ef_subject_spread_bp/);
   assert.match(
     page,
-    /\.sell-side-grid\s*\{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/,
+    /\.sell-side-grid\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:/,
   );
-  assert.match(page, /\.implication\s*\{[\s\S]*?margin-top:\s*auto;/);
+  assert.match(page, /grid-template-rows:\s*subgrid/);
+  assert.match(page, /\.implication\s*\{[\s\S]*?align-content:\s*start;/);
+  assert.doesNotMatch(page, /max-width:\s*1100px|margin-top:\s*auto/);
+  assert.match(page, /sellSideSummaryBody\(view\.summary, view\.institution\)/);
   assert.doesNotMatch(page, /近30日可比债中位利差|发行方案/);
   assert.doesNotMatch(page, /相对更优窗口|class="recommendation-band"/);
   assert.doesNotMatch(page, /id="driver-title"|交叉验证/);
@@ -338,11 +356,12 @@ test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模�
   assert.doesNotMatch(page, /class="research-meta"|class="source-footer"/);
   assert.doesNotMatch(page, /company\.interpretation|指标日期|<dt>公司流动性/);
   assert.doesNotMatch(page, /stanceLabel|sell-side-card--/);
-  assert.match(research, /PROMPT_CACHE_KEY = "financing-model-sell-side:v5"/);
+  assert.match(research, /PROMPT_CACHE_KEY = "financing-model-sell-side:v6"/);
   assert.match(research, /\.min\(4\)/);
   assert.match(research, /views\.length < 4/);
   assert.match(research, /筛选4至5家/);
   assert.match(research, /不得重复机构名、研报标题、发布日期/);
+  assert.match(research, /必须完全删除/);
   assert.doesNotMatch(research, /每家机构的 stance/);
 });
 
