@@ -421,6 +421,10 @@
   min-width: 780px;
 }
 
+.ledger-table--transactions :is(th, td) {
+  font-size: 1rem;
+}
+
 .ledger-panel-heading--transactions {
   min-height: 58px;
 }

@@ -35,6 +35,18 @@ test("交易研究工作台提供七个 path 标签页并保留稳定深链", ()
   );
 });
 
+test("二级池成交明细表统一使用 1rem 字号", async () => {
+  const styles = await readFile(
+    new URL("../src/bond-ledger.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    styles,
+    /\.ledger-table--transactions :is\(th, td\)\s*\{[\s\S]*?font-size:\s*1rem/,
+  );
+});
+
 test("演示交易汇总严格由迁入的十笔交易派生", () => {
   const summary = computeTradingSummary(demoTrades);
   assert.equal(summary.tradeCount, 10);
