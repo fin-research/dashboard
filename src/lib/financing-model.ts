@@ -135,7 +135,35 @@ export const conclusionUpdateSchema = z
   })
   .strict();
 
-export const sellSidePayloadSchema = z
+const sellSideViewSchema = z
+  .object({
+    institution: z.string().min(1).max(80),
+    title: z.string().min(1).max(300),
+    publishedAt: z.string().date(),
+    stance: z.enum(["supports", "mixed", "challenges"]),
+    summary: z.string().min(1).max(1200),
+    implication: z.string().min(1).max(800),
+    sourceKey: z.string().min(1).max(500),
+  })
+  .strict();
+
+const sellSidePayloadSchemaV2 = z
+  .object({
+    generatedAt: z.string().min(1),
+    periodStart: z.string().date(),
+    periodEnd: z.string().date(),
+    searchQuery: z.string().min(1),
+    maxResults: z.literal(50),
+    sourceDocuments: z.number().int().nonnegative(),
+    modelName: z.string().min(1),
+    logicSummary: z.string().trim().min(1).max(4000),
+    edited: z.boolean().default(false),
+    updatedAt: z.string().min(1).nullable().default(null),
+    views: z.array(sellSideViewSchema).min(3).max(5),
+  })
+  .strict();
+
+const legacySellSidePayloadSchema = z
   .object({
     generatedAt: z.string().min(1),
     periodStart: z.string().date(),
@@ -151,22 +179,36 @@ export const sellSidePayloadSchema = z
         disagreements: z.array(z.string().min(1).max(500)).max(5),
       })
       .strict(),
-    views: z
-      .array(
-        z
-          .object({
-            institution: z.string().min(1).max(80),
-            title: z.string().min(1).max(300),
-            publishedAt: z.string().date(),
-            stance: z.enum(["supports", "mixed", "challenges"]),
-            summary: z.string().min(1).max(1200),
-            implication: z.string().min(1).max(800),
-            sourceKey: z.string().min(1).max(500),
-          })
-          .strict(),
-      )
-      .min(3)
-      .max(5),
+    views: z.array(sellSideViewSchema).min(3).max(5),
+  })
+  .strict();
+
+export const sellSidePayloadSchema = z
+  .union([sellSidePayloadSchemaV2, legacySellSidePayloadSchema])
+  .transform((payload) => {
+    if ("logicSummary" in payload) return payload;
+    return sellSidePayloadSchemaV2.parse({
+      generatedAt: payload.generatedAt,
+      periodStart: payload.periodStart,
+      periodEnd: payload.periodEnd,
+      searchQuery: payload.searchQuery,
+      maxResults: payload.maxResults,
+      sourceDocuments: payload.sourceDocuments,
+      modelName: payload.modelName,
+      logicSummary: mergeLegacySellSideSummary(
+        payload.crossValidation.summary,
+        payload.crossValidation.disagreements,
+      ),
+      edited: false,
+      updatedAt: null,
+      views: payload.views,
+    });
+  });
+
+export const sellSideSummaryUpdateSchema = z
+  .object({
+    runId: z.string().uuid(),
+    logicSummary: z.string().trim().min(1).max(4000),
   })
   .strict();
 
@@ -186,8 +228,26 @@ export type FinancingModelConclusionUpdate = z.infer<
   typeof conclusionUpdateSchema
 >;
 export type SellSidePayload = z.infer<typeof sellSidePayloadSchema>;
+export type SellSideSummaryUpdate = z.infer<
+  typeof sellSideSummaryUpdateSchema
+>;
 export type FinancingModelReport = z.infer<typeof financingModelReportSchema>;
 
 export function parseFinancingModelReport(value: unknown): FinancingModelReport {
   return financingModelReportSchema.parse(value);
+}
+
+function mergeLegacySellSideSummary(
+  summary: string,
+  disagreements: string[],
+): string {
+  const fragments = [summary, ...disagreements]
+    .map((fragment) =>
+      fragment.trim().replace(/^[\s\-•]+/, "").replace(/[。；;]+$/, ""),
+    )
+    .filter(
+      (fragment, index, values) =>
+        fragment && values.indexOf(fragment) === index,
+    );
+  return `${fragments.join("；")}。`.slice(0, 4000);
 }

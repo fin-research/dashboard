@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 
 import { parseFinancingModelReport } from "../src/lib/financing-model.ts";
 import {
   loadFinancingModelReport,
   saveFinancingModelConclusion,
   saveSellSideSnapshot,
+  saveSellSideSummaryRevision,
 } from "../src/lib/server/financing-model-repository.ts";
 import {
   aiSearchPeriod,
@@ -115,11 +117,9 @@ function sellSidePayload() {
     maxResults: 50,
     sourceDocuments: 8,
     modelName: "gpt-5.6-luna",
-    crossValidation: {
-      alignment: "mixed",
-      summary: "资金面判断一致，长端方向存在分歧。",
-      disagreements: ["长端利率方向分歧"],
-    },
+    logicSummary: "资金面判断总体一致，但长端利率方向仍存在分歧。",
+    edited: false,
+    updatedAt: null,
     views: ["兴业固收", "天风固收", "华源固收"].map((institution, index) => ({
       institution,
       title: `${institution}周报`,
@@ -148,6 +148,37 @@ test("融资择时报告契约接受模型、人工结论和卖方观点", () =>
   assert.equal(report.snapshot.prediction.deviation_bp, 1.71);
   assert.equal(report.conclusion.edited, true);
   assert.equal(report.sellSide.views.length, 3);
+  assert.match(report.sellSide.logicSummary, /长端利率方向/);
+});
+
+test("历史卖方交叉验证快照读取时整合为单段逻辑汇总", () => {
+  const legacy = sellSidePayload();
+  delete legacy.logicSummary;
+  delete legacy.edited;
+  delete legacy.updatedAt;
+  legacy.crossValidation = {
+    alignment: "mixed",
+    summary: "资金面总体偏松。",
+    disagreements: ["信用债一级成本仍在上行。"],
+  };
+
+  const report = parseFinancingModelReport({
+    snapshot: snapshot(),
+    conclusion: {
+      verdict: "推荐发行",
+      preferredWindow: "8月24日",
+      narrative: "基础结论",
+      edited: false,
+      updatedAt: null,
+    },
+    sellSide: legacy,
+  });
+
+  assert.equal(
+    report.sellSide.logicSummary,
+    "资金面总体偏松；信用债一级成本仍在上行。",
+  );
+  assert.equal(report.sellSide.edited, false);
 });
 
 test("读取时无人工修订则回退到模型基础结论", async () => {
@@ -221,6 +252,51 @@ test("卖方观点快照保存搜索口径和完整 payload", async () => {
   assert.match(calls[0].sql, /sell_side_snapshot/);
   assert.equal(calls[0].parameters[1], snapshot().run_id);
   assert.match(calls[0].parameters[6], /"maxResults":50/);
+});
+
+test("卖方逻辑汇总编辑采用追加快照并保留检索证据", async () => {
+  const calls = [];
+  const client = {
+    async query(sql, parameters) {
+      calls.push({ sql, parameters });
+      return { rows: [] };
+    },
+  };
+  const updatedAt = "2026-08-24T04:30:00.000Z";
+
+  const revised = await saveSellSideSummaryRevision(
+    client,
+    snapshot(),
+    sellSidePayload(),
+    {
+      runId: snapshot().run_id,
+      logicSummary: "资金面偏松有利于发行，但信用一级成本仍有刚性。",
+    },
+    updatedAt,
+  );
+
+  assert.match(calls[0].sql, /sell_side_snapshot/);
+  assert.equal(calls[0].parameters[7], updatedAt);
+  assert.match(calls[0].parameters[6], /资金面偏松有利于发行/);
+  assert.match(calls[0].parameters[6], /兴业固收/);
+  assert.equal(revised.edited, true);
+  assert.equal(revised.updatedAt, updatedAt);
+});
+
+test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模块", async () => {
+  const page = await readFile(
+    new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(page, /market_drivers\.slice\(0, 5\)/);
+  assert.match(page, /aria-label="市场驱动因子 Top 5"/);
+  assert.match(page, /aria-label="编辑整体结论"/);
+  assert.match(page, /aria-label="编辑卖方逻辑汇总"/);
+  assert.match(page, /report\.sellSide\.logicSummary/);
+  assert.doesNotMatch(page, /近30日可比债中位利差|发行方案/);
+  assert.doesNotMatch(page, /相对更优窗口|class="recommendation-band"/);
+  assert.doesNotMatch(page, /id="driver-title"|交叉验证|class="sell-side-grid"/);
 });
 
 test("AI Search 固定检索最近七个上海自然日且最多返回50条", () => {

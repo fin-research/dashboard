@@ -24,17 +24,20 @@
   let report: FinancingModelReport | null = null;
   let loading = true;
   let saving = false;
+  let savingSellSide = false;
   let generatingResearch = false;
   let editingConclusion = false;
+  let editingSellSide = false;
   let futureWindowDetailsOpen = false;
   let errorMessage = "";
   let editVerdict = "";
-  let editPreferredWindow = "";
   let editNarrative = "";
+  let editSellSideSummary = "";
 
   $: snapshot = report?.snapshot ?? null;
   $: company = snapshot?.company_metrics ?? null;
   $: validation = snapshot?.validation ?? null;
+  $: marketDrivers = snapshot?.market_drivers.slice(0, 5) ?? [];
   $: metrics = snapshot
     ? [
         {
@@ -112,6 +115,7 @@
       if (!response.ok) throw new Error(payload.error || "融资择时模型读取失败");
       report = parseFinancingModelReport(payload);
       resetConclusionEditor();
+      resetSellSideEditor();
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
@@ -122,7 +126,6 @@
   function resetConclusionEditor(): void {
     if (!report) return;
     editVerdict = report.conclusion.verdict;
-    editPreferredWindow = report.conclusion.preferredWindow;
     editNarrative = report.conclusion.narrative;
   }
 
@@ -134,8 +137,16 @@
   function useBaseConclusion(): void {
     if (!snapshot) return;
     editVerdict = snapshot.base_conclusion.verdict;
-    editPreferredWindow = snapshot.base_conclusion.preferred_window;
     editNarrative = snapshot.base_conclusion.narrative;
+  }
+
+  function resetSellSideEditor(): void {
+    editSellSideSummary = report?.sellSide?.logicSummary ?? "";
+  }
+
+  function openSellSideEditor(): void {
+    resetSellSideEditor();
+    editingSellSide = true;
   }
 
   function financingMetricTone(
@@ -155,7 +166,7 @@
         body: JSON.stringify({
           runId: report.snapshot.run_id,
           verdict: editVerdict,
-          preferredWindow: editPreferredWindow,
+          preferredWindow: report.conclusion.preferredWindow,
           narrative: editNarrative,
         }),
       });
@@ -181,7 +192,7 @@
   async function generateResearch(): Promise<void> {
     if (!report || generatingResearch) return;
     generatingResearch = true;
-    globalMessages.info("正在检索最近七日卖方研报并交叉验证，可能需要数分钟", {
+    globalMessages.info("正在检索最近七日卖方研报并归纳逻辑，可能需要数分钟", {
       key: "financing-model-research",
       title: "卖方观点生成中",
       duration: 600_000,
@@ -196,6 +207,8 @@
       if (!response.ok) throw new Error(payload.error || "卖方观点生成失败");
       const sellSide = sellSidePayloadSchema.parse(payload);
       report = { ...report, sellSide };
+      editingSellSide = false;
+      resetSellSideEditor();
       globalMessages.success("卖方观点已生成并保存", {
         key: "financing-model-research",
         title: "生成完成",
@@ -212,6 +225,41 @@
       );
     } finally {
       generatingResearch = false;
+    }
+  }
+
+  async function saveSellSideSummary(): Promise<void> {
+    if (!report?.sellSide || savingSellSide) return;
+    savingSellSide = true;
+    try {
+      const response = await fetch("/api/financing-model/sell-side", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          runId: report.snapshot.run_id,
+          logicSummary: editSellSideSummary,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "卖方观点保存失败");
+      const sellSide = sellSidePayloadSchema.parse(payload);
+      report = { ...report, sellSide };
+      editingSellSide = false;
+      resetSellSideEditor();
+      globalMessages.success("卖方观点已保存", {
+        key: "financing-model-research-revision",
+        title: "保存完成",
+      });
+    } catch (error) {
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        {
+          key: "financing-model-research-revision",
+          title: "卖方观点保存失败",
+        },
+      );
+    } finally {
+      savingSellSide = false;
     }
   }
 
@@ -238,14 +286,6 @@
   function displayDate(value: string): string {
     const [year, month, day] = value.split("-");
     return `${year}年${Number(month)}月${Number(day)}日`;
-  }
-
-  function stanceLabel(value: "supports" | "mixed" | "challenges"): string {
-    return {
-      supports: "支持模型",
-      mixed: "部分一致",
-      challenges: "存在分歧",
-    }[value];
   }
 </script>
 
@@ -323,10 +363,16 @@
               <strong>{formatSigned(snapshot.prediction.deviation_bp, 2)} bp</strong>，处于历史
               <strong>P{snapshot.prediction.historical_percentile.toFixed(0)}</strong>。
             </p>
-            <dl>
-              <div><dt>近30日可比债中位利差</dt><dd>{snapshot.prediction.peer_spread_median_bp.toFixed(2)} bp</dd></div>
-              <div><dt>发行方案</dt><dd>{snapshot.issue_terms.tenor_years}Y · {snapshot.issue_terms.rating} · {snapshot.issue_terms.issue_size_billion_yuan}亿元</dd></div>
-            </dl>
+            <ol class="market-driver-list" aria-label="市场驱动因子 Top 5">
+              {#each marketDrivers as driver}
+                <li>
+                  <span>{driver.display_name}</span>
+                  <strong class:cost-down={driver.impact === "降低成本"} class:cost-up={driver.impact === "推高成本"}>
+                    {driver.impact}
+                  </strong>
+                </li>
+              {/each}
+            </ol>
           </article>
 
           <article class="insight-card company-card">
@@ -345,17 +391,22 @@
           <article class="insight-card conclusion-card">
             <div class="card-title-row">
               <h3>整体结论</h3>
-              {#if report.conclusion.edited}<span class="edited-badge">人工修订</span>{/if}
+              <div class="card-title-actions">
+                {#if report.conclusion.edited}<span class="edited-badge">人工修订</span>{/if}
+                {#if !editingConclusion}
+                  <button class="icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
+                    </svg>
+                  </button>
+                {/if}
+              </div>
             </div>
             {#if editingConclusion}
               <form onsubmit={(event) => { event.preventDefault(); saveConclusion(); }}>
                 <label>
                   <span>结论标题</span>
                   <input bind:value={editVerdict} maxlength="120" required />
-                </label>
-                <label>
-                  <span>更优窗口</span>
-                  <input bind:value={editPreferredWindow} maxlength="160" />
                 </label>
                 <label>
                   <span>结论正文</span>
@@ -370,23 +421,8 @@
             {:else}
               <strong class="conclusion-verdict">{report.conclusion.verdict}</strong>
               <p>{report.conclusion.narrative}</p>
-              <div class="conclusion-footer">
-                <span>更优窗口：{report.conclusion.preferredWindow || "待定"}</span>
-                <button type="button" onclick={openConclusionEditor}>编辑结论</button>
-              </div>
             {/if}
           </article>
-        </div>
-
-        <div class="recommendation-band">
-          <div>
-            <span>模型建议</span>
-            <strong>{snapshot.prediction.decision}</strong>
-          </div>
-          <div>
-            <span>相对更优窗口</span>
-            <strong>{report.conclusion.preferredWindow || "待定"}</strong>
-          </div>
         </div>
 
         <div class="metric-strip">
@@ -472,26 +508,6 @@
         </div>
       </section>
 
-      <section class="analysis-section" aria-labelledby="driver-title">
-        <div class="section-heading">
-          <span class="section-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M4 7h10m4 0h2M4 12h4m4 0h8M4 17h8m4 0h4M14 4v6M8 9v6m4-1v6" /></svg>
-          </span>
-          <h2 id="driver-title">市场驱动因素</h2>
-        </div>
-        <ol class="driver-list">
-          {#each snapshot.market_drivers as driver, index}
-            <li>
-              <span class="driver-rank">{index + 1}</span>
-              <div><strong>{driver.display_name}</strong><span>{driver.value.toFixed(4)}</span></div>
-              <span class:cost-down={driver.impact === "降低成本"} class:cost-up={driver.impact === "推高成本"}>
-                {driver.impact === "降低成本" ? "↓" : "↑"} {driver.impact}
-              </span>
-            </li>
-          {/each}
-        </ol>
-      </section>
-
       <section class="analysis-section sell-side-section" aria-labelledby="sell-side-title">
         <div class="section-heading section-heading--actions">
           <div>
@@ -500,40 +516,41 @@
             </span>
             <h2 id="sell-side-title">卖方观点</h2>
           </div>
-          <button class="primary-button research-button" type="button" onclick={generateResearch} disabled={generatingResearch}>
-            {generatingResearch ? "生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
-          </button>
+          <div class="section-actions">
+            {#if report.sellSide && !editingSellSide}
+              <button class="icon-button" type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
+                </svg>
+              </button>
+            {/if}
+            <button class="primary-button research-button" type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}>
+              {generatingResearch ? "生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
+            </button>
+          </div>
         </div>
 
         {#if report.sellSide}
-          <article class="cross-check-card">
-            <div>
-              <span>交叉验证</span>
-              <strong>{stanceLabel(report.sellSide.crossValidation.alignment)}</strong>
+          <article class="sell-side-summary-card">
+            <div class="card-title-row">
+              <h3>卖方逻辑汇总</h3>
+              {#if report.sellSide.edited}<span class="edited-badge">人工修订</span>{/if}
             </div>
-            <p>{report.sellSide.crossValidation.summary}</p>
-            {#if report.sellSide.crossValidation.disagreements.length}
-              <ul>
-                {#each report.sellSide.crossValidation.disagreements as disagreement}
-                  <li>{disagreement}</li>
-                {/each}
-              </ul>
+            {#if editingSellSide}
+              <form onsubmit={(event) => { event.preventDefault(); saveSellSideSummary(); }}>
+                <label>
+                  <span>卖方逻辑汇总</span>
+                  <textarea bind:value={editSellSideSummary} maxlength="4000" rows="6" required></textarea>
+                </label>
+                <div class="editor-actions">
+                  <button class="secondary-button" type="button" onclick={() => (editingSellSide = false)}>取消</button>
+                  <button class="primary-button" type="submit" disabled={savingSellSide}>{savingSellSide ? "保存中" : "保存"}</button>
+                </div>
+              </form>
+            {:else}
+              <p>{report.sellSide.logicSummary}</p>
             {/if}
           </article>
-          <div class="sell-side-grid">
-            {#each report.sellSide.views as view}
-              <article class={`sell-side-card sell-side-card--${view.stance}`}>
-                <div class="sell-side-meta">
-                  <strong>{view.institution}</strong>
-                  <span>{stanceLabel(view.stance)}</span>
-                </div>
-                <h3>{view.title}</h3>
-                <time datetime={view.publishedAt}>{displayDate(view.publishedAt)}</time>
-                <p>{view.summary}</p>
-                <div class="implication"><strong>对发行的含义</strong><span>{view.implication}</span></div>
-              </article>
-            {/each}
-          </div>
           <p class="research-meta">
             AI Search 检索区间 {displayDate(report.sellSide.periodStart)} 至 {displayDate(report.sellSide.periodEnd)}，
             最多返回 {report.sellSide.maxResults} 条，实际归并 {report.sellSide.sourceDocuments} 篇文档。
@@ -620,9 +637,9 @@
   .section-heading,
   .section-heading > div,
   .card-title-row,
-  .conclusion-footer,
+  .card-title-actions,
   .editor-actions,
-  .sell-side-meta {
+  .section-actions {
     display: flex;
     align-items: center;
   }
@@ -779,8 +796,7 @@
 
   .insight-card,
   .panel,
-  .cross-check-card,
-  .sell-side-card {
+  .sell-side-summary-card {
     border: 1px solid var(--border);
     border-radius: var(--radius-inner);
     background: var(--surface);
@@ -807,7 +823,7 @@
 
   .insight-card h3,
   .panel h3,
-  .sell-side-card h3 {
+  .sell-side-summary-card h3 {
     margin: 0;
     font-size: 1.125rem;
     font-weight: bold;
@@ -845,10 +861,14 @@
   }
 
   .card-title-row,
-  .conclusion-footer,
-  .sell-side-meta {
+  .card-title-actions,
+  .section-actions {
     justify-content: space-between;
     gap: 10px;
+  }
+
+  .card-title-actions {
+    justify-content: flex-end;
   }
 
   .edited-badge {
@@ -867,13 +887,6 @@
     font-size: 1.25rem;
   }
 
-  .conclusion-footer {
-    align-items: flex-end;
-    color: #087b72;
-    font-weight: bold;
-  }
-
-  .conclusion-footer button,
   .text-button {
     min-height: 44px;
     padding: 0 10px;
@@ -885,24 +898,61 @@
     font-weight: bold;
   }
 
+  .icon-button {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 0;
+    border-radius: var(--radius-control);
+    color: var(--color-primary);
+    background: transparent;
+    cursor: pointer;
+    transition: background 160ms ease;
+  }
+
+  .icon-button:hover:not(:disabled) {
+    background: var(--brand-soft);
+  }
+
+  .icon-button:disabled {
+    cursor: wait;
+    opacity: 0.62;
+  }
+
+  .icon-button svg {
+    width: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.9;
+  }
+
   .conclusion-card form,
-  .conclusion-card label {
+  .conclusion-card label,
+  .sell-side-summary-card form,
+  .sell-side-summary-card label {
     display: grid;
     gap: 7px;
   }
 
-  .conclusion-card form {
+  .conclusion-card form,
+  .sell-side-summary-card form {
     gap: 11px;
     margin-top: 12px;
   }
 
-  .conclusion-card label > span {
+  .conclusion-card label > span,
+  .sell-side-summary-card label > span {
     font-size: 0.875rem;
     font-weight: bold;
   }
 
   .conclusion-card input,
-  .conclusion-card textarea {
+  .conclusion-card textarea,
+  .sell-side-summary-card textarea {
     width: 100%;
     min-height: 44px;
     padding: 9px 11px;
@@ -913,7 +963,8 @@
     font: inherit;
   }
 
-  .conclusion-card textarea {
+  .conclusion-card textarea,
+  .sell-side-summary-card textarea {
     min-height: 124px;
     resize: vertical;
     line-height: 1.55;
@@ -948,46 +999,6 @@
   .secondary-button {
     border: 1px solid var(--border-strong);
     background: #fff;
-  }
-
-  .recommendation-band {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 12px;
-    margin-top: 12px;
-  }
-
-  .recommendation-band > div {
-    display: flex;
-    min-height: 68px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    padding: 10px 18px;
-    border: 1px solid color-mix(in srgb, var(--brand) 32%, var(--line));
-    border-radius: 8px;
-    color: var(--text-2);
-    background: color-mix(in srgb, var(--brand-soft) 66%, var(--surface));
-  }
-
-  .recommendation-band > div:last-child {
-    border-color: color-mix(in srgb, #16a394 34%, var(--line));
-    background: color-mix(in srgb, #eafaf7 68%, var(--surface));
-  }
-
-  .recommendation-band span {
-    font-size: 0.875rem;
-  }
-
-  .recommendation-band strong {
-    color: var(--brand-deep);
-    font-size: 1.25rem;
-    font-weight: bolder;
-    text-align: right;
-  }
-
-  .recommendation-band > div:last-child strong {
-    color: #087b72;
   }
 
   .metric-strip {
@@ -1127,64 +1138,36 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .driver-list {
+  .market-driver-list {
     display: grid;
-    gap: 8px;
-    margin: 0;
+    gap: 0;
+    margin: 12px 0 0;
     padding: 0;
+    border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
     list-style: none;
   }
 
-  .driver-list li {
-    display: grid;
-    min-height: 46px;
-    grid-template-columns: 34px minmax(0, 1fr) 150px;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--panel) 38%, var(--surface));
-  }
-
-  .driver-rank {
-    display: grid;
-    width: 28px;
-    height: 28px;
-    place-items: center;
-    border-radius: 6px;
-    color: var(--brand-deep);
-    background: var(--brand-soft);
-    font-weight: bold;
-  }
-
-  .driver-list li > div {
+  .market-driver-list li {
     display: flex;
+    min-height: 42px;
+    align-items: center;
     justify-content: space-between;
-    gap: 20px;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
   }
 
-  .driver-list li > div span {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .cost-down,
-  .cost-up {
-    justify-self: stretch;
-    padding: 7px 10px;
-    border-radius: 6px;
-    text-align: center;
+  .market-driver-list strong {
+    flex: 0 0 auto;
     font-weight: bold;
   }
 
-  .cost-down {
+  .market-driver-list .cost-down {
     color: #067647;
-    background: #ecfdf3;
   }
 
-  .cost-up {
+  .market-driver-list .cost-up {
     color: #b42318;
-    background: #fef3f2;
   }
 
   .section-heading--actions {
@@ -1199,103 +1182,21 @@
     min-width: 158px;
   }
 
-  .cross-check-card {
-    display: grid;
-    grid-template-columns: 150px minmax(0, 1fr);
-    gap: 12px 18px;
-    padding: 14px;
+  .sell-side-summary-card {
+    padding: 16px;
     background: color-mix(in srgb, var(--brand-soft) 38%, var(--surface));
   }
 
-  .cross-check-card > div {
-    display: grid;
-    align-content: center;
-    gap: 6px;
-    padding-right: 16px;
-    border-right: 1px solid var(--border);
-    color: var(--color-primary);
-  }
-
-  .cross-check-card > div strong {
-    font-size: 1.125rem;
-  }
-
-  .cross-check-card p {
-    margin: 0;
+  .sell-side-summary-card p {
+    margin: 12px 0 0;
+    max-width: 1100px;
     line-height: 1.6;
-  }
-
-  .cross-check-card ul {
-    grid-column: 2;
-    margin: 0;
-    padding-left: 20px;
-    color: var(--text-2);
-  }
-
-  .sell-side-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .sell-side-card {
-    display: grid;
-    align-content: start;
-    gap: 9px;
-    padding: 14px;
-    border-top: 3px solid var(--color-primary);
-  }
-
-  .sell-side-card--supports {
-    border-top-color: #12a873;
-  }
-
-  .sell-side-card--challenges {
-    border-top-color: #d92d20;
-  }
-
-  .sell-side-meta > span {
-    padding: 3px 7px;
-    border-radius: 5px;
-    color: var(--text-2);
-    background: #f1f4f8;
-    font-size: 0.75rem;
-    font-weight: bold;
-  }
-
-  .sell-side-card h3 {
-    font-size: 1rem;
-    line-height: 1.45;
-  }
-
-  .sell-side-card time,
-  .research-meta {
-    color: var(--text-3);
-    font-size: 0.8125rem;
-  }
-
-  .sell-side-card p {
-    margin: 0;
-    line-height: 1.65;
-  }
-
-  .implication {
-    display: grid;
-    gap: 5px;
-    margin-top: 2px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
-    color: var(--text-2);
-  }
-
-  .implication strong {
-    color: #173b78;
-    font-size: 0.875rem;
   }
 
   .research-meta {
     margin: 10px 0 0;
+    color: var(--text-3);
+    font-size: 0.8125rem;
   }
 
   .research-empty {
@@ -1419,9 +1320,7 @@
       padding: 12px;
     }
 
-    .summary-grid,
-    .recommendation-band,
-    .cross-check-card {
+    .summary-grid {
       grid-template-columns: 1fr;
     }
 
@@ -1429,40 +1328,19 @@
       grid-column: 1;
     }
 
-    .recommendation-band > div {
-      min-height: 58px;
-      padding: 10px 14px;
-    }
-
-    .driver-list li {
-      grid-template-columns: 34px minmax(0, 1fr);
-    }
-
-    .driver-list li > .cost-down,
-    .driver-list li > .cost-up {
-      grid-column: 2;
-      justify-self: start;
-    }
-
     .section-heading--actions {
       align-items: flex-start;
       gap: 12px;
     }
 
+    .section-actions {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
     .research-button {
       min-width: 0;
       padding-inline: 12px;
-    }
-
-    .cross-check-card > div {
-      padding-right: 0;
-      padding-bottom: 10px;
-      border-right: 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .cross-check-card ul {
-      grid-column: 1;
     }
 
     :global(.forecast-chart) {
@@ -1485,21 +1363,12 @@
     .refresh-control svg {
       width: 20px;
     }
-
-    .recommendation-band > div {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .recommendation-band strong {
-      text-align: left;
-    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .model-back,
     .refresh-control,
+    .icon-button,
     .window-details-toggle,
     .window-details-toggle svg {
       transition: none;

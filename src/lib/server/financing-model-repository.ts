@@ -5,11 +5,13 @@ import {
   financingModelReportSchema,
   financingModelSnapshotSchema,
   sellSidePayloadSchema,
+  sellSideSummaryUpdateSchema,
   type FinancingModelConclusion,
   type FinancingModelConclusionUpdate,
   type FinancingModelReport,
   type FinancingModelSnapshot,
   type SellSidePayload,
+  type SellSideSummaryUpdate,
 } from "../financing-model.ts";
 import type { BondDatabaseClient } from "./postgres";
 
@@ -63,7 +65,7 @@ export async function loadFinancingModelReport(
        SELECT snapshot.payload
        FROM financing_model.sell_side_snapshot AS snapshot
        WHERE snapshot.run_id = run.id
-       ORDER BY snapshot.generated_at DESC
+       ORDER BY snapshot.generated_at DESC, snapshot.id DESC
        LIMIT 1
      ) AS sell_side ON true
      WHERE ($1::uuid IS NULL OR run.id = $1::uuid)
@@ -168,8 +170,28 @@ export async function saveSellSideSnapshot(
       validated.searchQuery,
       validated.modelName,
       JSON.stringify(validated),
-      validated.generatedAt,
+      validated.updatedAt ?? validated.generatedAt,
     ],
   );
   return validated;
+}
+
+export async function saveSellSideSummaryRevision(
+  client: BondDatabaseClient,
+  run: FinancingModelSnapshot,
+  current: SellSidePayload,
+  input: SellSideSummaryUpdate,
+  updatedAt = new Date().toISOString(),
+): Promise<SellSidePayload> {
+  const validated = sellSideSummaryUpdateSchema.parse(input);
+  if (validated.runId !== run.run_id) {
+    throw new FinancingModelDatabaseError(404, "融资择时模型运行不存在");
+  }
+  const revised = sellSidePayloadSchema.parse({
+    ...current,
+    logicSummary: validated.logicSummary,
+    edited: true,
+    updatedAt,
+  });
+  return saveSellSideSnapshot(client, run, revised);
 }

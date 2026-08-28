@@ -16,17 +16,11 @@ const AI_SEARCH_MAX_RESULTS = 50 as const;
 const MAX_MCP_RESPONSE_BYTES = 6 * 1024 * 1024;
 const MAX_SOURCE_DOCUMENTS = 24;
 const MAX_DOCUMENT_TEXT = 2_400;
-const PROMPT_CACHE_KEY = "financing-model-sell-side:v1";
+const PROMPT_CACHE_KEY = "financing-model-sell-side:v2";
 
 const researchOutputSchema = z
   .object({
-    crossValidation: z
-      .object({
-        alignment: z.enum(["supports", "mixed", "challenges"]),
-        summary: z.string().min(1).max(1600),
-        disagreements: z.array(z.string().min(1).max(500)).max(5),
-      })
-      .strict(),
+    logicSummary: z.string().min(1).max(1600),
     views: z
       .array(
         z
@@ -135,7 +129,9 @@ export async function generateFinancingModelResearch(
     maxResults: AI_SEARCH_MAX_RESULTS,
     sourceDocuments: documents.length,
     modelName: AI_GATEWAY_MODEL,
-    crossValidation: analysis.crossValidation,
+    logicSummary: analysis.logicSummary,
+    edited: false,
+    updatedAt: null,
     views,
   });
 }
@@ -330,7 +326,8 @@ function researchMessages(
       role: "system" as const,
       content:
         "你是债券融资择时研究员。只能使用提供的 AI Search 证据，筛选3至5家直接讨论资金面、利率债、信用利差或一级发行环境的机构。" +
-        "不得补充外部知识，不得把量化、转债或权益主题凑数。必须保留机构分歧，并判断其与模型的相对融资成本结论是支持、部分一致还是挑战。" +
+        "不得补充外部知识，不得把量化、转债或权益主题凑数。logicSummary 必须把卖方共识、分歧及其影响融资成本的传导逻辑整合成一个连贯自然段，" +
+        "不得使用项目符号、小标题、交叉验证或支持模型等表述。每家机构的 stance 仍按其与模型相对融资成本判断的关系填写。" +
         "每条观点只引用一个 sourceId；不得改写机构、标题、日期或 sourceId。",
     },
     {

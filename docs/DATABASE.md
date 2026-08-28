@@ -69,13 +69,13 @@ Worker 通过同一 `HYPERDRIVE` 访问 `financing_model` schema：
 
 - `model_run`：quant pipeline 每次运行追加的不可变结构化快照；核心指标为检索列，完整契约保存在 `payload` JSONB。
 - `conclusion_revision`：页面人工修改整体结论的追加修订，读取最新一条；无修订时回退到模型 `base_conclusion`。
-- `sell_side_snapshot`：AI Search 检索与 AI Gateway 归纳后的卖方观点追加快照，读取最新一条。
+- `sell_side_snapshot`：AI Search 检索与 AI Gateway 归纳后的卖方逻辑汇总及人工修订追加快照，读取最新一条。
 
 规则：
 
 - migration 只放 `financing-model-migrations/`，使用 `pnpm financing-model:db:migrate` 应用。
 - dashboard 不更新或删除 `model_run.payload`；quant 不写人工结论和卖方观点。
-- 人工结论和卖方观点都追加保存，不原地覆盖历史版本。
+- 人工结论、生成的卖方观点和人工卖方逻辑汇总都追加保存，不原地覆盖历史版本。
 - 卖方快照只保存结构化观点、检索口径和源文档 key，不保存 AI Search 返回的完整正文。
 
 ## 变更检查

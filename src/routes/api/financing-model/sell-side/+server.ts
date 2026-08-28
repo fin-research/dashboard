@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+import { sellSideSummaryUpdateSchema } from "$lib/financing-model";
 import { BondLedgerUploadError, validateSameOrigin } from "$lib/server/bond-ledger";
 import {
   FinancingModelDatabaseError,
   loadFinancingModelReport,
   saveSellSideSnapshot,
+  saveSellSideSummaryRevision,
 } from "$lib/server/financing-model-repository";
 import {
   FinancingModelResearchError,
@@ -76,6 +78,60 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
             : status === 400
               ? "卖方观点请求无效"
               : "卖方观点生成失败，请稍后重试",
+      },
+      { status, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+};
+
+export const PATCH: RequestHandler = async ({ request, platform, url }) => {
+  try {
+    validateSameOrigin(request);
+    const input = sellSideSummaryUpdateSchema.parse(await request.json());
+    const saved = await withPostgres(
+      platform?.env.HYPERDRIVE?.connectionString,
+      "eastmoney-financing-model-research-revision",
+      async (client) => {
+        const report = await loadFinancingModelReport(client, input.runId);
+        if (!report.sellSide) {
+          throw new FinancingModelDatabaseError(404, "尚未生成卖方观点");
+        }
+        return saveSellSideSummaryRevision(
+          client,
+          report.snapshot,
+          report.sellSide,
+          input,
+        );
+      },
+    );
+    return Response.json(saved, {
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    const status =
+      error instanceof BondLedgerUploadError ||
+      error instanceof FinancingModelDatabaseError
+        ? error.status
+        : error instanceof z.ZodError
+          ? 400
+          : 500;
+    console.error(
+      JSON.stringify({
+        event: "financing_model_sell_side_revision_failed",
+        status,
+        path: url.pathname,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    return Response.json(
+      {
+        error:
+          error instanceof BondLedgerUploadError ||
+          error instanceof FinancingModelDatabaseError
+            ? error.message
+            : status === 400
+              ? "卖方观点内容无效"
+              : "卖方观点保存失败，请稍后重试",
       },
       { status, headers: { "Cache-Control": "no-store" } },
     );
