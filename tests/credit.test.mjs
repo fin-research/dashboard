@@ -9,7 +9,9 @@ import {
   parseCreditWorkbook,
 } from "../src/lib/credit/workbook.ts";
 import { creditInstitutionUpdateSchema } from "../src/lib/credit/update.ts";
+import { formatCreditWeeklyNews } from "../src/lib/credit/weekly-news.ts";
 import {
+  buildWeeklyCreditNews,
   compareCreditSnapshots,
   loadCreditReport,
   persistCreditWorkbook,
@@ -77,35 +79,54 @@ test("授信 Excel 将空状态按已撤销导入", () => {
   assert.equal(parsed.totalAvailable, 7);
 });
 
-test("周报分别识别授信额度变化和使用额度变化", () => {
+test("周报快讯只识别新增机构、总额扩额和到期日更新", () => {
   const previous = [
     institution("甲银行", 10, 3, 4, 1),
-    institution("丙银行", 2, 1, 2, 1),
+    institution("农业银行", 10, 3, 4, 1, { status: "applying" }),
+    institution("丙银行", 2, 1, 2, 1, { expiryDate: "2026-09-30" }),
+    institution("丁银行", 2, 1, 2, 1, { status: "applying" }),
+    institution("戊银行", 4, 1, 4, 1, { expiryDate: "2026-10-31" }),
   ];
   const current = [
-    institution("甲银行", 12, 4, 6, 2),
+    institution("甲银行", 10, 4, 6, 2),
+    institution("农业银行", 12, 3, 4, 1),
     institution("乙银行", 5, 0, 5, 0),
+    institution("丙银行", 2, 1, 2, 1, { expiryDate: "2027-09-30" }),
+    institution("丁银行", 3, 1, 3, 1, { status: "applying" }),
+    institution("戊银行", 4, 1, 4, 1, { status: "applying", expiryDate: "2027-10-31" }),
   ];
 
+  const weeklyNews = buildWeeklyCreditNews(current, previous);
   const limitChanges = compareCreditSnapshots(current, previous, "limit");
-  const usageChanges = compareCreditSnapshots(current, previous, "usage");
 
   assert.deepEqual(
-    limitChanges.map((change) => [change.institutionName, change.deltaAmount]),
-    [["乙银行", 5], ["丙银行", -2], ["甲银行", 2]],
+    weeklyNews.map((news) => [
+      news.institutionName,
+      news.eventTypes,
+      news.previousAmount,
+      news.currentAmount,
+      news.deltaAmount,
+    ]),
+    [
+      ["农业银行", ["increase"], 10, 12, 2],
+      ["乙银行", ["new"], 0, 5, 5],
+      ["丙银行", ["renewal"], 2, 2, 0],
+      ["戊银行", ["renewal"], 4, 4, 0],
+    ],
   );
   assert.deepEqual(
-    usageChanges.map((change) => [change.institutionName, change.deltaAmount]),
-    [["丙银行", -1], ["甲银行", 1]],
+    limitChanges.map((change) => [change.institutionName, change.deltaAmount]),
+    [["农业银行", 2], ["乙银行", 5], ["丙银行", 0], ["戊银行", 0]],
   );
-  assert.match(
-    limitChanges.find((change) => change.institutionName === "甲银行").details.join("；"),
-    /债券投资额度/,
-  );
-  assert.match(
-    usageChanges.find((change) => change.institutionName === "甲银行").details.join("；"),
-    /债券投资已用/,
-  );
+  assert.equal(weeklyNews.some((news) => news.institutionName === "甲银行"), false);
+  assert.equal(weeklyNews.some((news) => news.institutionName === "丁银行"), false);
+  assert.equal(limitChanges.some((change) => /债券投资额度/.test(change.details.join("；"))), false);
+  assert.deepEqual(weeklyNews.map(formatCreditWeeklyNews), [
+    "农业银行 扩额，总额 12.00 亿元；较上期增加 2.00 亿元",
+    "乙银行 新增授信，总额 5.00 亿元；较上期增加 5.00 亿元",
+    "丙银行 续签，总额 2.00 亿元；到期日由 2026年9月30日 更新至 2027年9月30日",
+    "戊银行 续签，总额 4.00 亿元；到期日由 2026年10月31日 更新至 2027年10月31日",
+  ]);
 });
 
 test("只有一个报告日时不生成周度变化且数据库查询顺序执行", async () => {
@@ -137,12 +158,13 @@ test("只有一个报告日时不生成周度变化且数据库查询顺序执�
   assert.equal(report.summary.totalAvailable, 7);
   assert.equal(report.weeklySummary.addedInstitutionCount, 0);
   assert.equal(report.weeklySummary.expiredInstitutionCount, 0);
+  assert.deepEqual(report.weeklyNews, []);
   assert.deepEqual(report.limitChanges, []);
   assert.deepEqual(report.usageChanges, []);
   assert.ok(report.calendarEvents.some((event) => event.type === "expiry"));
 });
 
-test("周报新增包含新批、续签和扩额，到期包含授信到期和状态撤销", async () => {
+test("周报快讯包含新增、扩额和续签，到期统计包含授信到期和状态撤销", async () => {
   const rows = [
     institutionRow({ report_date: "2026-08-14", institution_name: "甲银行", total_limit: 10, total_used: 3, expiry_date: "2026-12-31" }),
     institutionRow({ report_date: "2026-08-14", institution_name: "乙银行", total_limit: 2, total_used: 1, expiry_date: "2026-08-20" }),
@@ -168,8 +190,12 @@ test("周报新增包含新批、续签和扩额，到期包含授信到期和�
   assert.equal(report.weeklySummary.totalLimit, 17);
   assert.equal(report.weeklySummary.totalUsed, 4);
   assert.equal(report.weeklySummary.totalAvailable, 13);
-  assert.equal(report.weeklySummary.addedInstitutionCount, 2);
+  assert.equal(report.weeklySummary.addedInstitutionCount, 1);
   assert.equal(report.weeklySummary.expiredInstitutionCount, 1);
+  assert.deepEqual(
+    report.weeklyNews.map((news) => [news.institutionName, news.eventTypes]),
+    [["甲银行", ["increase", "renewal"]], ["丙银行", ["new"]]],
+  );
   assert.ok(report.calendarEvents.some((event) => event.kind === "renewal"));
   assert.ok(report.calendarEvents.some((event) => event.kind === "increase"));
   assert.ok(report.calendarEvents.some((event) => event.kind === "revoked"));
@@ -344,7 +370,8 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.match(view, /function cloneInstitution/);
   assert.doesNotMatch(view, /structuredClone/);
   assert.match(view, /授信额度变动/);
-  assert.match(view, /使用额度变动/);
+  assert.match(view, /<ol class="tr-credit-news-list">/);
+  assert.doesNotMatch(view, /使用额度变动/);
   assert.match(view, /打印 \/ 导出 PDF/);
   assert.doesNotMatch(view, /高使用率机构|授信预警|tr-result-count|一览表全口径|数据截至/);
   assert.doesNotMatch(demoData, /demoCreditLines|creditSummary|creditAlerts|CREDIT-USAGE|CREDIT-EXPIRY/);
@@ -430,7 +457,7 @@ function creditRow(
   return row;
 }
 
-function institution(name, total, used, bondLimit, bondUsed) {
+function institution(name, total, used, bondLimit, bondUsed, overrides = {}) {
   return {
     reportDate: "2026-08-21",
     sourceRow: 4,
@@ -461,6 +488,7 @@ function institution(name, total, used, bondLimit, bondUsed) {
       { type: "interbank_lending", limitAmount: null, usedAmount: null, remainingAmount: null, details: null },
       { type: "other", limitAmount: null, usedAmount: null, remainingAmount: null, details: null },
     ],
+    ...overrides,
   };
 }
 

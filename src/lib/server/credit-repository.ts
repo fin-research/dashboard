@@ -10,6 +10,7 @@ import {
   type CreditItemType,
   type CreditReportResponse,
   type CreditSummaryView,
+  type CreditWeeklyNewsItem,
   type CreditWeeklySummaryView,
   type ParsedCreditWorkbook,
 } from "../credit/types.ts";
@@ -174,6 +175,12 @@ export async function loadCreditReport(
     currentWeeklyInstitutions,
     previousWeeklyInstitutions,
   );
+  const weeklyNews = previousDate
+    ? buildWeeklyCreditNews(
+        currentWeeklyInstitutions,
+        previousWeeklyInstitutions,
+      )
+    : [];
 
   return {
     availableDates,
@@ -194,13 +201,8 @@ export async function loadCreditReport(
         }
       : null,
     institutions: currentInstitutions,
-    limitChanges: previousDate
-      ? compareCreditSnapshots(
-          currentWeeklyInstitutions,
-          previousWeeklyInstitutions,
-          "limit",
-        )
-      : [],
+    weeklyNews,
+    limitChanges: weeklyNews.map(toLimitChange),
     usageChanges: previousDate
       ? compareCreditSnapshots(
           currentWeeklyInstitutions,
@@ -378,6 +380,7 @@ export async function saveCreditInstitution(
     institution,
     summary: report.summary,
     weeklySummary: report.weeklySummary,
+    weeklyNews: report.weeklyNews,
     limitChanges: report.limitChanges,
     usageChanges: report.usageChanges,
     calendarEvents: report.calendarEvents,
@@ -389,6 +392,12 @@ export function compareCreditSnapshots(
   previousInstitutions: CreditInstitutionView[],
   mode: "limit" | "usage",
 ): CreditAmountChange[] {
+  if (mode === "limit") {
+    return buildWeeklyCreditNews(currentInstitutions, previousInstitutions).map(
+      toLimitChange,
+    );
+  }
+
   const currentByName = new Map(
     currentInstitutions.map((institution) => [institution.institutionName, institution]),
   );
@@ -404,38 +413,28 @@ export function compareCreditSnapshots(
     const previousAmount = amountForMode(previous, mode);
     const currentAmount = amountForMode(current, mode);
     const details: string[] = [];
-    if (mode === "limit" && current?.status !== previous?.status) {
-      details.push(`状态 ${statusLabel(previous?.status)} → ${statusLabel(current?.status)}`);
-    }
     if (different(previousAmount, currentAmount)) {
-      details.push(
-        `${mode === "limit" ? "授信总额" : "总已用"} ${amountTransition(previousAmount, currentAmount)}`,
-      );
+      details.push(`总已用 ${amountTransition(previousAmount, currentAmount)}`);
     }
     for (const type of creditItemTypes) {
-      if (mode === "limit" && type === "other") continue;
       const previousItem = previous?.items.find((item) => item.type === type);
       const currentItem = current?.items.find((item) => item.type === type);
       const previousValue = previous?.status === "approved"
-        ? mode === "limit"
-          ? previousItem?.limitAmount ?? 0
-          : previousItem?.usedAmount ?? 0
+        ? previousItem?.usedAmount ?? 0
         : 0;
       const currentValue = current?.status === "approved"
-        ? mode === "limit"
-          ? currentItem?.limitAmount ?? 0
-          : currentItem?.usedAmount ?? 0
+        ? currentItem?.usedAmount ?? 0
         : 0;
       if (different(previousValue, currentValue)) {
         details.push(
-          `${creditItemLabels[type]}${mode === "limit" ? "额度" : "已用"} ${amountTransition(previousValue, currentValue)}`,
+          `${creditItemLabels[type]}已用 ${amountTransition(previousValue, currentValue)}`,
         );
       }
     }
-    if (!previous && current && (mode === "limit" || details.length > 0)) {
+    if (!previous && current && details.length > 0) {
       details.unshift("新增授信主体");
     }
-    if (previous && !current && (mode === "limit" || details.length > 0)) {
+    if (previous && !current && details.length > 0) {
       details.unshift("本期不再出现");
     }
     if (details.length === 0) continue;
@@ -455,6 +454,76 @@ export function compareCreditSnapshots(
       Math.abs(right.deltaAmount) - Math.abs(left.deltaAmount) ||
       left.institutionName.localeCompare(right.institutionName, "zh-CN"),
   );
+}
+
+export function buildWeeklyCreditNews(
+  currentInstitutions: CreditInstitutionView[],
+  previousInstitutions: CreditInstitutionView[],
+): CreditWeeklyNewsItem[] {
+  const previousByName = new Map(
+    previousInstitutions.map((institution) => [institution.institutionName, institution]),
+  );
+  const news: CreditWeeklyNewsItem[] = [];
+
+  for (const current of currentInstitutions) {
+    const previous = previousByName.get(current.institutionName);
+    if (current.status !== "approved" && previous?.status !== "approved") continue;
+    const eventTypes: CreditWeeklyNewsItem["eventTypes"] = [];
+    const previousAmount = previous ? numberValue(previous.totalLimit) : 0;
+    const currentAmount = numberValue(current.totalLimit);
+
+    if (!previous) {
+      eventTypes.push("new");
+    } else {
+      if (currentAmount > previousAmount + AMOUNT_TOLERANCE) {
+        eventTypes.push("increase");
+      }
+      if (
+        current.expiryDate &&
+        current.expiryDate !== previous.expiryDate
+      ) {
+        eventTypes.push("renewal");
+      }
+    }
+    if (eventTypes.length === 0) continue;
+
+    news.push({
+      institutionName: current.institutionName,
+      institutionType: current.institutionType,
+      eventTypes,
+      previousAmount,
+      currentAmount,
+      deltaAmount: currentAmount - previousAmount,
+      previousExpiryDate: previous?.expiryDate ?? null,
+      currentExpiryDate: current.expiryDate,
+    });
+  }
+
+  return news;
+}
+
+function toLimitChange(news: CreditWeeklyNewsItem): CreditAmountChange {
+  const details: string[] = [];
+  if (news.eventTypes.includes("new")) {
+    details.push("新增授信主体");
+  }
+  if (news.eventTypes.includes("increase")) {
+    details.push(`授信总额 ${amountTransition(news.previousAmount, news.currentAmount)}`);
+  }
+  if (news.eventTypes.includes("renewal")) {
+    details.push(
+      `到期日 ${news.previousExpiryDate ?? "未登记"} → ${news.currentExpiryDate ?? "未登记"}`,
+    );
+  }
+  return {
+    institutionName: news.institutionName,
+    institutionType: news.institutionType,
+    kind: news.eventTypes.includes("new") ? "added" : "changed",
+    previousAmount: news.previousAmount,
+    currentAmount: news.currentAmount,
+    deltaAmount: news.deltaAmount,
+    details,
+  };
 }
 
 async function insertInstitutions(
@@ -665,18 +734,7 @@ function classifyWeeklyEvents(
 
   for (const current of currentInstitutions) {
     const previous = previousByName.get(current.institutionName);
-    if (
-      current.status === "approved" &&
-      (
-        previous?.status !== "approved" ||
-        numberValue(current.totalLimit) > numberValue(previous.totalLimit) + AMOUNT_TOLERANCE ||
-        Boolean(
-          current.expiryDate &&
-          previous.expiryDate &&
-          current.expiryDate > previous.expiryDate,
-        )
-      )
-    ) {
+    if (current.status === "approved" && !previous) {
       added.add(current.institutionName);
     }
     if (current.status === "revoked" && previous?.status !== "revoked") {
@@ -839,16 +897,6 @@ function amountForMode(
 function amountTransition(previous: number, current: number): string {
   const delta = current - previous;
   return `${previous.toFixed(2)} → ${current.toFixed(2)} 亿元（${delta >= 0 ? "+" : ""}${delta.toFixed(2)}）`;
-}
-
-function statusLabel(status: CreditInstitutionView["status"] | undefined): string {
-  if (!status) return "无记录";
-  const labels: Record<CreditInstitutionView["status"], string> = {
-    approved: "已获批",
-    applying: "申请中",
-    revoked: "已撤销",
-  };
-  return labels[status];
 }
 
 function different(left: number, right: number): boolean {

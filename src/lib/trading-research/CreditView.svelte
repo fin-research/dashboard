@@ -16,6 +16,7 @@
     type CreditReportResponse,
     type CreditStatus,
   } from "../credit/types.ts";
+  import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
   import type {
     CreditInstitutionChanges,
     CreditInstitutionUpdateInput,
@@ -102,16 +103,7 @@
   });
 
   const weeklyNews = $derived.by(() => {
-    if (!report?.previousDate) return [];
-    const limitNews = report.limitChanges.map(
-      (change) =>
-        `${change.institutionName}授信额度${directionText(change.deltaAmount)}${formatAbsAmount(change.deltaAmount)}亿元`,
-    );
-    const usageNews = report.usageChanges.map(
-      (change) =>
-        `${change.institutionName}使用额度${directionText(change.deltaAmount)}${formatAbsAmount(change.deltaAmount)}亿元`,
-    );
-    return [...limitNews, ...usageNews];
+    return report?.weeklyNews.map(formatCreditWeeklyNews) ?? [];
   });
 
   const calendarCells = $derived.by(() => {
@@ -239,6 +231,7 @@
           ...report,
           summary: result.summary,
           weeklySummary: result.weeklySummary,
+          weeklyNews: result.weeklyNews,
           limitChanges: result.limitChanges,
           usageChanges: result.usageChanges,
           calendarEvents: result.calendarEvents,
@@ -512,16 +505,6 @@
     return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
   }
 
-  function formatAbsAmount(value: number): string {
-    return Math.abs(value).toFixed(2);
-  }
-
-  function directionText(value: number): string {
-    if (value > 0) return "增加";
-    if (value < 0) return "减少";
-    return "保持";
-  }
-
   function changeKindLabel(kind: CreditAmountChange["kind"]): string {
     if (kind === "added") return "新增";
     if (kind === "removed") return "移出";
@@ -748,7 +731,7 @@
         {#if !report.previousDate}
           <p class="tr-credit-muted">需要至少两个报表日才能生成本周变化。</p>
         {:else if weeklyNews.length === 0}
-          <p class="tr-credit-muted">本期授信额度及使用额度较上期无变化。</p>
+          <p class="tr-credit-muted">本期无新增授信、扩额或续签事项。</p>
         {:else}
           <ol class="tr-credit-news-list">{#each weeklyNews as news}<li>{news}。</li>{/each}</ol>
         {/if}
@@ -764,24 +747,7 @@
               {#each report.limitChanges as change (change.institutionName)}
                 <tr><th scope="row">{change.institutionName}</th><td>{change.institutionType}</td><td>{changeKindLabel(change.kind)}</td><td class="is-numeric">{formatAmount(change.previousAmount)}</td><td class="is-numeric">{formatAmount(change.currentAmount)}</td><td class={`is-numeric tr-change ${change.deltaAmount > 0 ? "tr-change--up" : change.deltaAmount < 0 ? "tr-change--down" : ""}`}>{formatDelta(change.deltaAmount)}</td><td class="tr-credit-change-details">{change.details.join("；")}</td></tr>
               {:else}
-                <tr><td class="tr-empty-cell" colspan="7">本期授信额度较上期无变化</td></tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="tr-panel" aria-labelledby="credit-usage-changes-title">
-        <PanelHeading id="credit-usage-changes-title" title="使用额度变动"><Badge tone={report.usageChanges.length ? "warning" : "success"}>{report.usageChanges.length} 家</Badge></PanelHeading>
-        <div class="tr-table-scroll">
-          <table class="tr-data-table tr-credit-change-table">
-            <caption class="sr-only">本周相对上周的使用额度变动</caption>
-            <thead><tr><th>机构</th><th>性质</th><th class="is-numeric">上期已用</th><th class="is-numeric">本期已用</th><th class="is-numeric">变化</th><th>变化说明</th></tr></thead>
-            <tbody>
-              {#each report.usageChanges as change (change.institutionName)}
-                <tr><th scope="row">{change.institutionName}</th><td>{change.institutionType}</td><td class="is-numeric">{formatAmount(change.previousAmount)}</td><td class="is-numeric">{formatAmount(change.currentAmount)}</td><td class={`is-numeric tr-change ${change.deltaAmount > 0 ? "tr-change--up" : "tr-change--down"}`}>{formatDelta(change.deltaAmount)}</td><td class="tr-credit-change-details">{change.details.join("；")}</td></tr>
-              {:else}
-                <tr><td class="tr-empty-cell" colspan="6">本期使用额度较上期无变化</td></tr>
+                <tr><td class="tr-empty-cell" colspan="7">本期无新增授信、扩额或续签事项</td></tr>
               {/each}
             </tbody>
           </table>

@@ -104,6 +104,19 @@ export interface CreditAmountChange {
   details: string[];
 }
 
+export type CreditWeeklyEventType = "new" | "increase" | "renewal";
+
+export interface CreditWeeklyNewsItem {
+  institutionName: string;
+  institutionType: string;
+  eventTypes: CreditWeeklyEventType[];
+  previousAmount: number;
+  currentAmount: number;
+  deltaAmount: number;
+  previousExpiryDate: string | null;
+  currentExpiryDate: string | null;
+}
+
 export interface CreditCalendarEvent {
   id: string;
   date: string;
@@ -123,6 +136,7 @@ export interface CreditReportResponse {
   weeklySummary: CreditWeeklySummaryView;
   previousWeeklySummary: CreditWeeklySummaryView | null;
   institutions: CreditInstitutionView[];
+  weeklyNews: CreditWeeklyNewsItem[];
   limitChanges: CreditAmountChange[];
   usageChanges: CreditAmountChange[];
   calendarEvents: CreditCalendarEvent[];
@@ -132,6 +146,7 @@ export interface CreditInstitutionUpdateResponse {
   institution: CreditInstitutionView;
   summary: CreditSummaryView;
   weeklySummary: CreditWeeklySummaryView;
+  weeklyNews: CreditWeeklyNewsItem[];
   limitChanges: CreditAmountChange[];
   usageChanges: CreditAmountChange[];
   calendarEvents: CreditCalendarEvent[];
