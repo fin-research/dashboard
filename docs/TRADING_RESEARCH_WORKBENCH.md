@@ -120,7 +120,7 @@ pnpm edb:db:migrate
 pnpm edb:update -- --apply
 ```
 
-`edb:update` 不自动重试，缺少 `--apply` 会在网络和数据库操作前退出，避免误耗付费额度。命令一次 upsert 当前 36 项指标的近 18 个月原始观测；页面展示换算仍由前端统一完成。
+`edb:update` 默认使用生产 Data API，可通过 `DATA_API_BASE_URL` 或 `DATA_PROXY_TARGET` 覆盖；命令不自动重试，缺少 `--apply` 会在网络和数据库操作前退出，避免误耗付费额度。命令一次 upsert 当前 36 项指标的近 18 个月原始观测；页面展示换算仍由前端统一完成。
 
 尚未接入模块的首期接口建议：
 

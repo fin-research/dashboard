@@ -132,7 +132,7 @@ function resolveDataApiBaseUrl(): string {
   if (configured) return configured.replace(/\/$/, "");
   const proxyTarget = process.env.DATA_PROXY_TARGET?.trim();
   if (proxyTarget) return `${proxyTarget.replace(/\/$/, "")}/data`;
-  throw new Error("DATA_API_BASE_URL or DATA_PROXY_TARGET is required");
+  return "https://eastmoney.hasbai.xyz/data";
 }
 
 function currentWeekRange(now = new Date()): {
