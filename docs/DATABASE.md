@@ -67,15 +67,16 @@ Worker 通过 `HYPERDRIVE` 访问 `credit` schema；本地导入脚本使用直�
 
 Worker 通过同一 `HYPERDRIVE` 访问 `financing_model` schema：
 
-- `model_run`：quant pipeline 每次运行追加的不可变结构化快照；核心指标为检索列，完整契约保存在 `payload` JSONB。
-- `conclusion_revision`：页面人工修改整体结论的追加修订，读取最新一条；无修订时回退到模型 `base_conclusion`。
+- `model_run`：quant pipeline 每次运行追加的结构化模型记录；标量直接落列，校验迭代、分组均值和优选日期使用 PostgreSQL 原生数组，当前整体结论与模型基础结论分别落列。
+- `model_run_market_driver`：每次运行的有序市场驱动因子，主键 `(run_id, ordinal)`。
+- `model_run_forecast_window`：每次运行的有序未来发行窗口，主键 `(run_id, ordinal)`。
 - `sell_side_snapshot`：AI Search 检索与 AI Gateway 归纳后的卖方逻辑汇总及人工修订追加快照，读取最新一条。
 
 规则：
 
 - migration 只放 `financing-model-migrations/`，使用 `pnpm financing-model:db:migrate` 应用。
-- dashboard 不更新或删除 `model_run.payload`；quant 不写人工结论和卖方观点。
-- 人工结论、生成的卖方观点和人工卖方逻辑汇总都追加保存，不原地覆盖历史版本。
+- `model_run` 不保存原始 JSON；dashboard 从结构化列和两张有序明细表重建前端快照，quant 不写人工结论和卖方观点。
+- 人工结论只增量更新目标 `model_run` 的 `conclusion_*` 与 `conclusion_updated_at`；模型基础结论列保持不变。生成的卖方观点和人工卖方逻辑汇总继续追加保存。
 - 卖方快照只保存结构化观点、检索口径和源文档 key，不保存 AI Search 返回的完整正文。
 
 ## 变更检查

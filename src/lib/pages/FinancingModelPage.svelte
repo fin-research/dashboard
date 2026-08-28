@@ -10,6 +10,7 @@
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import MetricIcon from "../../components/MetricIcon.svelte";
+  import InstitutionLogo from "$lib/components/InstitutionLogo.svelte";
   import {
     companyBusinessNarrative,
     conclusionSchema,
@@ -420,7 +421,6 @@
             <div class="card-title-row">
               <h3>整体结论</h3>
               <div class="card-title-actions">
-                {#if report.conclusion.edited}<span class="edited-badge">人工修订</span>{/if}
                 {#if !editingConclusion}
                   <button class="icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
                     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -545,7 +545,6 @@
             <h2 id="sell-side-title">卖方观点</h2>
           </div>
           <div class="section-actions">
-            {#if report.sellSide?.edited}<span class="edited-badge">人工修订</span>{/if}
             {#if report.sellSide && !editingSellSide}
               <button class="icon-button" type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -579,7 +578,10 @@
           <div class={`sell-side-grid sell-side-grid--${report.sellSide.views.length}`}>
             {#each report.sellSide.views as view}
               <article class="sell-side-card">
-                <strong class="sell-side-institution">{view.institution}</strong>
+                <div class="sell-side-institution">
+                  <InstitutionLogo institution={view.institution} />
+                  <strong>{view.institution}</strong>
+                </div>
                 <p>{sellSideSummaryBody(view.summary, view.institution)}</p>
                 <div class="implication">
                   <strong>对发行的含义</strong>
@@ -895,15 +897,6 @@
 
   .card-title-actions {
     justify-content: flex-end;
-  }
-
-  .edited-badge {
-    padding: 3px 7px;
-    border-radius: var(--radius-tag);
-    color: #175cd3;
-    background: #eff4ff;
-    font-size: 0.75rem;
-    font-weight: bold;
   }
 
   .conclusion-verdict {
@@ -1258,6 +1251,7 @@
     display: flex;
     min-height: 48px;
     align-items: center;
+    gap: 10px;
     padding: 12px 16px;
     border-bottom: 1px solid color-mix(in srgb, var(--brand) 16%, var(--line));
     color: var(--brand-deep);

@@ -26,10 +26,10 @@ export class FinancingModelDatabaseError extends Error {
 }
 
 interface FinancingModelRow extends QueryResultRow {
-  payload: unknown;
-  verdict: string | null;
-  preferred_window: string | null;
-  narrative: string | null;
+  snapshot: unknown;
+  verdict: string;
+  preferred_window: string;
+  narrative: string;
   conclusion_updated_at: string | null;
   sell_side_payload: unknown | null;
 }
@@ -40,27 +40,141 @@ export async function loadFinancingModelReport(
 ): Promise<FinancingModelReport> {
   const result = await client.query<FinancingModelRow>(
     `SELECT
-       run.payload,
-       conclusion.verdict,
-       conclusion.preferred_window,
-       conclusion.narrative,
-       conclusion.updated_at AS conclusion_updated_at,
+       jsonb_build_object(
+         'schema_version', run.schema_version,
+         'run_id', run.id,
+         'model_name', run.model_name,
+         'generated_at', to_char(
+           run.generated_at AT TIME ZONE 'UTC',
+           'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+         ),
+         'as_of_date', to_char(run.as_of_date, 'YYYY-MM-DD'),
+         'market_data_date', to_char(run.market_data_date, 'YYYY-MM-DD'),
+         'issue_terms', jsonb_build_object(
+           'issue_size_billion_yuan', run.issue_size_billion_yuan,
+           'tenor_years', run.tenor_years,
+           'rating', run.rating,
+           'bond_type', run.bond_type
+         ),
+         'prediction', jsonb_build_object(
+           'deviation_bp', run.predicted_deviation_bp,
+           'peer_spread_median_bp', run.peer_spread_median_bp,
+           'historical_percentile', run.historical_percentile,
+           'recommendation', run.recommendation,
+           'recommendation_label', run.recommendation_label,
+           'decision', run.decision
+         ),
+         'company_metrics', CASE
+           WHEN run.company_metrics_date IS NULL THEN NULL
+           ELSE jsonb_build_object(
+             'date', to_char(run.company_metrics_date, 'YYYY-MM-DD'),
+             'ef_lcr_pctile_60d', run.lcr_percentile_60d,
+             'ef_nsfr_pctile_60d', run.nsfr_percentile_60d,
+             'ef_funding_gap', run.funding_gap_yi_yuan,
+             'ef_margin_zscore_60d', run.company_margin_zscore_60d,
+             'ef_funding_pressure', run.company_funding_pressure,
+             'ef_subject_spread_bp', run.subject_spread_bp,
+             'ef_subject_spread_pctile', run.subject_spread_percentile,
+             'ef_subject_spread_date', CASE
+               WHEN run.subject_spread_date IS NULL THEN NULL
+               ELSE to_char(run.subject_spread_date, 'YYYY-MM-DD')
+             END,
+             'composite_score', run.company_composite_score,
+             'readiness_label', run.company_readiness_label,
+             'interpretation', run.company_interpretation
+           )
+         END,
+         'market_drivers', drivers.items,
+         'forecast_window', forecast.items,
+         'validation', jsonb_build_object(
+           'tscv', jsonb_build_object(
+             'folds', run.cv_folds,
+             'validation_samples', run.cv_validation_samples,
+             'rmse', run.cv_rmse,
+             'ic', run.cv_ic,
+             'best_iter_median', run.cv_best_iter_median,
+             'best_iters', to_jsonb(run.cv_best_iters)
+           ),
+           'timing_value', jsonb_build_object(
+             'n_total', run.timing_n_total,
+             'n_recommended', run.timing_n_recommended,
+             'recommended_share', run.timing_recommended_share,
+             'cost_saving_bp', run.timing_cost_saving_bp,
+             'recommended_mean_bp', run.timing_recommended_mean_bp,
+             'baseline_mean_bp', run.timing_baseline_mean_bp,
+             'win_rate', run.timing_win_rate,
+             'ic', run.timing_ic,
+             'group_means', to_jsonb(run.timing_group_means),
+             'monotonic', run.timing_monotonic
+           )
+         ),
+         'base_conclusion', jsonb_build_object(
+           'verdict', run.base_conclusion_verdict,
+           'preferred_window', run.base_conclusion_preferred_window,
+           'narrative', run.base_conclusion_narrative,
+           'preferred_dates', to_jsonb(run.base_conclusion_preferred_dates)
+         ),
+         'source_freshness', jsonb_build_object(
+           'market_data_date', to_char(run.source_market_data_date, 'YYYY-MM-DD'),
+           'company_metrics_date', CASE
+             WHEN run.source_company_metrics_date IS NULL THEN NULL
+             ELSE to_char(run.source_company_metrics_date, 'YYYY-MM-DD')
+           END,
+           'subject_spread_date', CASE
+             WHEN run.source_subject_spread_date IS NULL THEN NULL
+             ELSE to_char(run.source_subject_spread_date, 'YYYY-MM-DD')
+           END
+         )
+       ) AS snapshot,
+       run.conclusion_verdict AS verdict,
+       run.conclusion_preferred_window AS preferred_window,
+       run.conclusion_narrative AS narrative,
+       CASE
+         WHEN run.conclusion_updated_at IS NULL THEN NULL
+         ELSE to_char(
+           run.conclusion_updated_at AT TIME ZONE 'UTC',
+           'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+         )
+       END AS conclusion_updated_at,
        sell_side.payload AS sell_side_payload
      FROM financing_model.model_run AS run
      LEFT JOIN LATERAL (
-       SELECT
-         revision.verdict,
-         revision.preferred_window,
-         revision.narrative,
-         to_char(
-           revision.created_at AT TIME ZONE 'UTC',
-           'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
-         ) AS updated_at
-       FROM financing_model.conclusion_revision AS revision
-       WHERE revision.run_id = run.id
-       ORDER BY revision.created_at DESC, revision.id DESC
-       LIMIT 1
-     ) AS conclusion ON true
+       SELECT COALESCE(
+         jsonb_agg(
+           jsonb_strip_nulls(jsonb_build_object(
+             'feature', driver.feature,
+             'display_name', driver.display_name,
+             'shap', driver.shap,
+             'value', driver.value,
+             'direction', driver.direction,
+             'impact', driver.impact
+           ))
+           ORDER BY driver.ordinal
+         ),
+         '[]'::jsonb
+       ) AS items
+       FROM financing_model.model_run_market_driver AS driver
+       WHERE driver.run_id = run.id
+     ) AS drivers ON true
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(
+         jsonb_agg(
+           jsonb_build_object(
+             'date', to_char(forecast_row.forecast_date, 'YYYY-MM-DD'),
+             'weekday', forecast_row.weekday,
+             'percentile', forecast_row.percentile,
+             'label', forecast_row.label,
+             'pred_bp', forecast_row.predicted_deviation_bp,
+             'savings_bp_vs_window_median', forecast_row.savings_bp_vs_window_median,
+             'savings_万元/年', forecast_row.savings_wan_yuan_per_year
+           )
+           ORDER BY forecast_row.ordinal
+         ),
+         '[]'::jsonb
+       ) AS items
+       FROM financing_model.model_run_forecast_window AS forecast_row
+       WHERE forecast_row.run_id = run.id
+     ) AS forecast ON true
      LEFT JOIN LATERAL (
        SELECT snapshot.payload
        FROM financing_model.sell_side_snapshot AS snapshot
@@ -79,15 +193,14 @@ export async function loadFinancingModelReport(
   }
 
   try {
-    const snapshot = financingModelSnapshotSchema.parse(row.payload);
-    const base = snapshot.base_conclusion;
+    const snapshot = financingModelSnapshotSchema.parse(row.snapshot);
     return financingModelReportSchema.parse({
       snapshot,
       conclusion: {
-        verdict: row.verdict ?? base.verdict,
-        preferredWindow: row.preferred_window ?? base.preferred_window,
-        narrative: row.narrative ?? base.narrative,
-        edited: row.verdict !== null,
+        verdict: row.verdict,
+        preferredWindow: row.preferred_window,
+        narrative: row.narrative,
+        edited: row.conclusion_updated_at !== null,
         updatedAt: row.conclusion_updated_at,
       },
       sellSide:
@@ -114,18 +227,19 @@ export async function saveFinancingModelConclusion(
     narrative: string;
     updated_at: string;
   }>(
-    `INSERT INTO financing_model.conclusion_revision (
-       run_id, verdict, preferred_window, narrative
-     )
-     SELECT id, $2, $3, $4
-     FROM financing_model.model_run
+    `UPDATE financing_model.model_run
+     SET
+       conclusion_verdict = $2,
+       conclusion_preferred_window = $3,
+       conclusion_narrative = $4,
+       conclusion_updated_at = now()
      WHERE id = $1::uuid
      RETURNING
-       verdict,
-       preferred_window,
-       narrative,
+       conclusion_verdict AS verdict,
+       conclusion_preferred_window AS preferred_window,
+       conclusion_narrative AS narrative,
        to_char(
-         created_at AT TIME ZONE 'UTC',
+         conclusion_updated_at AT TIME ZONE 'UTC',
          'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
        ) AS updated_at`,
     [

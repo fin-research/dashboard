@@ -7,6 +7,7 @@ import {
   parseFinancingModelReport,
   sellSideSummaryBody,
 } from "../src/lib/financing-model.ts";
+import { resolveInstitutionLogo } from "../src/lib/sell-side-institutions.ts";
 import {
   loadFinancingModelReport,
   saveFinancingModelConclusion,
@@ -194,6 +195,12 @@ test("卖方观点正文移除机构研报和发布日期引导句", () => {
   );
 });
 
+test("券商研究所 Logo 库按别名匹配并提供回退标识", () => {
+  assert.deepEqual(resolveInstitutionLogo("德邦资管固收").mark, "德邦");
+  assert.deepEqual(resolveInstitutionLogo("中信建投证券固收").mark, "建投");
+  assert.equal(resolveInstitutionLogo("示例研究所").key, "fallback");
+});
+
 test("历史卖方交叉验证快照读取时整合为单段逻辑汇总", () => {
   const legacy = sellSidePayload();
   delete legacy.logicSummary;
@@ -225,7 +232,7 @@ test("历史卖方交叉验证快照读取时整合为单段逻辑汇总", () =>
   assert.equal(report.sellSide.edited, false);
 });
 
-test("读取时无人工修订则回退到模型基础结论", async () => {
+test("读取时使用 model_run 当前结论并保留基础结论", async () => {
   const client = {
     async query(sql, parameters) {
       assert.match(sql, /financing_model\.model_run/);
@@ -233,10 +240,10 @@ test("读取时无人工修订则回退到模型基础结论", async () => {
       return {
         rows: [
           {
-            payload: snapshot(),
-            verdict: null,
-            preferred_window: null,
-            narrative: null,
+            snapshot: snapshot(),
+            verdict: "推荐发行",
+            preferred_window: "8月24日",
+            narrative: "基础结论",
             conclusion_updated_at: null,
             sell_side_payload: null,
           },
@@ -252,7 +259,7 @@ test("读取时无人工修订则回退到模型基础结论", async () => {
   assert.equal(report.sellSide, null);
 });
 
-test("整体结论保存采用追加修订", async () => {
+test("整体结论 PATCH 增量更新 model_run 当前结论", async () => {
   const calls = [];
   const client = {
     async query(sql, parameters) {
@@ -277,9 +284,28 @@ test("整体结论保存采用追加修订", async () => {
     narrative: "等待更优窗口。",
   });
 
-  assert.match(calls[0].sql, /conclusion_revision/);
+  assert.match(calls[0].sql, /UPDATE financing_model\.model_run/);
+  assert.match(calls[0].sql, /conclusion_updated_at = now\(\)/);
+  assert.doesNotMatch(calls[0].sql, /conclusion_revision|INSERT INTO/);
   assert.equal(calls[0].parameters[0], snapshot().run_id);
   assert.equal(result.edited, true);
+});
+
+test("model_run migration 完整拆分 payload 并合并整体结论", async () => {
+  const migration = await readFile(
+    new URL(
+      "../financing-model-migrations/0002_structure_model_run.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(migration, /CREATE TABLE financing_model\.model_run_market_driver/);
+  assert.match(migration, /CREATE TABLE financing_model\.model_run_forecast_window/);
+  assert.match(migration, /base_conclusion_preferred_dates date\[\]/);
+  assert.match(migration, /timing_group_means numeric\(20, 10\)\[\]/);
+  assert.match(migration, /DROP TABLE financing_model\.conclusion_revision/);
+  assert.match(migration, /DROP COLUMN payload/);
 });
 
 test("卖方观点快照保存搜索口径和完整 payload", async () => {
@@ -372,6 +398,8 @@ test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模�
   assert.doesNotMatch(page, /class="research-meta"|class="source-footer"/);
   assert.doesNotMatch(page, /company\.interpretation|指标日期|<dt>公司流动性/);
   assert.doesNotMatch(page, /stanceLabel|sell-side-card--/);
+  assert.match(page, /<InstitutionLogo institution=\{view\.institution\}/);
+  assert.doesNotMatch(page, />人工修订</);
   assert.match(research, /PROMPT_CACHE_KEY = "financing-model-sell-side:v6"/);
   assert.match(research, /\.min\(4\)/);
   assert.match(research, /views\.length < 4/);

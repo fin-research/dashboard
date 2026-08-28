@@ -47,7 +47,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。
 - `src/lib/server/credit-repository.ts` 封装 `credit` schema 的报表日导入、机构自动保存、历史日期读取、日历事件和相邻报告日比较；Worker 复用短生命周期 PostgreSQL 连接。
-- `src/lib/server/financing-model-repository.ts` 读取 quant 快照并追加人工结论、卖方观点和逻辑汇总修订；`src/lib/server/financing-model-research.ts` 按 `AI.md` 调用 AI Search MCP，再通过统一 AI Gateway 生成结构化卖方逻辑汇总。
+- `src/lib/server/financing-model-repository.ts` 从 `model_run` 结构化列及有序明细表重建 quant 快照，增量更新同一运行的当前整体结论，并追加卖方观点和逻辑汇总修订；`src/lib/server/financing-model-research.ts` 按 `AI.md` 调用 AI Search MCP，再通过统一 AI Gateway 生成结构化卖方逻辑汇总。
 
 ## 核心数据流
 
@@ -69,7 +69,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ### 融资择时模型
 
-quant pipeline → 本地结构化 JSON → Neon `financing_model.model_run` 追加快照 → dashboard 读取最新运行。人工结论写入追加修订表；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳为单段逻辑汇总及 4–5 家逐机构观点后追加保存。人工编辑逻辑汇总时保留原逐机构观点和检索证据，并追加新快照。
+quant pipeline → 本地结构化结果 → Neon `financing_model.model_run` 标量列、原生数组及有序明细表 → dashboard 重建最新运行。人工结论通过 PATCH 增量更新同一条 `model_run` 的当前结论列；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳为单段逻辑汇总及 4–5 家逐机构观点后追加保存。人工编辑逻辑汇总时保留原逐机构观点和检索证据，并追加新快照。
 
 ### 交易研究工作台
 
