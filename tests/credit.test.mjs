@@ -203,7 +203,7 @@ test("同日报表导入只替换机构和分项表，不建立汇总或导入�
   assert.equal(calls.at(-1).sql, "COMMIT");
 });
 
-test("授信详情只更新机构增量字段并使用完整 updated_at 并发检查", async () => {
+test("授信详情只更新机构增量字段并在同一事务返回服务端实体", async () => {
   const calls = [];
   const client = {
     async query(sql, parameters) {
@@ -213,7 +213,6 @@ test("授信详情只更新机构增量字段并使用完整 updated_at 并发�
           rows: [{
             effective_date: null,
             expiry_date: null,
-            updated_at: "2026-08-21T10:00:00.123456Z",
           }],
           rowCount: 1,
         };
@@ -233,7 +232,6 @@ test("授信详情只更新机构增量字段并使用完整 updated_at 并发�
   const result = await saveCreditInstitution(client, {
     reportDate: current.reportDate,
     institutionName: current.institutionName,
-    expectedUpdatedAt: current.updatedAt,
     changes: {
       institution: { notes: "已更新" },
     },
@@ -241,12 +239,12 @@ test("授信详情只更新机构增量字段并使用完整 updated_at 并发�
   const sql = calls.map((call) => call.sql).join("\n");
   const updateCall = calls.find((call) => /UPDATE credit\.institution/.test(call.sql));
 
-  assert.match(sql, /institution\.updated_at = \$3::timestamptz/);
+  assert.doesNotMatch(sql, /institution\.updated_at\s*=/);
   assert.match(sql, /patch\.data \? 'notes'/);
   assert.doesNotMatch(sql, /jsonb_array_elements/);
-  assert.deepEqual(JSON.parse(updateCall.parameters[3]), { notes: "已更新" });
+  assert.deepEqual(JSON.parse(updateCall.parameters[2]), { notes: "已更新" });
   assert.equal(result.institution.notes, "已更新");
-  assert.equal(result.institution.updatedAt, "2026-08-21T10:00:00.123456Z");
+  assert.equal(result.institution.updatedAt, "2026-08-21T10:00:00.000Z");
   assert.ok(
     calls.findIndex((call) => /SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(call.sql)) <
       calls.findIndex((call) => call.sql === "COMMIT"),
@@ -263,7 +261,6 @@ test("授信详情只更新发生变化的单个分项字段", async () => {
           rows: [{
             effective_date: null,
             expiry_date: null,
-            updated_at: "2026-08-21T10:00:00.123456Z",
           }],
           rowCount: 1,
         };
@@ -284,7 +281,6 @@ test("授信详情只更新发生变化的单个分项字段", async () => {
   await saveCreditInstitution(client, {
     reportDate: current.reportDate,
     institutionName: current.institutionName,
-    expectedUpdatedAt: "2026-08-21T10:00:00.123456Z",
     changes: {
       items: [{ type: "bond_investment", usedAmount: 2 }],
     },
@@ -297,11 +293,10 @@ test("授信详情只更新发生变化的单个分项字段", async () => {
   ]);
 });
 
-test("授信增量 PATCH 接受微秒版本且拒绝空变更", () => {
+test("授信增量 PATCH 不需要版本且拒绝空变更", () => {
   const base = {
     reportDate: "2026-08-21",
     institutionName: "甲银行",
-    expectedUpdatedAt: "2026-08-28T02:00:39.506354Z",
   };
 
   assert.equal(creditInstitutionUpdateSchema.safeParse({
@@ -328,6 +323,7 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.match(migration, /RENAME TO item/);
   assert.match(migration, /DROP TABLE credit\.daily_summary/);
   assert.doesNotMatch(repository, /daily_summary|institution_daily|item_daily|import_run|_snapshot/);
+  assert.doesNotMatch(repository, /expectedUpdatedAt|updated_at = \$3::timestamptz/);
   assert.match(repository, /SS\.US/);
   assert.doesNotMatch(repository, /SS\.MS/);
   assert.match(repository, /jsonb_array_elements/);

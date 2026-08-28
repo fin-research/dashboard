@@ -54,7 +54,6 @@ const creditItemChangesSchema = z.object({
 export const creditInstitutionUpdateSchema = z.object({
   reportDate: isoDate,
   institutionName: z.string().trim().min(1).max(200),
-  expectedUpdatedAt: z.string().datetime(),
   changes: z.object({
     institution: creditInstitutionChangesSchema.optional(),
     items: z.array(creditItemChangesSchema).max(creditItemTypes.length).optional(),

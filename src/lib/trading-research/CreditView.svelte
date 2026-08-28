@@ -220,7 +220,6 @@
     const target = {
       reportDate: editor.reportDate,
       institutionName: editor.institutionName,
-      expectedUpdatedAt: editor.updatedAt,
     };
     const changes = takePendingChanges();
     const version = editorVersion;

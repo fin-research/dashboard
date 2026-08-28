@@ -222,7 +222,6 @@ export async function saveCreditInstitution(
   input: CreditInstitutionUpdateInput,
 ): Promise<CreditInstitutionUpdateResponse> {
   let report: CreditReportResponse | null = null;
-  let confirmedUpdatedAt = "";
   await client.query("BEGIN");
   try {
     const institutionChanges = input.changes.institution ?? {};
@@ -230,9 +229,8 @@ export async function saveCreditInstitution(
     const updated = await client.query<{
       effective_date: string | null;
       expiry_date: string | null;
-      updated_at: string;
     }>(
-      `WITH patch AS (SELECT $4::jsonb AS data)
+      `WITH patch AS (SELECT $3::jsonb AS data)
        UPDATE credit.institution AS institution
        SET institution_type = CASE
              WHEN patch.data ? 'institutionType'
@@ -308,36 +306,19 @@ export async function saveCreditInstitution(
        FROM patch
        WHERE institution.report_date = $1::date
          AND institution.institution_name = $2
-         AND institution.updated_at = $3::timestamptz
        RETURNING
          to_char(institution.effective_date, 'YYYY-MM-DD') AS effective_date,
-         to_char(institution.expiry_date, 'YYYY-MM-DD') AS expiry_date,
-         to_char(
-           institution.updated_at AT TIME ZONE 'UTC',
-           'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-         ) AS updated_at`,
+         to_char(institution.expiry_date, 'YYYY-MM-DD') AS expiry_date`,
       [
         input.reportDate,
         input.institutionName,
-        input.expectedUpdatedAt,
         JSON.stringify(institutionChanges),
       ],
     );
     if (!updated.rowCount) {
-      const exists = await client.query(
-        `SELECT 1 FROM credit.institution
-         WHERE report_date = $1::date AND institution_name = $2`,
-        [input.reportDate, input.institutionName],
-      );
-      throw new CreditDatabaseError(
-        exists.rowCount ? 409 : 404,
-        exists.rowCount
-          ? "该授信记录已被其他操作更新，请刷新后重试"
-          : "该授信记录不存在",
-      );
+      throw new CreditDatabaseError(404, "该授信记录不存在");
     }
     const updatedDates = updated.rows[0]!;
-    confirmedUpdatedAt = updatedDates.updated_at;
     if (
       updatedDates.effective_date &&
       updatedDates.expiry_date &&
@@ -386,18 +367,15 @@ export async function saveCreditInstitution(
     throw error;
   }
 
-  if (!report || !confirmedUpdatedAt) {
+  if (!report) {
     throw new CreditDatabaseError(503, "授信更新结果读取失败");
   }
   const institution = report.institutions.find(
     (item) => item.institutionName === input.institutionName,
   );
   if (!institution) throw new CreditDatabaseError(404, "该授信记录不存在");
-  const confirmedInstitution = institution.updatedAt === confirmedUpdatedAt
-    ? institution
-    : { ...institution, updatedAt: confirmedUpdatedAt };
   return {
-    institution: confirmedInstitution,
+    institution,
     summary: report.summary,
     weeklySummary: report.weeklySummary,
     limitChanges: report.limitChanges,
