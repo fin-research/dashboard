@@ -128,41 +128,14 @@ export const ECONOMIC_INDICATOR_GROUPS: EconomicIndicatorGroup[] = [
 const rowSchema = z.object({
   code: z.string(),
   date: z.string(),
-  RESULT: z.union([z.number(), z.string()]),
+  value: z.union([z.number(), z.string()]),
 });
 
 const responseSchema = z.object({
-  data: z
-    .object({
-      economics: z.object({
-        function: z.literal("EDB"),
-        fields: z.array(z.string()),
-        rows: z.array(rowSchema),
-      }),
-    })
-    .nullish(),
-  errors: z.array(z.object({ message: z.string() })).optional(),
+  asOf: z.string(),
+  syncedAt: z.string(),
+  rows: z.array(rowSchema),
 });
-
-const ECONOMIC_INDICATORS_QUERY = `
-  query EconomicIndicators(
-    $edbIds: String!
-    $startDate: Date!
-    $endDate: Date!
-    $options: String!
-  ) {
-    economics: choiceEdb(
-      edbIds: $edbIds
-      startDate: $startDate
-      endDate: $endDate
-      options: $options
-    ) {
-      function
-      fields
-      rows
-    }
-  }
-`;
 
 const MAX_CHART_POINTS = 96;
 
@@ -207,7 +180,7 @@ export function mapEconomicIndicatorRows(
   const rowsByCode = new Map<string, EconomicIndicatorPoint[]>();
 
   for (const row of rows) {
-    const rawValue = typeof row.RESULT === "number" ? row.RESULT : Number(row.RESULT);
+    const rawValue = typeof row.value === "number" ? row.value : Number(row.value);
     if (!Number.isFinite(rawValue)) continue;
     const points = rowsByCode.get(row.code) ?? [];
     points.push({ date: row.date, value: rawValue });
@@ -232,27 +205,11 @@ export function mapEconomicIndicatorRows(
 
 export async function fetchEconomicIndicatorGroups(
   signal?: AbortSignal,
-  now = new Date(),
 ): Promise<EconomicIndicatorSeriesGroup[]> {
-  const { startDate, endDate } = economicIndicatorRange(now);
-  const edbIds = ECONOMIC_INDICATOR_GROUPS.flatMap((group) =>
-    group.indicators.map((item) => item.code),
-  ).join(",");
-  const response = await fetch("/data/graphql", {
-    method: "POST",
+  const response = await fetch("/api/economic-indicators", {
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      query: ECONOMIC_INDICATORS_QUERY,
-      variables: {
-        edbIds,
-        startDate,
-        endDate,
-        options: "IsPublishDate=0,FixDate=0",
-      },
-    }),
     signal,
   });
 
@@ -260,13 +217,7 @@ export async function fetchEconomicIndicatorGroups(
     throw new Error(`经济指标请求失败（HTTP ${response.status}）`);
   }
   const payload = responseSchema.parse(await response.json());
-  if (payload.errors?.length) {
-    throw new Error(payload.errors.map((item) => item.message).join("；"));
-  }
-  if (!payload.data) {
-    throw new Error("经济指标响应缺少 data");
-  }
-  return mapEconomicIndicatorRows(payload.data.economics.rows);
+  return mapEconomicIndicatorRows(payload.rows);
 }
 
 function downsample(points: EconomicIndicatorPoint[]): EconomicIndicatorPoint[] {

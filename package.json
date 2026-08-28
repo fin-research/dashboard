@@ -19,6 +19,8 @@
     "financing-model:db:migrate": "node scripts/apply-financing-model-migrations.mjs",
     "credit:db:migrate": "node scripts/apply-credit-migrations.mjs",
     "credit:import": "node --experimental-strip-types scripts/import-credit-workbook.ts",
+    "edb:db:migrate": "node --env-file-if-exists=.env.local scripts/apply-edb-migrations.mjs",
+    "edb:update": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/update-economic-indicators.ts",
     "db:sync:remote": "node scripts/sync-remote-d1.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",

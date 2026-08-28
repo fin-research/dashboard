@@ -91,8 +91,8 @@ test("经济指标按九类四项配置并应用必要口径换算", () => {
   );
 
   const groups = mapEconomicIndicatorRows([
-    { code: "EMI01737210", date: "2026-07-31", RESULT: 101.8 },
-    { code: "EMG01339436", date: "2026-08-27", RESULT: -0.12 },
+    { code: "EMI01737210", date: "2026-07-31", value: 101.8 },
+    { code: "EMG01339436", date: "2026-08-27", value: -0.12 },
   ]);
   assert.equal(Number(groups[2].indicators[1].points[0].value.toFixed(1)), 1.8);
   assert.equal(groups[6].indicators[3].points[0].value, -12);
@@ -238,7 +238,7 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(design, /禁止先在页面内实现/);
 });
 
-test("研究辅助由浏览器直连 Data API GraphQL 并使用专用走势卡", async () => {
+test("研究辅助从 Dashboard API 读取 Neon 并使用专用走势卡", async () => {
   const [research, card, dataClient, styles] = await Promise.all([
     readFile(new URL("../src/lib/trading-research/ResearchView.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/EconomicIndicatorCard.svelte", import.meta.url), "utf8"),
@@ -251,9 +251,8 @@ test("研究辅助由浏览器直连 Data API GraphQL 并使用专用走势卡",
   assert.match(card, /indicator\.name/);
   assert.match(card, /latest\?\.date/);
   assert.match(card, /<ChartHost/);
-  assert.match(dataClient, /fetch\("\/data\/graphql"/);
-  assert.match(dataClient, /choiceEdb/);
-  assert.doesNotMatch(dataClient, /fetch\("\/api\//);
+  assert.match(dataClient, /fetch\("\/api\/economic-indicators"/);
+  assert.doesNotMatch(dataClient, /\/data\/graphql|choiceEdb/);
   assert.match(styles, /\.tr-economic-grid\s*\{[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/);
 });
 
