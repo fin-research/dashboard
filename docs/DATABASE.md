@@ -50,17 +50,18 @@ Worker 只绑定私有 `eastmoney` R2 bucket，并通过固定小写前缀隔离
 
 Worker 通过 `HYPERDRIVE` 访问 `credit` schema；本地导入脚本使用直连 `DATABASE_URL`：
 
-- `daily_summary`：以 `report_date` 为主键，保存一览表口径、周报名单口径、当前源文件说明和数据质量提示。
-- `institution_daily`：以 `(report_date, institution_name)` 为主键，保存机构授信、使用、期限、经办信息及是否纳入周报名单。
-- `item_daily`：以 `(report_date, institution_name, item_type)` 为主键，保存标准化分项额度、已使用和可用余额。
+- `institution`：以 `(report_date, institution_name)` 为主键，保存机构授信、使用、期限、经办信息、周报名单标记和并发更新时间。
+- `item`：以 `(report_date, institution_name, item_type)` 为主键，保存标准化分项额度、已使用和说明。
+- `status`、`confidentiality_status` 与 `item_type` 使用 PostgreSQL enum；空授信状态在解析时规范为 `revoked`。
 
 规则：
 
 - migration 只放 `credit-migrations/`，配置直连 `DATABASE_URL` 后运行 `pnpm credit:db:migrate`。
 - Excel 只在本地解析；导入必须显式指定报告日期，并先使用 `--dry-run` 核对机构数、两套汇总和质量提示。
-- 不建立业务导入审计表，也不保存导入批次历史。同一报告日期在全局锁、日期锁和单事务内替换三张日报表记录，其他日期保持不变。
-- 一览表口径与周报名单口径分别由机构集合聚合，不允许使用固定差额修正。
-- Worker API 只读；浏览器不接收 Excel、不直连 Neon，也不写授信表。
+- 不建立业务导入审计表、汇总表或导入批次历史。同一报告日期在全局锁、日期锁和单事务内替换机构与分项记录，其他日期保持不变。
+- 一览表与周报的机构数、授信总额、已用和可用额度均从 `institution` 聚合；金额统计只纳入 `approved`，不允许使用固定差额修正。
+- 可用额度、使用率、周报新增与到期计数以及日历事件由机构和分项记录派生，不落冗余结果。
+- 浏览器不接收 Excel、不直连 Neon；详情修改通过同源 `/api/credit` 参数化更新并使用 `updated_at` 做乐观并发检查。
 
 ## Neon：融资择时模型
 

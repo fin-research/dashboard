@@ -46,7 +46,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。
-- `src/lib/server/credit-repository.ts` 封装 `credit` schema 的日报写入、历史日期读取和相邻报告日比较；Worker 读取仍复用短生命周期 PostgreSQL 连接。
+- `src/lib/server/credit-repository.ts` 封装 `credit` schema 的报表日导入、机构自动保存、历史日期读取、日历事件和相邻报告日比较；Worker 复用短生命周期 PostgreSQL 连接。
 - `src/lib/server/financing-model-repository.ts` 读取 quant 快照并追加人工结论和卖方观点；`src/lib/server/financing-model-research.ts` 按 `AI.md` 调用 AI Search MCP，再通过统一 AI Gateway 生成结构化交叉验证。
 
 ## 核心数据流
@@ -73,7 +73,7 @@ quant pipeline → 本地结构化 JSON → Neon `financing_model.model_run` 追
 
 ### 交易研究工作台
 
-授信链路：本地 Excel → `scripts/import-credit-workbook.ts` 解析“授信一览表”和“授信周报” → Neon `credit` 日报表；浏览器 `/trading-research/credit` → `/api/credit` → Hyperdrive → Neon。周报比较当前报告日与上一可用报告日，不在前端重算数据库事实。
+授信链路：本地 Excel → `scripts/import-credit-workbook.ts` 解析“授信一览表”和“授信周报” → Neon `credit.institution` / `credit.item`；浏览器 `/trading-research/credit` → `/api/credit` → Hyperdrive → Neon。读取、周报比较、日历事件和自动保存的服务端确认结果均来自数据库。
 
 其他迁入模块当前仍由冻结数据 → `src/lib/trading-research/demo-data.ts` → 对应只读视图；`/bond` 与 `/financing-model` 的同一页面组件同时装配到工作台子路径。
 

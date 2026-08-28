@@ -16,7 +16,6 @@ const parsed = parseCreditWorkbook(fileBuffer, {
   originalFileName: path.basename(options.file),
 });
 const input: PersistCreditImportInput = {
-  importedAt: new Date().toISOString(),
   parsed,
 };
 

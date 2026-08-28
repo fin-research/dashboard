@@ -18,7 +18,8 @@ export const creditItemLabels: Record<CreditItemType, string> = {
   other: "其它",
 };
 
-export type CreditStatus = "approved" | "applying" | "revoked" | "unknown";
+export const creditStatuses = ["approved", "applying", "revoked"] as const;
+export type CreditStatus = (typeof creditStatuses)[number];
 export type ConfidentialityStatus = "signed" | "not_signed" | "unknown";
 
 export interface ParsedCreditItem {
@@ -72,6 +73,7 @@ export interface CreditInstitutionView
   extends Omit<ParsedCreditInstitution, "sourceRow"> {
   reportDate: string;
   sourceRow: number;
+  updatedAt: string;
   utilization: number | null;
   availableAmount: number | null;
 }
@@ -85,7 +87,11 @@ export interface CreditSummaryView {
   totalAvailable: number;
   utilization: number;
   expiringWithin30Days: number;
-  warningCount: number;
+}
+
+export interface CreditWeeklySummaryView extends CreditSummaryView {
+  addedInstitutionCount: number;
+  expiredInstitutionCount: number;
 }
 
 export interface CreditAmountChange {
@@ -98,11 +104,15 @@ export interface CreditAmountChange {
   details: string[];
 }
 
-export interface CreditAlertView {
+export interface CreditCalendarEvent {
   id: string;
-  level: "danger" | "warning";
+  date: string;
+  type: "expiry" | "added";
+  kind: "expiry" | "revoked" | "new" | "renewal" | "increase";
   institutionName: string;
-  message: string;
+  label: string;
+  status: "upcoming" | "due" | "completed" | "revoked";
+  statusLabel: string;
 }
 
 export interface CreditReportResponse {
@@ -110,15 +120,19 @@ export interface CreditReportResponse {
   previousDate: string | null;
   summary: CreditSummaryView;
   previousSummary: CreditSummaryView | null;
-  weeklySummary: CreditSummaryView;
-  previousWeeklySummary: CreditSummaryView | null;
+  weeklySummary: CreditWeeklySummaryView;
+  previousWeeklySummary: CreditWeeklySummaryView | null;
   institutions: CreditInstitutionView[];
   limitChanges: CreditAmountChange[];
   usageChanges: CreditAmountChange[];
-  alerts: CreditAlertView[];
-  source: {
-    fileName: string;
-    importedAt: string;
-    warnings: string[];
-  };
+  calendarEvents: CreditCalendarEvent[];
+}
+
+export interface CreditInstitutionUpdateResponse {
+  institution: CreditInstitutionView;
+  summary: CreditSummaryView;
+  weeklySummary: CreditWeeklySummaryView;
+  limitChanges: CreditAmountChange[];
+  usageChanges: CreditAmountChange[];
+  calendarEvents: CreditCalendarEvent[];
 }

@@ -383,7 +383,8 @@ body:has(.tr-workbench) {
 }
 
 .tr-topbar__actions > .ledger-actions,
-.tr-topbar__actions > .model-actions {
+.tr-topbar__actions > .model-actions,
+.tr-topbar__actions > .tr-credit-toolbar {
   width: auto;
   justify-content: flex-end;
 }
@@ -396,6 +397,10 @@ body:has(.tr-workbench) {
 
   .tr-topbar:has(.tr-topbar__actions:not(:empty)) .tr-topbar__meta,
   .tr-topbar:has(.tr-topbar__actions:not(:empty)) .tr-topbar__actions {
+    width: 100%;
+  }
+
+  .tr-topbar__actions > .tr-credit-toolbar {
     width: 100%;
   }
 }
@@ -685,7 +690,6 @@ body:has(.tr-workbench) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -881,20 +885,12 @@ body:has(.tr-workbench) {
   height: 210px;
 }
 
-.tr-chart-host--credit {
-  height: 300px;
-}
-
 .tr-credit-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
-  padding: 10px;
-  border: 1px solid var(--tr-border);
-  border-radius: var(--tr-radius-card);
-  background: var(--tr-surface);
-  box-shadow: var(--tr-shadow);
+  padding: 0;
 }
 
 .tr-credit-tabs {
@@ -931,15 +927,16 @@ body:has(.tr-workbench) {
 
 .tr-credit-toolbar__actions {
   display: flex;
-  align-items: end;
+  align-items: center;
   gap: 10px;
 }
 
 .tr-credit-toolbar__actions label {
-  display: grid;
-  gap: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--tr-muted);
-  font-size: 0.75rem;
+  font-size: 1rem;
 }
 
 .tr-credit-toolbar__actions select {
@@ -949,6 +946,7 @@ body:has(.tr-workbench) {
   border-radius: var(--tr-radius-control);
   color: var(--tr-text-2);
   background: var(--tr-surface);
+  font-size: 1rem;
 }
 
 .tr-credit-print,
@@ -972,7 +970,30 @@ body:has(.tr-workbench) {
 }
 
 .tr-credit-table {
-  min-width: 1280px;
+  min-width: 1240px;
+}
+
+.tr-sort-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.tr-sort-button--numeric {
+  justify-content: flex-end;
+}
+
+.tr-sort-button span {
+  color: var(--tr-primary);
 }
 
 .tr-credit-detail-row > td {
@@ -988,55 +1009,246 @@ body:has(.tr-workbench) {
   background: color-mix(in srgb, var(--tr-primary-soft) 30%, var(--tr-surface));
 }
 
+.tr-credit-editor-head {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tr-credit-editor-head strong {
+  color: var(--tr-text);
+  font-size: 1rem;
+}
+
+.tr-credit-editor-head span {
+  color: var(--tr-green);
+  font-size: 0.875rem;
+}
+
+.tr-credit-editor-head span.error {
+  color: var(--tr-red);
+}
+
+.tr-credit-editor-grid,
 .tr-credit-item-grid,
-.tr-credit-meta-grid {
+.tr-credit-notes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px;
 }
 
-.tr-credit-item-grid article {
+.tr-credit-editor-grid label,
+.tr-credit-item-grid label,
+.tr-credit-notes-grid label {
   display: grid;
-  gap: 4px;
+  gap: 5px;
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+}
+
+.tr-credit-editor-grid input,
+.tr-credit-editor-grid select,
+.tr-credit-item-grid input,
+.tr-credit-notes-grid textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--tr-border-strong);
+  border-radius: var(--tr-radius-control);
+  color: var(--tr-text-2);
+  background: var(--tr-surface);
+  font: inherit;
+}
+
+.tr-credit-editor-grid input[readonly],
+.tr-credit-item-grid input[readonly] {
+  color: var(--tr-muted);
+  background: var(--tr-surface-muted);
+}
+
+.tr-credit-editor-grid .tr-credit-checkbox {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  color: var(--tr-text-2);
+}
+
+.tr-credit-checkbox input {
+  width: 20px;
+  min-height: 20px;
+}
+
+.tr-credit-item-grid fieldset {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  margin: 0;
   padding: 11px;
   border: 1px solid var(--tr-border);
   border-radius: var(--tr-radius-control);
   background: var(--tr-surface);
 }
 
-.tr-credit-item-grid strong,
-.tr-credit-item-grid span,
-.tr-credit-item-grid small {
-  font-size: 0.75rem;
+.tr-credit-item-grid legend {
+  padding-inline: 5px;
+  color: var(--tr-text-2);
+  font-size: 0.875rem;
+  font-weight: bold;
 }
 
-.tr-credit-item-grid small {
+.tr-credit-notes-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tr-credit-notes-grid textarea {
+  resize: vertical;
+}
+
+.tr-credit-calendar-panel {
+  overflow-x: auto;
+}
+
+.tr-credit-calendar-toolbar {
+  display: flex;
+  min-width: 960px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.tr-credit-calendar-filter,
+.tr-credit-calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tr-credit-calendar-filter button,
+.tr-credit-calendar-nav button {
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: 12px;
+  border: 1px solid var(--tr-border);
+  border-radius: var(--tr-radius-control);
+  color: var(--tr-text-2);
+  background: var(--tr-surface);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.tr-credit-calendar-filter button.active {
+  color: var(--tr-primary-deep);
+  border-color: color-mix(in srgb, var(--tr-primary) 45%, var(--tr-border));
+  background: var(--tr-primary-soft);
+  font-weight: bold;
+}
+
+.tr-credit-calendar-nav strong {
+  min-width: 8rem;
+  color: var(--tr-text);
+  font-size: 1.125rem;
+  text-align: center;
+}
+
+.tr-credit-calendar {
+  display: grid;
+  min-width: 960px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--tr-border);
+  border-left: 1px solid var(--tr-border);
+}
+
+.tr-credit-calendar-weekday {
+  padding: 10px;
+  border-right: 1px solid var(--tr-border);
+  border-bottom: 1px solid var(--tr-border);
   color: var(--tr-muted);
-  white-space: pre-wrap;
+  background: var(--tr-surface-muted);
+  font-size: 0.875rem;
+  font-weight: bold;
+  text-align: center;
 }
 
-.tr-credit-meta-grid {
-  margin: 0;
+.tr-credit-calendar-cell {
+  min-height: 132px;
+  padding: 8px;
+  border-right: 1px solid var(--tr-border);
+  border-bottom: 1px solid var(--tr-border);
+  background: var(--tr-surface);
 }
 
-.tr-credit-meta-grid > div {
-  min-width: 0;
+.tr-credit-calendar-cell.outside {
+  background: color-mix(in srgb, var(--tr-surface-muted) 55%, var(--tr-surface));
 }
 
-.tr-credit-meta-grid .is-wide {
-  grid-column: 1 / -1;
-}
-
-.tr-credit-meta-grid dt {
-  color: var(--tr-muted);
-  font-size: 0.75rem;
-}
-
-.tr-credit-meta-grid dd {
-  margin: 2px 0 0;
+.tr-credit-calendar-cell > time {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
   color: var(--tr-text-2);
   font-size: 0.8125rem;
-  white-space: pre-wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-credit-calendar-cell.report-date > time {
+  border-radius: 50%;
+  color: #ffffff;
+  background: var(--tr-primary);
+  font-weight: bold;
+}
+
+.tr-credit-calendar-events {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.tr-credit-calendar-event {
+  display: grid;
+  gap: 1px;
+  padding: 5px 7px;
+  border-left: 3px solid var(--tr-primary);
+  border-radius: 4px;
+  background: var(--tr-primary-soft);
+}
+
+.tr-credit-calendar-event--expiry {
+  border-left-color: var(--tr-orange);
+  background: var(--tr-orange-soft);
+}
+
+.tr-credit-calendar-event--revoked {
+  border-left-color: var(--tr-red);
+  background: var(--tr-red-soft);
+}
+
+.tr-credit-calendar-event strong,
+.tr-credit-calendar-event span,
+.tr-credit-calendar-more {
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tr-credit-calendar-event strong {
+  color: var(--tr-text-2);
+}
+
+.tr-credit-calendar-event span,
+.tr-credit-calendar-more {
+  color: var(--tr-muted);
+}
+
+.tr-credit-calendar-more {
+  padding-left: 7px;
 }
 
 .tr-credit-muted {
@@ -1045,7 +1257,6 @@ body:has(.tr-workbench) {
   font-size: 0.875rem;
 }
 
-.tr-credit-quality ul,
 .tr-credit-news-list {
   margin: 0;
   padding-left: 1.3rem;
@@ -1053,7 +1264,6 @@ body:has(.tr-workbench) {
   font-size: 0.875rem;
 }
 
-.tr-credit-quality li + li,
 .tr-credit-news-list li + li {
   margin-top: 7px;
 }
@@ -1071,12 +1281,6 @@ body:has(.tr-workbench) {
   min-width: 360px;
   max-width: 720px;
   white-space: normal !important;
-}
-
-.tr-credit-report-source {
-  color: var(--tr-muted);
-  font-size: 0.75rem;
-  text-align: right;
 }
 
 .tr-chart-host--curve {
@@ -1412,6 +1616,16 @@ body:has(.tr-workbench) {
     display: none;
   }
 
+  .tr-topbar:has(.tr-credit-toolbar) {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .tr-topbar:has(.tr-credit-toolbar) .tr-topbar__meta {
+    display: flex;
+    width: 100%;
+  }
+
   .tr-workflow-compose-grid {
     grid-template-columns: 1fr;
   }
@@ -1494,12 +1708,16 @@ body:has(.tr-workbench) {
 
   .tr-credit-tabs {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .tr-credit-toolbar__actions select,
   .tr-credit-print {
     width: 100%;
+  }
+
+  .tr-credit-notes-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1533,6 +1751,11 @@ body:has(.tr-workbench) {
 
   .tr-result-count {
     text-align: left;
+  }
+
+  .tr-credit-tabs button {
+    padding-inline: 8px;
+    font-size: 0.875rem;
   }
 
   .tr-unavailable-grid {

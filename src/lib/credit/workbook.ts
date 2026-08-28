@@ -61,11 +61,13 @@ export function parseCreditWorkbook(
   const institutions: ParsedCreditInstitution[] = [];
   const institutionNames = new Set<string>();
   let institutionType = "未分类";
+  let unclassifiedCount = 0;
 
   for (let rowIndex = 3; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex] ?? [];
     const currentType = cleanText(row[1]);
-    if (currentType) institutionType = currentType;
+    if (currentType === "合计") institutionType = "未分类";
+    else if (currentType) institutionType = currentType;
     const institutionName = cleanText(row[2]);
     if (!institutionName || institutionName === ".") continue;
     if (institutionNames.has(institutionName)) {
@@ -105,6 +107,7 @@ export function parseCreditWorkbook(
       warnings.push(`第${sourceRow}行“${institutionName}”总已用与分项已用不勾稽`);
     }
 
+    if (institutionType === "未分类") unclassifiedCount += 1;
     institutions.push({
       sourceRow,
       institutionType,
@@ -129,6 +132,9 @@ export function parseCreditWorkbook(
 
   if (institutions.length === 0) {
     throw new CreditWorkbookParseError("授信一览表没有可导入的机构记录");
+  }
+  if (unclassifiedCount > 0) {
+    warnings.push(`${unclassifiedCount}家机构未标记机构性质，按“未分类”导入`);
   }
 
   const approved = institutions.filter((institution) => institution.status === "approved");
@@ -256,7 +262,7 @@ function reconcileWeeklyReport(
 function parseStatus(approved: unknown, applying: unknown): CreditStatus {
   if (truthyFlag(approved)) return "approved";
   if (truthyFlag(applying)) return "applying";
-  return "unknown";
+  return "revoked";
 }
 
 function parseConfidentiality(value: unknown): ConfidentialityStatus {

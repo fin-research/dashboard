@@ -3,20 +3,22 @@ import type { QueryResultRow } from "pg";
 import {
   creditItemLabels,
   creditItemTypes,
-  type CreditAlertView,
   type CreditAmountChange,
+  type CreditCalendarEvent,
+  type CreditInstitutionUpdateResponse,
   type CreditInstitutionView,
   type CreditItemType,
   type CreditReportResponse,
   type CreditSummaryView,
+  type CreditWeeklySummaryView,
   type ParsedCreditWorkbook,
 } from "../credit/types.ts";
+import type { CreditInstitutionUpdateInput } from "../credit/update.ts";
 import type { DatabaseClient } from "./postgres.ts";
 
 const AMOUNT_TOLERANCE = 0.0001;
 
 export interface PersistCreditImportInput {
-  importedAt: string;
   parsed: ParsedCreditWorkbook;
 }
 
@@ -59,39 +61,12 @@ export async function persistCreditWorkbook(
       [parsed.reportDate],
     );
     const existing = await client.query(
-      "SELECT 1 FROM credit.daily_summary WHERE report_date = $1::date",
+      "SELECT 1 FROM credit.institution WHERE report_date = $1::date LIMIT 1",
       [parsed.reportDate],
     );
     await client.query(
-      "DELETE FROM credit.daily_summary WHERE report_date = $1::date",
+      "DELETE FROM credit.institution WHERE report_date = $1::date",
       [parsed.reportDate],
-    );
-    await client.query(
-      `INSERT INTO credit.daily_summary (
-         report_date, source_file_name, source_sheet, institution_count,
-         approved_count, total_limit, total_used, total_available,
-         weekly_approved_count, weekly_total_limit, weekly_total_used,
-         weekly_total_available, warnings, imported_at, updated_at
-       ) VALUES (
-         $1::date, $2, $3, $4, $5, $6, $7, $8,
-         $9, $10, $11, $12, $13::jsonb, $14::timestamptz, now()
-       )`,
-      [
-        parsed.reportDate,
-        parsed.originalFileName,
-        parsed.sourceSheet,
-        parsed.institutions.length,
-        parsed.approvedCount,
-        parsed.totalLimit,
-        parsed.totalUsed,
-        parsed.totalAvailable,
-        parsed.weeklyApprovedCount,
-        parsed.weeklyTotalLimit,
-        parsed.weeklyTotalUsed,
-        parsed.weeklyTotalAvailable,
-        JSON.stringify(parsed.warnings),
-        input.importedAt,
-      ],
     );
     await insertInstitutions(client, parsed);
     await insertItems(client, parsed);
@@ -120,8 +95,8 @@ export async function loadCreditReport(
   requestedDate: string | null = null,
 ): Promise<CreditReportResponse> {
   const datesResult = await client.query<{ report_date: string }>(
-    `SELECT to_char(report_date, 'YYYY-MM-DD') AS report_date
-     FROM credit.daily_summary
+    `SELECT DISTINCT to_char(report_date, 'YYYY-MM-DD') AS report_date
+     FROM credit.institution
      ORDER BY report_date`,
   );
   const availableDates = datesResult.rows.map((row) => row.report_date);
@@ -136,38 +111,17 @@ export async function loadCreditReport(
   const previousDate = currentIndex > 0 ? availableDates[currentIndex - 1]! : null;
   const reportDates = previousDate ? [previousDate, reportDate] : [reportDate];
 
-  const snapshotResult = await client.query<SnapshotRow>(
-    `SELECT
-         to_char(snapshot.report_date, 'YYYY-MM-DD') AS report_date,
-         snapshot.institution_count,
-         snapshot.approved_count,
-         snapshot.total_limit::double precision,
-         snapshot.total_used::double precision,
-         snapshot.total_available::double precision,
-         snapshot.weekly_approved_count,
-         snapshot.weekly_total_limit::double precision,
-         snapshot.weekly_total_used::double precision,
-         snapshot.weekly_total_available::double precision,
-         snapshot.source_file_name,
-         snapshot.warnings,
-         to_char(snapshot.imported_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS imported_at
-       FROM credit.daily_summary AS snapshot
-       WHERE snapshot.report_date = ANY($1::date[])
-       ORDER BY snapshot.report_date`,
-    [reportDates],
-  );
   const institutionResult = await client.query<InstitutionRow>(
     `SELECT
          to_char(report_date, 'YYYY-MM-DD') AS report_date,
          source_row,
          institution_type,
          institution_name,
-         confidentiality_status,
-         status,
+         confidentiality_status::text AS confidentiality_status,
+         status::text AS status,
          included_in_weekly_report,
          total_limit::double precision,
          total_used::double precision,
-         total_remaining::double precision,
          to_char(effective_date, 'YYYY-MM-DD') AS effective_date,
          to_char(expiry_date, 'YYYY-MM-DD') AS expiry_date,
          bank_office,
@@ -175,8 +129,9 @@ export async function loadCreditReport(
          handler,
          notes,
          bond_preference,
-         usage_details
-       FROM credit.institution_daily
+         usage_details,
+         to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at
+       FROM credit.institution
        WHERE report_date = ANY($1::date[])
        ORDER BY report_date, source_row`,
     [reportDates],
@@ -185,55 +140,21 @@ export async function loadCreditReport(
     `SELECT
          to_char(report_date, 'YYYY-MM-DD') AS report_date,
          institution_name,
-         item_type,
+         item_type::text AS item_type,
          limit_amount::double precision,
          used_amount::double precision,
-         remaining_amount::double precision,
          details
-       FROM credit.item_daily
+       FROM credit.item
        WHERE report_date = ANY($1::date[])
        ORDER BY report_date, institution_name, item_type`,
     [reportDates],
   );
 
-  const itemsBySnapshot = groupItems(itemResult.rows);
+  const itemsByInstitution = groupItems(itemResult.rows);
   const institutionsByDate = new Map<string, CreditInstitutionView[]>();
   for (const row of institutionResult.rows) {
-    const totalLimit = nullableNumber(row.total_limit);
-    const totalUsed = nullableNumber(row.total_used);
     const institutions = institutionsByDate.get(row.report_date) ?? [];
-    institutions.push({
-      reportDate: row.report_date,
-      sourceRow: row.source_row,
-      institutionType: row.institution_type,
-      institutionName: row.institution_name,
-      confidentialityStatus: row.confidentiality_status,
-      status: row.status,
-      includedInWeeklyReport: row.included_in_weekly_report,
-      totalLimit,
-      totalUsed,
-      totalRemaining: nullableNumber(row.total_remaining),
-      availableAmount: totalLimit == null ? null : totalLimit - (totalUsed ?? 0),
-      utilization:
-        totalLimit && totalLimit > 0 ? ((totalUsed ?? 0) / totalLimit) * 100 : null,
-      effectiveDate: row.effective_date,
-      expiryDate: row.expiry_date,
-      bankOffice: row.bank_office,
-      applyingDepartment: row.applying_department,
-      handler: row.handler,
-      notes: row.notes,
-      bondPreference: row.bond_preference,
-      usageDetails: row.usage_details,
-      items: creditItemTypes.map((type) =>
-        itemsBySnapshot.get(itemKey(row.report_date, row.institution_name, type)) ?? {
-          type,
-          limitAmount: null,
-          usedAmount: null,
-          remainingAmount: null,
-          details: null,
-        },
-      ),
-    });
+    institutions.push(toInstitutionView(row, itemsByInstitution));
     institutionsByDate.set(row.report_date, institutions);
   }
 
@@ -241,29 +162,36 @@ export async function loadCreditReport(
   const previousInstitutions = previousDate
     ? institutionsByDate.get(previousDate) ?? []
     : [];
-  const snapshots = new Map(snapshotResult.rows.map((row) => [row.report_date, row]));
-  const currentSnapshot = snapshots.get(reportDate);
-  if (!currentSnapshot) throw new CreditDatabaseError(404, `${reportDate} 授信记录不存在`);
-  const summary = toSummary(currentSnapshot, currentInstitutions, "overview");
-  const previousSnapshot = previousDate ? snapshots.get(previousDate) : undefined;
-  const alerts = buildAlerts(reportDate, currentInstitutions);
   const currentWeeklyInstitutions = currentInstitutions.filter(
     (institution) => institution.includedInWeeklyReport,
   );
   const previousWeeklyInstitutions = previousInstitutions.filter(
     (institution) => institution.includedInWeeklyReport,
   );
+  const weeklyEventCounts = classifyWeeklyEvents(
+    reportDate,
+    previousDate,
+    currentWeeklyInstitutions,
+    previousWeeklyInstitutions,
+  );
 
   return {
     availableDates,
     previousDate,
-    summary: { ...summary, warningCount: alerts.length },
-    previousSummary: previousSnapshot
-      ? toSummary(previousSnapshot, previousInstitutions, "overview")
+    summary: toSummary(reportDate, currentInstitutions),
+    previousSummary: previousDate
+      ? toSummary(previousDate, previousInstitutions)
       : null,
-    weeklySummary: toSummary(currentSnapshot, currentWeeklyInstitutions, "weekly"),
-    previousWeeklySummary: previousSnapshot
-      ? toSummary(previousSnapshot, previousWeeklyInstitutions, "weekly")
+    weeklySummary: {
+      ...toSummary(reportDate, currentWeeklyInstitutions),
+      ...weeklyEventCounts,
+    },
+    previousWeeklySummary: previousDate
+      ? {
+          ...toSummary(previousDate, previousWeeklyInstitutions),
+          addedInstitutionCount: 0,
+          expiredInstitutionCount: 0,
+        }
       : null,
     institutions: currentInstitutions,
     limitChanges: previousDate
@@ -280,14 +208,126 @@ export async function loadCreditReport(
           "usage",
         )
       : [],
-    alerts,
-    source: {
-      fileName: currentSnapshot.source_file_name,
-      importedAt: currentSnapshot.imported_at,
-      warnings: Array.isArray(currentSnapshot.warnings)
-        ? currentSnapshot.warnings.filter((warning): warning is string => typeof warning === "string")
-        : [],
-    },
+    calendarEvents: buildCalendarEvents(
+      reportDate,
+      previousDate,
+      currentInstitutions,
+      previousInstitutions,
+    ),
+  };
+}
+
+export async function saveCreditInstitution(
+  client: DatabaseClient,
+  input: CreditInstitutionUpdateInput,
+): Promise<CreditInstitutionUpdateResponse> {
+  await client.query("BEGIN");
+  try {
+    const institution = input.institution;
+    const updated = await client.query(
+      `UPDATE credit.institution
+       SET institution_type = $4,
+           confidentiality_status = $5::credit.confidentiality_status,
+           status = $6::credit.credit_status,
+           included_in_weekly_report = $7,
+           total_limit = $8,
+           total_used = $9,
+           effective_date = $10::date,
+           expiry_date = $11::date,
+           bank_office = $12,
+           applying_department = $13,
+           handler = $14,
+           notes = $15,
+           bond_preference = $16,
+           usage_details = $17,
+           updated_at = clock_timestamp()
+       WHERE report_date = $1::date
+         AND institution_name = $2
+         AND updated_at = $3::timestamptz
+       RETURNING updated_at`,
+      [
+        input.reportDate,
+        input.institutionName,
+        input.expectedUpdatedAt,
+        institution.institutionType,
+        institution.confidentialityStatus,
+        institution.status,
+        institution.includedInWeeklyReport,
+        institution.totalLimit,
+        institution.totalUsed,
+        institution.effectiveDate,
+        institution.expiryDate,
+        institution.bankOffice,
+        institution.applyingDepartment,
+        institution.handler,
+        institution.notes,
+        institution.bondPreference,
+        institution.usageDetails,
+      ],
+    );
+    if (!updated.rowCount) {
+      const exists = await client.query(
+        `SELECT 1 FROM credit.institution
+         WHERE report_date = $1::date AND institution_name = $2`,
+        [input.reportDate, input.institutionName],
+      );
+      throw new CreditDatabaseError(
+        exists.rowCount ? 409 : 404,
+        exists.rowCount
+          ? "该授信记录已被其他操作更新，请刷新后重试"
+          : "该授信记录不存在",
+      );
+    }
+
+    await client.query(
+      `INSERT INTO credit.item (
+         report_date, institution_name, item_type,
+         limit_amount, used_amount, details, updated_at
+       )
+       SELECT
+         $1::date, $2, row.item_type::credit.item_type,
+         row.limit_amount, row.used_amount, row.details, clock_timestamp()
+       FROM jsonb_to_recordset($3::jsonb) AS row(
+         item_type text,
+         limit_amount numeric,
+         used_amount numeric,
+         details text
+       )
+       ON CONFLICT (report_date, institution_name, item_type)
+       DO UPDATE SET
+         limit_amount = EXCLUDED.limit_amount,
+         used_amount = EXCLUDED.used_amount,
+         details = EXCLUDED.details,
+         updated_at = clock_timestamp()`,
+      [
+        input.reportDate,
+        input.institutionName,
+        JSON.stringify(institution.items.map((item) => ({
+          item_type: item.type,
+          limit_amount: item.limitAmount,
+          used_amount: item.usedAmount,
+          details: item.details,
+        }))),
+      ],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  }
+
+  const report = await loadCreditReport(client, input.reportDate);
+  const institution = report.institutions.find(
+    (item) => item.institutionName === input.institutionName,
+  );
+  if (!institution) throw new CreditDatabaseError(404, "该授信记录不存在");
+  return {
+    institution,
+    summary: report.summary,
+    weeklySummary: report.weeklySummary,
+    limitChanges: report.limitChanges,
+    usageChanges: report.usageChanges,
+    calendarEvents: report.calendarEvents,
   };
 }
 
@@ -323,12 +363,16 @@ export function compareCreditSnapshots(
       if (mode === "limit" && type === "other") continue;
       const previousItem = previous?.items.find((item) => item.type === type);
       const currentItem = current?.items.find((item) => item.type === type);
-      const previousValue = mode === "limit"
-        ? previousItem?.limitAmount ?? 0
-        : previousItem?.usedAmount ?? 0;
-      const currentValue = mode === "limit"
-        ? currentItem?.limitAmount ?? 0
-        : currentItem?.usedAmount ?? 0;
+      const previousValue = previous?.status === "approved"
+        ? mode === "limit"
+          ? previousItem?.limitAmount ?? 0
+          : previousItem?.usedAmount ?? 0
+        : 0;
+      const currentValue = current?.status === "approved"
+        ? mode === "limit"
+          ? currentItem?.limitAmount ?? 0
+          : currentItem?.usedAmount ?? 0
+        : 0;
       if (different(previousValue, currentValue)) {
         details.push(
           `${creditItemLabels[type]}${mode === "limit" ? "额度" : "已用"} ${amountTransition(previousValue, currentValue)}`,
@@ -373,7 +417,6 @@ async function insertInstitutions(
     included_in_weekly_report: institution.includedInWeeklyReport,
     total_limit: institution.totalLimit,
     total_used: institution.totalUsed,
-    total_remaining: institution.totalRemaining,
     effective_date: institution.effectiveDate,
     expiry_date: institution.expiryDate,
     bank_office: institution.bankOffice,
@@ -384,19 +427,21 @@ async function insertInstitutions(
     usage_details: institution.usageDetails,
   }));
   await client.query(
-    `INSERT INTO credit.institution_daily (
+    `INSERT INTO credit.institution (
        report_date, institution_name, source_row,
        institution_type, confidentiality_status, status,
        included_in_weekly_report, total_limit,
-       total_used, total_remaining, effective_date, expiry_date,
+       total_used, effective_date, expiry_date,
        bank_office, applying_department, handler, notes,
        bond_preference, usage_details
      )
      SELECT
        $1::date, row.institution_name, row.source_row,
-       row.institution_type, row.confidentiality_status, row.status,
+       row.institution_type,
+       row.confidentiality_status::credit.confidentiality_status,
+       row.status::credit.credit_status,
        row.included_in_weekly_report,
-       row.total_limit, row.total_used, row.total_remaining,
+       row.total_limit, row.total_used,
        row.effective_date, row.expiry_date, row.bank_office,
        row.applying_department, row.handler, row.notes,
        row.bond_preference, row.usage_details
@@ -409,7 +454,6 @@ async function insertInstitutions(
        included_in_weekly_report boolean,
        total_limit numeric,
        total_used numeric,
-       total_remaining numeric,
        effective_date date,
        expiry_date date,
        bank_office text,
@@ -433,42 +477,88 @@ async function insertItems(
       item_type: item.type,
       limit_amount: item.limitAmount,
       used_amount: item.usedAmount,
-      remaining_amount: item.remainingAmount,
       details: item.details,
     })),
   );
   await client.query(
-    `INSERT INTO credit.item_daily (
+    `INSERT INTO credit.item (
        report_date, institution_name, item_type,
-       limit_amount, used_amount, remaining_amount, details
+       limit_amount, used_amount, details
      )
      SELECT
-       $1::date, row.institution_name, row.item_type,
-       row.limit_amount, row.used_amount, row.remaining_amount, row.details
+       $1::date, row.institution_name,
+       row.item_type::credit.item_type,
+       row.limit_amount, row.used_amount, row.details
      FROM jsonb_to_recordset($2::jsonb) AS row(
        institution_name text,
        item_type text,
        limit_amount numeric,
        used_amount numeric,
-       remaining_amount numeric,
        details text
      )`,
     [parsed.reportDate, JSON.stringify(rows)],
   );
 }
 
-function groupItems(rows: ItemRow[]): Map<string, CreditInstitutionView["items"][number]> {
-  return new Map(
-    rows.map((row) => [
-      itemKey(row.report_date, row.institution_name, row.item_type),
-      {
-        type: row.item_type,
-        limitAmount: nullableNumber(row.limit_amount),
-        usedAmount: nullableNumber(row.used_amount),
-        remainingAmount: nullableNumber(row.remaining_amount),
-        details: row.details,
+function toInstitutionView(
+  row: InstitutionRow,
+  itemsByInstitution: Map<string, CreditInstitutionView["items"][number]>,
+): CreditInstitutionView {
+  const totalLimit = nullableNumber(row.total_limit);
+  const totalUsed = nullableNumber(row.total_used);
+  return {
+    reportDate: row.report_date,
+    sourceRow: row.source_row,
+    institutionType: row.institution_type,
+    institutionName: row.institution_name,
+    confidentialityStatus: row.confidentiality_status,
+    status: row.status,
+    includedInWeeklyReport: row.included_in_weekly_report,
+    totalLimit,
+    totalUsed,
+    totalRemaining: totalLimit == null ? null : totalLimit - (totalUsed ?? 0),
+    availableAmount: totalLimit == null ? null : totalLimit - (totalUsed ?? 0),
+    utilization:
+      totalLimit && totalLimit > 0 ? ((totalUsed ?? 0) / totalLimit) * 100 : null,
+    effectiveDate: row.effective_date,
+    expiryDate: row.expiry_date,
+    bankOffice: row.bank_office,
+    applyingDepartment: row.applying_department,
+    handler: row.handler,
+    notes: row.notes,
+    bondPreference: row.bond_preference,
+    usageDetails: row.usage_details,
+    updatedAt: row.updated_at,
+    items: creditItemTypes.map((type) =>
+      itemsByInstitution.get(itemKey(row.report_date, row.institution_name, type)) ?? {
+        type,
+        limitAmount: null,
+        usedAmount: null,
+        remainingAmount: null,
+        details: null,
       },
-    ]),
+    ),
+  };
+}
+
+function groupItems(
+  rows: ItemRow[],
+): Map<string, CreditInstitutionView["items"][number]> {
+  return new Map(
+    rows.map((row) => {
+      const limitAmount = nullableNumber(row.limit_amount);
+      const usedAmount = nullableNumber(row.used_amount);
+      return [
+        itemKey(row.report_date, row.institution_name, row.item_type),
+        {
+          type: row.item_type,
+          limitAmount,
+          usedAmount,
+          remainingAmount: limitAmount == null ? null : limitAmount - (usedAmount ?? 0),
+          details: row.details,
+        },
+      ];
+    }),
   );
 }
 
@@ -477,76 +567,220 @@ function itemKey(reportDate: string, institutionName: string, type: CreditItemTy
 }
 
 function toSummary(
-  row: SnapshotRow,
+  reportDate: string,
   institutions: CreditInstitutionView[],
-  scope: "overview" | "weekly",
 ): CreditSummaryView {
-  const totalLimit = numberValue(
-    scope === "weekly" ? row.weekly_total_limit : row.total_limit,
+  const approved = institutions.filter((institution) => institution.status === "approved");
+  const totalLimit = sumAmounts(approved.map((institution) => institution.totalLimit));
+  const totalUsed = sumAmounts(approved.map((institution) => institution.totalUsed));
+  const totalAvailable = sumAmounts(
+    approved.map((institution) => institution.availableAmount),
   );
-  const totalUsed = numberValue(
-    scope === "weekly" ? row.weekly_total_used : row.total_used,
-  );
-  const expiringWithin30Days = institutions.filter((institution) => {
-    if (institution.status !== "approved" || !institution.expiryDate) return false;
-    const days = dayDifference(row.report_date, institution.expiryDate);
-    return days >= 0 && days <= 30;
-  }).length;
   return {
-    reportDate: row.report_date,
-    institutionCount: scope === "weekly" ? institutions.length : row.institution_count,
-    approvedCount:
-      scope === "weekly" ? row.weekly_approved_count : row.approved_count,
+    reportDate,
+    institutionCount: institutions.length,
+    approvedCount: approved.length,
     totalLimit,
     totalUsed,
-    totalAvailable: numberValue(
-      scope === "weekly" ? row.weekly_total_available : row.total_available,
-    ),
+    totalAvailable,
     utilization: totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0,
-    expiringWithin30Days,
-    warningCount: 0,
+    expiringWithin30Days: approved.filter((institution) => {
+      if (!institution.expiryDate) return false;
+      const days = dayDifference(reportDate, institution.expiryDate);
+      return days >= 0 && days <= 30;
+    }).length,
   };
 }
 
-function buildAlerts(
+function classifyWeeklyEvents(
   reportDate: string,
-  institutions: CreditInstitutionView[],
-): CreditAlertView[] {
-  const alerts: CreditAlertView[] = [];
-  for (const institution of institutions) {
-    if (institution.status !== "approved") continue;
-    if (institution.utilization != null && institution.utilization >= 80) {
-      alerts.push({
-        id: `usage-${institution.institutionName}`,
-        level: institution.utilization >= 100 ? "danger" : "warning",
+  previousDate: string | null,
+  currentInstitutions: CreditInstitutionView[],
+  previousInstitutions: CreditInstitutionView[],
+): Pick<CreditWeeklySummaryView, "addedInstitutionCount" | "expiredInstitutionCount"> {
+  if (!previousDate) {
+    return { addedInstitutionCount: 0, expiredInstitutionCount: 0 };
+  }
+  const previousByName = new Map(
+    previousInstitutions.map((institution) => [institution.institutionName, institution]),
+  );
+  const currentByName = new Map(
+    currentInstitutions.map((institution) => [institution.institutionName, institution]),
+  );
+  const added = new Set<string>();
+  const expired = new Set<string>();
+
+  for (const current of currentInstitutions) {
+    const previous = previousByName.get(current.institutionName);
+    if (
+      current.status === "approved" &&
+      (
+        previous?.status !== "approved" ||
+        numberValue(current.totalLimit) > numberValue(previous.totalLimit) + AMOUNT_TOLERANCE ||
+        Boolean(
+          current.expiryDate &&
+          previous.expiryDate &&
+          current.expiryDate > previous.expiryDate,
+        )
+      )
+    ) {
+      added.add(current.institutionName);
+    }
+    if (current.status === "revoked" && previous?.status !== "revoked") {
+      expired.add(current.institutionName);
+    }
+    if (
+      current.expiryDate &&
+      current.expiryDate > previousDate &&
+      current.expiryDate <= reportDate
+    ) {
+      expired.add(current.institutionName);
+    }
+  }
+  for (const previous of previousInstitutions) {
+    if (previous.status === "approved" && !currentByName.has(previous.institutionName)) {
+      expired.add(previous.institutionName);
+    }
+  }
+  return {
+    addedInstitutionCount: added.size,
+    expiredInstitutionCount: expired.size,
+  };
+}
+
+function buildCalendarEvents(
+  reportDate: string,
+  previousDate: string | null,
+  currentInstitutions: CreditInstitutionView[],
+  previousInstitutions: CreditInstitutionView[],
+): CreditCalendarEvent[] {
+  const events = new Map<string, CreditCalendarEvent>();
+  const add = (event: CreditCalendarEvent): void => {
+    events.set(event.id, event);
+  };
+  for (const institution of currentInstitutions) {
+    if (institution.status === "approved" && institution.effectiveDate) {
+      const state = eventState(reportDate, institution.effectiveDate, "added");
+      add({
+        id: `added:new:${institution.institutionName}:${institution.effectiveDate}`,
+        date: institution.effectiveDate,
+        type: "added",
+        kind: "new",
         institutionName: institution.institutionName,
-        message: `额度使用率 ${institution.utilization.toFixed(1)}%`,
+        label: "新增授信",
+        ...state,
       });
     }
     if (institution.expiryDate) {
-      const days = dayDifference(reportDate, institution.expiryDate);
-      if (days >= 0 && days <= 30) {
-        alerts.push({
-          id: `expiry-${institution.institutionName}`,
-          level: days <= 7 ? "danger" : "warning",
-          institutionName: institution.institutionName,
-          message: `${days === 0 ? "当日" : `${days}天后`}到期（${institution.expiryDate}）`,
+      const state = institution.status === "revoked"
+        ? { status: "revoked" as const, statusLabel: "已撤销" }
+        : eventState(reportDate, institution.expiryDate, "expiry");
+      add({
+        id: `expiry:expiry:${institution.institutionName}:${institution.expiryDate}`,
+        date: institution.expiryDate,
+        type: "expiry",
+        kind: "expiry",
+        institutionName: institution.institutionName,
+        label: "授信到期",
+        ...state,
+      });
+    }
+  }
+  if (previousDate) {
+    const previousByName = new Map(
+      previousInstitutions.map((institution) => [institution.institutionName, institution]),
+    );
+    for (const current of currentInstitutions) {
+      const previous = previousByName.get(current.institutionName);
+      if (current.status === "approved" && previous?.status !== "approved") {
+        if (current.effectiveDate !== reportDate) {
+          add(completedChangeEvent(reportDate, current, "new", "新增授信"));
+        }
+      } else if (
+        current.status === "approved" &&
+        current.expiryDate &&
+        previous?.expiryDate &&
+        current.expiryDate > previous.expiryDate
+      ) {
+        add(completedChangeEvent(reportDate, current, "renewal", "续签授信"));
+      }
+      if (
+        current.status === "approved" &&
+        numberValue(current.totalLimit) > numberValue(previous?.totalLimit) + AMOUNT_TOLERANCE
+      ) {
+        add(completedChangeEvent(reportDate, current, "increase", "授信扩额"));
+      }
+      if (current.status === "revoked" && previous?.status !== "revoked") {
+        add({
+          id: `expiry:revoked:${current.institutionName}:${reportDate}`,
+          date: reportDate,
+          type: "expiry",
+          kind: "revoked",
+          institutionName: current.institutionName,
+          label: "状态撤销",
+          status: "revoked",
+          statusLabel: "已撤销",
         });
       }
     }
   }
-  return alerts.sort((left, right) =>
-    left.level === right.level ? left.institutionName.localeCompare(right.institutionName, "zh-CN") : left.level === "danger" ? -1 : 1,
+  return [...events.values()].sort(
+    (left, right) =>
+      left.date.localeCompare(right.date) ||
+      left.institutionName.localeCompare(right.institutionName, "zh-CN") ||
+      left.kind.localeCompare(right.kind),
   );
+}
+
+function completedChangeEvent(
+  reportDate: string,
+  institution: CreditInstitutionView,
+  kind: "new" | "renewal" | "increase",
+  label: string,
+): CreditCalendarEvent {
+  return {
+    id: `added:${kind}:${institution.institutionName}:${reportDate}`,
+    date: reportDate,
+    type: "added",
+    kind,
+    institutionName: institution.institutionName,
+    label,
+    status: "completed",
+    statusLabel: "已完成",
+  };
+}
+
+function eventState(
+  reportDate: string,
+  eventDate: string,
+  type: "expiry" | "added",
+): Pick<CreditCalendarEvent, "status" | "statusLabel"> {
+  if (eventDate > reportDate) {
+    return {
+      status: "upcoming",
+      statusLabel: type === "expiry" ? "待到期" : "待生效",
+    };
+  }
+  if (eventDate === reportDate) {
+    return {
+      status: "due",
+      statusLabel: type === "expiry" ? "今日到期" : "今日生效",
+    };
+  }
+  return {
+    status: "completed",
+    statusLabel: type === "expiry" ? "已到期" : "已生效",
+  };
 }
 
 function amountForMode(
   institution: CreditInstitutionView | undefined,
   mode: "limit" | "usage",
 ): number {
+  if (institution?.status !== "approved") return 0;
   return mode === "limit"
-    ? institution?.totalLimit ?? 0
-    : institution?.totalUsed ?? 0;
+    ? institution.totalLimit ?? 0
+    : institution.totalUsed ?? 0;
 }
 
 function amountTransition(previous: number, current: number): string {
@@ -560,7 +794,6 @@ function statusLabel(status: CreditInstitutionView["status"] | undefined): strin
     approved: "已获批",
     applying: "申请中",
     revoked: "已撤销",
-    unknown: "未标记",
   };
   return labels[status];
 }
@@ -585,20 +818,9 @@ function numberValue(value: unknown): number {
   return nullableNumber(value) ?? 0;
 }
 
-interface SnapshotRow extends QueryResultRow {
-  report_date: string;
-  institution_count: number;
-  approved_count: number;
-  total_limit: number;
-  total_used: number;
-  total_available: number;
-  weekly_approved_count: number;
-  weekly_total_limit: number;
-  weekly_total_used: number;
-  weekly_total_available: number;
-  source_file_name: string;
-  warnings: unknown;
-  imported_at: string;
+function sumAmounts(values: Array<number | null>): number {
+  const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+  return Math.round(total * 1_000_000) / 1_000_000;
 }
 
 interface InstitutionRow extends QueryResultRow {
@@ -611,7 +833,6 @@ interface InstitutionRow extends QueryResultRow {
   included_in_weekly_report: boolean;
   total_limit: number | null;
   total_used: number | null;
-  total_remaining: number | null;
   effective_date: string | null;
   expiry_date: string | null;
   bank_office: string | null;
@@ -620,6 +841,7 @@ interface InstitutionRow extends QueryResultRow {
   notes: string | null;
   bond_preference: string | null;
   usage_details: string | null;
+  updated_at: string;
 }
 
 interface ItemRow extends QueryResultRow {
@@ -628,6 +850,5 @@ interface ItemRow extends QueryResultRow {
   item_type: CreditItemType;
   limit_amount: number | null;
   used_amount: number | null;
-  remaining_amount: number | null;
   details: string | null;
 }

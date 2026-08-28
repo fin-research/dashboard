@@ -93,10 +93,8 @@ export function workbenchViewPath(view: WorkbenchViewId): string {
 export const demoMeta = {
   importedAt: "2026-08-25",
   tradingAsOf: "2026-08-07 15:00",
-  creditAsOf: "2026-08-21",
   researchStart: "2026-08-10",
   researchEnd: "2026-08-14",
-  creditSnapshotId: "credit-20260821-6096d604b537",
   researchSnapshotId: "market-20260814-ebd1924910cc",
 } as const;
 
@@ -169,55 +167,6 @@ export type DemoAlert = {
 
 export const overviewAlerts: DemoAlert[] = [
   { id: "ALR-002", level: "high", category: "交易", owner: "资金交易岗", eventAt: "2026-08-07 14:35", text: "质押式回购拆出待确认2笔、合计12.5亿元，需完成押券准入与估值折算复核" },
-  { id: "CREDIT-EXPIRY-80", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "天津滨海农商行授信到期日为2026-08-27，剩余6天，需关注续作" },
-  { id: "CREDIT-USAGE-12", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "工银理财额度使用率达98.8%，超过80%预警线" },
-  { id: "CREDIT-USAGE-83", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "浙江三门农商行额度使用率达100.0%，超过80%预警线" },
-];
-
-export const creditSummary = {
-  total: 3448.35,
-  used: 1022.5955,
-  available: 2425.7545,
-  utilization: 29.6546,
-  count: 120,
-  expiring30: 5,
-  mainTableTotal: 3450.35,
-  scopeAdjustment: -2,
-  validationStatus: "pass",
-} as const;
-
-export type DemoCreditLine = {
-  bank: string;
-  bankType: string;
-  creditType: string;
-  total: number;
-  used: number;
-  available: number;
-  utilization: number;
-  expiry: string | null;
-};
-
-export const demoCreditLines: DemoCreditLine[] = [
-  { bank: "浙江三门农商行", bankType: "农商行", creditType: "同业授信", total: 3, used: 3, available: 0, utilization: 100, expiry: "2027-06-20" },
-  { bank: "工银理财", bankType: "国有银行", creditType: "综合授信", total: 8, used: 7.9, available: 0.1, utilization: 98.75, expiry: "2027-03-11" },
-  { bank: "平安银行", bankType: "股份行", creditType: "同业授信", total: 49, used: 47, available: 2, utilization: 95.9184, expiry: "2027-02-03" },
-  { bank: "上海银行", bankType: "城商行", creditType: "同业授信", total: 63, used: 50.4, available: 12.6, utilization: 80, expiry: "2026-12-26" },
-  { bank: "苏银理财", bankType: "城商行", creditType: "综合授信", total: 15, used: 10.1, available: 4.9, utilization: 67.3333, expiry: null },
-  { bank: "民生理财", bankType: "股份行", creditType: "综合授信", total: 50, used: 32.8, available: 17.2, utilization: 65.6, expiry: "2027-11-19" },
-  { bank: "民生银行", bankType: "股份行", creditType: "同业授信", total: 80, used: 50.7, available: 29.3, utilization: 63.375, expiry: "2027-06-12" },
-  { bank: "光大理财", bankType: "股份行", creditType: "综合授信", total: 15, used: 9.4, available: 5.6, utilization: 62.6667, expiry: "2026-11-18" },
-  { bank: "昆仑银行", bankType: "城商行", creditType: "同业授信", total: 8, used: 5, available: 3, utilization: 62.5, expiry: "2027-07-31" },
-  { bank: "湖南昭阳农商行", bankType: "农商行", creditType: "同业授信", total: 1.6, used: 1, available: 0.6, utilization: 62.5, expiry: "2026-12-18" },
-  { bank: "湖南衡南农商行", bankType: "农商行", creditType: "同业授信", total: 1.6, used: 1, available: 0.6, utilization: 62.5, expiry: "2027-06-25" },
-  { bank: "招商银行", bankType: "股份行", creditType: "同业授信", total: 160, used: 97.5, available: 62.5, utilization: 60.9375, expiry: "2026-11-05" },
-];
-
-export const creditAlerts: DemoAlert[] = [
-  { id: "CREDIT-EXPIRY-80", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "天津滨海农商行授信到期日为2026-08-27，剩余6天，需关注续作" },
-  { id: "CREDIT-USAGE-12", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "工银理财额度使用率达98.8%，超过80%预警线" },
-  { id: "CREDIT-USAGE-27", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "平安银行额度使用率达95.9%，超过80%预警线" },
-  { id: "CREDIT-USAGE-36", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "上海银行额度使用率达80.0%，超过80%预警线" },
-  { id: "CREDIT-USAGE-83", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "浙江三门农商行额度使用率达100.0%，超过80%预警线" },
 ];
 
 export type DemoRate = {

@@ -12,6 +12,7 @@ import {
   compareCreditSnapshots,
   loadCreditReport,
   persistCreditWorkbook,
+  saveCreditInstitution,
 } from "../src/lib/server/credit-repository.ts";
 
 test("授信 Excel 同时保留一览表全口径和周报名单口径", () => {
@@ -60,6 +61,21 @@ test("授信 Excel 拒绝不存在的报告日期", () => {
   );
 });
 
+test("授信 Excel 将空状态按已撤销导入", () => {
+  const workbook = syntheticWorkbook();
+  workbook.Sheets["授信一览表"].E5.v = null;
+  const parsed = parseCreditWorkbook(
+    write(workbook, { type: "buffer", bookType: "xlsx" }),
+    { reportDate: "2026-08-21", originalFileName: "授信周报.xlsx" },
+  );
+
+  assert.equal(parsed.institutions[1].status, "revoked");
+  assert.equal(parsed.approvedCount, 1);
+  assert.equal(parsed.totalLimit, 10);
+  assert.equal(parsed.totalUsed, 3);
+  assert.equal(parsed.totalAvailable, 7);
+});
+
 test("周报分别识别授信额度变化和使用额度变化", () => {
   const previous = [
     institution("甲银行", 10, 3, 4, 1),
@@ -99,33 +115,13 @@ test("只有一个报告日时不生成周度变化且数据库查询顺序执�
       active = true;
       await new Promise((resolve) => setImmediate(resolve));
       active = false;
-      if (/FROM credit\.daily_summary\s+ORDER BY/.test(sql)) {
+      if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
         return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
       }
-      if (/FROM credit\.daily_summary AS snapshot/.test(sql)) {
-        return {
-          rows: [{
-            report_date: "2026-08-21",
-            institution_count: 1,
-            approved_count: 1,
-            total_limit: 10,
-            total_used: 3,
-            total_available: 7,
-            weekly_approved_count: 1,
-            weekly_total_limit: 10,
-            weekly_total_used: 3,
-            weekly_total_available: 7,
-            source_file_name: "授信周报.xlsx",
-            warnings: [],
-            imported_at: "2026-08-21T09:00:00.000Z",
-          }],
-          rowCount: 1,
-        };
-      }
-      if (/FROM credit\.institution_daily/.test(sql)) {
+      if (/FROM credit\.institution[\s\S]*WHERE report_date/.test(sql)) {
         return { rows: [institutionRow()], rowCount: 1 };
       }
-      if (/FROM credit\.item_daily/.test(sql)) {
+      if (/FROM credit\.item/.test(sql)) {
         return { rows: [], rowCount: 0 };
       }
       throw new Error(`未处理的 SQL：${sql}`);
@@ -135,16 +131,55 @@ test("只有一个报告日时不生成周度变化且数据库查询顺序执�
   const report = await loadCreditReport(client, "2026-08-21");
 
   assert.equal(report.previousDate, null);
+  assert.equal(report.summary.totalLimit, 10);
+  assert.equal(report.summary.totalUsed, 3);
+  assert.equal(report.summary.totalAvailable, 7);
+  assert.equal(report.weeklySummary.addedInstitutionCount, 0);
+  assert.equal(report.weeklySummary.expiredInstitutionCount, 0);
   assert.deepEqual(report.limitChanges, []);
   assert.deepEqual(report.usageChanges, []);
+  assert.ok(report.calendarEvents.some((event) => event.type === "expiry"));
 });
 
-test("同日报表导入只替换 daily 表，不建立导入审计或 snapshot 表", async () => {
+test("周报新增包含新批、续签和扩额，到期包含授信到期和状态撤销", async () => {
+  const rows = [
+    institutionRow({ report_date: "2026-08-14", institution_name: "甲银行", total_limit: 10, total_used: 3, expiry_date: "2026-12-31" }),
+    institutionRow({ report_date: "2026-08-14", institution_name: "乙银行", total_limit: 2, total_used: 1, expiry_date: "2026-08-20" }),
+    institutionRow({ report_date: "2026-08-21", institution_name: "甲银行", total_limit: 12, total_used: 4, expiry_date: "2027-12-31" }),
+    institutionRow({ report_date: "2026-08-21", institution_name: "乙银行", status: "revoked", total_limit: 2, total_used: 1, expiry_date: "2026-08-20" }),
+    institutionRow({ report_date: "2026-08-21", institution_name: "丙银行", total_limit: 5, total_used: 0, effective_date: "2026-08-21" }),
+  ];
+  const client = {
+    async query(sql) {
+      if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
+        return { rows: [{ report_date: "2026-08-14" }, { report_date: "2026-08-21" }], rowCount: 2 };
+      }
+      if (/FROM credit\.institution[\s\S]*WHERE report_date/.test(sql)) {
+        return { rows, rowCount: rows.length };
+      }
+      if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };
+      throw new Error(`未处理的 SQL：${sql}`);
+    },
+  };
+
+  const report = await loadCreditReport(client, "2026-08-21");
+
+  assert.equal(report.weeklySummary.totalLimit, 17);
+  assert.equal(report.weeklySummary.totalUsed, 4);
+  assert.equal(report.weeklySummary.totalAvailable, 13);
+  assert.equal(report.weeklySummary.addedInstitutionCount, 2);
+  assert.equal(report.weeklySummary.expiredInstitutionCount, 1);
+  assert.ok(report.calendarEvents.some((event) => event.kind === "renewal"));
+  assert.ok(report.calendarEvents.some((event) => event.kind === "increase"));
+  assert.ok(report.calendarEvents.some((event) => event.kind === "revoked"));
+});
+
+test("同日报表导入只替换机构和分项表，不建立汇总或导入状态表", async () => {
   const calls = [];
   const client = {
     async query(sql, parameters) {
       calls.push({ sql, parameters });
-      return /SELECT 1 FROM credit\.daily_summary/.test(sql)
+      return /SELECT 1 FROM credit\.institution/.test(sql)
         ? { rows: [{ "?column?": 1 }], rowCount: 1 }
         : { rows: [], rowCount: 0 };
     },
@@ -155,39 +190,93 @@ test("同日报表导入只替换 daily 表，不建立导入审计或 snapshot 
   });
 
   const result = await persistCreditWorkbook(client, {
-    importedAt: "2026-08-21T09:00:00.000Z",
     parsed,
   });
   const sql = calls.map((call) => call.sql).join("\n");
 
   assert.equal(result.replaced, true);
-  assert.match(sql, /DELETE FROM credit\.daily_summary/);
-  assert.match(sql, /INSERT INTO credit\.institution_daily/);
-  assert.match(sql, /INSERT INTO credit\.item_daily/);
-  assert.doesNotMatch(sql, /import_run|_snapshot/);
+  assert.match(sql, /DELETE FROM credit\.institution/);
+  assert.match(sql, /INSERT INTO credit\.institution/);
+  assert.match(sql, /INSERT INTO credit\.item/);
+  assert.doesNotMatch(sql, /daily_summary|institution_daily|item_daily|import_run|_snapshot/);
   assert.equal(calls.at(-1).sql, "COMMIT");
 });
 
-test("授信 migration、API 与页面使用 credit daily 表及周度变化契约", async () => {
-  const [migration, repository, route, view] = await Promise.all([
-    readFile(new URL("../credit-migrations/0001_create_credit_schema.sql", import.meta.url), "utf8"),
+test("授信详情更新使用 updated_at 并发检查并返回服务端确认实体", async () => {
+  const calls = [];
+  const client = {
+    async query(sql, parameters) {
+      calls.push({ sql, parameters });
+      if (/UPDATE credit\.institution/.test(sql)) return { rows: [{ updated_at: "new" }], rowCount: 1 };
+      if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
+        return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
+      }
+      if (/FROM credit\.institution[\s\S]*WHERE report_date/.test(sql)) {
+        return { rows: [institutionRow({ notes: "已更新", updated_at: "2026-08-21T10:00:00.000Z" })], rowCount: 1 };
+      }
+      if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };
+      return { rows: [], rowCount: 0 };
+    },
+  };
+  const current = institution("甲银行", 10, 3, 4, 1);
+
+  const result = await saveCreditInstitution(client, {
+    reportDate: current.reportDate,
+    institutionName: current.institutionName,
+    expectedUpdatedAt: current.updatedAt,
+    institution: {
+      institutionType: current.institutionType,
+      confidentialityStatus: current.confidentialityStatus,
+      status: current.status,
+      includedInWeeklyReport: current.includedInWeeklyReport,
+      totalLimit: current.totalLimit,
+      totalUsed: current.totalUsed,
+      effectiveDate: current.effectiveDate,
+      expiryDate: current.expiryDate,
+      bankOffice: current.bankOffice,
+      applyingDepartment: current.applyingDepartment,
+      handler: current.handler,
+      notes: "已更新",
+      bondPreference: current.bondPreference,
+      usageDetails: current.usageDetails,
+      items: current.items.map(({ type, limitAmount, usedAmount, details }) => ({ type, limitAmount, usedAmount, details })),
+    },
+  });
+  const sql = calls.map((call) => call.sql).join("\n");
+
+  assert.match(sql, /AND updated_at = \$3::timestamptz/);
+  assert.match(sql, /ON CONFLICT \(report_date, institution_name, item_type\)/);
+  assert.equal(result.institution.notes, "已更新");
+  assert.equal(result.institution.updatedAt, "2026-08-21T10:00:00.000Z");
+});
+
+test("授信最终 schema、API 与页面使用规范表、日历和自动保存契约", async () => {
+  const [migration, repository, route, view, demoData] = await Promise.all([
+    readFile(new URL("../credit-migrations/0002_normalize_credit_tables.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/server/credit-repository.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/api/credit/+server.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/CreditView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/demo-data.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(migration, /CREATE SCHEMA IF NOT EXISTS credit/);
-  assert.match(migration, /credit\.daily_summary/);
-  assert.match(migration, /credit\.institution_daily/);
-  assert.match(migration, /credit\.item_daily/);
-  assert.doesNotMatch(`${migration}\n${repository}`, /import_run|_snapshot/);
+  assert.match(migration, /CREATE TYPE credit\.credit_status AS ENUM/);
+  assert.match(migration, /RENAME TO institution/);
+  assert.match(migration, /RENAME TO item/);
+  assert.match(migration, /DROP TABLE credit\.daily_summary/);
+  assert.doesNotMatch(repository, /daily_summary|institution_daily|item_daily|import_run|_snapshot/);
   assert.match(route, /HYPERDRIVE/);
+  assert.match(route, /export const PATCH/);
+  assert.match(route, /creditInstitutionUpdateSchema/);
   assert.match(view, /授信一览表/);
+  assert.match(view, /授信日历/);
   assert.match(view, /授信周报/);
+  assert.match(view, /updateCreditInstitution/);
+  assert.match(view, /toggleSort/);
   assert.match(view, /授信额度变动/);
   assert.match(view, /使用额度变动/);
   assert.match(view, /打印 \/ 导出 PDF/);
-  assert.doesNotMatch(view, /demoCreditLines|creditSummary/);
+  assert.doesNotMatch(view, /高使用率机构|授信预警|tr-result-count|一览表全口径|数据截至/);
+  assert.doesNotMatch(demoData, /demoCreditLines|creditSummary|creditAlerts|CREDIT-USAGE|CREDIT-EXPIRY/);
 });
 
 function workbookBuffer() {
@@ -292,6 +381,7 @@ function institution(name, total, used, bondLimit, bondUsed) {
     notes: null,
     bondPreference: null,
     usageDetails: null,
+    updatedAt: "2026-08-21T09:00:00.000Z",
     items: [
       { type: "bond_investment", limitAmount: bondLimit, usedAmount: bondUsed, remainingAmount: bondLimit - bondUsed, details: null },
       { type: "yield_certificate", limitAmount: null, usedAmount: null, remainingAmount: null, details: null },
@@ -303,7 +393,7 @@ function institution(name, total, used, bondLimit, bondUsed) {
   };
 }
 
-function institutionRow() {
+function institutionRow(overrides = {}) {
   return {
     report_date: "2026-08-21",
     source_row: 4,
@@ -323,5 +413,7 @@ function institutionRow() {
     notes: null,
     bond_preference: null,
     usage_details: null,
+    updated_at: "2026-08-21T09:00:00.000Z",
+    ...overrides,
   };
 }

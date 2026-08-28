@@ -99,9 +99,11 @@ test("工作台数据图表统一通过 ChartHost 和 ECharts renderer", async (
     readFile(new URL("../src/lib/trading-research/WorkbenchIcon.svelte", import.meta.url), "utf8"),
   ]);
 
-  for (const view of [overview, trading, credit, research]) {
+  for (const view of [overview, trading, research]) {
     assert.match(view, /<ChartHost/);
   }
+  assert.doesNotMatch(credit, /<ChartHost/);
+  assert.match(credit, /tr-credit-calendar/);
   assert.match(charts, /renderWorkbenchBarChart/);
   assert.match(charts, /renderWorkbenchHistoryChart/);
   assert.match(charts, /renderWorkbenchCurveChart/);
