@@ -120,7 +120,7 @@ function sellSidePayload() {
     logicSummary: "资金面判断总体一致，但长端利率方向仍存在分歧。",
     edited: false,
     updatedAt: null,
-    views: ["兴业固收", "天风固收", "华源固收"].map((institution, index) => ({
+    views: ["兴业固收", "天风固收", "华源固收", "中信固收"].map((institution, index) => ({
       institution,
       title: `${institution}周报`,
       publishedAt: "2026-08-24",
@@ -147,7 +147,7 @@ test("融资择时报告契约接受模型、人工结论和卖方观点", () =>
 
   assert.equal(report.snapshot.prediction.deviation_bp, 1.71);
   assert.equal(report.conclusion.edited, true);
-  assert.equal(report.sellSide.views.length, 3);
+  assert.equal(report.sellSide.views.length, 4);
   assert.match(report.sellSide.logicSummary, /长端利率方向/);
 });
 
@@ -156,6 +156,7 @@ test("历史卖方交叉验证快照读取时整合为单段逻辑汇总", () =>
   delete legacy.logicSummary;
   delete legacy.edited;
   delete legacy.updatedAt;
+  legacy.views = legacy.views.slice(0, 3);
   legacy.crossValidation = {
     alignment: "mixed",
     summary: "资金面总体偏松。",
@@ -284,19 +285,35 @@ test("卖方逻辑汇总编辑采用追加快照并保留检索证据", async ()
 });
 
 test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模块", async () => {
-  const page = await readFile(
-    new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url),
-    "utf8",
-  );
+  const [page, research] = await Promise.all([
+    readFile(
+      new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../src/lib/server/financing-model-research.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
 
   assert.match(page, /market_drivers\.slice\(0, 5\)/);
   assert.match(page, /aria-label="市场驱动因子 Top 5"/);
   assert.match(page, /aria-label="编辑整体结论"/);
   assert.match(page, /aria-label="编辑卖方逻辑汇总"/);
   assert.match(page, /report\.sellSide\.logicSummary/);
+  assert.match(page, /class="sell-side-grid"/);
+  assert.match(page, /report\.sellSide\.views as view/);
   assert.doesNotMatch(page, /近30日可比债中位利差|发行方案/);
   assert.doesNotMatch(page, /相对更优窗口|class="recommendation-band"/);
-  assert.doesNotMatch(page, /id="driver-title"|交叉验证|class="sell-side-grid"/);
+  assert.doesNotMatch(page, /id="driver-title"|交叉验证/);
+  assert.doesNotMatch(page, /<h3>卖方逻辑汇总<\/h3>/);
+  assert.match(research, /PROMPT_CACHE_KEY = "financing-model-sell-side:v3"/);
+  assert.match(research, /\.min\(4\)/);
+  assert.match(research, /views\.length < 4/);
+  assert.match(research, /筛选4至5家/);
 });
 
 test("AI Search 固定检索最近七个上海自然日且最多返回50条", () => {

@@ -69,7 +69,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ### 融资择时模型
 
-quant pipeline → 本地结构化 JSON → Neon `financing_model.model_run` 追加快照 → dashboard 读取最新运行。人工结论写入追加修订表；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳为单段逻辑汇总后追加保存。人工编辑逻辑汇总时保留原检索证据，并追加新快照。
+quant pipeline → 本地结构化 JSON → Neon `financing_model.model_run` 追加快照 → dashboard 读取最新运行。人工结论写入追加修订表；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳为单段逻辑汇总及 4–5 家逐机构观点后追加保存。人工编辑逻辑汇总时保留原逐机构观点和检索证据，并追加新快照。
 
 ### 交易研究工作台
 

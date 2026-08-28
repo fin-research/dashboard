@@ -287,6 +287,14 @@
     const [year, month, day] = value.split("-");
     return `${year}年${Number(month)}月${Number(day)}日`;
   }
+
+  function stanceLabel(value: "supports" | "mixed" | "challenges"): string {
+    return {
+      supports: "支持模型",
+      mixed: "部分一致",
+      challenges: "存在分歧",
+    }[value];
+  }
 </script>
 
 <svelte:head>
@@ -517,6 +525,7 @@
             <h2 id="sell-side-title">卖方观点</h2>
           </div>
           <div class="section-actions">
+            {#if report.sellSide?.edited}<span class="edited-badge">人工修订</span>{/if}
             {#if report.sellSide && !editingSellSide}
               <button class="icon-button" type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -531,11 +540,7 @@
         </div>
 
         {#if report.sellSide}
-          <article class="sell-side-summary-card">
-            <div class="card-title-row">
-              <h3>卖方逻辑汇总</h3>
-              {#if report.sellSide.edited}<span class="edited-badge">人工修订</span>{/if}
-            </div>
+          <div class="sell-side-summary-card">
             {#if editingSellSide}
               <form onsubmit={(event) => { event.preventDefault(); saveSellSideSummary(); }}>
                 <label>
@@ -550,7 +555,21 @@
             {:else}
               <p>{report.sellSide.logicSummary}</p>
             {/if}
-          </article>
+          </div>
+          <div class="sell-side-grid">
+            {#each report.sellSide.views as view}
+              <article class={`sell-side-card sell-side-card--${view.stance}`}>
+                <div class="sell-side-meta">
+                  <strong>{view.institution}</strong>
+                  <span>{stanceLabel(view.stance)}</span>
+                </div>
+                <h3>{view.title}</h3>
+                <time datetime={view.publishedAt}>{displayDate(view.publishedAt)}</time>
+                <p>{view.summary}</p>
+                <div class="implication"><strong>对发行的含义</strong><span>{view.implication}</span></div>
+              </article>
+            {/each}
+          </div>
           <p class="research-meta">
             AI Search 检索区间 {displayDate(report.sellSide.periodStart)} 至 {displayDate(report.sellSide.periodEnd)}，
             最多返回 {report.sellSide.maxResults} 条，实际归并 {report.sellSide.sourceDocuments} 篇文档。
@@ -639,7 +658,8 @@
   .card-title-row,
   .card-title-actions,
   .editor-actions,
-  .section-actions {
+  .section-actions,
+  .sell-side-meta {
     display: flex;
     align-items: center;
   }
@@ -796,7 +816,8 @@
 
   .insight-card,
   .panel,
-  .sell-side-summary-card {
+  .sell-side-summary-card,
+  .sell-side-card {
     border: 1px solid var(--border);
     border-radius: var(--radius-inner);
     background: var(--surface);
@@ -823,7 +844,7 @@
 
   .insight-card h3,
   .panel h3,
-  .sell-side-summary-card h3 {
+  .sell-side-card h3 {
     margin: 0;
     font-size: 1.125rem;
     font-weight: bold;
@@ -862,7 +883,8 @@
 
   .card-title-row,
   .card-title-actions,
-  .section-actions {
+  .section-actions,
+  .sell-side-meta {
     justify-content: space-between;
     gap: 10px;
   }
@@ -1188,9 +1210,74 @@
   }
 
   .sell-side-summary-card p {
-    margin: 12px 0 0;
+    margin: 0;
     max-width: 1100px;
     line-height: 1.6;
+  }
+
+  .sell-side-summary-card form {
+    margin-top: 0;
+  }
+
+  .sell-side-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .sell-side-card {
+    display: grid;
+    align-content: start;
+    gap: 9px;
+    padding: 14px;
+    border-top: 3px solid var(--color-primary);
+  }
+
+  .sell-side-card--supports {
+    border-top-color: #12a873;
+  }
+
+  .sell-side-card--challenges {
+    border-top-color: #d92d20;
+  }
+
+  .sell-side-meta > span {
+    padding: 3px 7px;
+    border-radius: 5px;
+    color: var(--text-2);
+    background: #f1f4f8;
+    font-size: 0.75rem;
+    font-weight: bold;
+  }
+
+  .sell-side-card h3 {
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .sell-side-card time {
+    color: var(--text-3);
+    font-size: 0.8125rem;
+  }
+
+  .sell-side-card p {
+    margin: 0;
+    line-height: 1.65;
+  }
+
+  .implication {
+    display: grid;
+    gap: 5px;
+    margin-top: 2px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    color: var(--text-2);
+  }
+
+  .implication strong {
+    color: #173b78;
+    font-size: 0.875rem;
   }
 
   .research-meta {

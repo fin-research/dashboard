@@ -16,7 +16,7 @@ const AI_SEARCH_MAX_RESULTS = 50 as const;
 const MAX_MCP_RESPONSE_BYTES = 6 * 1024 * 1024;
 const MAX_SOURCE_DOCUMENTS = 24;
 const MAX_DOCUMENT_TEXT = 2_400;
-const PROMPT_CACHE_KEY = "financing-model-sell-side:v2";
+const PROMPT_CACHE_KEY = "financing-model-sell-side:v3";
 
 const researchOutputSchema = z
   .object({
@@ -32,7 +32,7 @@ const researchOutputSchema = z
           })
           .strict(),
       )
-      .min(3)
+      .min(4)
       .max(5),
   })
   .strict();
@@ -96,10 +96,10 @@ export async function generateFinancingModelResearch(
     0,
     MAX_SOURCE_DOCUMENTS,
   );
-  if (new Set(documents.map((document) => document.institution)).size < 3) {
+  if (new Set(documents.map((document) => document.institution)).size < 4) {
     throw new FinancingModelResearchError(
       422,
-      "最近七日 AI Search 结果不足三家直接相关卖方机构",
+      "最近七日 AI Search 结果不足四家直接相关卖方机构",
     );
   }
 
@@ -308,10 +308,10 @@ function resolveResearchViews(
       sourceKey: document.sourceKey,
     });
   }
-  if (views.length < 3) {
+  if (views.length < 4) {
     throw new FinancingModelResearchError(
       502,
-      "模型未返回三家可核验且互不重复的卖方机构观点",
+      "模型未返回四家可核验且互不重复的卖方机构观点",
     );
   }
   return views.slice(0, 5);
@@ -325,9 +325,10 @@ function researchMessages(
     {
       role: "system" as const,
       content:
-        "你是债券融资择时研究员。只能使用提供的 AI Search 证据，筛选3至5家直接讨论资金面、利率债、信用利差或一级发行环境的机构。" +
+        "你是债券融资择时研究员。只能使用提供的 AI Search 证据，筛选4至5家直接讨论资金面、利率债、信用利差或一级发行环境的机构。" +
         "不得补充外部知识，不得把量化、转债或权益主题凑数。logicSummary 必须把卖方共识、分歧及其影响融资成本的传导逻辑整合成一个连贯自然段，" +
-        "不得使用项目符号、小标题、交叉验证或支持模型等表述。每家机构的 stance 仍按其与模型相对融资成本判断的关系填写。" +
+        "不得使用项目符号、小标题、交叉验证或支持模型等表述。views 必须保留4至5家机构各自的核心判断和对发行的含义，" +
+        "每家机构的 stance 按其与模型相对融资成本判断的关系填写。" +
         "每条观点只引用一个 sourceId；不得改写机构、标题、日期或 sourceId。",
     },
     {
