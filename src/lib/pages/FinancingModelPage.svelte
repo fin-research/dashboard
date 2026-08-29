@@ -1259,6 +1259,11 @@
     font-size: 1rem;
   }
 
+  .sell-side-institution strong {
+    min-width: 0;
+    line-height: 1.35;
+  }
+
   .sell-side-card p {
     margin: 0;
     padding: 15px 16px 16px;

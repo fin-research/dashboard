@@ -6,25 +6,39 @@
   $: logo = resolveInstitutionLogo(institution);
 </script>
 
-<span
-  class="institution-logo"
-  style={`--institution-logo-color: ${logo.foreground}; --institution-logo-background: ${logo.background};`}
-  aria-hidden="true"
->{logo.mark}</span>
+{#if logo}
+  <span class="institution-logo" aria-hidden="true">
+    <img
+      src={logo.src}
+      alt=""
+      width="76"
+      height="32"
+      loading="lazy"
+      decoding="async"
+    />
+  </span>
+{/if}
 
 <style>
   .institution-logo {
-    display: inline-grid;
-    width: 32px;
+    display: inline-flex;
+    box-sizing: border-box;
+    width: 76px;
     height: 32px;
-    flex: 0 0 32px;
-    place-items: center;
-    border: 1px solid color-mix(in srgb, var(--institution-logo-color) 18%, transparent);
-    border-radius: 8px;
-    color: var(--institution-logo-color);
-    background: var(--institution-logo-background);
-    font-size: 0.75rem;
-    font-weight: bold;
-    line-height: 1;
+    flex: 0 0 76px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 4px 6px;
+    border: 1px solid color-mix(in srgb, var(--brand) 12%, var(--line));
+    border-radius: 7px;
+    background: #fff;
+  }
+
+  .institution-logo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 </style>

@@ -195,10 +195,27 @@ test("卖方观点正文移除机构研报和发布日期引导句", () => {
   );
 });
 
-test("券商研究所 Logo 库按别名匹配并提供回退标识", () => {
-  assert.deepEqual(resolveInstitutionLogo("德邦资管固收").mark, "德邦");
-  assert.deepEqual(resolveInstitutionLogo("中信建投证券固收").mark, "建投");
-  assert.equal(resolveInstitutionLogo("示例研究所").key, "fallback");
+test("券商研究所 Logo 库按别名匹配官网图片且不伪造回退标识", () => {
+  assert.equal(
+    resolveInstitutionLogo("德邦资管固收")?.src,
+    "/institution-logos/tebon.png",
+  );
+  assert.equal(
+    resolveInstitutionLogo("国联民生证券")?.src,
+    "/institution-logos/glms.png",
+  );
+  assert.equal(resolveInstitutionLogo("示例研究所"), null);
+});
+
+test("当前卖方机构 Logo 均为本地 PNG 图片", async () => {
+  const files = ["tebon.png", "cms.png", "glms.png", "swhy.png", "xyzq.png"];
+  for (const file of files) {
+    const asset = await readFile(
+      new URL(`../static/institution-logos/${file}`, import.meta.url),
+    );
+    assert.ok(asset.length > 1_000, `${file} 应包含实际图片数据`);
+    assert.equal(asset.subarray(1, 4).toString("ascii"), "PNG");
+  }
 });
 
 test("历史卖方交叉验证快照读取时整合为单段逻辑汇总", () => {
