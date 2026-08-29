@@ -198,23 +198,83 @@ test("卖方观点正文移除机构研报和发布日期引导句", () => {
 test("券商研究所 Logo 库按别名匹配官网图片且不伪造回退标识", () => {
   assert.equal(
     resolveInstitutionLogo("德邦资管固收")?.src,
-    "/institution-logos/tebon.png",
+    "/institution-logos/tebon.ico",
   );
   assert.equal(
     resolveInstitutionLogo("国联民生证券")?.src,
-    "/institution-logos/glms.png",
+    "/institution-logos/glms.ico",
+  );
+  assert.equal(
+    resolveInstitutionLogo("中信建投固收")?.src,
+    "/institution-logos/csc.ico",
+  );
+  assert.equal(
+    resolveInstitutionLogo("国泰君安研究")?.src,
+    "/institution-logos/gtht.png",
+  );
+  assert.equal(
+    resolveInstitutionLogo("华创固收团队")?.src,
+    "/institution-logos/hczq.ico",
+  );
+  assert.equal(
+    resolveInstitutionLogo("中金公司研究部")?.src,
+    "/institution-logos/cicc.ico",
   );
   assert.equal(resolveInstitutionLogo("示例研究所"), null);
 });
 
-test("当前卖方机构 Logo 均为本地 PNG 图片", async () => {
-  const files = ["tebon.png", "cms.png", "glms.png", "swhy.png", "xyzq.png"];
+test("券商研究所 Logo 库包含 32 个本地图形资产", async () => {
+  const files = [
+    "boci.ico",
+    "cicc.ico",
+    "citics.ico",
+    "cjsc.ico",
+    "cms.ico",
+    "csc.ico",
+    "ctsec.png",
+    "dfzq.ico",
+    "dwzq.ico",
+    "ebscn.ico",
+    "founder.ico",
+    "galaxy.ico",
+    "gf.ico",
+    "ghzq.jpg",
+    "gjzq.ico",
+    "glms.ico",
+    "gszq.png",
+    "gtht.png",
+    "guosen.ico",
+    "hczq.ico",
+    "hfzq.png",
+    "htsc.ico",
+    "hx168.ico",
+    "kysec.ico",
+    "pingan.ico",
+    "stocke.ico",
+    "swhy.ico",
+    "tebon.ico",
+    "tfzq.ico",
+    "west.png",
+    "xyzq.png",
+    "zts.ico",
+  ];
+  const signatures = [
+    Buffer.from([0x00, 0x00, 0x01, 0x00]),
+    Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+    Buffer.from([0xff, 0xd8, 0xff]),
+  ];
+
   for (const file of files) {
     const asset = await readFile(
       new URL(`../static/institution-logos/${file}`, import.meta.url),
     );
-    assert.ok(asset.length > 1_000, `${file} 应包含实际图片数据`);
-    assert.equal(asset.subarray(1, 4).toString("ascii"), "PNG");
+    assert.ok(asset.length >= 300, `${file} 应包含实际图片数据`);
+    assert.ok(
+      signatures.some((signature) =>
+        asset.subarray(0, signature.length).equals(signature),
+      ),
+      `${file} 应为可识别的图片格式`,
+    );
   }
 });
 
