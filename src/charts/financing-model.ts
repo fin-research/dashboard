@@ -13,6 +13,12 @@ const forecastAxisLabel = {
   fontWeight: "normal" as const,
 };
 
+const chartBlue = "#2f6fd6";
+const chartTeal = "#138a7a";
+const chartAmber = "#c87912";
+const chartRed = "#c53a32";
+const chartSlate = "#a9b8cd";
+
 export function renderFinancingForecast(
   host: HTMLElement,
   rows: FinancingModelSnapshot["forecast_window"],
@@ -22,13 +28,13 @@ export function renderFinancingForecast(
     return;
   }
   setChart(host, {
-    animationDuration: 220,
+    animationDuration: 180,
     aria: {
       enabled: true,
       description:
         "未来发行窗口预测图，折线表示相对可比债中位数的预测偏离，柱形表示相对窗口中位数的成本变化",
     },
-    color: ["#2f6fed", "#16a394"],
+    color: [chartBlue, chartTeal],
     legend: {
       top: 0,
       right: 0,
@@ -85,8 +91,7 @@ export function renderFinancingForecast(
         data: rows.map((row) => ({
           value: row.savings_bp_vs_window_median,
           itemStyle: {
-            color:
-              row.savings_bp_vs_window_median <= 0 ? "#16a394" : "#d92d20",
+            color: row.savings_bp_vs_window_median <= 0 ? chartTeal : chartRed,
             borderRadius:
               row.savings_bp_vs_window_median <= 0 ? [0, 0, 3, 3] : [3, 3, 0, 0],
           },
@@ -99,10 +104,10 @@ export function renderFinancingForecast(
         symbol: "circle",
         symbolSize: 7,
         smooth: 0.12,
-        lineStyle: { color: "#2f6fed", width: 2.4 },
+        lineStyle: { color: chartBlue, width: 2.2 },
         itemStyle: {
           color: colors.paper,
-          borderColor: "#2f6fed",
+          borderColor: chartBlue,
           borderWidth: 2,
         },
       },
@@ -115,7 +120,7 @@ export function renderFinancingGauge(
   prediction: FinancingModelSnapshot["prediction"],
 ): void {
   setChart(host, {
-    animationDuration: 220,
+    animationDuration: 180,
     aria: {
       enabled: true,
       description: `当前预测发行利差偏离处于历史 P${prediction.historical_percentile.toFixed(0)}，窗口处于${prediction.window_zone}区间`,
@@ -140,23 +145,23 @@ export function renderFinancingGauge(
         progress: { show: false },
         axisLine: {
           lineStyle: {
-            width: 16,
+            width: 12,
             color: [
-              [0.25, "#16a394"],
-              [0.5, "#f79009"],
-              [1, "#d92d20"],
+              [0.25, "#74bdb3"],
+              [0.5, "#edc27a"],
+              [1, "#de8a84"],
             ],
           },
         },
         pointer: {
           length: "62%",
-          width: 5,
+          width: 4,
           itemStyle: { color: colors.ink },
         },
         anchor: {
           show: true,
-          size: 10,
-          itemStyle: { color: colors.ink },
+          size: 9,
+          itemStyle: { color: colors.paper, borderColor: colors.ink, borderWidth: 3 },
         },
         axisTick: { show: false },
         splitLine: { show: false },
@@ -192,12 +197,12 @@ export function renderFinancingDriverRadar(
     return;
   }
   setChart(host, {
-    animationDuration: 220,
+    animationDuration: 180,
     aria: {
       enabled: true,
       description: "融资择时六维驱动结构雷达图，五十分为中性，越高越支持发行",
     },
-    color: ["#2f6fed", colors.zero],
+    color: [chartBlue, colors.zero],
     legend: {
       top: 0,
       right: 0,
@@ -230,10 +235,8 @@ export function renderFinancingDriverRadar(
       indicator: rows.map((row) => ({ name: row.display_name, min: 0, max: 100 })),
       axisName: { ...forecastAxisLabel, color: colors.ink },
       axisLine: { lineStyle: { color: colors.line } },
-      splitLine: { lineStyle: { color: colors.grid } },
-      splitArea: {
-        areaStyle: { color: ["rgba(47,111,237,0.02)", "rgba(47,111,237,0.05)"] },
-      },
+      splitLine: { lineStyle: { color: "rgba(128, 148, 177, 0.24)" } },
+      splitArea: { show: false },
     },
     series: [
       {
@@ -244,9 +247,9 @@ export function renderFinancingDriverRadar(
           {
             name: "发行支持度",
             value: rows.map((row) => row.support_score),
-            lineStyle: { color: "#2f6fed", width: 2.4 },
-            itemStyle: { color: "#2f6fed" },
-            areaStyle: { color: "rgba(47,111,237,0.16)" },
+            lineStyle: { color: chartBlue, width: 2.2 },
+            itemStyle: { color: colors.paper, borderColor: chartBlue, borderWidth: 2 },
+            areaStyle: { color: "rgba(47,111,214,0.13)" },
           },
           {
             name: "中性基准",
@@ -273,12 +276,12 @@ export function renderFinancingDriverContributions(
   const maxAbs = Math.max(...values.map(Math.abs), 0.1);
   const bound = Math.ceil(maxAbs * 12) / 10;
   setChart(host, {
-    animationDuration: 220,
+    animationDuration: 180,
     aria: {
       enabled: true,
-      description: "本次预测的前五项 SHAP 因子贡献，正值支持发行并降低成本，负值抑制发行",
+      description: "本次预测的前五项 SHAP 因子贡献，横轴正号代表支持发行",
     },
-    grid: { left: 12, right: 74, top: 8, bottom: 26, containLabel: true },
+    grid: { left: 12, right: 78, top: 8, bottom: 48, containLabel: true },
     tooltip: {
       ...tooltip,
       trigger: "axis",
@@ -292,7 +295,6 @@ export function renderFinancingDriverContributions(
           `<strong>${escapeHtml(row.display_name)}</strong>`,
           `发行贡献 ${signed(contribution, 3)} bp`,
           `因子值 ${row.value.toFixed(4)}`,
-          contribution >= 0 ? "支持发行（降低成本）" : "抑制发行（推高成本）",
         ].join("<br>");
       },
     },
@@ -300,12 +302,14 @@ export function renderFinancingDriverContributions(
       type: "value",
       min: -bound,
       max: bound,
-      name: "贡献 bp",
+      name: "正号代表支持发行（融资成本低）",
+      nameLocation: "middle",
+      nameGap: 32,
       axisLine: { lineStyle: { color: colors.line } },
       axisTick: { show: false },
       axisLabel: forecastAxisLabel,
-      nameTextStyle: forecastAxisLabel,
-      splitLine: { lineStyle: gridLine },
+      nameTextStyle: { ...forecastAxisLabel, color: colors.muted },
+      splitLine: { show: false },
     },
     yAxis: {
       type: "category",
@@ -319,8 +323,6 @@ export function renderFinancingDriverContributions(
       {
         type: "bar",
         barMaxWidth: 22,
-        showBackground: true,
-        backgroundStyle: { color: "rgba(102,112,133,0.08)", borderRadius: 4 },
         label: {
           show: true,
           position: "right",
@@ -338,7 +340,7 @@ export function renderFinancingDriverContributions(
         data: values.map((value) => ({
           value,
           itemStyle: {
-            color: value >= 0 ? "#2f6fed" : "#f79009",
+            color: value >= 0 ? chartBlue : chartAmber,
             borderRadius: value >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4],
           },
         })),
@@ -356,8 +358,9 @@ export function renderFinancingProductComparison(
     setEmpty(host, "品种预测暂缺");
     return;
   }
+  const displayRows = [...rows].sort((left, right) => left.rank - right.rank);
   setChart(host, {
-    animationDuration: 220,
+    animationDuration: 180,
     aria: {
       enabled: true,
       description: `四种发行方案相对各自同类债中位数的预测偏离对比，模型推荐${recommendation?.recommended_product ?? ""}`,
@@ -369,7 +372,7 @@ export function renderFinancingProductComparison(
       axisPointer: { type: "shadow" },
       formatter: (params: unknown) => {
         const item = (params as Array<{ dataIndex: number }>)[0];
-        const row = rows[item?.dataIndex ?? -1];
+        const row = displayRows[item?.dataIndex ?? -1];
         if (!row) return "";
         return [
           `<strong>${escapeHtml(row.display_name)}</strong>`,
@@ -393,7 +396,7 @@ export function renderFinancingProductComparison(
     yAxis: {
       type: "category",
       inverse: true,
-      data: rows.map((row) => row.display_name),
+      data: displayRows.map((row) => row.display_name),
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { ...forecastAxisLabel, color: colors.ink },
@@ -408,7 +411,7 @@ export function renderFinancingProductComparison(
           color: colors.ink,
           fontSize: forecastAxisLabel.fontSize,
           formatter: (params: { dataIndex: number; value: number }) => {
-            const row = rows[params.dataIndex];
+            const row = displayRows[params.dataIndex];
             return `${signed(params.value, 2)} bp · P${row?.historical_percentile.toFixed(0) ?? "—"}`;
           },
         },
@@ -419,10 +422,10 @@ export function renderFinancingProductComparison(
           label: { show: false },
           data: [{ xAxis: 0 }],
         },
-        data: rows.map((row) => ({
+        data: displayRows.map((row) => ({
           value: row.pred_bp,
           itemStyle: {
-            color: row.is_recommended ? "#2f6fed" : "#b8c7e0",
+            color: row.is_recommended ? chartBlue : chartSlate,
             borderRadius: row.pred_bp >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4],
           },
         })),

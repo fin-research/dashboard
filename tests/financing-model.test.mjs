@@ -119,6 +119,7 @@ function snapshot() {
       tscv: {
         folds: 10,
         validation_samples: 100,
+        sample_count: 2023,
         sample_start_date: "2022-01-01",
         sample_end_date: "2026-06-30",
         rmse: 8.4,
@@ -446,7 +447,7 @@ test("历史择时决策记录只手工保存操作与结果并从 model_run 派
 });
 
 test("model_run migration 完整拆分 payload 并合并整体结论", async () => {
-  const [migration, recommendationMigration] = await Promise.all([
+  const [migration, recommendationMigration, sampleMigration] = await Promise.all([
     readFile(
       new URL(
         "../financing-model-migrations/0002_structure_model_run.sql",
@@ -457,6 +458,13 @@ test("model_run migration 完整拆分 payload 并合并整体结论", async () 
     readFile(
       new URL(
         "../financing-model-migrations/0003_driver_groups_and_product_scenarios.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../financing-model-migrations/0004_model_sample_range.sql",
         import.meta.url,
       ),
       "utf8",
@@ -477,6 +485,9 @@ test("model_run migration 完整拆分 payload 并合并整体结论", async () 
   assert.match(recommendationMigration, /decision_action text NOT NULL/);
   assert.match(recommendationMigration, /outcome text NOT NULL DEFAULT ''/);
   assert.doesNotMatch(recommendationMigration, /\bstatus\b/);
+  assert.match(sampleMigration, /ADD COLUMN model_sample_count integer/);
+  assert.match(sampleMigration, /model_sample_start_date date/);
+  assert.match(sampleMigration, /model_sample_end_date date/);
 });
 
 test("卖方观点快照保存搜索口径和完整 payload", async () => {
@@ -525,7 +536,7 @@ test("卖方逻辑汇总编辑采用追加快照并保留检索证据", async ()
 });
 
 test("融资模型页面按决策三行展示并提供品种推荐和验证说明", async () => {
-  const [page, research] = await Promise.all([
+  const [page, research, chart] = await Promise.all([
     readFile(
       new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url),
       "utf8",
@@ -537,6 +548,10 @@ test("融资模型页面按决策三行展示并提供品种推荐和验证说�
       ),
       "utf8",
     ),
+    readFile(
+      new URL("../src/charts/financing-model.ts", import.meta.url),
+      "utf8",
+    ),
   ]);
 
   assert.match(page, /market_drivers\.slice\(0, 5\)/);
@@ -544,6 +559,10 @@ test("融资模型页面按决策三行展示并提供品种推荐和验证说�
   assert.match(page, /renderer=\{renderFinancingDriverRadar\}/);
   assert.match(page, /renderer=\{renderFinancingDriverContributions\}/);
   assert.match(page, /renderer=\{renderFinancingProductComparison\}/);
+  assert.match(page, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
+  assert.match(page, /PanelHeading from "\$lib\/trading-research\/PanelHeading\.svelte"/);
+  assert.match(page, /title="因子贡献"/);
+  assert.doesNotMatch(page, /因子贡献（\+ 支持发行）/);
   assert.match(page, /窗口处于\{snapshot\.prediction\.window_zone\}区间/);
   assert.match(page, /正值支持发行/);
   assert.match(page, /aria-label="编辑整体结论"/);
@@ -575,6 +594,11 @@ test("融资模型页面按决策三行展示并提供品种推荐和验证说�
   }
   assert.match(page, /aria-describedby=\{`validation-tip-\$\{index\}`\}/);
   assert.match(page, /role="tooltip"/);
+  assert.match(page, /validation\.tscv\.sample_count \?\? validation\.tscv\.validation_samples/);
+  assert.match(chart, /name: "正号代表支持发行（融资成本低）"/);
+  assert.match(chart, /splitLine: \{ show: false \}/);
+  assert.doesNotMatch(chart, /支持发行（降低成本）/);
+  assert.doesNotMatch(chart, /showBackground|backgroundStyle/);
   assert.match(
     page,
     /\.sell-side-grid\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:/,

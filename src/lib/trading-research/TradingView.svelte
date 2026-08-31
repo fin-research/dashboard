@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
+  import ModuleCard from "../../components/ModuleCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import Badge from "./Badge.svelte";
   import PanelHeading from "./PanelHeading.svelte";
@@ -119,7 +120,7 @@
   </section>
 
   <div class="tr-two-column tr-two-column--trading">
-    <section class="tr-panel" aria-labelledby="product-structure-title">
+    <ModuleCard labelledBy="product-structure-title">
       <PanelHeading id="product-structure-title" title="业务品种分布">
         <Badge>按当日成交金额</Badge>
       </PanelHeading>
@@ -129,9 +130,9 @@
         ariaLabel="按当日成交金额统计的业务品种分布横向柱状图"
         className="tr-chart-host tr-chart-host--compact"
       />
-    </section>
+    </ModuleCard>
 
-    <section class="tr-panel" aria-labelledby="counterparty-title">
+    <ModuleCard labelledBy="counterparty-title">
       <PanelHeading id="counterparty-title" title="交易对手集中度">
         <Badge>前五名</Badge>
       </PanelHeading>
@@ -144,10 +145,10 @@
           </li>
         {/each}
       </ol>
-    </section>
+    </ModuleCard>
   </div>
 
-  <section class="tr-panel" aria-labelledby="trade-table-title">
+  <ModuleCard labelledBy="trade-table-title">
     <PanelHeading id="trade-table-title" title="交易记录" wrap>
       <div class="tr-table-controls" role="search">
         <label class="tr-search-control">
@@ -204,5 +205,5 @@
         </tbody>
       </table>
     </div>
-  </section>
+  </ModuleCard>
 </div>

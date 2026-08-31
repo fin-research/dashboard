@@ -67,7 +67,7 @@ Worker 通过 `HYPERDRIVE` 访问 `credit` schema；本地导入脚本使用直�
 
 Worker 通过同一 `HYPERDRIVE` 访问 `financing_model` schema：
 
-- `model_run`：quant pipeline 每次运行追加的结构化模型记录；标量直接落列，校验迭代、分组均值和优选日期使用 PostgreSQL 原生数组，当前整体结论与模型基础结论分别落列。
+- `model_run`：quant pipeline 每次运行追加的结构化模型记录；标量直接落列，完整训练样本量与起止发行日独立于样本外验证指标保存，校验迭代、分组均值和优选日期使用 PostgreSQL 原生数组，当前整体结论与模型基础结论分别落列。
 - `model_run_market_driver`：每次运行的有序市场驱动因子，主键 `(run_id, ordinal)`。
 - `model_run_driver_group`：六类正式特征组的局部 SHAP 发行支持度与权重，主键 `(run_id, ordinal)`。
 - `model_run_product_scenario`：3Y/5Y 公募债与次级债四种方案相对各自同类债中位数的同批预测、排序及推荐标记，主键 `(run_id, ordinal)`。

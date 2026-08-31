@@ -2,7 +2,9 @@
   import { onMount } from "svelte";
 
   import { portal } from "../portal";
+  import ModuleCard from "../../components/ModuleCard.svelte";
   import EconomicIndicatorCard from "./EconomicIndicatorCard.svelte";
+  import PanelHeading from "./PanelHeading.svelte";
   import SectionHeading from "./SectionHeading.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import {
@@ -67,17 +69,16 @@
   {/if}
 
   {#each groups as group, groupIndex}
-    <section
+    <ModuleCard
       class="tr-economic-group"
       style={`--tr-economic-accent: ${group.accent}`}
-      aria-labelledby={`economic-group-${groupIndex}`}
+      labelledBy={`economic-group-${groupIndex}`}
     >
-      <header class="tr-economic-group__header">
-        <div>
-          <span aria-hidden="true"></span>
-          <h2 id={`economic-group-${groupIndex}`}>{group.type}</h2>
-        </div>
-      </header>
+      <PanelHeading
+        id={`economic-group-${groupIndex}`}
+        title={group.type}
+        accent={group.accent}
+      />
       <div class="tr-economic-grid">
         {#each group.indicators as indicator (indicator.key)}
           <EconomicIndicatorCard
@@ -87,6 +88,6 @@
           />
         {/each}
       </div>
-    </section>
+    </ModuleCard>
   {/each}
 </div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ModuleCard from "../../components/ModuleCard.svelte";
+
   import Badge from "./Badge.svelte";
   import PanelHeading from "./PanelHeading.svelte";
   import SectionHeading from "./SectionHeading.svelte";
@@ -44,7 +46,7 @@
     </div>
   </section>
 
-  <section class="tr-panel" aria-labelledby="workflow-list-title">
+  <ModuleCard labelledBy="workflow-list-title">
     <PanelHeading id="workflow-list-title" title="我的流程与待办复核">
       <Badge tone="info">{workflowDemos.length} 条任务</Badge>
     </PanelHeading>
@@ -73,5 +75,5 @@
         </article>
       {/each}
     </div>
-  </section>
+  </ModuleCard>
 </div>

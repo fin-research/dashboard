@@ -115,6 +115,7 @@ export const financingModelSnapshotSchema = z
           .object({
             folds: z.number().int().positive(),
             validation_samples: z.number().int().nonnegative(),
+            sample_count: z.number().int().positive().nullable(),
             sample_start_date: z.string().date().nullable(),
             sample_end_date: z.string().date().nullable(),
             rmse: z.number().finite(),

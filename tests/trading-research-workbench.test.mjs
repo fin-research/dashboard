@@ -215,7 +215,8 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
     "../src/lib/trading-research/ResearchView.svelte",
     "../src/lib/trading-research/WorkflowView.svelte",
   ];
-  const [metricCard, coreMetrics, metricIcon, panelHeading, workbenchPage, bond, financing, styles, design, ...views] = await Promise.all([
+  const [moduleCard, metricCard, coreMetrics, metricIcon, panelHeading, workbenchPage, bond, financing, styles, design, ...views] = await Promise.all([
+    readFile(new URL("../src/components/ModuleCard.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/components/MetricCard.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/components/CoreMetrics.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/components/MetricIcon.svelte", import.meta.url), "utf8"),
@@ -230,6 +231,8 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
 
   for (const view of views) {
     assert.match(view, /SectionHeading from "\.\/SectionHeading\.svelte"/);
+    assert.match(view, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
+    assert.match(view, /<ModuleCard/);
   }
   for (const view of [...views.slice(0, 3), views[4]]) {
     assert.match(view, /PanelHeading from "\.\/PanelHeading\.svelte"/);
@@ -244,6 +247,13 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
     assert.match(integratedPage, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
     assert.match(integratedPage, /<MetricCard/);
   }
+  assert.match(financing, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
+  assert.match(financing, /<ModuleCard/);
+  assert.match(financing, /PanelHeading from "\$lib\/trading-research\/PanelHeading\.svelte"/);
+  assert.match(moduleCard, /class=\{`module-card tr-panel/);
+  assert.match(moduleCard, /border:\s*1px solid var\(--tr-border/);
+  assert.match(moduleCard, /border-radius:\s*var\(--tr-radius-card/);
+  assert.match(moduleCard, /box-shadow:\s*var\(/);
   assert.match(metricCard, /detailPrefix/);
   assert.match(metricCard, /iconPosition/);
   assert.match(metricCard, /iconPosition = "start"/);
@@ -256,8 +266,11 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.doesNotMatch(coreMetrics, /core-card|card__balance/);
   assert.match(metricIcon, /class=\{`metric-icon metric-icon--\$\{icon\}`\}/);
   assert.match(panelHeading, /tr-panel-heading__controls/);
-  assert.match(styles, /\.tr-panel-heading\s*\{[\s\S]*?display:\s*grid/);
+  assert.match(panelHeading, /tr-panel-heading__mark/);
+  assert.match(panelHeading, /\.tr-panel-heading\s*\{[\s\S]*?display:\s*grid/);
+  assert.match(panelHeading, /font-size:\s*1\.125rem/);
   assert.match(styles, /\.tr-panel-heading--wrap \.tr-table-controls\s*\{[\s\S]*?flex-wrap:\s*nowrap/);
+  assert.doesNotMatch(styles, /^\.tr-panel\s*\{/m);
   assert.match(workbenchPage, /id="tr-topbar-actions"/);
   assert.doesNotMatch(workbenchPage, /观测日期|见各指标卡/);
   assert.match(bond, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
@@ -269,6 +282,7 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.doesNotMatch(styles, /\.tr-(metric-card|rate-card)\b/);
   assert.match(design, /共享组件归属与复用顺序/);
   assert.match(design, /src\/components\/MetricCard\.svelte/);
+  assert.match(design, /src\/components\/ModuleCard\.svelte/);
   assert.match(design, /禁止先在页面内实现/);
 });
 

@@ -16,7 +16,9 @@
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import MetricIcon from "../../components/MetricIcon.svelte";
+  import ModuleCard from "../../components/ModuleCard.svelte";
   import InstitutionLogo from "$lib/components/InstitutionLogo.svelte";
+  import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
   import {
     conclusionSchema,
     parseFinancingModelReport,
@@ -99,8 +101,8 @@
     ? [
         {
           label: "样本量",
-          value: `${validation.tscv.validation_samples} 笔`,
-          tip: "扩展窗口时序验证中所有样本外预测的发行记录数。",
+          value: `${validation.tscv.sample_count ?? validation.tscv.validation_samples} 笔`,
+          tip: "最终预测模型实际使用的全部有效历史发行样本数。",
         },
         {
           label: "样本区间",
@@ -108,7 +110,7 @@
             validation.tscv.sample_start_date,
             validation.tscv.sample_end_date,
           ),
-          tip: "样本外验证记录中最早至最晚的发行日期。",
+          tip: "最终预测模型全部有效历史样本的最早至最晚发行日期。",
         },
         {
           label: "胜率",
@@ -493,8 +495,8 @@
   {:else if report && snapshot}
     <main id="financing-model-report" class="report-stack">
       <section class="decision-grid" aria-label="融资窗口与整体结论">
-        <article class="panel window-card">
-          <h2>融资窗口</h2>
+        <ModuleCard class="window-card" labelledBy="financing-window-title">
+          <PanelHeading id="financing-window-title" title="融资窗口" />
           <div class="window-card-body">
             <ChartHost
               renderer={renderFinancingGauge}
@@ -514,21 +516,18 @@
               </p>
             </div>
           </div>
-        </article>
+        </ModuleCard>
 
-        <article class="panel conclusion-card">
-            <div class="card-title-row">
-              <h2>整体结论</h2>
-              <div class="card-title-actions">
-                {#if !editingConclusion}
-                  <button class="icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
-                    </svg>
-                  </button>
-                {/if}
-              </div>
-            </div>
+        <ModuleCard class="conclusion-card" labelledBy="overall-conclusion-title">
+            <PanelHeading id="overall-conclusion-title" title="整体结论">
+              {#if !editingConclusion}
+                <button class="icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
+                  </svg>
+                </button>
+              {/if}
+            </PanelHeading>
             {#if editingConclusion}
               <form onsubmit={(event) => { event.preventDefault(); saveConclusion(); }}>
                 <label>
@@ -549,32 +548,32 @@
               <strong class="conclusion-verdict">{report.conclusion.verdict}</strong>
               <p>{report.conclusion.narrative}</p>
             {/if}
-        </article>
+        </ModuleCard>
       </section>
 
       <section class="driver-grid" aria-label="模型驱动解释">
-        <article class="panel chart-card">
-          <h2>驱动结构</h2>
+        <ModuleCard class="chart-card" labelledBy="driver-structure-title">
+          <PanelHeading id="driver-structure-title" title="驱动结构" />
           <ChartHost
             renderer={renderFinancingDriverRadar}
             args={[snapshot.driver_structure]}
             ariaLabel="按六类因子汇总的 SHAP 发行支持度雷达图"
             className="driver-radar-chart"
           />
-        </article>
-        <article class="panel chart-card">
-          <h2>因子贡献（+ 支持发行）</h2>
+        </ModuleCard>
+        <ModuleCard class="chart-card" labelledBy="factor-contribution-title">
+          <PanelHeading id="factor-contribution-title" title="因子贡献" />
           <ChartHost
             renderer={renderFinancingDriverContributions}
             args={[marketDrivers]}
             ariaLabel="当前预测 Top 5 因子贡献，正值支持发行"
             className="driver-contribution-chart"
           />
-        </article>
+        </ModuleCard>
       </section>
 
       <section class="business-section" aria-labelledby="business-title">
-        <h2 id="business-title">业务指标</h2>
+        <PanelHeading id="business-title" title="业务指标" />
         <div class="business-metric-grid">
           {#each businessMetrics as metric}
             <MetricCard
@@ -594,18 +593,18 @@
       {#if productRecommendation}
         <section class="product-section" aria-labelledby="product-title">
           <div class="product-layout">
-            <article class="panel chart-card">
-              <h2 id="product-title">品种推荐</h2>
+            <ModuleCard class="chart-card" labelledBy="product-title">
+              <PanelHeading id="product-title" title="品种推荐" />
               <ChartHost
                 renderer={renderFinancingProductComparison}
                 args={[productRecommendation]}
                 ariaLabel="3年与5年公募债和次级债预测偏离对比"
                 className="product-comparison-chart"
               />
-            </article>
-            <article class="panel product-result">
-              <h2>模型推荐</h2>
-              <strong>{productRecommendation.recommended_product}</strong>
+            </ModuleCard>
+            <ModuleCard class="product-result" labelledBy="product-result-title">
+              <PanelHeading id="product-result-title" title="模型推荐" />
+              <strong class="product-result-name">{productRecommendation.recommended_product}</strong>
               {#if recommendedScenario}
                 <span class={`recommendation-badge recommendation-badge--${recommendedScenario.recommendation}`}>
                   {recommendedScenario.recommendation_label}
@@ -615,15 +614,14 @@
                   P{recommendedScenario.historical_percentile.toFixed(0)}
                 </p>
               {/if}
-            </article>
+            </ModuleCard>
           </div>
         </section>
       {/if}
 
       <section class="supporting-grid" aria-label="未来发行窗口与模型验证">
-        <article class="panel forecast-panel">
-          <div class="panel-title-row">
-            <h2 id="window-title">未来发行窗口</h2>
+        <ModuleCard class="forecast-panel" labelledBy="window-title">
+          <PanelHeading id="window-title" title="未来发行窗口">
             <button
               class="window-details-toggle"
               type="button"
@@ -634,7 +632,7 @@
             >
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
             </button>
-          </div>
+          </PanelHeading>
             <ChartHost
               renderer={renderFinancingForecast}
               args={[snapshot.forecast_window]}
@@ -670,9 +668,9 @@
                 </tbody>
               </table>
             </div>
-        </article>
-        <article class="panel validation-panel">
-          <h2>模型验证</h2>
+        </ModuleCard>
+        <ModuleCard class="validation-panel" labelledBy="validation-title">
+          <PanelHeading id="validation-title" title="模型验证" />
           <dl class="validation-grid">
             {#each validationMetrics as metric, index}
               <div>
@@ -692,18 +690,17 @@
               </div>
             {/each}
             </dl>
-        </article>
+        </ModuleCard>
       </section>
 
-      <section class="analysis-section decision-history-section" aria-labelledby="decision-history-title">
-        <div class="section-heading section-heading--actions">
-          <h2 id="decision-history-title">历史择时决策记录</h2>
+      <ModuleCard class="decision-history-section" labelledBy="decision-history-title">
+        <PanelHeading id="decision-history-title" title="历史择时决策记录">
           {#if !editingDecision}
             <button class="primary-button" type="button" onclick={() => openDecisionEditor()}>
               录入当前决策
             </button>
           {/if}
-        </div>
+        </PanelHeading>
 
         {#if editingDecision}
           <form class="decision-editor" onsubmit={(event) => { event.preventDefault(); saveDecision(); }}>
@@ -765,16 +762,10 @@
             </tbody>
           </table>
         </div>
-      </section>
+      </ModuleCard>
 
-      <section class="analysis-section sell-side-section" aria-labelledby="sell-side-title">
-        <div class="section-heading section-heading--actions">
-          <div>
-            <span class="section-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 1a3 3 0 1 0 0-6M2 21v-2a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v2m2-7a5 5 0 0 1 6 5v2" /></svg>
-            </span>
-            <h2 id="sell-side-title">卖方观点</h2>
-          </div>
+      <ModuleCard class="sell-side-section" labelledBy="sell-side-title">
+        <PanelHeading id="sell-side-title" title="卖方观点">
           <div class="section-actions">
             {#if report.sellSide && !editingSellSide}
               <button class="icon-button" type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
@@ -787,7 +778,7 @@
               {generatingResearch ? "生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
             </button>
           </div>
-        </div>
+        </PanelHeading>
 
         {#if report.sellSide}
           <div class="sell-side-summary-card">
@@ -826,7 +817,7 @@
             <p>尚未生成卖方观点。</p>
           </div>
         {/if}
-      </section>
+      </ModuleCard>
 
     </main>
   {/if}
@@ -895,10 +886,6 @@
   .model-actions,
   .model-as-of,
   .refresh-control,
-  .section-heading,
-  .section-heading > div,
-  .card-title-row,
-  .card-title-actions,
   .editor-actions,
   .section-actions {
     display: flex;
@@ -954,8 +941,7 @@
 
   .model-back svg,
   .model-as-of svg,
-  .refresh-control svg,
-  .section-icon svg {
+  .refresh-control svg {
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -1013,43 +999,6 @@
     gap: 16px;
   }
 
-  .summary-section,
-  .analysis-section {
-    padding: 18px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-card);
-    background: var(--bg-card);
-    box-shadow: var(--shadow-card);
-  }
-
-  .section-heading {
-    gap: 10px;
-    min-height: 44px;
-    margin-bottom: 12px;
-  }
-
-  .section-heading h2 {
-    margin: 0;
-    color: #173b78;
-    font-size: 1.25rem;
-    font-weight: bold;
-  }
-
-  .section-icon {
-    display: grid;
-    width: 36px;
-    height: 36px;
-    place-items: center;
-    border-radius: 8px;
-    color: var(--brand-deep);
-    background: var(--brand-soft);
-  }
-
-  .section-icon svg {
-    width: 21px;
-  }
-
-  .panel,
   .sell-side-summary-card,
   .sell-side-card {
     border: 1px solid var(--border);
@@ -1057,21 +1006,9 @@
     background: var(--surface);
   }
 
-  .panel h3 {
-    margin: 0;
-    font-size: 1.125rem;
-    font-weight: bold;
-  }
-
-  .card-title-row,
-  .card-title-actions,
   .section-actions {
     justify-content: space-between;
     gap: 10px;
-  }
-
-  .card-title-actions {
-    justify-content: flex-end;
   }
 
   .conclusion-verdict {
@@ -1124,28 +1061,28 @@
     stroke-width: 1.9;
   }
 
-  .conclusion-card form,
-  .conclusion-card label,
+  :global(.conclusion-card) form,
+  :global(.conclusion-card) label,
   .sell-side-summary-card form,
   .sell-side-summary-card label {
     display: grid;
     gap: 7px;
   }
 
-  .conclusion-card form,
+  :global(.conclusion-card) form,
   .sell-side-summary-card form {
     gap: 11px;
     margin-top: 12px;
   }
 
-  .conclusion-card label > span,
+  :global(.conclusion-card) label > span,
   .sell-side-summary-card label > span {
     font-size: 0.875rem;
     font-weight: bold;
   }
 
-  .conclusion-card input,
-  .conclusion-card textarea,
+  :global(.conclusion-card) input,
+  :global(.conclusion-card) textarea,
   .sell-side-summary-card textarea {
     width: 100%;
     min-height: 44px;
@@ -1157,7 +1094,7 @@
     font: inherit;
   }
 
-  .conclusion-card textarea,
+  :global(.conclusion-card) textarea,
   .sell-side-summary-card textarea {
     min-height: 124px;
     resize: vertical;
@@ -1195,10 +1132,6 @@
     background: #fff;
   }
 
-  .section-heading--window {
-    width: fit-content;
-  }
-
   .window-details-toggle {
     display: grid;
     width: 44px;
@@ -1231,10 +1164,6 @@
     transform: rotate(180deg);
   }
 
-  .panel {
-    padding: 16px;
-  }
-
   .decision-grid,
   .driver-grid,
   .product-layout,
@@ -1257,14 +1186,6 @@
 
   .supporting-grid {
     grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.8fr);
-  }
-
-  .panel h2,
-  .business-section h2 {
-    margin: 0;
-    color: #173b78;
-    font-size: 1.125rem;
-    font-weight: bold;
   }
 
   .window-card-body {
@@ -1294,8 +1215,8 @@
   }
 
   .window-decision p,
-  .conclusion-card p,
-  .product-result p {
+  :global(.conclusion-card) p,
+  :global(.product-result) p {
     margin: 0;
     color: var(--text-2);
     font-size: 1rem;
@@ -1342,7 +1263,7 @@
     border-color: color-mix(in srgb, var(--brand) 28%, var(--line));
   }
 
-  .conclusion-card .conclusion-verdict {
+  :global(.conclusion-card) .conclusion-verdict {
     margin-top: 4px;
   }
 
@@ -1359,7 +1280,6 @@
 
   .business-section {
     display: grid;
-    gap: 10px;
   }
 
   .business-metric-grid {
@@ -1383,21 +1303,15 @@
     background: color-mix(in srgb, #eaf1fd 46%, var(--surface));
   }
 
-  .product-result > strong {
+  .product-result-name {
     color: #173b78;
     font-size: 1.5rem;
     font-weight: bolder;
   }
 
-  .panel-title-row,
   .validation-label {
     display: flex;
     align-items: center;
-  }
-
-  .panel-title-row {
-    justify-content: space-between;
-    gap: 12px;
   }
 
   .forecast-panel {
@@ -1644,14 +1558,6 @@
     text-align: center !important;
   }
 
-  .section-heading--actions {
-    justify-content: space-between;
-  }
-
-  .section-heading--actions > div {
-    gap: 10px;
-  }
-
   .research-button {
     min-width: 158px;
   }
@@ -1862,11 +1768,6 @@
       min-width: 0;
     }
 
-    .summary-section,
-    .analysis-section {
-      padding: 12px;
-    }
-
     .driver-grid,
     .business-metric-grid {
       grid-template-columns: 1fr;
@@ -1888,11 +1789,6 @@
     .window-decision {
       justify-items: center;
       text-align: center;
-    }
-
-    .section-heading--actions {
-      align-items: flex-start;
-      gap: 12px;
     }
 
     .section-actions {

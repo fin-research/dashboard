@@ -64,7 +64,7 @@ endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `func
 
 ### 融资择时模型
 
-- `GET /api/financing-model`：返回最新 quant 模型快照、当前有效整体结论和最近卖方观点；模型快照包含实际 LCR/NSFR、六类 SHAP 驱动结构、Top 因子贡献、四种品种相对各自同类债中位数的预测偏离与样本外验证区间；无模型运行返回 404。
+- `GET /api/financing-model`：返回最新 quant 模型快照、当前有效整体结论和最近卖方观点；模型快照包含实际 LCR/NSFR、六类 SHAP 驱动结构、Top 因子贡献、四种品种相对各自同类债中位数的预测偏离、完整训练样本区间与样本外验证指标；无模型运行返回 404。
 - `GET /api/financing-model?run=<uuid>`：读取指定运行；模型基础字段保持不变，当前整体结论可由 PATCH 增量更新。
 - `PATCH /api/financing-model/conclusion`：增量更新目标 `model_run` 的当前整体结论；请求含 `runId`、`verdict`、`preferredWindow`、`narrative`，不修改模型基础结论。
 - `GET /api/financing-model/decisions`：读取历史择时决策记录；日期、历史分位和发行建议来自对应模型运行，按模型日期倒序返回。

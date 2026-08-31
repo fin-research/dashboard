@@ -3,6 +3,7 @@
 
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
+  import ModuleCard from "../../components/ModuleCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import { fetchCreditReport } from "../credit/client.ts";
   import type { CreditReportResponse } from "../credit/types.ts";
@@ -93,7 +94,7 @@
     </div>
   </section>
 
-  <section class="tr-panel" aria-labelledby="business-snapshot-title">
+  <ModuleCard labelledBy="business-snapshot-title">
     <PanelHeading id="business-snapshot-title" title="交易与授信结构">
       <Badge tone="info">多基准日</Badge>
     </PanelHeading>
@@ -103,9 +104,9 @@
       ariaLabel="交易品种与授信使用率结构横向柱状图"
       className="tr-chart-host tr-chart-host--compact"
     />
-  </section>
+  </ModuleCard>
 
-  <section class="tr-panel" aria-labelledby="overview-alerts-title">
+  <ModuleCard labelledBy="overview-alerts-title">
     <PanelHeading id="overview-alerts-title" title="待办与风险">
       <Badge tone="warning">{overviewAlerts.length} 项</Badge>
     </PanelHeading>
@@ -124,5 +125,5 @@
         </article>
       {/each}
     </div>
-  </section>
+  </ModuleCard>
 </div>

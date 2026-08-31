@@ -112,13 +112,14 @@ export async function loadFinancingModelReport(
            'tscv', jsonb_build_object(
              'folds', run.cv_folds,
              'validation_samples', run.cv_validation_samples,
+             'sample_count', run.model_sample_count,
              'sample_start_date', CASE
-               WHEN run.cv_sample_start_date IS NULL THEN NULL
-               ELSE to_char(run.cv_sample_start_date, 'YYYY-MM-DD')
+               WHEN run.model_sample_start_date IS NULL THEN NULL
+               ELSE to_char(run.model_sample_start_date, 'YYYY-MM-DD')
              END,
              'sample_end_date', CASE
-               WHEN run.cv_sample_end_date IS NULL THEN NULL
-               ELSE to_char(run.cv_sample_end_date, 'YYYY-MM-DD')
+               WHEN run.model_sample_end_date IS NULL THEN NULL
+               ELSE to_char(run.model_sample_end_date, 'YYYY-MM-DD')
              END,
              'rmse', run.cv_rmse,
              'mae', run.cv_mae,

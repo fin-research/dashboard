@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from "svelte";
 
   import MetricCard from "../../components/MetricCard.svelte";
+  import ModuleCard from "../../components/ModuleCard.svelte";
   import { portal } from "../portal.ts";
   import {
     fetchCreditReport,
@@ -568,7 +569,7 @@
       </div>
     </section>
 
-    <section class="tr-panel" aria-labelledby="credit-table-title">
+    <ModuleCard labelledBy="credit-table-title">
       <PanelHeading id="credit-table-title" title="授信一览表" wrap>
         <div class="tr-table-controls" role="search">
           <label class="tr-search-control">
@@ -677,11 +678,11 @@
           </tbody>
         </table>
       </div>
-    </section>
+    </ModuleCard>
   {:else if activeTab === "calendar"}
     <section aria-labelledby="credit-calendar-title">
       <SectionHeading id="credit-calendar-title" title="授信日历" />
-      <div class="tr-panel tr-credit-calendar-panel">
+      <ModuleCard class="tr-credit-calendar-panel" labelledBy="credit-calendar-title">
         <div class="tr-credit-calendar-toolbar">
           <div class="tr-credit-calendar-filter" role="group" aria-label="授信日历事件类型">
             <button class:active={calendarFilter === "all"} type="button" onclick={() => (calendarFilter = "all")}>全部</button>
@@ -711,7 +712,7 @@
             </div>
           {/each}
         </div>
-      </div>
+      </ModuleCard>
     </section>
   {:else}
     <div class="tr-credit-weekly-report">
@@ -726,7 +727,7 @@
         </div>
       </section>
 
-      <section class="tr-panel" aria-labelledby="credit-news-title">
+      <ModuleCard labelledBy="credit-news-title">
         <PanelHeading id="credit-news-title" title="本周授信快讯"><Badge>{weeklyNews.length} 项</Badge></PanelHeading>
         {#if !report.previousDate}
           <p class="tr-credit-muted">需要至少两个报表日才能生成本周变化。</p>
@@ -735,9 +736,9 @@
         {:else}
           <ol class="tr-credit-news-list">{#each weeklyNews as news}<li>{news}。</li>{/each}</ol>
         {/if}
-      </section>
+      </ModuleCard>
 
-      <section class="tr-panel" aria-labelledby="credit-limit-changes-title">
+      <ModuleCard labelledBy="credit-limit-changes-title">
         <PanelHeading id="credit-limit-changes-title" title="授信额度变动"><Badge tone={report.limitChanges.length ? "warning" : "success"}>{report.limitChanges.length} 家</Badge></PanelHeading>
         <div class="tr-table-scroll">
           <table class="tr-data-table tr-credit-change-table">
@@ -752,7 +753,7 @@
             </tbody>
           </table>
         </div>
-      </section>
+      </ModuleCard>
     </div>
   {/if}
 </div>
