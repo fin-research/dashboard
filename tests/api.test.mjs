@@ -154,6 +154,25 @@ test("浏览器一次拉取原始资源并加工为视觉与文字共享报告",
   assert.equal(report.cached_at, snapshot().cached_at);
 });
 
+test("当天尚无人工定稿时继续使用实时市场数据", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url) =>
+    String(url).startsWith("/api/market-report?")
+      ? Response.json(
+          { error: "该日期尚无市场点评定稿" },
+          { status: 404 },
+        )
+      : directResponse(url);
+
+  const report = await fetchReport("2026-08-25", false);
+
+  assert.equal(report.report_date, "2026-08-25");
+  assert.equal(report.focus_text, "");
+  assert.equal(report.finalized_at, null);
+  assert.equal(report.equities[0].name, "上证指数");
+});
+
 test("原始资源请求不附带 GraphQL refresh 参数", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
