@@ -4,6 +4,7 @@ import {
   GaugeChart,
   LineChart,
   PieChart,
+  RadarChart,
   ScatterChart,
   TreemapChart,
 } from "echarts/charts";
@@ -13,6 +14,7 @@ import {
   GridComponent,
   LegendComponent,
   MarkLineComponent,
+  RadarComponent,
   TooltipComponent,
 } from "echarts/components";
 import { LabelLayout } from "echarts/features";
@@ -30,6 +32,8 @@ echarts.use([
   LabelLayout,
   LineChart,
   PieChart,
+  RadarChart,
+  RadarComponent,
   ScatterChart,
   TooltipComponent,
   TreemapChart,

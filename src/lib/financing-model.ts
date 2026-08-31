@@ -25,12 +25,15 @@ export const financingModelSnapshotSchema = z
         historical_percentile: z.number().min(0).max(100),
         recommendation: z.enum(["strong_buy", "neutral", "wait"]),
         recommendation_label: z.string().min(1),
+        window_zone: z.enum(["较优", "中枢", "较劣"]),
         decision: z.string().min(1),
       })
       .strict(),
     company_metrics: z
       .object({
         date: z.string().date(),
+        ef_lcr: nullableNumber,
+        ef_nsfr: nullableNumber,
         ef_lcr_pctile_60d: nullableNumber,
         ef_nsfr_pctile_60d: nullableNumber,
         ef_funding_gap: nullableNumber,
@@ -57,6 +60,42 @@ export const financingModelSnapshotSchema = z
         })
         .strict(),
     ),
+    driver_structure: z.array(
+      z
+        .object({
+          category: z.string().min(1),
+          display_name: z.string().min(1),
+          support_score: z.number().min(0).max(100),
+          support_bp: z.number().finite(),
+          importance_weight: z.number().min(0).max(1),
+        })
+        .strict(),
+    ),
+    product_recommendation: z
+      .object({
+        recommended_product: z.string().min(1),
+        recommended_tenor_years: z.number().positive(),
+        recommended_bond_type: z.string().min(1),
+        scenarios: z.array(
+          z
+            .object({
+              display_name: z.string().min(1),
+              tenor_years: z.number().positive(),
+              bond_type: z.string().min(1),
+              pred_bp: z.number().finite(),
+              peer_spread_median_bp: z.number().finite(),
+              historical_percentile: z.number().min(0).max(100),
+              recommendation: z.enum(["strong_buy", "neutral", "wait"]),
+              recommendation_label: z.string().min(1),
+              rank: z.number().int().min(1).max(4),
+              cost_vs_best_bp: z.number().nonnegative(),
+              is_recommended: z.boolean(),
+            })
+            .strict(),
+        ).length(4),
+      })
+      .strict()
+      .nullable(),
     forecast_window: z.array(
       z
         .object({
@@ -76,7 +115,10 @@ export const financingModelSnapshotSchema = z
           .object({
             folds: z.number().int().positive(),
             validation_samples: z.number().int().nonnegative(),
+            sample_start_date: z.string().date().nullable(),
+            sample_end_date: z.string().date().nullable(),
             rmse: z.number().finite(),
+            mae: nullableNumber,
             ic: z.number().finite(),
             best_iter_median: z.number().int().positive(),
             best_iters: z.array(z.number().int().positive()),
@@ -134,6 +176,29 @@ export const conclusionUpdateSchema = z
     narrative: z.string().trim().min(1).max(4000),
   })
   .strict();
+
+export const timingDecisionInputSchema = z
+  .object({
+    runId: z.string().uuid(),
+    decisionAction: z.string().trim().min(1).max(1000),
+    outcome: z.string().trim().max(2000),
+  })
+  .strict();
+
+export const timingDecisionRecordSchema = z
+  .object({
+    runId: z.string().uuid(),
+    decisionDate: z.string().date(),
+    historicalPercentile: z.number().min(0).max(100),
+    recommendation: z.enum(["strong_buy", "neutral", "wait"]),
+    recommendationLabel: z.string().min(1),
+    decisionAction: z.string().min(1).max(1000),
+    outcome: z.string().max(2000),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
+export const timingDecisionHistorySchema = z.array(timingDecisionRecordSchema);
 
 const sellSideViewSchema = z
   .object({
@@ -230,6 +295,8 @@ export type FinancingModelConclusion = z.infer<typeof conclusionSchema>;
 export type FinancingModelConclusionUpdate = z.infer<
   typeof conclusionUpdateSchema
 >;
+export type TimingDecisionInput = z.infer<typeof timingDecisionInputSchema>;
+export type TimingDecisionRecord = z.infer<typeof timingDecisionRecordSchema>;
 export type SellSidePayload = z.infer<typeof sellSidePayloadSchema>;
 export type SellSideSummaryUpdate = z.infer<
   typeof sellSideSummaryUpdateSchema

@@ -64,9 +64,11 @@ endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `func
 
 ### 融资择时模型
 
-- `GET /api/financing-model`：返回最新 quant 模型快照、当前有效整体结论和最近卖方观点；无模型运行返回 404。
+- `GET /api/financing-model`：返回最新 quant 模型快照、当前有效整体结论和最近卖方观点；模型快照包含实际 LCR/NSFR、六类 SHAP 驱动结构、Top 因子贡献、四种品种相对各自同类债中位数的预测偏离与样本外验证区间；无模型运行返回 404。
 - `GET /api/financing-model?run=<uuid>`：读取指定运行；模型基础字段保持不变，当前整体结论可由 PATCH 增量更新。
 - `PATCH /api/financing-model/conclusion`：增量更新目标 `model_run` 的当前整体结论；请求含 `runId`、`verdict`、`preferredWindow`、`narrative`，不修改模型基础结论。
+- `GET /api/financing-model/decisions`：读取历史择时决策记录；日期、历史分位和发行建议来自对应模型运行，按模型日期倒序返回。
+- `POST /api/financing-model/decisions`：按 `runId` 新增或覆盖一条人工记录；`decisionAction` 必填，`outcome` 可在结果形成后补录，不设置状态字段。
 - `POST /api/financing-model/sell-side`：按 `runId` 使用 AI Search 与 AI Gateway 生成并追加卖方逻辑汇总及 4–5 家逐机构观点，成功为 201。
 - `PATCH /api/financing-model/sell-side`：追加人工卖方逻辑汇总修订；请求含 `runId`、`logicSummary`，保留原检索口径与来源证据。
 
@@ -83,7 +85,7 @@ endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `func
 
 - JSON 错误使用 `{ "error": "可公开信息" }`；服务端日志可记录诊断信息，但不得包含 Secret 或完整敏感输入。
 - 动态生成和台账 JSON 响应使用 `Cache-Control: no-store`。
-- 融资择时模型读取、人工结论、卖方生成和卖方修订响应同样使用 `Cache-Control: no-store`；写接口执行同源校验，但当前不等同于账号鉴权。
+- 融资择时模型读取、人工结论、历史决策记录、卖方生成和卖方修订响应同样使用 `Cache-Control: no-store`；写接口执行同源校验，但当前不等同于账号鉴权。
 - 日期参数使用严格 `YYYY-MM-DD`；起止日期必须同时提供且起始不晚于结束。
 - route handler 只做解析、校验、错误映射和服务调用；业务逻辑放入 `src/lib`。
 - 兼容跳转 `/bond-ledger` 固定以 308 指向 `/bond`。

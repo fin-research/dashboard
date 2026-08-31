@@ -6,19 +6,27 @@
   import "../../app.css";
   import "../../styles.css";
 
-  import { renderFinancingForecast } from "../../charts/financing-model";
+  import {
+    renderFinancingDriverContributions,
+    renderFinancingDriverRadar,
+    renderFinancingForecast,
+    renderFinancingGauge,
+    renderFinancingProductComparison,
+  } from "../../charts/financing-model";
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import MetricIcon from "../../components/MetricIcon.svelte";
   import InstitutionLogo from "$lib/components/InstitutionLogo.svelte";
   import {
-    companyBusinessNarrative,
     conclusionSchema,
     parseFinancingModelReport,
     sellSideSummaryBody,
     sellSidePayloadSchema,
+    timingDecisionHistorySchema,
+    timingDecisionRecordSchema,
     type FinancingModelConclusion,
     type FinancingModelReport,
+    type TimingDecisionRecord,
   } from "$lib/financing-model";
   import { globalMessages } from "$lib/global-messages";
   import { portal } from "$lib/portal";
@@ -28,79 +36,102 @@
   let loading = true;
   let saving = false;
   let savingSellSide = false;
+  let savingDecision = false;
   let generatingResearch = false;
   let editingConclusion = false;
   let editingSellSide = false;
+  let editingDecision = false;
   let futureWindowDetailsOpen = false;
   let errorMessage = "";
   let editVerdict = "";
   let editNarrative = "";
   let editSellSideSummary = "";
+  let editDecisionRunId = "";
+  let editDecisionAction = "";
+  let editDecisionOutcome = "";
+  let decisionHistory: TimingDecisionRecord[] = [];
 
   $: snapshot = report?.snapshot ?? null;
   $: company = snapshot?.company_metrics ?? null;
   $: validation = snapshot?.validation ?? null;
   $: marketDrivers = snapshot?.market_drivers.slice(0, 5) ?? [];
-  $: metrics = snapshot
+  $: productRecommendation = snapshot?.product_recommendation ?? null;
+  $: recommendedScenario =
+    productRecommendation?.scenarios.find((scenario) => scenario.is_recommended) ??
+    null;
+  $: businessMetrics = snapshot
     ? [
         {
-          label: "利差偏离",
-          value: formatSigned(snapshot.prediction.deviation_bp, 2),
-          unit: "bp",
-          tone: snapshot.prediction.deviation_bp <= 0 ? "good" : "bad",
-          detail:
-            snapshot.prediction.deviation_bp <= 0
-              ? "低于可比债中位数"
-              : "高于可比债中位数",
-          icon: "trade" as MetricIconName,
-        },
-        {
-          label: "历史分位",
-          value: `P${snapshot.prediction.historical_percentile.toFixed(0)}`,
-          unit: "",
-          tone: "primary",
-          detail:
-            snapshot.prediction.historical_percentile <= 50
-              ? "历史融资成本偏低"
-              : "历史融资成本偏高",
-          icon: "bond" as MetricIconName,
-        },
-        {
-          label: "LCR六十日分位",
-          value: formatPercent(company?.ef_lcr_pctile_60d),
-          unit: "",
+          label: "LCR",
+          value: formatRatioPercent(company?.ef_lcr),
+          unit: "%",
           tone: "teal",
-          detail: "短期流动性分位",
+          detail: lcrInsight(company?.ef_lcr),
           icon: "liquidity" as MetricIconName,
         },
         {
-          label: "NSFR六十日分位",
-          value: formatPercent(company?.ef_nsfr_pctile_60d),
-          unit: "",
-          tone: "teal",
-          detail: "稳定资金分位",
+          label: "NSFR",
+          value: formatRatioPercent(company?.ef_nsfr),
+          unit: "%",
+          tone: "blue",
+          detail: nsfrInsight(company?.ef_nsfr),
           icon: "leverage" as MetricIconName,
         },
         {
           label: "资金缺口",
           value: formatSignedNullable(company?.ef_funding_gap, 1),
           unit: "亿元",
-          tone: (company?.ef_funding_gap ?? 0) >= 0 ? "good" : "bad",
-          detail:
-            company?.ef_funding_gap === null || company?.ef_funding_gap === undefined
-              ? "公司资金数据暂缺"
-              : company.ef_funding_gap >= 0
-                ? "资金净余量"
-                : "资金净缺口",
+          tone: "orange",
+          detail: fundingGapInsight(company?.ef_funding_gap),
           icon: "bank" as MetricIconName,
         },
         {
           label: "主体利差",
           value: formatNullable(company?.ef_subject_spread_bp, 2),
           unit: "bp",
-          tone: "primary",
-          detail: "主体信用定价参考",
+          tone: "purple",
+          detail: subjectSpreadInsight(company?.ef_subject_spread_pctile),
           icon: "issuance" as MetricIconName,
+        },
+      ]
+    : [];
+  $: validationMetrics = validation
+    ? [
+        {
+          label: "样本量",
+          value: `${validation.tscv.validation_samples} 笔`,
+          tip: "扩展窗口时序验证中所有样本外预测的发行记录数。",
+        },
+        {
+          label: "样本区间",
+          value: formatDateRange(
+            validation.tscv.sample_start_date,
+            validation.tscv.sample_end_date,
+          ),
+          tip: "样本外验证记录中最早至最晚的发行日期。",
+        },
+        {
+          label: "胜率",
+          value: `${(validation.timing_value.win_rate * 100).toFixed(1)}%`,
+          tip: "模型推荐样本中，实际发行利差偏离低于零的记录占比。",
+        },
+        {
+          label: "历史节约",
+          value: `${formatSigned(validation.timing_value.cost_saving_bp, 2)} bp`,
+          tip: "全样本实际偏离均值减去模型推荐样本实际偏离均值，正值表示节约。",
+        },
+        {
+          label: "信息系数",
+          value: validation.tscv.ic.toFixed(3),
+          tip: "各时序验证折内预测偏离与实际偏离相关系数的平均值。",
+        },
+        {
+          label: "平均误差",
+          value:
+            validation.tscv.mae === null
+              ? "—"
+              : `${validation.tscv.mae.toFixed(2)} bp`,
+          tip: "所有样本外预测与实际发行利差偏离之差的平均绝对值。",
         },
       ]
     : [];
@@ -111,14 +142,29 @@
     loading = true;
     errorMessage = "";
     try {
-      const response = await fetch("/api/financing-model", {
-        headers: { Accept: "application/json" },
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "融资择时模型读取失败");
-      report = parseFinancingModelReport(payload);
+      const [reportResponse, historyResponse] = await Promise.all([
+        fetch("/api/financing-model", {
+          headers: { Accept: "application/json" },
+        }),
+        fetch("/api/financing-model/decisions", {
+          headers: { Accept: "application/json" },
+        }),
+      ]);
+      const [reportPayload, historyPayload] = await Promise.all([
+        reportResponse.json(),
+        historyResponse.json(),
+      ]);
+      if (!reportResponse.ok) {
+        throw new Error(reportPayload.error || "融资择时模型读取失败");
+      }
+      if (!historyResponse.ok) {
+        throw new Error(historyPayload.error || "择时决策记录读取失败");
+      }
+      report = parseFinancingModelReport(reportPayload);
+      decisionHistory = timingDecisionHistorySchema.parse(historyPayload);
       resetConclusionEditor();
       resetSellSideEditor();
+      closeDecisionEditor();
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
@@ -152,10 +198,69 @@
     editingSellSide = true;
   }
 
+  function openDecisionEditor(record?: TimingDecisionRecord): void {
+    if (!snapshot) return;
+    const current =
+      record ??
+      decisionHistory.find((item) => item.runId === snapshot?.run_id);
+    editDecisionRunId = current?.runId ?? snapshot.run_id;
+    editDecisionAction = current?.decisionAction ?? "";
+    editDecisionOutcome = current?.outcome ?? "";
+    editingDecision = true;
+  }
+
+  function closeDecisionEditor(): void {
+    editingDecision = false;
+    editDecisionRunId = "";
+    editDecisionAction = "";
+    editDecisionOutcome = "";
+  }
+
+  async function saveDecision(): Promise<void> {
+    if (!editDecisionRunId || savingDecision) return;
+    savingDecision = true;
+    try {
+      const response = await fetch("/api/financing-model/decisions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          runId: editDecisionRunId,
+          decisionAction: editDecisionAction,
+          outcome: editDecisionOutcome,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "择时决策记录保存失败");
+      const saved = timingDecisionRecordSchema.parse(payload);
+      decisionHistory = [
+        saved,
+        ...decisionHistory.filter((item) => item.runId !== saved.runId),
+      ].sort((left, right) => right.decisionDate.localeCompare(left.decisionDate));
+      closeDecisionEditor();
+      globalMessages.success("择时决策记录已保存", {
+        key: "financing-model-decision",
+        title: "保存完成",
+      });
+    } catch (error) {
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "financing-model-decision", title: "决策记录保存失败" },
+      );
+    } finally {
+      savingDecision = false;
+    }
+  }
+
   function financingMetricTone(
     tone: string,
-  ): "primary" | "teal" | "good" | "bad" {
-    if (tone === "teal" || tone === "good" || tone === "bad") return tone;
+  ): "primary" | "teal" | "blue" | "orange" | "purple" {
+    if (
+      tone === "teal" ||
+      tone === "blue" ||
+      tone === "orange" ||
+      tone === "purple"
+    )
+      return tone;
     return "primary";
   }
 
@@ -282,8 +387,44 @@
     return value === null || value === undefined ? "—" : formatSigned(value, digits);
   }
 
-  function formatPercent(value: number | null | undefined): string {
-    return value === null || value === undefined ? "—" : `${(value * 100).toFixed(1)}%`;
+  function formatRatioPercent(value: number | null | undefined): string {
+    return value === null || value === undefined ? "—" : (value * 100).toFixed(1);
+  }
+
+  function lcrInsight(value: number | null | undefined): string {
+    if (value === null || value === undefined) return "流动性数据暂缺";
+    if (value >= 1.5) return "流动性宽裕";
+    if (value >= 1) return "流动性充足";
+    return "流动性偏紧";
+  }
+
+  function nsfrInsight(value: number | null | undefined): string {
+    if (value === null || value === undefined) return "稳定资金数据暂缺";
+    if (value >= 1.2) return "稳定资金充足";
+    if (value >= 1) return "稳定资金达标";
+    return "稳定资金承压";
+  }
+
+  function fundingGapInsight(value: number | null | undefined): string {
+    if (value === null || value === undefined) return "资金缺口数据暂缺";
+    if (value < -100) return "资金缺口较大";
+    if (value > 50) return "资金较为宽裕";
+    return "资金缺口可控";
+  }
+
+  function subjectSpreadInsight(value: number | null | undefined): string {
+    if (value === null || value === undefined) return "主体利差分位暂缺";
+    if (value <= 0.33) return "主体利差相对低位";
+    if (value >= 0.67) return "主体利差相对高位";
+    return "主体利差处于中枢";
+  }
+
+  function formatDateRange(
+    start: string | null,
+    end: string | null,
+  ): string {
+    if (!start || !end) return "—";
+    return `${start.replaceAll("-", ".")}–${end.replaceAll("-", ".")}`;
   }
 
   function displayDate(value: string): string {
@@ -351,75 +492,33 @@
     </main>
   {:else if report && snapshot}
     <main id="financing-model-report" class="report-stack">
-      <section class="summary-section" aria-labelledby="summary-title">
-        <div class="section-heading">
-          <span class="section-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7M3 21h18" /></svg>
-          </span>
-          <h2 id="summary-title">发行建议</h2>
-        </div>
+      <section class="decision-grid" aria-label="融资窗口与整体结论">
+        <article class="panel window-card">
+          <h2>融资窗口</h2>
+          <div class="window-card-body">
+            <ChartHost
+              renderer={renderFinancingGauge}
+              args={[snapshot.prediction]}
+              ariaLabel={`融资窗口历史分位 P${snapshot.prediction.historical_percentile.toFixed(0)}`}
+              className="window-gauge"
+            />
+            <div class="window-decision">
+              <span class={`recommendation-badge recommendation-badge--${snapshot.prediction.recommendation}`}>
+                {snapshot.prediction.recommendation_label}
+              </span>
+              <h3>窗口处于{snapshot.prediction.window_zone}区间</h3>
+              <p>
+                模型预测发行利差相对偏离
+                <strong>{formatSigned(snapshot.prediction.deviation_bp, 2)} bp</strong>，处于历史
+                <strong>P{snapshot.prediction.historical_percentile.toFixed(0)}</strong>
+              </p>
+            </div>
+          </div>
+        </article>
 
-        <div class="summary-grid">
-          <article class="insight-card market-card">
-            <h3>市场数据</h3>
-            <p>
-              截至 {displayDate(snapshot.market_data_date)}，模型预测发行利差相对可比债中位数
-              <strong>{formatSigned(snapshot.prediction.deviation_bp, 2)} bp</strong>，处于历史
-              <strong>P{snapshot.prediction.historical_percentile.toFixed(0)}</strong>。
-            </p>
-            <ol class="market-driver-list" aria-label="市场驱动因子 Top 5">
-              {#each marketDrivers as driver}
-                <li>
-                  <span>{driver.display_name}</span>
-                  <strong class:cost-down={driver.impact === "降低成本"} class:cost-up={driver.impact === "推高成本"}>
-                    {driver.impact}
-                  </strong>
-                </li>
-              {/each}
-            </ol>
-          </article>
-
-          <article class="insight-card company-card">
-            <h3>公司业务指标</h3>
-            {#if company}
-              <p>{companyBusinessNarrative(company)}</p>
-              <ol class="market-driver-list" aria-label="公司业务指标">
-                <li>
-                  <span>LCR六十日分位</span>
-                  <strong class="business-value--liquidity">
-                    {formatPercent(company.ef_lcr_pctile_60d)}
-                  </strong>
-                </li>
-                <li>
-                  <span>NSFR六十日分位</span>
-                  <strong class="business-value--stability">
-                    {formatPercent(company.ef_nsfr_pctile_60d)}
-                  </strong>
-                </li>
-                <li>
-                  <span>资金缺口</span>
-                  <strong
-                    class:business-value--positive={company.ef_funding_gap !== null && company.ef_funding_gap >= 0}
-                    class:business-value--negative={company.ef_funding_gap !== null && company.ef_funding_gap < 0}
-                  >
-                    {formatSignedNullable(company.ef_funding_gap, 1)} 亿元
-                  </strong>
-                </li>
-                <li>
-                  <span>主体利差</span>
-                  <strong class="business-value--spread">
-                    {formatNullable(company.ef_subject_spread_bp, 2)} bp
-                  </strong>
-                </li>
-              </ol>
-            {:else}
-              <p>暂无可用公司业务指标，本次仅使用市场择时信号。</p>
-            {/if}
-          </article>
-
-          <article class="insight-card conclusion-card">
+        <article class="panel conclusion-card">
             <div class="card-title-row">
-              <h3>整体结论</h3>
+              <h2>整体结论</h2>
               <div class="card-title-actions">
                 {#if !editingConclusion}
                   <button class="icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
@@ -450,11 +549,34 @@
               <strong class="conclusion-verdict">{report.conclusion.verdict}</strong>
               <p>{report.conclusion.narrative}</p>
             {/if}
-          </article>
-        </div>
+        </article>
+      </section>
 
-        <div class="metric-strip">
-          {#each metrics as metric}
+      <section class="driver-grid" aria-label="模型驱动解释">
+        <article class="panel chart-card">
+          <h2>驱动结构</h2>
+          <ChartHost
+            renderer={renderFinancingDriverRadar}
+            args={[snapshot.driver_structure]}
+            ariaLabel="按六类因子汇总的 SHAP 发行支持度雷达图"
+            className="driver-radar-chart"
+          />
+        </article>
+        <article class="panel chart-card">
+          <h2>因子贡献（+ 支持发行）</h2>
+          <ChartHost
+            renderer={renderFinancingDriverContributions}
+            args={[marketDrivers]}
+            ariaLabel="当前预测 Top 5 因子贡献，正值支持发行"
+            className="driver-contribution-chart"
+          />
+        </article>
+      </section>
+
+      <section class="business-section" aria-labelledby="business-title">
+        <h2 id="business-title">业务指标</h2>
+        <div class="business-metric-grid">
+          {#each businessMetrics as metric}
             <MetricCard
               label={metric.label}
               value={metric.value}
@@ -469,25 +591,50 @@
         </div>
       </section>
 
-      <section class="analysis-section" aria-labelledby="window-title">
-        <div class="section-heading section-heading--window">
-          <span class="section-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M4 19h16M5 16l4-5 4 3 6-8" /></svg>
-          </span>
-          <h2 id="window-title">未来发行窗口</h2>
-          <button
-            class="window-details-toggle"
-            type="button"
-            aria-label={futureWindowDetailsOpen ? "收起未来发行窗口明细" : "展开未来发行窗口明细"}
-            aria-expanded={futureWindowDetailsOpen}
-            aria-controls="forecast-window-details"
-            onclick={() => (futureWindowDetailsOpen = !futureWindowDetailsOpen)}
-          >
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
-          </button>
-        </div>
-        <div class="window-layout">
-          <article class="panel chart-panel">
+      {#if productRecommendation}
+        <section class="product-section" aria-labelledby="product-title">
+          <div class="product-layout">
+            <article class="panel chart-card">
+              <h2 id="product-title">品种推荐</h2>
+              <ChartHost
+                renderer={renderFinancingProductComparison}
+                args={[productRecommendation]}
+                ariaLabel="3年与5年公募债和次级债预测偏离对比"
+                className="product-comparison-chart"
+              />
+            </article>
+            <article class="panel product-result">
+              <h2>模型推荐</h2>
+              <strong>{productRecommendation.recommended_product}</strong>
+              {#if recommendedScenario}
+                <span class={`recommendation-badge recommendation-badge--${recommendedScenario.recommendation}`}>
+                  {recommendedScenario.recommendation_label}
+                </span>
+                <p>
+                  相对同类债中位数 {formatSigned(recommendedScenario.pred_bp, 2)} bp · 历史
+                  P{recommendedScenario.historical_percentile.toFixed(0)}
+                </p>
+              {/if}
+            </article>
+          </div>
+        </section>
+      {/if}
+
+      <section class="supporting-grid" aria-label="未来发行窗口与模型验证">
+        <article class="panel forecast-panel">
+          <div class="panel-title-row">
+            <h2 id="window-title">未来发行窗口</h2>
+            <button
+              class="window-details-toggle"
+              type="button"
+              aria-label={futureWindowDetailsOpen ? "收起未来发行窗口明细" : "展开未来发行窗口明细"}
+              aria-expanded={futureWindowDetailsOpen}
+              aria-controls="forecast-window-details"
+              onclick={() => (futureWindowDetailsOpen = !futureWindowDetailsOpen)}
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
+            </button>
+          </div>
             <ChartHost
               renderer={renderFinancingForecast}
               args={[snapshot.forecast_window]}
@@ -523,16 +670,100 @@
                 </tbody>
               </table>
             </div>
-          </article>
-          <article class="panel confidence-panel">
-            <h3>模型验证</h3>
-            <dl class="confidence-grid">
-              <div><dt>TSCV IC</dt><dd>{validation?.tscv.ic.toFixed(3)}</dd></div>
-              <div><dt>RMSE</dt><dd>{validation?.tscv.rmse.toFixed(2)} bp</dd></div>
-              <div><dt>推荐胜率</dt><dd>{validation ? `${(validation.timing_value.win_rate * 100).toFixed(1)}%` : "—"}</dd></div>
-              <div><dt>历史节约</dt><dd>{validation ? `${formatSigned(validation.timing_value.cost_saving_bp, 2)} bp` : "—"}</dd></div>
+        </article>
+        <article class="panel validation-panel">
+          <h2>模型验证</h2>
+          <dl class="validation-grid">
+            {#each validationMetrics as metric, index}
+              <div>
+                <div class="validation-label">
+                  <dt>{metric.label}</dt>
+                  <button class="info-tip" type="button" aria-label={`${metric.label}指标含义`} aria-describedby={`validation-tip-${index}`}>
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <circle cx="10" cy="10" r="7.5" />
+                      <path d="M10 9v5M10 6.3h.01" />
+                    </svg>
+                    <span class="metric-tooltip" id={`validation-tip-${index}`} role="tooltip">
+                      {metric.tip}
+                    </span>
+                  </button>
+                </div>
+                <dd>{metric.value}</dd>
+              </div>
+            {/each}
             </dl>
-          </article>
+        </article>
+      </section>
+
+      <section class="analysis-section decision-history-section" aria-labelledby="decision-history-title">
+        <div class="section-heading section-heading--actions">
+          <h2 id="decision-history-title">历史择时决策记录</h2>
+          {#if !editingDecision}
+            <button class="primary-button" type="button" onclick={() => openDecisionEditor()}>
+              录入当前决策
+            </button>
+          {/if}
+        </div>
+
+        {#if editingDecision}
+          <form class="decision-editor" onsubmit={(event) => { event.preventDefault(); saveDecision(); }}>
+            <label>
+              <span>决策操作</span>
+              <textarea bind:value={editDecisionAction} maxlength="1000" rows="3" required></textarea>
+            </label>
+            <label>
+              <span>结果</span>
+              <textarea bind:value={editDecisionOutcome} maxlength="2000" rows="3"></textarea>
+            </label>
+            <div class="editor-actions">
+              <button class="secondary-button" type="button" onclick={closeDecisionEditor}>取消</button>
+              <button class="primary-button" type="submit" disabled={savingDecision}>
+                {savingDecision ? "保存中" : "保存"}
+              </button>
+            </div>
+          </form>
+        {/if}
+
+        <div class="decision-table-wrap">
+          <table class="decision-table">
+            <thead>
+              <tr>
+                <th scope="col">日期</th>
+                <th scope="col">历史分位</th>
+                <th scope="col">发行建议</th>
+                <th scope="col">决策操作</th>
+                <th scope="col">结果</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each decisionHistory as record}
+                <tr>
+                  <th scope="row">{displayDate(record.decisionDate)}</th>
+                  <td>P{record.historicalPercentile.toFixed(0)}</td>
+                  <td>
+                    <span class={`recommendation-badge recommendation-badge--${record.recommendation}`}>
+                      {record.recommendationLabel}
+                    </span>
+                  </td>
+                  <td>{record.decisionAction}</td>
+                  <td>
+                    <div class="decision-result-cell">
+                      <span>{record.outcome || "—"}</span>
+                      <button class="icon-button" type="button" aria-label={`编辑${record.decisionDate}择时决策记录`} onclick={() => openDecisionEditor(record)}>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              {:else}
+                <tr>
+                  <td class="decision-empty" colspan="5">暂无决策记录</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -818,13 +1049,6 @@
     width: 21px;
   }
 
-  .summary-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1.25fr;
-    gap: 12px;
-  }
-
-  .insight-card,
   .panel,
   .sell-side-summary-card,
   .sell-side-card {
@@ -833,59 +1057,10 @@
     background: var(--surface);
   }
 
-  .insight-card {
-    min-width: 0;
-    padding: 16px;
-  }
-
-  .market-card {
-    border-color: color-mix(in srgb, var(--brand) 32%, var(--line));
-    background: color-mix(in srgb, var(--brand-soft) 38%, var(--surface));
-  }
-
-  .company-card {
-    border-color: color-mix(in srgb, #16a394 32%, var(--line));
-    background: color-mix(in srgb, #eafaf7 42%, var(--surface));
-  }
-
-  .conclusion-card {
-    border-color: color-mix(in srgb, var(--brand) 24%, var(--line));
-  }
-
-  .insight-card h3,
   .panel h3 {
     margin: 0;
     font-size: 1.125rem;
     font-weight: bold;
-  }
-
-  .insight-card p {
-    margin: 12px 0;
-    line-height: 1.65;
-  }
-
-  .insight-card p strong {
-    color: var(--color-primary);
-  }
-
-  .business-value--liquidity {
-    color: #087b72;
-  }
-
-  .business-value--stability {
-    color: #175cd3;
-  }
-
-  .business-value--positive {
-    color: #067647;
-  }
-
-  .business-value--negative {
-    color: #b42318;
-  }
-
-  .business-value--spread {
-    color: #6941c6;
   }
 
   .card-title-row,
@@ -1020,19 +1195,6 @@
     background: #fff;
   }
 
-  .metric-strip {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
-    gap: 8px;
-    margin-top: 12px;
-  }
-
-  .window-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 2.2fr) minmax(280px, 0.8fr);
-    gap: 12px;
-  }
-
   .section-heading--window {
     width: fit-content;
   }
@@ -1071,6 +1233,267 @@
 
   .panel {
     padding: 16px;
+  }
+
+  .decision-grid,
+  .driver-grid,
+  .product-layout,
+  .supporting-grid {
+    display: grid;
+    gap: 16px;
+  }
+
+  .decision-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  }
+
+  .driver-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .product-layout {
+    grid-template-columns: minmax(0, 2.25fr) minmax(260px, 0.75fr);
+  }
+
+  .supporting-grid {
+    grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.8fr);
+  }
+
+  .panel h2,
+  .business-section h2 {
+    margin: 0;
+    color: #173b78;
+    font-size: 1.125rem;
+    font-weight: bold;
+  }
+
+  .window-card-body {
+    display: grid;
+    min-height: 220px;
+    grid-template-columns: minmax(210px, 0.85fr) minmax(0, 1.15fr);
+    align-items: center;
+    gap: 18px;
+  }
+
+  :global(.window-gauge) {
+    width: 100%;
+    height: 210px;
+  }
+
+  .window-decision {
+    display: grid;
+    justify-items: start;
+    gap: 12px;
+  }
+
+  .window-decision h3 {
+    margin: 0;
+    color: var(--text-1);
+    font-size: 1.5rem;
+    font-weight: bolder;
+  }
+
+  .window-decision p,
+  .conclusion-card p,
+  .product-result p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  .window-decision p strong {
+    color: #173b78;
+    font-weight: bolder;
+    white-space: nowrap;
+  }
+
+  .recommendation-badge {
+    display: inline-flex;
+    min-height: 32px;
+    align-items: center;
+    padding: 5px 12px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: bold;
+    line-height: 1;
+  }
+
+  .recommendation-badge--strong_buy {
+    color: #067647;
+    background: #ecfdf3;
+  }
+
+  .recommendation-badge--neutral {
+    color: #b54708;
+    background: #fff7ed;
+  }
+
+  .recommendation-badge--wait {
+    color: #b42318;
+    background: #fef3f2;
+  }
+
+  .conclusion-card {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    border-color: color-mix(in srgb, var(--brand) 28%, var(--line));
+  }
+
+  .conclusion-card .conclusion-verdict {
+    margin-top: 4px;
+  }
+
+  .chart-card {
+    min-width: 0;
+  }
+
+  :global(.driver-radar-chart),
+  :global(.driver-contribution-chart) {
+    width: 100%;
+    height: 320px;
+    margin-top: 8px;
+  }
+
+  .business-section {
+    display: grid;
+    gap: 10px;
+  }
+
+  .business-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  :global(.product-comparison-chart) {
+    width: 100%;
+    height: 280px;
+    margin-top: 8px;
+  }
+
+  .product-result {
+    display: grid;
+    align-content: center;
+    justify-items: start;
+    gap: 14px;
+    border-color: color-mix(in srgb, #2f6fed 30%, var(--line));
+    background: color-mix(in srgb, #eaf1fd 46%, var(--surface));
+  }
+
+  .product-result > strong {
+    color: #173b78;
+    font-size: 1.5rem;
+    font-weight: bolder;
+  }
+
+  .panel-title-row,
+  .validation-label {
+    display: flex;
+    align-items: center;
+  }
+
+  .panel-title-row {
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .forecast-panel {
+    min-width: 0;
+  }
+
+  .validation-panel {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+  }
+
+  .validation-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0;
+  }
+
+  .validation-grid > div {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--panel) 72%, var(--surface));
+  }
+
+  .validation-label {
+    gap: 4px;
+  }
+
+  .validation-grid dt {
+    color: var(--text-3);
+    font-size: 0.875rem;
+    font-weight: bold;
+  }
+
+  .validation-grid dd {
+    margin: 6px 0 0;
+    color: #173b78;
+    font-size: 1.125rem;
+    font-weight: bolder;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  .info-tip {
+    position: relative;
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--text-3);
+    cursor: help;
+  }
+
+  .info-tip:hover,
+  .info-tip:focus-visible {
+    color: var(--color-primary);
+    background: var(--brand-soft);
+  }
+
+  .info-tip svg {
+    width: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+  }
+
+  .metric-tooltip {
+    position: absolute;
+    z-index: 12;
+    top: calc(100% + 6px);
+    left: 50%;
+    display: none;
+    width: min(260px, calc(100vw - 40px));
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: #fff;
+    background: rgba(23, 32, 51, 0.96);
+    box-shadow: 0 8px 24px rgba(23, 32, 51, 0.2);
+    font-size: 0.875rem;
+    font-weight: normal;
+    line-height: 1.45;
+    transform: translateX(-50%);
+  }
+
+  .info-tip:hover .metric-tooltip,
+  .info-tip:focus-visible .metric-tooltip {
+    display: block;
   }
 
   :global(.forecast-chart) {
@@ -1124,69 +1547,101 @@
     font-weight: normal;
   }
 
-  .confidence-panel {
+  .decision-editor {
     display: grid;
-    align-content: start;
-    gap: 14px;
-  }
-
-  .confidence-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin: 0;
-  }
-
-  .confidence-grid div {
-    padding: 12px;
-    border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--panel) 72%, var(--surface));
-  }
-
-  .confidence-grid dt {
-    color: var(--text-3);
-    font-size: 0.875rem;
-  }
-
-  .confidence-grid dd {
-    margin: 6px 0 0;
-    color: #173b78;
-    font-size: 1.25rem;
-    font-weight: bolder;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .market-driver-list {
-    display: grid;
-    gap: 0;
-    margin: 12px 0 0;
-    padding: 0;
-    border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-    list-style: none;
-  }
-
-  .market-driver-list li {
-    display: flex;
-    min-height: 42px;
-    align-items: center;
-    justify-content: space-between;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
-    padding: 6px 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+    margin-bottom: 14px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
+    border-radius: var(--radius-inner);
+    background: color-mix(in srgb, var(--brand-soft) 24%, var(--surface));
   }
 
-  .market-driver-list strong {
-    flex: 0 0 auto;
+  .decision-editor label {
+    display: grid;
+    gap: 7px;
+  }
+
+  .decision-editor label > span {
     font-weight: bold;
   }
 
-  .market-driver-list .cost-down {
-    color: #067647;
+  .decision-editor textarea {
+    width: 100%;
+    min-height: 92px;
+    padding: 9px 11px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    color: var(--text-1);
+    background: #fff;
+    font: inherit;
+    line-height: 1.55;
+    resize: vertical;
   }
 
-  .market-driver-list .cost-up {
-    color: #b42318;
+  .decision-editor .editor-actions {
+    grid-column: 1 / -1;
+  }
+
+  .decision-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .decision-table {
+    width: 100%;
+    min-width: 900px;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .decision-table th,
+  .decision-table td {
+    padding: 11px 12px;
+    border-top: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .decision-table thead th {
+    border-top: 0;
+    color: var(--text-3);
+    background: #f4f7fb;
+  }
+
+  .decision-table tbody th {
+    color: var(--text-2);
+    font-weight: normal;
+    white-space: nowrap;
+  }
+
+  .decision-table th:nth-child(1),
+  .decision-table td:nth-child(1) {
+    width: 150px;
+  }
+
+  .decision-table th:nth-child(2),
+  .decision-table td:nth-child(2),
+  .decision-table th:nth-child(3),
+  .decision-table td:nth-child(3) {
+    width: 128px;
+  }
+
+  .decision-result-cell {
+    display: flex;
+    min-width: 220px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .decision-empty {
+    height: 88px;
+    color: var(--text-2);
+    text-align: center !important;
   }
 
   .section-heading--actions {
@@ -1376,16 +1831,14 @@
       justify-content: flex-end;
     }
 
-    .summary-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .conclusion-card {
-      grid-column: 1 / -1;
-    }
-
-    .window-layout {
+    .decision-grid,
+    .product-layout,
+    .supporting-grid {
       grid-template-columns: 1fr;
+    }
+
+    .business-metric-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
@@ -1414,12 +1867,27 @@
       padding: 12px;
     }
 
-    .summary-grid {
+    .driver-grid,
+    .business-metric-grid {
       grid-template-columns: 1fr;
     }
 
-    .conclusion-card {
-      grid-column: 1;
+    .decision-editor {
+      grid-template-columns: 1fr;
+    }
+
+    .decision-editor .editor-actions {
+      grid-column: auto;
+    }
+
+    .window-card-body {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    .window-decision {
+      justify-items: center;
+      text-align: center;
     }
 
     .section-heading--actions {
@@ -1464,6 +1932,10 @@
 
     .refresh-control svg {
       width: 20px;
+    }
+
+    .validation-grid {
+      grid-template-columns: 1fr;
     }
   }
 

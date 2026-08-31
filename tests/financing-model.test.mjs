@@ -6,13 +6,16 @@ import {
   companyBusinessNarrative,
   parseFinancingModelReport,
   sellSideSummaryBody,
+  timingDecisionHistorySchema,
 } from "../src/lib/financing-model.ts";
 import { resolveInstitutionLogo } from "../src/lib/sell-side-institutions.ts";
 import {
   loadFinancingModelReport,
+  loadTimingDecisionHistory,
   saveFinancingModelConclusion,
   saveSellSideSnapshot,
   saveSellSideSummaryRevision,
+  saveTimingDecisionRecord,
 } from "../src/lib/server/financing-model-repository.ts";
 import {
   aiSearchPeriod,
@@ -39,11 +42,14 @@ function snapshot() {
       peer_spread_median_bp: 41.18,
       historical_percentile: 51,
       recommendation: "neutral",
-      recommendation_label: "尚可",
+      recommendation_label: "择机发行",
+      window_zone: "中枢",
       decision: "推荐发行",
     },
     company_metrics: {
       date: "2026-08-21",
+      ef_lcr: 5.832,
+      ef_nsfr: 2.2347,
       ef_lcr_pctile_60d: 0.39,
       ef_nsfr_pctile_60d: 0.847,
       ef_funding_gap: -232.1,
@@ -66,6 +72,38 @@ function snapshot() {
         impact: "降低成本",
       },
     ],
+    driver_structure: [
+      {
+        category: "funding",
+        display_name: "资金面",
+        support_score: 62,
+        support_bp: 0.3,
+        importance_weight: 1,
+      },
+    ],
+    product_recommendation: {
+      recommended_product: "3Y 次级债",
+      recommended_tenor_years: 3,
+      recommended_bond_type: "证券公司次级债",
+      scenarios: [
+        ["3Y 公募债", 3, "证券公司债", 1.71, 2, false],
+        ["5Y 公募债", 5, "证券公司债", 2.2, 4, false],
+        ["3Y 次级债", 3, "证券公司次级债", -0.5, 1, true],
+        ["5Y 次级债", 5, "证券公司次级债", 1.9, 3, false],
+      ].map(([display_name, tenor_years, bond_type, pred_bp, rank, is_recommended]) => ({
+        display_name,
+        tenor_years,
+        bond_type,
+        pred_bp,
+        peer_spread_median_bp: 41.18,
+        historical_percentile: 51,
+        recommendation: rank === 1 ? "strong_buy" : "neutral",
+        recommendation_label: rank === 1 ? "建议发行" : "择机发行",
+        rank,
+        cost_vs_best_bp: pred_bp + 0.5,
+        is_recommended,
+      })),
+    },
     forecast_window: [
       {
         date: "2026-08-24",
@@ -81,7 +119,10 @@ function snapshot() {
       tscv: {
         folds: 10,
         validation_samples: 100,
+        sample_start_date: "2022-01-01",
+        sample_end_date: "2026-06-30",
         rmse: 8.4,
+        mae: 6.2,
         ic: 0.22,
         best_iter_median: 80,
         best_iters: [80],
@@ -368,14 +409,59 @@ test("整体结论 PATCH 增量更新 model_run 当前结论", async () => {
   assert.equal(result.edited, true);
 });
 
+test("历史择时决策记录只手工保存操作与结果并从 model_run 派生模型字段", async () => {
+  const row = {
+    run_id: snapshot().run_id,
+    decision_date: "2026-08-24",
+    historical_percentile: 51,
+    recommendation: "neutral",
+    recommendation_label: "择机发行",
+    decision_action: "启动3年期公募债预沟通",
+    outcome: "最终票面低于预算2bp",
+    updated_at: "2026-08-25T02:00:00.000Z",
+  };
+  const calls = [];
+  const client = {
+    async query(sql, parameters) {
+      calls.push({ sql, parameters });
+      return { rows: [row] };
+    },
+  };
+
+  const saved = await saveTimingDecisionRecord(client, {
+    runId: snapshot().run_id,
+    decisionAction: row.decision_action,
+    outcome: row.outcome,
+  });
+  const history = await loadTimingDecisionHistory(client);
+
+  assert.match(calls[0].sql, /INSERT INTO financing_model\.timing_decision_record/);
+  assert.match(calls[0].sql, /ON CONFLICT \(run_id\) DO UPDATE/);
+  assert.match(calls[0].sql, /run\.historical_percentile/);
+  assert.doesNotMatch(calls[0].sql, /\bstatus\b/);
+  assert.equal(calls[0].parameters[1], snapshot().run_id);
+  assert.equal(saved.decisionAction, row.decision_action);
+  assert.equal(history[0].outcome, row.outcome);
+  assert.deepEqual(timingDecisionHistorySchema.parse(history), history);
+});
+
 test("model_run migration 完整拆分 payload 并合并整体结论", async () => {
-  const migration = await readFile(
-    new URL(
-      "../financing-model-migrations/0002_structure_model_run.sql",
-      import.meta.url,
+  const [migration, recommendationMigration] = await Promise.all([
+    readFile(
+      new URL(
+        "../financing-model-migrations/0002_structure_model_run.sql",
+        import.meta.url,
+      ),
+      "utf8",
     ),
-    "utf8",
-  );
+    readFile(
+      new URL(
+        "../financing-model-migrations/0003_driver_groups_and_product_scenarios.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
 
   assert.match(migration, /CREATE TABLE financing_model\.model_run_market_driver/);
   assert.match(migration, /CREATE TABLE financing_model\.model_run_forecast_window/);
@@ -383,6 +469,14 @@ test("model_run migration 完整拆分 payload 并合并整体结论", async () 
   assert.match(migration, /timing_group_means numeric\(20, 10\)\[\]/);
   assert.match(migration, /DROP TABLE financing_model\.conclusion_revision/);
   assert.match(migration, /DROP COLUMN payload/);
+  assert.match(recommendationMigration, /ADD COLUMN lcr_value/);
+  assert.match(recommendationMigration, /ADD COLUMN cv_mae/);
+  assert.match(recommendationMigration, /model_run_driver_group/);
+  assert.match(recommendationMigration, /model_run_product_scenario/);
+  assert.match(recommendationMigration, /CREATE TABLE financing_model\.timing_decision_record/);
+  assert.match(recommendationMigration, /decision_action text NOT NULL/);
+  assert.match(recommendationMigration, /outcome text NOT NULL DEFAULT ''/);
+  assert.doesNotMatch(recommendationMigration, /\bstatus\b/);
 });
 
 test("卖方观点快照保存搜索口径和完整 payload", async () => {
@@ -430,7 +524,7 @@ test("卖方逻辑汇总编辑采用追加快照并保留检索证据", async ()
   assert.equal(revised.updatedAt, updatedAt);
 });
 
-test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模块", async () => {
+test("融资模型页面按决策三行展示并提供品种推荐和验证说明", async () => {
   const [page, research] = await Promise.all([
     readFile(
       new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url),
@@ -446,18 +540,41 @@ test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模�
   ]);
 
   assert.match(page, /market_drivers\.slice\(0, 5\)/);
-  assert.match(page, /aria-label="市场驱动因子 Top 5"/);
+  assert.match(page, /renderer=\{renderFinancingGauge\}/);
+  assert.match(page, /renderer=\{renderFinancingDriverRadar\}/);
+  assert.match(page, /renderer=\{renderFinancingDriverContributions\}/);
+  assert.match(page, /renderer=\{renderFinancingProductComparison\}/);
+  assert.match(page, /窗口处于\{snapshot\.prediction\.window_zone\}区间/);
+  assert.match(page, /正值支持发行/);
   assert.match(page, /aria-label="编辑整体结论"/);
   assert.match(page, /aria-label="编辑卖方逻辑汇总"/);
   assert.match(page, /report\.sellSide\.logicSummary/);
   assert.match(page, /class=\{`sell-side-grid sell-side-grid--\$\{/);
   assert.match(page, /report\.sellSide\.views as view/);
-  assert.match(page, /companyBusinessNarrative\(company\)/);
-  assert.match(page, /<ol class="market-driver-list" aria-label="公司业务指标">/);
-  assert.match(page, /LCR六十日分位/);
-  assert.match(page, /NSFR六十日分位/);
-  assert.match(page, /company\.ef_funding_gap/);
-  assert.match(page, /company\.ef_subject_spread_bp/);
+  assert.match(page, /label: "LCR"/);
+  assert.match(page, /label: "NSFR"/);
+  assert.match(page, /company\?\.ef_lcr/);
+  assert.match(page, /company\?\.ef_nsfr/);
+  assert.match(page, /company\?\.ef_funding_gap/);
+  assert.match(page, /company\?\.ef_subject_spread_bp/);
+  assert.match(page, /class="business-metric-grid"/);
+  assert.match(page, /productRecommendation\.recommended_product/);
+  assert.match(page, /相对同类债中位数/);
+  assert.match(page, /历史择时决策记录/);
+  assert.match(page, /<th scope="col">决策操作<\/th>/);
+  assert.match(page, /<th scope="col">结果<\/th>/);
+  assert.match(page, /bind:value=\{editDecisionAction\}/);
+  assert.match(page, /bind:value=\{editDecisionOutcome\}/);
+  assert.doesNotMatch(page, /<th scope="col">状态<\/th>/);
+  const validationLabels = ["样本量", "样本区间", "胜率", "历史节约", "信息系数", "平均误差"];
+  let previousIndex = -1;
+  for (const label of validationLabels) {
+    const currentIndex = page.indexOf(`label: "${label}"`);
+    assert.ok(currentIndex > previousIndex, `${label} 应按指定顺序展示`);
+    previousIndex = currentIndex;
+  }
+  assert.match(page, /aria-describedby=\{`validation-tip-\$\{index\}`\}/);
+  assert.match(page, /role="tooltip"/);
   assert.match(
     page,
     /\.sell-side-grid\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:/,
@@ -468,7 +585,7 @@ test("融资模型页面只列示市场驱动 Top 5 并收敛结论与卖方模�
   assert.match(page, /sellSideSummaryBody\(view\.summary, view\.institution\)/);
   assert.doesNotMatch(page, /近30日可比债中位利差|发行方案/);
   assert.doesNotMatch(page, /相对更优窗口|class="recommendation-band"/);
-  assert.doesNotMatch(page, /id="driver-title"|交叉验证/);
+  assert.doesNotMatch(page, /TSCV IC|推荐胜率|<dt>RMSE<\/dt>|交叉验证/);
   assert.doesNotMatch(page, /<h3>卖方逻辑汇总<\/h3>/);
   assert.doesNotMatch(page, /<h3>\{view\.title\}<\/h3>/);
   assert.doesNotMatch(page, /<time datetime=\{view\.publishedAt\}>/);
