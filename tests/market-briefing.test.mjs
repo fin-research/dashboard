@@ -76,7 +76,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
         target,
         "https://eastmoney.hasbai.xyz/data/news?date=2026-08-10&important=true&pageSize=40&fields=sentimentId%2Ctitle%2Ctime%2Ctags%2Cimportant",
       );
-      return Response.json([
+      return Response.json({ list: [
           {
             sentimentId: "news-1",
             title: "债市要闻",
@@ -84,7 +84,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
             tags: ["债市"],
             important: true,
           },
-      ]);
+      ] });
     }
     if (target.includes("/data/news/news-1?")) {
       return Response.json({

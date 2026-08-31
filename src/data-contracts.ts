@@ -1,47 +1,109 @@
 import { z } from "zod";
 
 const finiteNumber = z.number().finite();
+const numericValue = z
+  .union([
+    finiteNumber,
+    z.string().trim().regex(/^-?\d+(?:\.\d+)?$/),
+  ])
+  .transform(Number);
+const nullableNumericValue = z
+  .union([
+    finiteNumber,
+    z.string().trim().regex(/^-?\d+(?:\.\d+)?$/),
+    z.literal("--"),
+    z.literal(""),
+    z.null(),
+  ])
+  .transform((value) => value === null || value === "--" || value === ""
+    ? null
+    : Number(value));
+const identifier = z
+  .union([z.string().min(1), z.number().int().finite()])
+  .transform(String);
+
+function directOrLegacyList<T extends z.ZodType, L extends z.ZodType>(
+  rows: z.ZodArray<T>,
+  legacy: L,
+  selectLegacy: (value: z.output<L>) => unknown,
+): z.ZodType<z.output<typeof rows>> {
+  return z.union([rows, legacy]).transform((value) =>
+    rows.parse(Array.isArray(value) ? value : selectLegacy(value)),
+  );
+}
 
 export const omoOperationSchema = z.object({
   operationDate: z.string(),
   operationName: z.string(),
   duration: z.string(),
-  interestRate: finiteNumber.nullable(),
-  operationAmount: finiteNumber,
+  interestRate: nullableNumericValue,
+  operationAmount: numericValue,
 });
-export const omoOperationsSchema = z.array(omoOperationSchema);
+const omoRowsSchema = z.array(omoOperationSchema);
+const legacyOmoSchema = z.object({ data: z.array(z.unknown()) });
+export const omoOperationsSchema = directOrLegacyList(
+  omoRowsSchema,
+  legacyOmoSchema,
+  (value) => value.data,
+);
 
 export const cfetsRateSchema = z.object({
   bondCode: z.string(),
-  weightedYield: finiteNumber,
-  weightedYieldUpDownValueBp: finiteNumber,
+  weightedYield: numericValue,
+  weightedYieldUpDownValueBp: numericValue,
 });
-export const cfetsRatesSchema = z.array(cfetsRateSchema);
+const cfetsRowsSchema = z.array(cfetsRateSchema);
+const legacyCfetsSchema = z.object({ cfetsCapitalTable: z.array(z.unknown()) });
+export const cfetsRatesSchema = directOrLegacyList(
+  cfetsRowsSchema,
+  legacyCfetsSchema,
+  (value) => value.cfetsCapitalTable,
+);
 
 export const governmentBondSchema = z.object({
   ordinateName: z.string(),
   abscissaName: z.string(),
   bondCode: z.string(),
-  tradeNum: finiteNumber,
-  yield: finiteNumber,
-  yieldSubYtdCloseBp: finiteNumber.nullable(),
+  tradeNum: numericValue,
+  yield: numericValue,
+  yieldSubYtdCloseBp: nullableNumericValue,
 });
-export const governmentBondsSchema = z.array(governmentBondSchema);
+const governmentRowsSchema = z.array(governmentBondSchema);
+const legacyGovernmentSchema = z.object({ data: z.array(z.unknown()) });
+export const governmentBondsSchema = directOrLegacyList(
+  governmentRowsSchema,
+  legacyGovernmentSchema,
+  (value) => value.data,
+);
 
 export const futuresQuoteSchema = z.object({
   contractCode: z.string(),
-  lastPrice: finiteNumber,
-  upDownValuePct: finiteNumber,
+  lastPrice: numericValue,
+  upDownValuePct: numericValue,
 });
-export const futuresQuotesSchema = z.array(futuresQuoteSchema);
+const futuresRowsSchema = z.array(futuresQuoteSchema);
+const legacyFuturesSchema = z.object({
+  futuresContractLatestTradeProtoList: z.array(z.unknown()),
+});
+export const futuresQuotesSchema = directOrLegacyList(
+  futuresRowsSchema,
+  legacyFuturesSchema,
+  (value) => value.futuresContractLatestTradeProtoList,
+);
 
 export const marginBalanceSchema = z.object({
   DIM_DATE: z.string(),
-  TOTAL_RZRQYE: finiteNumber,
-  TOTAL_RZYE: finiteNumber,
-  TOTAL_RQYE: finiteNumber,
+  TOTAL_RZRQYE: numericValue,
+  TOTAL_RZYE: numericValue,
+  TOTAL_RQYE: numericValue,
 });
-export const marginBalancesSchema = z.array(marginBalanceSchema);
+const marginRowsSchema = z.array(marginBalanceSchema);
+const legacyMarginSchema = z.object({ data: z.array(z.unknown()) });
+export const marginBalancesSchema = directOrLegacyList(
+  marginRowsSchema,
+  legacyMarginSchema,
+  (value) => value.data,
+);
 
 export const primaryIssueSchema = z.object({
   bidStartDate: z.string().optional(),
@@ -60,43 +122,69 @@ export const primaryIssueSchema = z.object({
   bondTypeText: z.string().optional(),
   bondShortName: z.string(),
   issueTenor: z.string().optional(),
-  planIssueAmount: finiteNumber.optional(),
-  issueCouponRate: finiteNumber.nullable().optional(),
+  planIssueAmount: numericValue.optional(),
+  issueCouponRate: nullableNumericValue.optional(),
 });
-export const primaryIssuesSchema = z.array(primaryIssueSchema);
+const primaryRowsSchema = z.array(primaryIssueSchema);
+const legacyPrimarySchema = z.object({
+  data: z.object({ list: z.array(z.unknown()) }),
+});
+export const primaryIssuesSchema = directOrLegacyList(
+  primaryRowsSchema,
+  legacyPrimarySchema,
+  (value) => value.data.list,
+);
 
 export const todayTradeSchema = z.object({
-  bondUniCode: z.string(),
+  bondUniCode: identifier,
   remainingTenor: z.string(),
-  cbYte: finiteNumber.nullable().optional(),
-  tradeYield: finiteNumber,
-  tradeYieldSubCb: finiteNumber.nullable().optional(),
+  cbYte: nullableNumericValue.optional(),
+  tradeYield: numericValue,
+  tradeYieldSubCb: nullableNumericValue.optional(),
 });
-export const todayTradesSchema = z.array(todayTradeSchema);
+const todayRowsSchema = z.array(todayTradeSchema);
+const legacyTodaySchema = z.object({ list: z.array(z.unknown()) });
+export const todayTradesSchema = directOrLegacyList(
+  todayRowsSchema,
+  legacyTodaySchema,
+  (value) => value.list,
+);
 
 export const favoriteQuoteSchema = z.object({
-  bondUniCode: z.string(),
+  bondUniCode: identifier,
   bondShortName: z.string().optional(),
   remainingTenor: z.string(),
-  remainingTenorDay: finiteNumber.optional(),
-  cbYield: finiteNumber.nullable().optional(),
-  bidYield: finiteNumber.nullable().optional(),
-  bidEntryPrice: finiteNumber.nullable().optional(),
-  ofrYield: finiteNumber.nullable().optional(),
-  ofrEntryPrice: finiteNumber.nullable().optional(),
-  tradeEntryPrice: finiteNumber.nullable().optional(),
-  tradeYieldSubCb: finiteNumber.nullable().optional(),
+  remainingTenorDay: numericValue.optional(),
+  cbYield: nullableNumericValue.optional(),
+  bidYield: nullableNumericValue.optional(),
+  bidEntryPrice: nullableNumericValue.optional(),
+  ofrYield: nullableNumericValue.optional(),
+  ofrEntryPrice: nullableNumericValue.optional(),
+  tradeEntryPrice: nullableNumericValue.optional(),
+  tradeYieldSubCb: nullableNumericValue.optional(),
 });
-export const favoriteQuotesSchema = z.array(favoriteQuoteSchema);
+const favoriteRowsSchema = z.array(favoriteQuoteSchema);
+const legacyFavoriteSchema = z.object({ list: z.array(z.unknown()) });
+export const favoriteQuotesSchema = directOrLegacyList(
+  favoriteRowsSchema,
+  legacyFavoriteSchema,
+  (value) => value.list,
+);
 
 export const bondInfoSchema = z.object({
-  bondUniCode: z.string(),
+  bondUniCode: identifier,
   bondShortName: z.string(),
   comShortName: z.string(),
-  bondType: finiteNumber,
-  bondOfferingType: finiteNumber,
+  bondType: numericValue,
+  bondOfferingType: numericValue,
 });
-export const bondInfosSchema = z.array(bondInfoSchema);
+const bondInfoRowsSchema = z.array(bondInfoSchema);
+const legacyBondInfoSchema = z.object({ data: z.array(z.unknown()) });
+export const bondInfosSchema = directOrLegacyList(
+  bondInfoRowsSchema,
+  legacyBondInfoSchema,
+  (value) => value.data,
+);
 
 const equitySchema = z.object({
   name: z.string(),

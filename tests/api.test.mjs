@@ -77,7 +77,17 @@ function directResponse(target) {
       paragraphs: snapshot().stock_paragraphs,
     });
   }
-  if (url.pathname === "/data/omo") return Response.json([]);
+  if (url.pathname === "/data/omo") {
+    return Response.json({
+      data: [{
+        operationDate: "2026-08-25",
+        operationName: "逆回购",
+        duration: "7D",
+        interestRate: "--",
+        operationAmount: "1000",
+      }],
+    });
+  }
   if (url.pathname === "/data/cfets") {
     return Response.json([]);
   }
@@ -157,6 +167,8 @@ test("浏览器一次拉取原始资源并加工为视觉与文字共享报告",
     1,
   );
   assert.equal(report.equities[0].change_pct, 0.4);
+  assert.equal(report.omo_operations[0].amount_yi, 1000);
+  assert.equal(report.omo_operations[0].interest_rate, null);
   assert.equal(report.primary_summary.current_amount, 0);
   assert.equal(report.secondary_bonds[0].issuer, "测试公司");
   assert.equal(report.inventory_bonds[0].bid_yield, 2.01);

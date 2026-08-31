@@ -21,8 +21,14 @@ const briefingNewsSummarySchema = z.object({
   important: z.boolean().optional(),
 });
 const briefingNewsListSchema = z.array(briefingNewsSummarySchema);
+const briefingNewsResponseSchema = z
+  .union([
+    briefingNewsListSchema,
+    z.object({ list: briefingNewsListSchema }),
+  ])
+  .transform((value) => Array.isArray(value) ? value : value.list);
 const briefingNewsDetailSchema = briefingNewsSummarySchema.extend({
-  content: z.string(),
+  content: z.string().default(""),
   link: z.string().url().optional(),
 });
 const MARKET_BRIEFING_TRANSPORT_INSTRUCTION =
@@ -281,7 +287,7 @@ async function fetchBriefingNews(
       `${baseUrl}/stock-summary?${query}&fields=title,time,paragraphs`,
       briefingStockSchema,
     ),
-    fetchDataJson(env, `${baseUrl}/news?${newsQuery}`, briefingNewsListSchema),
+    fetchDataJson(env, `${baseUrl}/news?${newsQuery}`, briefingNewsResponseSchema),
   ]);
   const paragraphs = stockPayload.paragraphs.filter((item) => item.length > 0);
   if (paragraphs.length === 0) {
