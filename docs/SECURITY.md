@@ -13,6 +13,7 @@
 
 - 浏览器不得取得 Provider 密钥、数据库连接字符串、D1/R2 binding、完整二级池 Excel 数据缓存或授信源 Excel。本地授信导入不得上传文件到 Worker、R2 或浏览器接口。
 - `$lib/server` 模块不得被客户端代码导入。
+- Dashboard Worker 到同一 zone 的 Data Worker 使用 `DATA` Service Binding；服务端代码不得以公开 hostname 做 Worker-to-Worker 回环请求。浏览器仍只访问同源 `/data/*`。
 - 生成式 AI 输出必须经 Zod Schema 或明确的文本协议校验后进入业务层。
 - 融资择时卖方观点先调用固定 AI Search MCP 公共端点，仅把限长、去重后的证据交给 AI Gateway；机构、标题、日期和源 key 由检索元数据回填，不接受模型自由生成。
 - R2 对象 key 和下载文件必须先由数据库记录解析，不能接受任意用户路径直读存储桶。

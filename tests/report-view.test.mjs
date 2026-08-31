@@ -107,6 +107,16 @@ test("存量债按规范期限排序并保留成交和报价", () => {
   assert.equal(points[1].bid_yield, 1.71);
 });
 
+test("存量债零 Bid/Ofr 在视觉派生层转为空值", () => {
+  const points = inventoryPoints([
+    { bond_name: "25东财G1", tenor_label: "1Y", tenor_years: 1, valuation: 1.7, trade_yield: null, trade_spread_bp: null, bid_yield: 0, ofr_yield: 0 },
+  ]);
+  assert.equal(points.length, 1);
+  assert.equal(points[0].bond_name, "25东财G1");
+  assert.equal(points[0].bid_yield, null);
+  assert.equal(points[0].ofr_yield, null);
+});
+
 test("deriveReport 从最小契约产出全部派生视图", () => {
   const derived = deriveReport({
     report_date: "2026-08-13", generated_at: "2026-08-13T15:00:00+08:00",

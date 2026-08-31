@@ -1,6 +1,17 @@
+import type {
+  BondInfo,
+  CfetsRate,
+  FavoriteQuote,
+  FuturesQuote,
+  GovernmentBond,
+  IndustrySnapshot,
+  MarginBalance,
+  OmoOperation,
+  PrimaryIssue,
+  StockSummary,
+  TodayTrade,
+} from "./data-contracts.ts";
 import type { ReportData } from "./types";
-
-type Row = Record<string, unknown>;
 
 const FUNDING_CODES = ["DR001", "DR007", "DIBO001", "DIBO007"] as const;
 const GOVERNMENT_BOND_TARGETS = [
@@ -17,18 +28,18 @@ export interface RawMarketReportResources {
   reportDate: string;
   generatedAt: string;
   previousPrimaryDate: string;
-  omo: unknown;
-  dr: unknown;
-  dibo: unknown;
-  governmentBonds: unknown;
-  futures: unknown;
-  stock: unknown;
-  margin: unknown;
-  industry: unknown;
-  primary: unknown;
-  todayTrades: unknown;
-  favoriteQuotes: unknown;
-  bondInfos: unknown;
+  omo: OmoOperation[];
+  dr: CfetsRate[];
+  dibo: CfetsRate[];
+  governmentBonds: GovernmentBond[];
+  futures: FuturesQuote[];
+  stock: StockSummary;
+  margin: MarginBalance[];
+  industry: IndustrySnapshot;
+  primary: PrimaryIssue[];
+  todayTrades: TodayTrade[];
+  favoriteQuotes: FavoriteQuote[];
+  bondInfos: BondInfo[];
 }
 
 export function dayOffset(date: string, offset: number): string {
@@ -55,28 +66,6 @@ function isoDate(value: unknown): string | null {
     : null;
 }
 
-function record(value: unknown, label: string): Row {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${label}响应格式无效`);
-  }
-  return value as Row;
-}
-
-function rows(value: unknown, label: string): Row[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => record(item, label));
-}
-
-function rowsFrom(payload: unknown, key: string, label: string): Row[] {
-  return rows(record(payload, label)[key], label);
-}
-
-function strings(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
-}
-
 function normalizeCompanyShortName(value: unknown): string {
   const text = String(value ?? "").replace(/\s+/g, "");
   return text === "安信证券" ? "国投证券" : text;
@@ -97,15 +86,15 @@ function normalizePrimaryIssuerName(value: unknown): string {
   return [...text].slice(0, 4).join("");
 }
 
-function primaryIssuer(row: Row): string {
-  for (const key of ["comShortName", "issuerShortName", "issuerShortNameCn"]) {
+function primaryIssuer(row: PrimaryIssue): string {
+  for (const key of ["comShortName", "issuerShortName", "issuerShortNameCn"] as const) {
     const value = normalizePrimaryIssuerName(normalizeCompanyShortName(row[key]));
     if (value) return value;
   }
   return normalizePrimaryIssuerName(row.comFullName ?? row.issuerName);
 }
 
-function isPrivatePrimary(row: Row): boolean {
+function isPrivatePrimary(row: PrimaryIssue): boolean {
   return (
     String(row.publicOffering) === "2" ||
     [row.publicOfferingText, row.offeringType, row.issueWay, row.raisingMode].some(
@@ -123,7 +112,7 @@ function primaryTenorLeOneYear(value: unknown): boolean {
   return match[2] === "Y" ? number <= 1 : number <= 365;
 }
 
-function classifyPrimary(row: Row): string {
+function classifyPrimary(row: PrimaryIssue): string {
   const bondType = String(row.bondTypeText ?? "");
   const bondName = String(row.bondShortName ?? "");
   if (isPrivatePrimary(row)) return "私募债";
@@ -135,11 +124,11 @@ function classifyPrimary(row: Row): string {
   return "小公募";
 }
 
-function primaryDateKey(row: Row): string {
+function primaryDateKey(row: PrimaryIssue): string {
   return isoDate(row.bidStartDate ?? row.issueStartDate) ?? "";
 }
 
-function primaryDateText(row: Row): string {
+function primaryDateText(row: PrimaryIssue): string {
   const date = primaryDateKey(row);
   if (date) return `${date.slice(5, 7)}/${date.slice(8, 10)}`;
   const bidding = String(row.biddingTime ?? "");
@@ -153,10 +142,9 @@ function isEastmoney(value: unknown): boolean {
   return text.includes("东财") || text.includes("东方财富");
 }
 
-function isEastmoneyPrimary(row: Row): boolean {
+function isEastmoneyPrimary(row: PrimaryIssue): boolean {
   return [
     row.bondShortName,
-    row.issuer,
     row.comShortName,
     row.issuerShortName,
     row.issuerShortNameCn,
@@ -200,7 +188,7 @@ function parseTenorYears(value: unknown): number | null {
   return perpetual?.[1] ? Number(perpetual[1]) : null;
 }
 
-function aggregatePrimaryIssues(primaryRows: Row[]): ReportData["primary_issues"] {
+function aggregatePrimaryIssues(primaryRows: PrimaryIssue[]): ReportData["primary_issues"] {
   interface Leg {
     bondName: string;
     tenor: string;
@@ -285,16 +273,15 @@ function aggregatePrimaryIssues(primaryRows: Row[]): ReportData["primary_issues"
 }
 
 function primaryReport(
-  payload: unknown,
+  primaryRows: PrimaryIssue[],
   reportDate: string,
   previousDate: string,
 ): Pick<ReportData, "primary_summary" | "primary_issues"> {
-  const data = record(record(payload, "一级发行").data, "一级发行");
-  const primaryRows = rows(data.list, "一级发行明细").filter((row) =>
+  const datedRows = primaryRows.filter((row) =>
     [previousDate, reportDate].includes(primaryDateKey(row)),
   );
   const amount = (date: string) =>
-    primaryRows
+    datedRows
       .filter(
         (row) =>
           primaryDateKey(row) === date &&
@@ -310,23 +297,26 @@ function primaryReport(
       current_amount: current,
       change_amount: current - previous,
     },
-    primary_issues: aggregatePrimaryIssues(primaryRows),
+    primary_issues: aggregatePrimaryIssues(datedRows),
   };
 }
 
-function quoteYields(row: Row): readonly [number | null, number | null] {
+function positiveYield(value: unknown): number | null {
+  const parsed = toFloat(value);
+  return parsed !== null && parsed > 0 ? parsed : null;
+}
+
+function quoteYields(row: FavoriteQuote): readonly [number | null, number | null] {
   return [
-    toFloat(row.bidYield) ?? toFloat(row.bidEntryPrice),
-    toFloat(row.ofrYield) ?? toFloat(row.ofrEntryPrice),
+    positiveYield(row.bidYield) ?? positiveYield(row.bidEntryPrice),
+    positiveYield(row.ofrYield) ?? positiveYield(row.ofrEntryPrice),
   ];
 }
 
-function isPublicSecondaryBondName(value: unknown): boolean {
-  const name = String(value ?? "").trim().split(" ")[0] ?? "";
-  return Boolean(name) && (name.includes("G") || !/[A-Za-z]/.test(name));
-}
+type EnrichedTodayTrade = TodayTrade & Partial<BondInfo>;
+type EnrichedFavoriteQuote = FavoriteQuote & Partial<BondInfo>;
 
-function normalizeSecondary(rows: Row[]): ReportData["secondary_bonds"] {
+function normalizeSecondary(rows: EnrichedTodayTrade[]): ReportData["secondary_bonds"] {
   const result: ReportData["secondary_bonds"] = [];
   for (const row of rows) {
     const bondName = String(row.bondShortName ?? "").trim().split(" ")[0] ?? "";
@@ -335,7 +325,8 @@ function normalizeSecondary(rows: Row[]): ReportData["secondary_bonds"] {
     const tenorYears = parseTenorYears(tenorLabel);
     const tradeYield = toFloat(row.tradeYield);
     if (
-      !isPublicSecondaryBondName(bondName) ||
+      row.bondType !== 37 ||
+      row.bondOfferingType !== 1 ||
       isEastmoney(bondName) ||
       isEastmoney(issuer) ||
       tenorYears === null ||
@@ -358,8 +349,8 @@ function normalizeSecondary(rows: Row[]): ReportData["secondary_bonds"] {
 }
 
 function normalizeInventory(
-  inventory: Row[],
-  trades: Row[],
+  inventory: EnrichedFavoriteQuote[],
+  trades: EnrichedTodayTrade[],
 ): ReportData["inventory_bonds"] {
   const tradeYieldByCode = new Map(
     trades
@@ -393,10 +384,10 @@ function normalizeInventory(
   return result.sort((left, right) => left.tenor_years - right.tenor_years);
 }
 
-function fundingRates(dr: Row[], dibo: Row[]): ReportData["funding_rates"] {
+function fundingRates(dr: CfetsRate[], dibo: CfetsRate[]): ReportData["funding_rates"] {
   const byCode = new Map(
     [...dr, ...dibo].map((row) => [
-      String(row.bondCode ?? row.bondShortName ?? ""),
+      row.bondCode,
       row,
     ]),
   );
@@ -414,7 +405,7 @@ function fundingRates(dr: Row[], dibo: Row[]): ReportData["funding_rates"] {
   });
 }
 
-function governmentBonds(rows: Row[]): ReportData["government_bonds"] {
+function governmentBonds(rows: GovernmentBond[]): ReportData["government_bonds"] {
   return GOVERNMENT_BOND_TARGETS.flatMap(([category, tenor]) => {
     const row = rows
       .filter(
@@ -439,8 +430,8 @@ function governmentBonds(rows: Row[]): ReportData["government_bonds"] {
   });
 }
 
-function futures(rows: Row[]): ReportData["futures"] {
-  const byCode = new Map(rows.map((row) => [String(row.contractCode ?? ""), row]));
+function futures(rows: FuturesQuote[]): ReportData["futures"] {
+  const byCode = new Map(rows.map((row) => [row.contractCode, row]));
   return FUTURES_CODES.flatMap((code) => {
     const row = byCode.get(code);
     return row
@@ -455,23 +446,23 @@ function futures(rows: Row[]): ReportData["futures"] {
   });
 }
 
-function margin(rows: Row[]): ReportData["margin"] {
-  const current = rows[0] ?? {};
-  const previous = rows[1] ?? {};
+function margin(rows: MarginBalance[]): ReportData["margin"] {
+  const current = rows[0];
+  const previous = rows[1];
   const yi = (value: unknown) => {
     const parsed = toFloat(value);
     return parsed === null ? null : parsed / 1e8;
   };
   const change = (left: number | null, right: number | null) =>
     left === null || right === null ? null : left - right;
-  const total = yi(current.TOTAL_RZRQYE);
-  const previousTotal = yi(previous.TOTAL_RZRQYE);
-  const financing = yi(current.TOTAL_RZYE);
-  const previousFinancing = yi(previous.TOTAL_RZYE);
-  const lending = yi(current.TOTAL_RQYE);
-  const previousLending = yi(previous.TOTAL_RQYE);
+  const total = yi(current?.TOTAL_RZRQYE);
+  const previousTotal = yi(previous?.TOTAL_RZRQYE);
+  const financing = yi(current?.TOTAL_RZYE);
+  const previousFinancing = yi(previous?.TOTAL_RZYE);
+  const lending = yi(current?.TOTAL_RQYE);
+  const previousLending = yi(previous?.TOTAL_RQYE);
   return {
-    data_date: isoDate(current.DIM_DATE),
+    data_date: isoDate(current?.DIM_DATE),
     total,
     total_change: change(total, previousTotal),
     financing,
@@ -481,7 +472,7 @@ function margin(rows: Row[]): ReportData["margin"] {
   };
 }
 
-function omoOperations(rows: Row[]): ReportData["omo_operations"] {
+function omoOperations(rows: OmoOperation[]): ReportData["omo_operations"] {
   const dates = [
     ...new Set(
       rows
@@ -508,23 +499,28 @@ function omoOperations(rows: Row[]): ReportData["omo_operations"] {
   });
 }
 
-function attachBondInfos(rows: Row[], infos: Row[], infoFirst: boolean): Row[] {
+function attachBondInfos<T extends TodayTrade | FavoriteQuote>(
+  rows: T[],
+  infos: BondInfo[],
+  infoFirst: boolean,
+): Array<T & Partial<BondInfo>> {
   const byCode = new Map(infos.map((row) => [String(row.bondUniCode), row]));
   return rows.map((row) => {
-    const info = byCode.get(String(row.bondUniCode)) ?? {};
+    const info = byCode.get(String(row.bondUniCode));
+    if (!info) return row;
     return infoFirst ? { ...info, ...row } : { ...row, ...info };
   });
 }
 
-export function bondCodesFromPayloads(
-  todayTrades: unknown,
-  favoriteQuotes: unknown,
+export function referencedBondCodes(
+  todayTrades: TodayTrade[],
+  favoriteQuotes: FavoriteQuote[],
 ): string[] {
   return [
     ...new Set(
       [
-        ...rowsFrom(todayTrades, "list", "今日成交"),
-        ...rowsFrom(favoriteQuotes, "list", "收藏报价"),
+        ...todayTrades,
+        ...favoriteQuotes,
       ]
         .map((row) => String(row.bondUniCode ?? ""))
         .filter((code) => code && code !== "0"),
@@ -533,12 +529,10 @@ export function bondCodesFromPayloads(
 }
 
 export function previousTradingDate(
-  industryPayload: unknown,
+  industryPayload: IndustrySnapshot,
   reportDate: string,
 ): string {
-  const previousDate = strings(
-    record(industryPayload, "行业数据").tradingDates,
-  )
+  const previousDate = industryPayload.tradingDates
     .filter((date) => date < reportDate)
     .sort()
     .at(-1);
@@ -547,11 +541,11 @@ export function previousTradingDate(
 }
 
 export function buildReportData(resources: RawMarketReportResources): ReportData {
-  const industry = record(resources.industry, "行业数据");
-  const stock = record(resources.stock, "A股收评");
-  const trades = rowsFrom(resources.todayTrades, "list", "今日成交");
-  const quotes = rowsFrom(resources.favoriteQuotes, "list", "收藏报价");
-  const infos = rowsFrom(resources.bondInfos, "data", "债券基础信息");
+  const industry = resources.industry;
+  const stock = resources.stock;
+  const trades = resources.todayTrades;
+  const quotes = resources.favoriteQuotes;
+  const infos = resources.bondInfos;
   const primary = primaryReport(
     resources.primary,
     resources.reportDate,
@@ -562,37 +556,18 @@ export function buildReportData(resources: RawMarketReportResources): ReportData
   return {
     report_date: resources.reportDate,
     generated_at: resources.generatedAt,
-    omo_operations: omoOperations(rowsFrom(resources.omo, "data", "公开市场操作")),
-    funding_rates: fundingRates(
-      rowsFrom(resources.dr, "cfetsCapitalTable", "DR资金利率"),
-      rowsFrom(resources.dibo, "cfetsCapitalTable", "DIBO资金利率"),
-    ),
-    government_bonds: governmentBonds(
-      rowsFrom(resources.governmentBonds, "data", "国债行情"),
-    ),
-    futures: futures(
-      rowsFrom(
-        resources.futures,
-        "futuresContractLatestTradeProtoList",
-        "国债期货",
-      ),
-    ),
-    stock_paragraphs: strings(stock.paragraphs).slice(0, 2),
-    margin: margin(rowsFrom(resources.margin, "data", "两融数据")),
-    equities: rows(industry.equities, "主要指数").map((row) => ({
-      name: String(row.name ?? ""),
-      close: toFloat(row.close) ?? Number.NaN,
-      change_pct: toFloat(row.change_pct) ?? Number.NaN,
-    })),
+    omo_operations: omoOperations(resources.omo),
+    funding_rates: fundingRates(resources.dr, resources.dibo),
+    government_bonds: governmentBonds(resources.governmentBonds),
+    futures: futures(resources.futures),
+    stock_paragraphs: stock.paragraphs.slice(0, 2),
+    margin: margin(resources.margin),
+    equities: industry.equities,
     equity_data_time: null,
     turnover_yi: toFloat(industry.turnoverYi),
     turnover_change_yi: toFloat(industry.turnoverChangeYi),
-    industries: rows(industry.industries, "行业数据").map((row) => ({
-      name: String(row.name ?? ""),
-      change_pct: toFloat(row.change_pct) ?? Number.NaN,
-      market_cap_yuan: toFloat(row.market_cap_yuan) ?? Number.NaN,
-    })),
-    industry_data_date: String(industry.dataDate ?? ""),
+    industries: industry.industries,
+    industry_data_date: industry.dataDate,
     ...primary,
     secondary_bonds: normalizeSecondary(secondary),
     inventory_bonds: normalizeInventory(inventory, secondary),

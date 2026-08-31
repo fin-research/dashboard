@@ -1,13 +1,28 @@
+import { z } from "zod";
+
+import {
+  bondInfosSchema,
+  cfetsRatesSchema,
+  favoriteQuotesSchema,
+  futuresQuotesSchema,
+  governmentBondsSchema,
+  industrySnapshotSchema,
+  marginBalancesSchema,
+  omoOperationsSchema,
+  primaryIssuesSchema,
+  stockSummarySchema,
+  todayTradesSchema,
+} from "./data-contracts.ts";
 import {
   marketReportFinalizationSchema,
   marketReportSnapshotSchema,
   reportDataSchema,
 } from "./market-report.ts";
 import {
-  bondCodesFromPayloads,
   buildReportData,
   dayOffset,
   previousTradingDate,
+  referencedBondCodes,
 } from "./market-report-resources.ts";
 import type {
   MarketBriefing,
@@ -15,8 +30,19 @@ import type {
   ReportData,
 } from "./types";
 
+const apiErrorSchema = z.object({
+  detail: z.string().optional(),
+  error: z.string().optional(),
+});
+const marketBriefingSchema = z.object({
+  report_date: z.string(),
+  content: z.string(),
+  news_count: z.number().int().nonnegative(),
+});
+
 async function getJson<T>(
   url: string,
+  schema: z.ZodType<T>,
   signal?: AbortSignal,
   method = "GET",
   body?: unknown,
@@ -30,14 +56,26 @@ async function getJson<T>(
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const payload = (await response.json()) as T & {
-    detail?: string;
-    error?: string;
-  };
-  if (!response.ok) {
-    throw new Error(payload.detail || payload.error || "上游数据读取失败");
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(
+      response.ok ? `${url.split("?")[0]} 返回的不是有效 JSON` : "上游数据读取失败",
+    );
   }
-  return payload;
+  if (!response.ok) {
+    const error = apiErrorSchema.safeParse(payload);
+    throw new Error(
+      (error.success && (error.data.detail || error.data.error)) ||
+        "上游数据读取失败",
+    );
+  }
+  const parsed = schema.safeParse(payload);
+  if (!parsed.success) {
+    throw new Error(`${url.split("?")[0]} 返回数据不符合接口 Schema`);
+  }
+  return parsed.data;
 }
 
 export function generateMarketBriefing(
@@ -45,8 +83,9 @@ export function generateMarketBriefing(
   signal?: AbortSignal,
 ): Promise<MarketBriefing> {
   const query = new URLSearchParams({ date: reportDate });
-  return getJson<MarketBriefing>(
+  return getJson(
     `/api/market-briefing?${query}`,
+    marketBriefingSchema,
     signal,
     "POST",
   );
@@ -57,39 +96,63 @@ export async function fetchReport(
   _refresh: boolean,
   signal?: AbortSignal,
 ): Promise<MarketReportSnapshot> {
-  const query = new URLSearchParams({ date: reportDate });
   const omoQuery = new URLSearchParams({
     startDate: dayOffset(reportDate, -35),
     endDate: reportDate,
+    fields: "operationDate,operationName,duration,interestRate,operationAmount",
   });
-  const industryPromise = getJson<unknown>(`/data/industry?${query}`, signal);
+  const industryQuery = new URLSearchParams({
+    date: reportDate,
+    fields: "dataDate,equities,industries,turnoverYi,turnoverChangeYi,tradingDates",
+  });
+  const industryPromise = getJson(
+    `/data/industry?${industryQuery}`,
+    industrySnapshotSchema,
+    signal,
+  );
   const primaryPromise = industryPromise.then(async (industry) => {
     const previousDate = previousTradingDate(industry, reportDate);
     const primaryQuery = new URLSearchParams({
       date: reportDate,
       startDate: previousDate,
+      fields: [
+        "bidStartDate", "issueStartDate", "biddingTime", "comShortName",
+        "issuerShortName", "issuerShortNameCn", "comFullName", "issuerName",
+        "publicOffering", "publicOfferingText", "offeringType", "issueWay",
+        "raisingMode", "bondTypeText", "bondShortName", "issueTenor",
+        "planIssueAmount", "issueCouponRate",
+      ].join(","),
     });
     return {
       previousDate,
-      payload: await getJson<unknown>(`/data/primary-issues?${primaryQuery}`, signal),
+      payload: await getJson(
+        `/data/primary-issues?${primaryQuery}`,
+        primaryIssuesSchema,
+        signal,
+      ),
     };
   });
-  const todayTradesPromise = getJson<unknown>(
-    "/data/today-trades?limit=300",
+  const todayTradesPromise = getJson(
+    "/data/today-trades?limit=300&fields=bondUniCode,remainingTenor,cbYte,tradeYield,tradeYieldSubCb",
+    todayTradesSchema,
     signal,
   );
-  const favoriteQuotesPromise = getJson<unknown>(
-    "/data/favorite-quotes?limit=100",
+  const favoriteQuotesPromise = getJson(
+    "/data/favorite-quotes?limit=100&fields=bondUniCode,bondShortName,remainingTenor,remainingTenorDay,cbYield,bidYield,bidEntryPrice,ofrYield,ofrEntryPrice,tradeEntryPrice,tradeYieldSubCb",
+    favoriteQuotesSchema,
     signal,
   );
   const bondInfosPromise = Promise.all([
     todayTradesPromise,
     favoriteQuotesPromise,
   ]).then(([todayTrades, favoriteQuotes]) => {
-    const codes = bondCodesFromPayloads(todayTrades, favoriteQuotes);
-    if (codes.length === 0) return { data: [] };
-    const bondQuery = new URLSearchParams({ codes: codes.join(",") });
-    return getJson<unknown>(`/data/bond-infos?${bondQuery}`, signal);
+    const codes = referencedBondCodes(todayTrades, favoriteQuotes);
+    if (codes.length === 0) return [];
+    const bondQuery = new URLSearchParams({
+      codes: codes.join(","),
+      fields: "bondUniCode,bondShortName,comShortName,bondType,bondOfferingType",
+    });
+    return getJson(`/data/bond-infos?${bondQuery}`, bondInfosSchema, signal);
   });
 
   const [
@@ -107,13 +170,37 @@ export async function fetchReport(
     bondInfosPayload,
     stored,
   ] = await Promise.all([
-    getJson<unknown>(`/data/omo?${omoQuery}`, signal),
-    getJson<unknown>(`/data/cfets?date=${reportDate}&source=DR`, signal),
-    getJson<unknown>(`/data/cfets?date=${reportDate}&source=DIBO`, signal),
-    getJson<unknown>(`/data/bond-top-case?${query}`, signal),
-    getJson<unknown>("/data/futures-latest", signal),
-    getJson<unknown>(`/data/stock-summary?${query}`, signal),
-    getJson<unknown>(`/data/margin?${query}`, signal),
+    getJson(`/data/omo?${omoQuery}`, omoOperationsSchema, signal),
+    getJson(
+      `/data/cfets?date=${reportDate}&source=DR&fields=bondCode,weightedYield,weightedYieldUpDownValueBp`,
+      cfetsRatesSchema,
+      signal,
+    ),
+    getJson(
+      `/data/cfets?date=${reportDate}&source=DIBO&fields=bondCode,weightedYield,weightedYieldUpDownValueBp`,
+      cfetsRatesSchema,
+      signal,
+    ),
+    getJson(
+      `/data/bond-top-case?date=${reportDate}&fields=ordinateName,abscissaName,bondCode,tradeNum,yield,yieldSubYtdCloseBp`,
+      governmentBondsSchema,
+      signal,
+    ),
+    getJson(
+      "/data/futures-latest?fields=contractCode,lastPrice,upDownValuePct",
+      futuresQuotesSchema,
+      signal,
+    ),
+    getJson(
+      `/data/stock-summary?date=${reportDate}&fields=title,time,paragraphs`,
+      stockSummarySchema,
+      signal,
+    ),
+    getJson(
+      `/data/margin?date=${reportDate}&fields=DIM_DATE,TOTAL_RZRQYE,TOTAL_RZYE,TOTAL_RQYE`,
+      marginBalancesSchema,
+      signal,
+    ),
     industryPromise,
     primaryPromise,
     todayTradesPromise,
@@ -178,8 +265,9 @@ export async function saveMarketReport(
 ): Promise<MarketReportSnapshot> {
   const parsedReport = reportDataSchema.strip().parse(report);
   const query = new URLSearchParams({ date: parsedReport.report_date });
-  const payload = await getJson<unknown>(
+  const payload = await getJson(
     `/api/market-report?${query}`,
+    marketReportSnapshotSchema,
     signal,
     "PUT",
     { report: parsedReport, focusText },

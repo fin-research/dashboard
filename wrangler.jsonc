@@ -25,6 +25,13 @@
       "zone_name": "hasbai.xyz"
     }
   ],
+  "services": [
+    {
+      "binding": "DATA",
+      "service": "eastmoney-data",
+      "remote": true
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

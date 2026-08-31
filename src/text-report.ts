@@ -211,7 +211,8 @@ function emBonds(rows: InventoryPoint[]): string {
 function emTradeText(row: InventoryPoint): string {
   const trade = row.trade_yield;
   if (trade !== null) { const bp = row.trade_spread_bp; return `成交${compact(trade)}%${bp === null ? "" : `(${bp >= 0 ? "+" : ""}${fixed(bp, 2)}bp)`}`; }
-  const bid = row.bid_yield ?? null; const ofr = row.ofr_yield ?? null;
+  const bid = row.bid_yield && row.bid_yield > 0 ? row.bid_yield : null;
+  const ofr = row.ofr_yield && row.ofr_yield > 0 ? row.ofr_yield : null;
   return [bid === null ? "" : `Bid${compact(bid)}%`, ofr === null ? "" : `Ofr${compact(ofr)}%`].filter(Boolean).join("-");
 }
 

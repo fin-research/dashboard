@@ -6,12 +6,17 @@
 
 浏览器或 Dashboard Worker 通过同源 `/data/*` 访问独立 Data Worker：
 
+除基础配置和 Choice 外，所有 REST 资源都支持 `fields=a,b` 顶层字段投影；未知字段为
+422。列表资源直接返回 JSON array，不再读取 `data`、`list` 等上游 envelope。响应必须
+先通过 `src/data-contracts.ts` 或服务端局部 Zod Schema，不能用 TypeScript 断言猜测上游
+结构。
+
 - `GET /data/config`：默认报告配置。
 - `GET /data/omo?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`、`GET /data/cfets?date=YYYY-MM-DD&source=DR|DIBO`：OMO 与资金利率原始映射。
 - `GET /data/bond-top-case?date=YYYY-MM-DD`、`GET /data/futures-latest`、`GET /data/margin?date=YYYY-MM-DD`：国债、期货与两融原始映射。
 - `GET /data/industry?date=YYYY-MM-DD`：行业、主要指数、成交额及可用交易日。
 - `GET /data/primary-issues?date=YYYY-MM-DD&startDate=YYYY-MM-DD`：一级发行原始映射。
-- `GET /data/today-trades?limit=300`、`GET /data/favorite-quotes?limit=100`、`GET /data/bond-infos?codes=...`：今日成交、收藏报价与批量债券基础信息原始映射。
+- `GET /data/today-trades?limit=300`、`GET /data/favorite-quotes?limit=100`、`GET /data/bond-infos?codes=...`：今日成交、收藏报价与批量债券基础信息原始映射。`codes` 由本次两份行情的 `bondUniCode` 合并去重后动态生成；`fields` 只取连接、展示和类型筛选需要的 `bondUniCode,bondShortName,comShortName,bondType,bondOfferingType`。
 - `GET /data/stock-summary?date=YYYY-MM-DD`：A 股收评标题、时间与前两段。
 - `GET /data/news?date=YYYY-MM-DD&important=true&pageSize=40` 与 `GET /data/news/{id}`：今日聚焦的 DM 新闻列表和正文。
 - `POST /data/graphql`：仅保留 Choice 等兼容查询；市场点评不得使用其聚合字段。
@@ -44,6 +49,7 @@ endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `func
 
 - `POST /api/market-briefing?date=YYYY-MM-DD`：日期缺省时使用上海时区当天。
 - 无效日期为 400；上游、模型或配置错误按路由映射为 5xx。
+- Dashboard Worker 通过 `DATA` Service Binding 读取股票收评和 DM 新闻；详情最多 5 个并发，避免同一 invocation 的外连等待槽被耗尽。
 
 ### 资金日报
 

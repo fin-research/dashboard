@@ -9,7 +9,8 @@
 - Dashboard Worker 普通读取只返回 R2 定稿的 `focus_text` 与时间元数据；手动保存时才覆盖裁剪后的完整规范报告与定稿。视觉版与文字版始终读取同一份前端报告契约，不分别取数。
 - OMO 文字输出按报告日过滤规范字段 `operation_date`；排序和数字格式由视觉版与文字版共享派生层统一维护。
 - 一级发行只使用报告日和上一交易日数据。同日、同类型、同发行人的多期限合并、东财排除和缺失票息规范由浏览器共享加工层完成；视觉与文字版直接消费 `primary_issues`。
-- 二级成交的债券基础信息批量补全、公募债名、五年期限和东财排除由浏览器共享加工层完成；视图派生层继续使用 Theil-Sen / MAD 残差过滤不可比成交。
+- 二级成交的债券基础信息批量补全、结构化公募公司债类型、五年期限和东财排除由浏览器共享加工层完成；公募公司债固定以 `bondType=37` 且 `bondOfferingType=1` 判断，不再根据简称字母猜测；视图派生层继续使用 Theil-Sen / MAD 残差过滤不可比成交。
+- 东财存量债的 Bid/Ofr 只有严格大于零才视为有效报价；零值归一为空，不进入文字字段、图表散点或 tooltip，但债券本身及其估值、成交信息继续展示。
 
 ### 市场热点
 
@@ -21,7 +22,7 @@
 
 ### 今日聚焦
 
-- Dashboard Worker 分别请求 `/data/stock-summary`、`/data/news` 和 `/data/news/{id}`，在本项目拼接新闻素材后调用统一 AI Gateway 适配器生成纯文本。
+- Dashboard Worker 通过 `DATA` Service Binding 分别请求 `/data/stock-summary`、`/data/news` 和 `/data/news/{id}`，在本项目拼接新闻素材后调用统一 AI Gateway 适配器生成纯文本。
 - 新闻筛选、详情合并与提示词格式属于 Dashboard Worker 契约；更改时必须同步检查 `data` 与本项目测试。
 
 ### 二级池周报

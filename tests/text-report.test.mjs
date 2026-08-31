@@ -72,6 +72,19 @@ test("一级发行展示共享加工层已合并的发行腿", () => {
   assert.ok(report.includes("08/13-丙证券-3年/5年-42亿-1.70%/2.28%"));
 });
 
+test("文字版保留零报价债券但不显示 Bid/Ofr", () => {
+  const input = structuredClone(data);
+  input.inventory_bonds.push({
+    bond_name: "25东财G3", tenor_label: "2Y", tenor_years: 2,
+    valuation: 1.75, trade_yield: null, trade_spread_bp: null,
+    bid_yield: 0, ofr_yield: 0,
+  });
+  const report = buildTextReport(input);
+  assert.ok(report.includes("25东财G3-估值1.75%"));
+  assert.ok(!report.includes("Bid0%"));
+  assert.ok(!report.includes("Ofr0%"));
+});
+
 test("文字版展示当前手动修改后的今日聚焦", () => {
   assert.ok(buildTextReport(data, "手动修改后的判断").endsWith("【今日聚焦】\n手动修改后的判断\n"));
 });

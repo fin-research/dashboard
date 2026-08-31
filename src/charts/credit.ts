@@ -4,6 +4,7 @@ import {
   type LabelRect,
 } from "../label-placement";
 import type { InventoryPoint } from "../types";
+import { positiveInventoryQuotes } from "../positive-quotes.ts";
 import {
   axisLabel,
   chartTextSize,
@@ -30,8 +31,7 @@ export function renderInventory(
   }
   const sorted = [...valid].sort((a, b) => a.tenor_years - b.tenor_years);
   const trades = sorted.filter((point) => Number.isFinite(point.trade_yield));
-  const bids = sorted.filter((point) => Number.isFinite(point.bid_yield));
-  const offers = sorted.filter((point) => Number.isFinite(point.ofr_yield));
+  const { bids, offers } = positiveInventoryQuotes(sorted);
   const labelLayout = createInventoryLabelLayout(host, trades, sorted);
 
   setChart(host, {
@@ -74,8 +74,12 @@ export function renderInventory(
           Number.isFinite(tradeYield)
             ? `成交 ${number(tradeYield, 2)}%`
             : "",
-          Number.isFinite(bidYield) ? `Bid ${number(bidYield, 4)}%` : "",
-          Number.isFinite(ofrYield) ? `Ofr ${number(ofrYield, 4)}%` : "",
+          Number.isFinite(bidYield) && (bidYield ?? 0) > 0
+            ? `Bid ${number(bidYield, 4)}%`
+            : "",
+          Number.isFinite(ofrYield) && (ofrYield ?? 0) > 0
+            ? `Ofr ${number(ofrYield, 4)}%`
+            : "",
         ]
           .filter(Boolean)
           .join("<br>");

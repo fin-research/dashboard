@@ -52,20 +52,21 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
   const originalFetch = globalThis.fetch;
   const originalLog = console.log;
   const aiCalls = [];
+  const dataCalls = [];
   console.log = () => {};
-  globalThis.fetch = async (url, init) => {
-    const target = String(url);
+  const dataFetch = async (url) => {
+    const target = url instanceof Request ? url.url : String(url);
+    dataCalls.push(target);
     if (target.includes("/data/stock-summary")) {
       assert.equal(
         target,
-        "https://eastmoney.hasbai.xyz/data/stock-summary?date=2026-08-10",
+        "https://eastmoney.hasbai.xyz/data/stock-summary?date=2026-08-10&fields=title,time,paragraphs",
       );
       return new Response(
         JSON.stringify({
           title: "A股收评",
           time: "2026-08-10T15:00:00+08:00",
           paragraphs: ["股市收盘正文"],
-          summary: "股市收盘正文",
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
@@ -73,10 +74,9 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     if (target.includes("/data/news?")) {
       assert.equal(
         target,
-        "https://eastmoney.hasbai.xyz/data/news?date=2026-08-10&important=true&pageSize=40",
+        "https://eastmoney.hasbai.xyz/data/news?date=2026-08-10&important=true&pageSize=40&fields=sentimentId%2Ctitle%2Ctime%2Ctags%2Cimportant",
       );
-      return Response.json({
-        list: [
+      return Response.json([
           {
             sentimentId: "news-1",
             title: "债市要闻",
@@ -84,10 +84,9 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
             tags: ["债市"],
             important: true,
           },
-        ],
-      });
+      ]);
     }
-    if (target.endsWith("/data/news/news-1")) {
+    if (target.includes("/data/news/news-1?")) {
       return Response.json({
         sentimentId: "news-1",
         title: "债市要闻",
@@ -96,6 +95,10 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
         content: "债市新闻正文",
       });
     }
+    throw new Error(`unexpected Data request: ${target}`);
+  };
+  globalThis.fetch = async (url, init) => {
+    const target = String(url);
     if (target.includes("/custom-opencode/responses")) {
       aiCalls.push({ url: target, init });
       return Response.json(
@@ -128,6 +131,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     AI_GATEWAY_ID: "default",
     CF_AIG_TOKEN: "test-token",
     DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
+    DATA: { fetch: dataFetch },
   };
   try {
     const result = await generateMarketBriefing(env, "2026-08-10");
@@ -136,6 +140,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
       content: "1、股市结论。\n2、债市结论。",
       news_count: 2,
     });
+    assert.equal(dataCalls.length, 3);
     assert.equal(
       aiCalls[0].url,
       "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-opencode/responses",

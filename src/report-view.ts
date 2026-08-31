@@ -29,9 +29,7 @@ export function deriveReport(data: ReportData): ReportDerived {
     margin: data.margin,
     primary: data.primary_issues,
     comparable: comparablePoints(data.secondary_bonds),
-    inventory: [...data.inventory_bonds].sort(
-      (left, right) => left.tenor_years - right.tenor_years,
-    ),
+    inventory: inventoryPoints(data.inventory_bonds),
   };
 }
 
@@ -109,7 +107,19 @@ export function comparablePoints(
 }
 
 export function inventoryPoints(rows: InventoryPoint[]): InventoryPoint[] {
-  return [...rows].sort((left, right) => left.tenor_years - right.tenor_years);
+  return rows
+    .map((row) => ({
+      ...row,
+      bid_yield:
+        typeof row.bid_yield === "number" && row.bid_yield > 0
+          ? row.bid_yield
+          : null,
+      ofr_yield:
+        typeof row.ofr_yield === "number" && row.ofr_yield > 0
+          ? row.ofr_yield
+          : null,
+    }))
+    .sort((left, right) => left.tenor_years - right.tenor_years);
 }
 
 function filterComparableOutliers(

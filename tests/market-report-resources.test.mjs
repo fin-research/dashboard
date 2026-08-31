@@ -2,91 +2,79 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  bondCodesFromPayloads,
   buildReportData,
+  referencedBondCodes,
 } from "../src/market-report-resources.ts";
 
 test("浏览器共享加工层从原始资源构造完整规范报告", () => {
-  const todayTrades = {
-    list: [
+  const todayTrades = [
       {
-        bondUniCode: 101,
-        bondShortName: "26测试01",
+        bondUniCode: "101",
         remainingTenor: "3Y",
-        tradeYield: "2.10",
-        cbYte: "2.00",
+        tradeYield: 2.10,
+        cbYte: 2.00,
       },
       {
-        bondUniCode: 102,
-        bondShortName: "26东财01",
+        bondUniCode: "102",
         remainingTenor: "2Y",
-        tradeYield: "2.20",
-        cbYte: "2.10",
+        tradeYield: 2.20,
+        cbYte: 2.10,
       },
-    ],
-  };
-  const favoriteQuotes = {
-    list: [
       {
-        bondUniCode: 101,
-        bondShortName: "26测试01",
+        bondUniCode: "103",
+        remainingTenor: "2Y",
+        tradeYield: 2.30,
+        cbYte: 2.20,
+      },
+  ];
+  const favoriteQuotes = [
+      {
+        bondUniCode: "101",
         remainingTenor: "3Y",
         remainingTenorDay: 1095,
-        cbYield: "2.00",
-        bidYield: "2.01",
-        ofrYield: "2.02",
+        cbYield: 2.00,
+        bidYield: 2.01,
+        ofrYield: 2.02,
       },
-    ],
-  };
-  assert.deepEqual(bondCodesFromPayloads(todayTrades, favoriteQuotes), ["101", "102"]);
+  ];
+  assert.deepEqual(referencedBondCodes(todayTrades, favoriteQuotes), ["101", "102", "103"]);
 
   const report = buildReportData({
     reportDate: "2026-08-25",
     generatedAt: "2026-08-25T15:00:00+08:00",
     previousPrimaryDate: "2026-08-22",
-    omo: {
-      data: [
+    omo: [
         {
           operationDate: "2026-08-25",
           operationName: "逆回购",
           duration: "7D",
-          operationAmount: "1000",
-          interestRate: "1.40",
+          operationAmount: 1000,
+          interestRate: 1.40,
         },
+    ],
+    dr: [
+        { bondCode: "DR001", weightedYield: 1.50, weightedYieldUpDownValueBp: 1 },
+        { bondCode: "DR007", weightedYield: 1.60, weightedYieldUpDownValueBp: 2 },
       ],
-    },
-    dr: {
-      cfetsCapitalTable: [
-        { bondCode: "DR001", weightedYield: "1.50", weightedYieldUpDownValueBp: "1" },
-        { bondCode: "DR007", weightedYield: "1.60", weightedYieldUpDownValueBp: "2" },
+    dibo: [
+        { bondCode: "DIBO001", weightedYield: 1.55, weightedYieldUpDownValueBp: 1.5 },
+        { bondCode: "DIBO007", weightedYield: 1.65, weightedYieldUpDownValueBp: 2.5 },
       ],
-    },
-    dibo: {
-      cfetsCapitalTable: [
-        { bondCode: "DIBO001", weightedYield: "1.55", weightedYieldUpDownValueBp: "1.5" },
-        { bondCode: "DIBO007", weightedYield: "1.65", weightedYieldUpDownValueBp: "2.5" },
-      ],
-    },
-    governmentBonds: {
-      data: [
+    governmentBonds: [
         {
           ordinateName: "国债",
           abscissaName: "10Y",
           bondCode: "250011",
-          yield: "1.80",
-          yieldSubYtdCloseBp: "-1",
-          tradeNum: "10",
+          yield: 1.80,
+          yieldSubYtdCloseBp: -1,
+          tradeNum: 10,
         },
+    ],
+    futures: [
+        { contractCode: "T9999", lastPrice: 108.2, upDownValuePct: 0.12 },
       ],
-    },
-    futures: {
-      futuresContractLatestTradeProtoList: [
-        { contractCode: "T9999", lastPrice: "108.2", upDownValuePct: "0.12" },
-      ],
-    },
     stock: { paragraphs: ["第一段", "第二段", "不应保留"] },
-    margin: {
-      data: [
+    margin: [
         {
           DIM_DATE: "2026-08-22",
           TOTAL_RZRQYE: 2e12,
@@ -99,8 +87,7 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
           TOTAL_RZYE: 1.9891e12,
           TOTAL_RQYE: 9.9e9,
         },
-      ],
-    },
+    ],
     industry: {
       dataDate: "2026-08-25",
       equities: [{ name: "上证指数", close: 3610.2, change_pct: 0.4 }],
@@ -108,9 +95,7 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
       turnoverYi: 15000,
       turnoverChangeYi: 200,
     },
-    primary: {
-      data: {
-        list: [
+    primary: [
           {
             bidStartDate: "2026-08-22",
             comShortName: "上期公司",
@@ -146,17 +131,14 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
             issueTenor: "1Y",
             planIssueAmount: 999,
           },
-        ],
-      },
-    },
+    ],
     todayTrades,
     favoriteQuotes,
-    bondInfos: {
-      data: [
-        { bondUniCode: 101, comShortName: "测试公司" },
-        { bondUniCode: 102, comShortName: "东方财富" },
+    bondInfos: [
+        { bondUniCode: "101", bondShortName: "26测试01", comShortName: "测试公司", bondType: 37, bondOfferingType: 1 },
+        { bondUniCode: "102", bondShortName: "26东财01", comShortName: "东方财富", bondType: 37, bondOfferingType: 1 },
+        { bondUniCode: "103", bondShortName: "26私募01", comShortName: "私募公司", bondType: 37, bondOfferingType: 2 },
       ],
-    },
   });
 
   assert.equal(report.omo_operations[0].amount_yi, 1000);
@@ -176,4 +158,32 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
   assert.equal(report.secondary_bonds.length, 1);
   assert.equal(report.secondary_bonds[0].issuer, "测试公司");
   assert.equal(report.inventory_bonds[0].bid_yield, 2.01);
+});
+
+test("东财债券零 Bid/Ofr 归一为空但债券仍保留", () => {
+  const report = buildReportData({
+    reportDate: "2026-08-25",
+    generatedAt: "2026-08-25T15:00:00+08:00",
+    previousPrimaryDate: "2026-08-22",
+    omo: [], dr: [], dibo: [], governmentBonds: [], futures: [],
+    stock: { title: "收评", time: null, paragraphs: [] },
+    margin: [],
+    industry: {
+      dataDate: "2026-08-25", equities: [], industries: [],
+      turnoverYi: null, turnoverChangeYi: null, tradingDates: ["2026-08-22"],
+    },
+    primary: [], todayTrades: [],
+    favoriteQuotes: [{
+      bondUniCode: "101", remainingTenor: "1Y", remainingTenorDay: 365,
+      cbYield: 1.8, bidYield: 0, bidEntryPrice: 0, ofrYield: 0, ofrEntryPrice: 0,
+    }],
+    bondInfos: [{
+      bondUniCode: "101", bondShortName: "25东财G1",
+      comShortName: "东方财富证券", bondType: 37, bondOfferingType: 1,
+    }],
+  });
+  assert.equal(report.inventory_bonds.length, 1);
+  assert.equal(report.inventory_bonds[0].bond_name, "25东财G1");
+  assert.equal(report.inventory_bonds[0].bid_yield, null);
+  assert.equal(report.inventory_bonds[0].ofr_yield, null);
 });

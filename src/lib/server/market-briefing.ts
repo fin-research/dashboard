@@ -8,6 +8,23 @@ const DATA_TIMEOUT_MS = 60_000;
 const marketBriefingOutputSchema = z
   .object({ content: z.string().min(1).describe("只包含两条市场聚焦正文") })
   .strict();
+const briefingStockSchema = z.object({
+  title: z.string(),
+  time: z.string().nullable(),
+  paragraphs: z.array(z.string()),
+});
+const briefingNewsSummarySchema = z.object({
+  sentimentId: z.string(),
+  title: z.string(),
+  time: z.string(),
+  tags: z.array(z.string()),
+  important: z.boolean().optional(),
+});
+const briefingNewsListSchema = z.array(briefingNewsSummarySchema);
+const briefingNewsDetailSchema = briefingNewsSummarySchema.extend({
+  content: z.string(),
+  link: z.string().url().optional(),
+});
 const MARKET_BRIEFING_TRANSPORT_INSTRUCTION =
   "结构化传输要求：先按上述规范写出两条正文，再将完整正文原样放入响应 JSON 的 content 字段；content 内不要使用 Markdown 代码围栏。";
 const DISCARD_TITLE_PREFIXES = [
@@ -256,32 +273,34 @@ async function fetchBriefingNews(
     date: reportDate,
     important: "true",
     pageSize: "40",
+    fields: "sentimentId,title,time,tags,important",
   });
   const [stockPayload, newsPayload] = await Promise.all([
-    fetchDataJson(`${baseUrl}/stock-summary?${query}`),
-    fetchDataJson(`${baseUrl}/news?${newsQuery}`),
+    fetchDataJson(
+      env,
+      `${baseUrl}/stock-summary?${query}&fields=title,time,paragraphs`,
+      briefingStockSchema,
+    ),
+    fetchDataJson(env, `${baseUrl}/news?${newsQuery}`, briefingNewsListSchema),
   ]);
-  const paragraphs = Array.isArray(stockPayload.paragraphs)
-    ? stockPayload.paragraphs.filter(
-        (item): item is string => typeof item === "string" && item.length > 0,
-      )
-    : [];
+  const paragraphs = stockPayload.paragraphs.filter((item) => item.length > 0);
   if (paragraphs.length === 0) {
     throw new MarketBriefingError(503, "新闻数据为空，请稍后重试");
   }
-  const summaries = Array.isArray(newsPayload.list)
-    ? newsPayload.list.filter(isRecord)
-    : [];
-  const details = await Promise.all(
-    summaries.map(async (summary) => {
-      const articleId =
-        typeof summary.sentimentId === "string" ? summary.sentimentId : "";
-      if (!articleId) return summary;
+  const details = await mapWithConcurrency(
+    newsPayload,
+    5,
+    async (summary) => {
+      const detailQuery = new URLSearchParams({
+        fields: "sentimentId,title,time,tags,important,content,link",
+      });
       const detail = await fetchDataJson(
-        `${baseUrl}/news/${encodeURIComponent(articleId)}`,
+        env,
+        `${baseUrl}/news/${encodeURIComponent(summary.sentimentId)}?${detailQuery}`,
+        briefingNewsDetailSchema,
       );
       return { ...summary, ...detail };
-    }),
+    },
   );
   const items: Array<Record<string, unknown>> = [
     {
@@ -300,13 +319,20 @@ async function fetchBriefingNews(
   };
 }
 
-async function fetchDataJson(url: string): Promise<Record<string, unknown>> {
+async function fetchDataJson<T>(
+  env: Env,
+  url: string,
+  schema: z.ZodType<T>,
+): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url, {
+    const request = new Request(url, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(DATA_TIMEOUT_MS),
     });
+    response = env.DATA
+      ? await env.DATA.fetch(request)
+      : await fetch(request);
   } catch (error) {
     const name = error instanceof Error ? error.name : "";
     if (name === "TimeoutError" || name === "AbortError") {
@@ -315,13 +341,41 @@ async function fetchDataJson(url: string): Promise<Record<string, unknown>> {
     throw new MarketBriefingError(503, "新闻数据读取失败，请稍后重试");
   }
   if (!response.ok) {
+    await response.body?.cancel();
     throw new MarketBriefingError(503, "新闻数据读取失败，请稍后重试");
   }
-  const payload: unknown = await response.json();
-  if (!isRecord(payload)) {
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
     throw new MarketBriefingError(503, "新闻数据格式无效，请稍后重试");
   }
-  return payload;
+  const parsed = schema.safeParse(payload);
+  if (!parsed.success) {
+    throw new MarketBriefingError(503, "新闻数据格式无效，请稍后重试");
+  }
+  return parsed.data;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  task: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const item = items[index];
+      if (item !== undefined) results[index] = await task(item);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, worker),
+  );
+  return results;
 }
 
 function formatBriefingItem(
@@ -344,8 +398,4 @@ function formatBriefingItem(
     "正文：",
     content,
   ].join("\n");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

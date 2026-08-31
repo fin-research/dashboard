@@ -71,56 +71,64 @@ function directResponse(target) {
     });
   }
   if (url.pathname === "/data/stock-summary") {
-    return Response.json({ paragraphs: snapshot().stock_paragraphs });
+    return Response.json({
+      title: "A股收评",
+      time: "2026-08-25T15:00:00+08:00",
+      paragraphs: snapshot().stock_paragraphs,
+    });
   }
-  if (url.pathname === "/data/omo") return Response.json({ data: [] });
+  if (url.pathname === "/data/omo") return Response.json([]);
   if (url.pathname === "/data/cfets") {
-    return Response.json({ cfetsCapitalTable: [] });
+    return Response.json([]);
   }
   if (url.pathname === "/data/bond-top-case") {
-    return Response.json({ data: [] });
+    return Response.json([]);
   }
   if (url.pathname === "/data/futures-latest") {
-    return Response.json({ futuresContractLatestTradeProtoList: [] });
+    return Response.json([]);
   }
   if (url.pathname === "/data/margin") {
-    return Response.json({ data: marginRows() });
+    return Response.json(marginRows());
   }
   if (url.pathname === "/data/primary-issues") {
     assert.equal(url.searchParams.get("startDate"), "2026-08-22");
-    return Response.json({ data: { list: [] } });
+    return Response.json([]);
   }
   if (url.pathname === "/data/today-trades") {
-    return Response.json({
-      list: [
+    return Response.json([
         {
-          bondUniCode: 123,
-          bondShortName: "26测试01",
+          bondUniCode: "123",
           remainingTenor: "3Y",
-          tradeYield: "2.10",
-          cbYte: "2.00",
+          tradeYield: 2.10,
+          cbYte: 2.00,
         },
-      ],
-    });
+    ]);
   }
   if (url.pathname === "/data/favorite-quotes") {
-    return Response.json({
-      list: [
+    return Response.json([
         {
-          bondUniCode: 123,
-          bondShortName: "26测试01",
+          bondUniCode: "123",
           remainingTenor: "3Y",
           remainingTenorDay: 1095,
-          cbYield: "2.00",
-          bidYield: "2.01",
-          ofrYield: "2.02",
+          cbYield: 2.00,
+          bidYield: 2.01,
+          ofrYield: 2.02,
         },
-      ],
-    });
+    ]);
   }
   if (url.pathname === "/data/bond-infos") {
     assert.equal(url.searchParams.get("codes"), "123");
-    return Response.json({ data: [{ bondUniCode: 123, comShortName: "测试公司" }] });
+    assert.equal(
+      url.searchParams.get("fields"),
+      "bondUniCode,bondShortName,comShortName,bondType,bondOfferingType",
+    );
+    return Response.json([{
+      bondUniCode: "123",
+      bondShortName: "26测试01",
+      comShortName: "测试公司",
+      bondType: 37,
+      bondOfferingType: 1,
+    }]);
   }
   throw new Error(`unexpected request: ${target}`);
 }
@@ -141,6 +149,7 @@ test("浏览器一次拉取原始资源并加工为视觉与文字共享报告",
   assert.equal(dataUrls.length, 12);
   assert.equal(dataUrls.filter((url) => url.startsWith("/data/cfets?")).length, 2);
   assert.equal(dataUrls.filter((url) => url.startsWith("/data/bond-infos?")).length, 1);
+  assert.ok(dataUrls.every((url) => url.includes("fields=")));
   assert.ok(dataUrls.every((url) => !url.includes("/data/market-report/")));
   assert.ok(dataUrls.every((url) => !url.includes("/data/graphql")));
   assert.equal(

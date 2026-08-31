@@ -72,21 +72,24 @@ function directDataResponse(target) {
     });
   }
   if (url.pathname === "/data/stock-summary") {
-    return Response.json({ paragraphs: ["第一段", "第二段"] });
+    return Response.json({
+      title: "A股收评",
+      time: "2026-08-25T15:00:00+08:00",
+      paragraphs: ["第一段", "第二段"],
+    });
   }
-  if (url.pathname === "/data/omo") return Response.json({ data: [] });
+  if (url.pathname === "/data/omo") return Response.json([]);
   if (url.pathname === "/data/cfets") {
-    return Response.json({ cfetsCapitalTable: [] });
+    return Response.json([]);
   }
   if (url.pathname === "/data/bond-top-case") {
-    return Response.json({ data: [] });
+    return Response.json([]);
   }
   if (url.pathname === "/data/futures-latest") {
-    return Response.json({ futuresContractLatestTradeProtoList: [] });
+    return Response.json([]);
   }
   if (url.pathname === "/data/margin") {
-    return Response.json({
-      data: [
+    return Response.json([
         {
           DIM_DATE: "2026-08-22",
           TOTAL_RZRQYE: 2e12,
@@ -99,15 +102,14 @@ function directDataResponse(target) {
           TOTAL_RZYE: 1.9891e12,
           TOTAL_RQYE: 9.9e9,
         },
-      ],
-    });
+    ]);
   }
   if (url.pathname === "/data/primary-issues") {
     assert.equal(url.searchParams.get("startDate"), "2026-08-22");
-    return Response.json({ data: { list: [] } });
+    return Response.json([]);
   }
-  if (url.pathname === "/data/today-trades") return Response.json({ list: [] });
-  if (url.pathname === "/data/favorite-quotes") return Response.json({ list: [] });
+  if (url.pathname === "/data/today-trades") return Response.json([]);
+  if (url.pathname === "/data/favorite-quotes") return Response.json([]);
   throw new Error(`unexpected request: ${target}`);
 }
 
