@@ -37,33 +37,95 @@ function snapshot() {
   };
 }
 
-test("市场点评从 Dashboard 按日缓存接口读取", async (context) => {
+function directResponse(target) {
+  const url = new URL(String(target), "https://example.test");
+  if (url.pathname === "/api/market-report") return Response.json(snapshot());
+  if (url.pathname === "/data/industry") {
+    return Response.json({
+      dataDate: "2026-08-25",
+      equities: snapshot().equities,
+      industries: snapshot().industries,
+      turnoverYi: 15000,
+      turnoverChangeYi: 200,
+      tradingDates: ["2026-08-22", "2026-08-25"],
+    });
+  }
+  if (url.pathname === "/data/stock-summary") {
+    return Response.json({ paragraphs: snapshot().stock_paragraphs });
+  }
+  if (url.pathname === "/data/market-report/omo") {
+    return Response.json({ omoOperations: [] });
+  }
+  if (url.pathname === "/data/market-report/funding") {
+    return Response.json({ fundingRates: [] });
+  }
+  if (url.pathname === "/data/market-report/government-bonds") {
+    return Response.json({ governmentBonds: [] });
+  }
+  if (url.pathname === "/data/market-report/futures") {
+    return Response.json({ futures: [] });
+  }
+  if (url.pathname === "/data/market-report/margin") {
+    const margin = snapshot().margin;
+    return Response.json({
+      margin: {
+        dataDate: margin.data_date,
+        totalBalanceYi: margin.total,
+        totalChangeYi: margin.total_change,
+        financingBalanceYi: margin.financing,
+        financingChangeYi: margin.financing_change,
+        securitiesLendingBalanceYi: margin.securities_lending,
+        securitiesLendingChangeYi: margin.securities_lending_change,
+      },
+    });
+  }
+  if (url.pathname === "/data/market-report/primary") {
+    return Response.json({
+      primarySummary: { currentAmount: 50, changeAmount: 10 },
+      primaryIssues: [],
+    });
+  }
+  if (url.pathname === "/data/market-report/secondary") {
+    return Response.json({ secondaryBonds: [] });
+  }
+  if (url.pathname === "/data/market-report/inventory") {
+    return Response.json({ inventoryBonds: [] });
+  }
+  throw new Error(`unexpected request: ${target}`);
+}
+
+test("市场点评由浏览器拆分读取 Data REST，Dashboard 只读取定稿", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   const calls = [];
   globalThis.fetch = async (url, init) => {
     calls.push({ url, init });
-    return Response.json(snapshot());
+    return directResponse(url);
   };
 
   const report = await fetchReport("2026-08-25", true);
 
-  assert.equal(calls[0].url, "/api/market-report?date=2026-08-25&refresh=true");
-  assert.equal(calls[0].init.method, "GET");
+  assert.equal(
+    calls.filter((call) => String(call.url).includes("/data/market-report/")).length,
+    8,
+  );
+  assert.ok(calls.some((call) => String(call.url) === "/api/market-report?date=2026-08-25"));
+  assert.ok(calls.every((call) => !String(call.url).includes("/data/graphql")));
   assert.equal(report.equities[0].change_pct, 0.4);
   assert.equal(report.primary_summary.current_amount, 50);
+  assert.equal(report.cached_at, snapshot().cached_at);
 });
 
-test("历史市场点评读取不附带刷新参数", async (context) => {
+test("拆分请求不再附带 GraphQL refresh 参数", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
-  let requestedUrl = "";
+  const requestedUrls = [];
   globalThis.fetch = async (url) => {
-    requestedUrl = String(url);
-    return Response.json(snapshot());
+    requestedUrls.push(String(url));
+    return directResponse(url);
   };
   await fetchReport("2026-08-25", false);
-  assert.equal(requestedUrl, "/api/market-report?date=2026-08-25");
+  assert.ok(requestedUrls.every((url) => !url.includes("refresh=")));
 });
 
 test("保存定稿只提交规范报告与今日聚焦", async (context) => {
@@ -88,9 +150,12 @@ test("保存定稿只提交规范报告与今日聚焦", async (context) => {
   assert.equal(saved.finalized_at, "2026-08-25T16:00:00+08:00");
 });
 
-test("缓存接口错误时前端显示业务错误", async (context) => {
+test("Data 分段接口错误时前端显示业务错误", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
-  globalThis.fetch = async () => Response.json({ error: "Choice 数据源不可用" }, { status: 502 });
+  globalThis.fetch = async (url) =>
+    String(url).startsWith("/data/industry?")
+      ? Response.json({ detail: "Choice 数据源不可用" }, { status: 503 })
+      : directResponse(url);
   await assert.rejects(fetchReport("2026-08-25", false), /Choice 数据源不可用/);
 });

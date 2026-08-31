@@ -1,6 +1,6 @@
 import {
-  loadMarketReport,
   MarketReportStoreError,
+  readMarketReport,
   saveMarketReport,
 } from "$lib/server/market-report";
 import { validateSameOrigin } from "$lib/server/bond-ledger";
@@ -9,12 +9,9 @@ import type { RequestHandler } from "./$types";
 export const GET: RequestHandler = async ({ platform, url }) => {
   try {
     const reportDate = requiredDate(url);
-    const refresh = url.searchParams.get("refresh") === "true";
-    const snapshot = await loadMarketReport(
+    const snapshot = await readMarketReport(
       platform?.env.EASTMONEY,
-      platform?.env.DATA_API_BASE_URL,
       reportDate,
-      refresh,
     );
     return Response.json(snapshot, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
@@ -54,14 +51,16 @@ function requiredDate(url: URL): string {
 
 function errorResponse(error: unknown, url: URL, action: string): Response {
   const status = error instanceof MarketReportStoreError ? error.status : 500;
-  console.error(
-    JSON.stringify({
-      event: `market_report_${action}_failed`,
-      status,
-      path: url.pathname,
-      error: error instanceof Error ? error.message : String(error),
-    }),
-  );
+  if (status !== 404) {
+    console.error(
+      JSON.stringify({
+        event: `market_report_${action}_failed`,
+        status,
+        path: url.pathname,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
   return Response.json(
     {
       error:

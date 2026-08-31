@@ -55,20 +55,46 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
   console.log = () => {};
   globalThis.fetch = async (url, init) => {
     const target = String(url);
-    if (target.includes("/data/market-briefing/news")) {
+    if (target.includes("/data/stock-summary")) {
       assert.equal(
         target,
-        "https://eastmoney.hasbai.xyz/data/market-briefing/news?date=2026-08-10",
+        "https://eastmoney.hasbai.xyz/data/stock-summary?date=2026-08-10",
       );
-      assert.equal(init?.method, "POST");
       return new Response(
         JSON.stringify({
-          report_date: "2026-08-10",
-          news_count: 2,
-          news_text: "【1】股市收盘正文",
+          title: "A股收评",
+          time: "2026-08-10T15:00:00+08:00",
+          paragraphs: ["股市收盘正文"],
+          summary: "股市收盘正文",
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
+    }
+    if (target.includes("/data/news?")) {
+      assert.equal(
+        target,
+        "https://eastmoney.hasbai.xyz/data/news?date=2026-08-10&important=true&pageSize=40",
+      );
+      return Response.json({
+        list: [
+          {
+            sentimentId: "news-1",
+            title: "债市要闻",
+            time: "2026-08-10T14:30:00+08:00",
+            tags: ["债市"],
+            important: true,
+          },
+        ],
+      });
+    }
+    if (target.endsWith("/data/news/news-1")) {
+      return Response.json({
+        sentimentId: "news-1",
+        title: "债市要闻",
+        time: "2026-08-10T14:30:00+08:00",
+        tags: ["债市"],
+        content: "债市新闻正文",
+      });
     }
     if (target.includes("/custom-opencode/responses")) {
       aiCalls.push({ url: target, init });
@@ -143,7 +169,10 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
       query.input[0].content,
       /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
     );
-    assert.match(query.input[0].content, /【1】股市收盘正文/);
+    assert.match(query.input[0].content, /【1】2026-08-10 15:00:00 A股收评/);
+    assert.match(query.input[0].content, /股市收盘正文/);
+    assert.match(query.input[0].content, /【2】2026-08-10 14:30:00 债市要闻/);
+    assert.match(query.input[0].content, /债市新闻正文/);
   } finally {
     globalThis.fetch = originalFetch;
     console.log = originalLog;

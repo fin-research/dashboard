@@ -9,9 +9,10 @@ Worker Assets 只承载随应用版本一起构建、发布的前端资源。资
 ```text
 Browser
 ├→ Svelte pages / components / charts
-├→ /api/market-report ──→ R2 市场点评 JSON / Data API GraphQL
+├→ /data/market-report/*、/data/industry、/data/stock-summary ──→ Data Worker
+├→ /api/market-report ──→ R2 市场点评定稿 JSON
 ├→ /fund-report/* ──────→ R2 HTML 日报
-├→ /data/* ─────────────→ Python data service
+├→ /data/* ─────────────→ TypeScript Data Worker
 └→ /api/* ──────────────→ SvelteKit Worker routes
                           ├→ D1
                           ├→ AI Gateway
@@ -30,7 +31,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 - `src/routes/` 负责页面装配、路由参数和 HTTP 边界，不承载复杂业务计算。
 - `src/App.svelte` 保留市场点评的整体报告装配。
-- `src/api.ts` 只访问同源 Dashboard `/api/*`。
+- `src/api.ts` 直接读取同源 `/data/*` 分段资源，并只用 Dashboard `/api/market-report` 读取或保存人工定稿。
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
@@ -40,8 +41,8 @@ Local credit Excel ──────→ local parser → Neon credit
 
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。
-- `src/lib/server/market-briefing.ts` 从 `/data/market-briefing/news` 取材并生成今日聚焦。
-- `src/lib/server/market-report.ts` 负责精准 GraphQL 查询、按日 R2 快照和人工定稿覆盖。
+- `src/lib/server/market-briefing.ts` 分别从 `/data/stock-summary`、`/data/news` 和新闻详情取材，在 Dashboard Worker 组装提示词并生成今日聚焦。
+- `src/lib/server/market-report.ts` 只负责按日 R2 定稿读取与覆盖，不查询 Data API。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器，使用 provider-specific Responses API 固定执行 `custom-opencode` → `custom-codex` 顺序 fallback。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
@@ -53,7 +54,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ### 市场点评
 
-浏览器 `GET /api/market-report?date=` → Dashboard Worker → `market-briefing/YYYY-MM-DD.json`。R2 未命中或显式刷新时，Worker 才用精准 GraphQL 查询 Data API 的强类型根字段并覆盖当天快照。视觉版与文字版共享同一最小规范契约；`PUT /api/market-report` 保存完整报告和人工定稿的今日聚焦。
+浏览器并发请求 `/data/market-report/*`、`/data/industry` 和 `/data/stock-summary`，再在 `src/api.ts` 组装规范报告；一级发行在行业资源给出上一交易日后单独请求。市场数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。浏览器另以 `GET /api/market-report?date=` 只读取已有 R2 定稿并合并 `focus_text`；无定稿时继续展示实时分段数据。`PUT /api/market-report` 保存完整报告和人工定稿的今日聚焦。
 
 ### 市场热点
 

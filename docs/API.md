@@ -4,39 +4,31 @@
 
 ## 外部数据服务 `/data/*`
 
-Dashboard Worker 通过同源代理访问：
+浏览器或 Dashboard Worker 通过同源 `/data/*` 访问独立 Data Worker：
 
 - `GET /data/config`：默认报告配置。
-- `POST /data/graphql`：复杂、多资源选择查询；市场点评使用带 `request` 参数的强类型根字段。
-- `POST /data/market-briefing/news?date=YYYY-MM-DD`：供 Worker 使用的新闻素材。
+- `GET /data/market-report/{omo|funding|government-bonds|futures|margin|secondary|inventory}?date=YYYY-MM-DD`：市场点评独立分段资源。
+- `GET /data/industry?date=YYYY-MM-DD`：行业、主要指数、成交额及可用交易日。
+- `GET /data/market-report/primary?date=YYYY-MM-DD&previousDate=YYYY-MM-DD`：报告日与上一交易日的一级发行汇总和明细。
+- `GET /data/stock-summary?date=YYYY-MM-DD`：A 股收评标题、时间与前两段。
+- `GET /data/news?date=YYYY-MM-DD&important=true&pageSize=40` 与 `GET /data/news/{id}`：今日聚焦的 DM 新闻列表和正文。
+- `POST /data/graphql`：仅保留 Choice 等兼容查询；市场点评不得使用其聚合字段。
 
 本地 Vite 完整保留 `/data` 前缀并代理到 `DATA_PROXY_TARGET`。线上由独立数据服务处理，Dashboard Worker 不注册这些路由。
 
-市场点评根字段的变化必须与 Worker 映射、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/report`，也不要为视觉版或文字版增加单独的数据源。
+市场点评分段字段的变化必须与 `src/api.ts` 组装、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 GraphQL 市场报告聚合，也不要为视觉版或文字版增加单独的数据源。
 
 研究辅助由浏览器直接 `POST /data/graphql`，使用 `choiceEdb(edbIds, startDate,
 endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `function + fields + rows`
 表格结构。该请求不经过 Dashboard `/api/*`，也不由 Dashboard Worker 代理拼装业务数据。
 
-Worker 精准查询示例：
-
-```graphql
-query MarketReport($request: MarketReportInput!) {
-  reportDate(request: $request)
-  fundingRates(request: $request) { code rate changeBp }
-  equities(request: $request) { name close changePct }
-  industries(request: $request) { name changePct marketCapYuan }
-  primarySummary(request: $request) { currentAmount changeAmount }
-}
-```
-
-浏览器通过 Dashboard REST 读取或保存市场点评；研究辅助是明确例外，直接使用既有 Data API GraphQL。今日聚焦素材、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
+浏览器直接读取 Data REST 市场数据；Dashboard REST 只读取或保存人工定稿。研究辅助仍直接使用既有 Data API Choice GraphQL。今日聚焦、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
 
 ## Dashboard Worker `/api/*`
 
 ### 市场点评
 
-- `GET /api/market-report?date=YYYY-MM-DD[&refresh=true]`：优先返回 R2 日快照；缺失或刷新时请求 Data API 并覆盖 `market-briefing/YYYY-MM-DD.json`。
+- `GET /api/market-report?date=YYYY-MM-DD`：只读取已有 R2 定稿；无定稿返回 404，不请求 Data API。
 - `PUT /api/market-report?date=YYYY-MM-DD`：同源保存完整规范报告与今日聚焦定稿，覆盖当天对象。
 
 ### 市场热点

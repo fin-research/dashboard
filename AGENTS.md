@@ -24,7 +24,7 @@
 - 修改前先搜索现有页面、组件、图表、派生函数和测试；优先复用，不建立平行实现。
 - UI 变更必须读取 `DESIGN.md`；保持既有桌面布局和移动端模块顺序，不自行引入新设计体系。
 - 浏览器只请求同源 `/data/*`；本地由 Vite 代理，线上 Dashboard Worker 不接管 `/data/*`。
-- `/data/graphql` 的 `marketReport` 是视觉版与文字版的统一完整数据契约。GraphQL 只选择页面需要的完整字段，筛选和格式化仍放在共享前端派生层；不得恢复 `/data/report` 或为某个视图建立独立数据源。
+- 市场点评由浏览器直接请求 `/data/market-report/*` 分段 REST、`/data/industry` 和 `/data/stock-summary`，再组装为视觉版与文字版共享的完整契约；不得经过 Dashboard Worker 聚合，也不得恢复 Data GraphQL 市场报告查询。
 - 一级发行视觉与文字输出必须共用 `src/primary-issues.ts`；文字报告不得读取 Python 归档文本。
 - 热点首次访问只读最近成功快照；只有用户手动生成才调用模型并追加 `hotspot_snapshot`。旧快照的证据范围以快照自身为准。
 - 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。

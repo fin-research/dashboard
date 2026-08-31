@@ -1,22 +1,40 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { fetchReport } from "../src/api.ts";
 import {
-  loadMarketReport,
+  readMarketReport,
   saveMarketReport,
 } from "../src/lib/server/market-report.ts";
 
-function graphQLData() {
+function reportData() {
   return {
-    reportDate: "2026-08-25",
-    generatedAt: "2026-08-25T15:00:00+08:00",
-    omoOperations: [], fundingRates: [], governmentBonds: [], futures: [],
-    stockParagraphs: ["第一段", "第二段"],
-    margin: { dataDate: "2026-08-22", totalBalanceYi: 20000, totalChangeYi: 10, financingBalanceYi: 19900, financingChangeYi: 9, securitiesLendingBalanceYi: 100, securitiesLendingChangeYi: 1 },
-    equities: [], equityDataTime: null, turnoverYi: null, turnoverChangeYi: null,
-    industries: [], industryDataDate: "2026-08-25",
-    primarySummary: { currentAmount: 0, changeAmount: null },
-    primaryIssues: [], secondaryBonds: [], inventoryBonds: [],
+    report_date: "2026-08-25",
+    generated_at: "2026-08-25T15:00:00+08:00",
+    omo_operations: [],
+    funding_rates: [],
+    government_bonds: [],
+    futures: [],
+    stock_paragraphs: ["第一段", "第二段"],
+    margin: {
+      data_date: "2026-08-22",
+      total: 20000,
+      total_change: 10,
+      financing: 19900,
+      financing_change: 9,
+      securities_lending: 100,
+      securities_lending_change: 1,
+    },
+    equities: [],
+    equity_data_time: null,
+    turnover_yi: null,
+    turnover_change_yi: null,
+    industries: [],
+    industry_data_date: "2026-08-25",
+    primary_summary: { current_amount: 0, change_amount: null },
+    primary_issues: [],
+    secondary_bonds: [],
+    inventory_bonds: [],
   };
 }
 
@@ -26,7 +44,9 @@ function memoryBucket() {
     objects,
     async get(key) {
       const text = objects.get(key);
-      return text === undefined ? null : { async json() { return JSON.parse(text); } };
+      return text === undefined
+        ? null
+        : { async json() { return JSON.parse(text); } };
     },
     async put(key, value, options) {
       objects.set(key, String(value));
@@ -35,53 +55,100 @@ function memoryBucket() {
   };
 }
 
-test("当天无 R2 快照时精准查询 GraphQL 并写入 market-briefing", async (context) => {
+function directDataResponse(target) {
+  const url = new URL(target, "https://example.test");
+  if (url.pathname === "/api/market-report") {
+    return Response.json({ error: "该日期尚无市场点评定稿" }, { status: 404 });
+  }
+  if (url.pathname === "/data/industry") {
+    return Response.json({
+      dataDate: "2026-08-25",
+      industries: [],
+      equities: [],
+      turnoverYi: null,
+      turnoverChangeYi: null,
+      tradingDates: ["2026-08-22", "2026-08-25"],
+    });
+  }
+  if (url.pathname === "/data/stock-summary") {
+    return Response.json({ paragraphs: ["第一段", "第二段"] });
+  }
+  if (url.pathname === "/data/market-report/omo") {
+    return Response.json({ omoOperations: [] });
+  }
+  if (url.pathname === "/data/market-report/funding") {
+    return Response.json({ fundingRates: [] });
+  }
+  if (url.pathname === "/data/market-report/government-bonds") {
+    return Response.json({ governmentBonds: [] });
+  }
+  if (url.pathname === "/data/market-report/futures") {
+    return Response.json({ futures: [] });
+  }
+  if (url.pathname === "/data/market-report/margin") {
+    return Response.json({
+      margin: {
+        dataDate: "2026-08-22",
+        totalBalanceYi: 20000,
+        totalChangeYi: 10,
+        financingBalanceYi: 19900,
+        financingChangeYi: 9,
+        securitiesLendingBalanceYi: 100,
+        securitiesLendingChangeYi: 1,
+      },
+    });
+  }
+  if (url.pathname === "/data/market-report/primary") {
+    assert.equal(url.searchParams.get("previousDate"), "2026-08-22");
+    return Response.json({
+      primarySummary: { currentAmount: 0, changeAmount: null },
+      primaryIssues: [],
+    });
+  }
+  if (url.pathname === "/data/market-report/secondary") {
+    return Response.json({ secondaryBonds: [] });
+  }
+  if (url.pathname === "/data/market-report/inventory") {
+    return Response.json({ inventoryBonds: [] });
+  }
+  throw new Error(`unexpected request: ${target}`);
+}
+
+test("浏览器拆分请求 Data REST 并且不走 Dashboard 聚合或 GraphQL", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   const calls = [];
-  globalThis.fetch = async (url, init) => {
-    calls.push({ url, init });
-    return Response.json({ data: graphQLData() });
+  globalThis.fetch = async (target) => {
+    calls.push(String(target));
+    return directDataResponse(String(target));
   };
-  const bucket = memoryBucket();
-  const result = await loadMarketReport(bucket, "https://example.test/data", "2026-08-25", false);
-  const body = JSON.parse(calls[0].init.body);
-  assert.equal(calls[0].url, "https://example.test/data/graphql");
-  assert.deepEqual(body.variables, { request: { date: "2026-08-25", refresh: false } });
-  assert.ok(!body.query.includes("marketReport"));
-  assert.ok(body.query.includes("secondaryBonds(request: $request)"));
-  assert.ok(bucket.objects.has("market-briefing/2026-08-25.json"));
+
+  const result = await fetchReport("2026-08-25", false);
+  assert.equal(result.report_date, "2026-08-25");
   assert.equal(result.margin.total, 20000);
+  assert.deepEqual(result.stock_paragraphs, ["第一段", "第二段"]);
+  assert.equal(result.focus_text, "");
+  assert.equal(calls.filter((target) => target.includes("/data/market-report/")).length, 8);
+  assert.ok(calls.some((target) => target.includes("/data/industry?")));
+  assert.ok(calls.some((target) => target.includes("/data/stock-summary?")));
+  assert.ok(calls.every((target) => !target.includes("/data/graphql")));
 });
 
-test("已有当天快照时直接从 R2 返回且不请求上游", async (context) => {
-  const originalFetch = globalThis.fetch;
-  context.after(() => { globalThis.fetch = originalFetch; });
+test("人工定稿写入 R2 后可独立读取，不触发 Data API", async () => {
   const bucket = memoryBucket();
-  globalThis.fetch = async () => Response.json({ data: graphQLData() });
-  const first = await loadMarketReport(bucket, "https://example.test/data", "2026-08-25", false);
-  globalThis.fetch = async () => assert.fail("缓存命中不应请求上游");
-  const second = await loadMarketReport(bucket, "https://example.test/data", "2026-08-25", false);
-  assert.deepEqual(second, first);
-});
-
-test("人工定稿保存完整报告与聚焦文本并覆盖当日对象", async () => {
-  const bucket = memoryBucket();
-  const raw = graphQLData();
-  const report = {
-    report_date: raw.reportDate, generated_at: raw.generatedAt,
-    omo_operations: [], funding_rates: [], government_bonds: [], futures: [],
-    stock_paragraphs: raw.stockParagraphs,
-    margin: { data_date: raw.margin.dataDate, total: 20000, total_change: 10, financing: 19900, financing_change: 9, securities_lending: 100, securities_lending_change: 1 },
-    equities: [], equity_data_time: null, turnover_yi: null, turnover_change_yi: null,
-    industries: [], industry_data_date: raw.industryDataDate,
-    primary_summary: { current_amount: 0, change_amount: null },
-    primary_issues: [], secondary_bonds: [], inventory_bonds: [],
-  };
-  const saved = await saveMarketReport(bucket, "2026-08-25", report, "定稿判断");
+  const saved = await saveMarketReport(
+    bucket,
+    "2026-08-25",
+    reportData(),
+    "定稿判断",
+  );
   assert.equal(saved.focus_text, "定稿判断");
   assert.ok(saved.finalized_at);
-  const stored = JSON.parse(bucket.objects.get("market-briefing/2026-08-25.json"));
-  assert.equal(stored.focus_text, "定稿判断");
-  assert.equal(stored.report_date, "2026-08-25");
+
+  const stored = await readMarketReport(bucket, "2026-08-25");
+  assert.deepEqual(stored, saved);
+  assert.equal(
+    JSON.parse(bucket.objects.get("market-briefing/2026-08-25.json")).focus_text,
+    "定稿判断",
+  );
 });

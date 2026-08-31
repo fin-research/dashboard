@@ -5,9 +5,9 @@
 ### 市场点评
 
 - 报告日期按 `Asia/Shanghai` 解释；开盘前默认日期逻辑由 `src/report-date.ts` 统一维护。
-- Dashboard Worker 通过 `/data/graphql` 选择市场点评强类型根字段；响应字段直接位于 GraphQL `data` 下。Data API 负责上游编码、单位和业务筛选的规范化，不向 Dashboard 透传原始行。
-- Worker 按报告日读取 `market-briefing/YYYY-MM-DD.json`：命中直接返回，缺失才请求 Data API 并写入；显式刷新覆盖当天数据。视觉版与文字版读取同一快照，不是两套口径。
-- OMO 文字输出按报告日过滤规范字段 `operation_date`；排序和数字格式应与 `api/scripts/report_cli.py` 保持一致。
+- 浏览器直接请求 Data API 的 `/market-report/*` 分段 REST、`/industry` 和 `/stock-summary`，在 `src/api.ts` 组装为统一报告契约；市场数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。
+- Dashboard Worker 只按报告日读取 `market-briefing/YYYY-MM-DD.json` 中的人工定稿；浏览器将其 `focus_text` 与最新分段市场数据合并。保存时才覆盖完整报告与定稿，视觉版与文字版始终读取同一份前端报告契约。
+- OMO 文字输出按报告日过滤规范字段 `operation_date`；排序和数字格式由视觉版与文字版共享派生层统一维护。
 - 一级发行只使用报告日和上一交易日数据。同日、同类型、同发行人的多期限合并、东财排除和缺失票息规范由 Data API 完成；视觉与文字版直接消费 `primary_issues`。
 - 二级成交的公募债名、五年期限和东财排除由 Data API 完成；Dashboard 仅继续使用 Theil-Sen / MAD 残差过滤不可比成交。
 
@@ -21,8 +21,8 @@
 
 ### 今日聚焦
 
-- Dashboard Worker 从 `/data/market-briefing/news` 取得指定日期新闻素材，再调用统一 AI Gateway 适配器生成纯文本。
-- 素材格式是提示词输入契约；更改时必须同步检查 `api` 与本项目测试。
+- Dashboard Worker 分别请求 `/data/stock-summary`、`/data/news` 和 `/data/news/{id}`，在本项目拼接新闻素材后调用统一 AI Gateway 适配器生成纯文本。
+- 新闻筛选、详情合并与提示词格式属于 Dashboard Worker 契约；更改时必须同步检查 `data` 与本项目测试。
 
 ### 二级池周报
 

@@ -252,10 +252,58 @@ async function fetchBriefingNews(
   const baseUrl =
     env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
   const query = new URLSearchParams({ date: reportDate });
+  const newsQuery = new URLSearchParams({
+    date: reportDate,
+    important: "true",
+    pageSize: "40",
+  });
+  const [stockPayload, newsPayload] = await Promise.all([
+    fetchDataJson(`${baseUrl}/stock-summary?${query}`),
+    fetchDataJson(`${baseUrl}/news?${newsQuery}`),
+  ]);
+  const paragraphs = Array.isArray(stockPayload.paragraphs)
+    ? stockPayload.paragraphs.filter(
+        (item): item is string => typeof item === "string" && item.length > 0,
+      )
+    : [];
+  if (paragraphs.length === 0) {
+    throw new MarketBriefingError(503, "新闻数据为空，请稍后重试");
+  }
+  const summaries = Array.isArray(newsPayload.list)
+    ? newsPayload.list.filter(isRecord)
+    : [];
+  const details = await Promise.all(
+    summaries.map(async (summary) => {
+      const articleId =
+        typeof summary.sentimentId === "string" ? summary.sentimentId : "";
+      if (!articleId) return summary;
+      const detail = await fetchDataJson(
+        `${baseUrl}/news/${encodeURIComponent(articleId)}`,
+      );
+      return { ...summary, ...detail };
+    }),
+  );
+  const items: Array<Record<string, unknown>> = [
+    {
+      title: stockPayload.title,
+      time: stockPayload.time,
+      tags: ["股市", "行情"],
+      content: paragraphs.join("\n"),
+    },
+    ...details,
+  ];
+  return {
+    news_count: items.length,
+    news_text: items
+      .map((item, index) => formatBriefingItem(index + 1, item))
+      .join("\n\n"),
+  };
+}
+
+async function fetchDataJson(url: string): Promise<Record<string, unknown>> {
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}/market-briefing/news?${query}`, {
-      method: "POST",
+    response = await fetch(url, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(DATA_TIMEOUT_MS),
     });
@@ -269,13 +317,35 @@ async function fetchBriefingNews(
   if (!response.ok) {
     throw new MarketBriefingError(503, "新闻数据读取失败，请稍后重试");
   }
-  const payload = (await response.json()) as {
-    report_date?: string;
-    news_count?: number;
-    news_text?: string;
-  };
-  if (typeof payload.news_text !== "string" || !payload.news_text) {
-    throw new MarketBriefingError(503, "新闻数据为空，请稍后重试");
+  const payload: unknown = await response.json();
+  if (!isRecord(payload)) {
+    throw new MarketBriefingError(503, "新闻数据格式无效，请稍后重试");
   }
-  return { news_count: payload.news_count ?? 0, news_text: payload.news_text };
+  return payload;
+}
+
+function formatBriefingItem(
+  index: number,
+  item: Record<string, unknown>,
+): string {
+  const timeText =
+    typeof item.time === "string"
+      ? item.time.replace("T", " ").slice(0, 19)
+      : "--";
+  const tags =
+    Array.isArray(item.tags) && item.tags.length > 0
+      ? item.tags.filter((tag): tag is string => typeof tag === "string").join("、")
+      : "--";
+  const content =
+    typeof item.content === "string" && item.content ? item.content : "（无正文）";
+  return [
+    `【${index}】${timeText} ${String(item.title ?? "")}`,
+    `标签：${tags}`,
+    "正文：",
+    content,
+  ].join("\n");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
