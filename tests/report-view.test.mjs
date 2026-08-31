@@ -48,7 +48,7 @@ test("资金面指标直接投影 API 规范字段", () => {
   ]);
 });
 
-test("关键期限国债收益率直接使用服务端已选成交券", () => {
+test("关键期限国债收益率直接使用共享加工层已选成交券", () => {
   assert.deepEqual(governmentBondMetrics([
     { category: "国债", tenor: "1Y", code: "1", yield_rate: 1.4, change_bp: 2 },
     { category: "国债", tenor: "10Y", code: "10", yield_rate: 1.8, change_bp: -1 },
@@ -67,22 +67,22 @@ test("融资融券快照不再暴露上游编码", () => {
   assert.equal("TOTAL_RZRQYE" in snapshot, false);
 });
 
-test("一级发行保留服务端规范后的票息空值", () => {
+test("一级发行保留共享加工层规范后的票息空值", () => {
   const points = primaryPoints([{ issue_date: "08/10", issue_date_key: "2026-08-10", issuer: "丙", category: "小公募", bond_names: ["26无票面01"], tenors: ["2年"], coupons: [null], amount: 10 }]);
   assert.deepEqual(points[0].coupons, [null]);
 });
 
-test("一级发行列表不再包含被后端排除的东方财富条目", () => {
+test("一级发行列表不再包含被共享加工层排除的东方财富条目", () => {
   const points = primaryPoints([{ issue_date: "08/13", issue_date_key: "2026-08-13", issuer: "东莞证券", category: "小公募", bond_names: ["26东莞03"], tenors: ["2年"], coupons: [1.65], amount: 20 }]);
   assert.deepEqual(points.flatMap((point) => point.bond_names), ["26东莞03"]);
 });
 
-test("一级发行保持服务端合并后的腿顺序和金额", () => {
+test("一级发行保持共享加工层合并后的腿顺序和金额", () => {
   const points = primaryPoints([{ issue_date: "08/18", issue_date_key: "2026-08-18", issuer: "甲证券", category: "小公募", bond_names: ["26甲01", "26甲02"], tenors: ["3年", "5年"], coupons: [1.86, 2.28], amount: 32.4 }]);
   assert.deepEqual(points[0], { issue_date: "08/18", issue_date_key: "2026-08-18", issuer: "甲证券", category: "小公募", bond_names: ["26甲01", "26甲02"], tenors: ["3年", "5年"], coupons: [1.86, 2.28], amount: 32.4 });
 });
 
-test("可比债券视图只消费后端已筛选的公募券", () => {
+test("可比债券视图只消费共享加工层已筛选的公募券", () => {
   const points = comparablePoints([{ bond_id: "2", bond_name: "25券商01", issuer: "国投证券", tenor_label: "0.8Y", tenor_years: 0.8, valuation: 1.41, trade_yield: 1.42 }]);
   assert.deepEqual(points, [{ bond_name: "25券商01", issuer: "国投证券", tenor_years: 0.8, trade_yield: 1.42 }]);
 });

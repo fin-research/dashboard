@@ -2,6 +2,7 @@ import {
   marketReportObjectKey,
   marketReportSnapshotSchema,
   reportDataSchema,
+  type MarketReportFinalizationContract,
   type MarketReportSnapshotContract,
   type ReportDataContract,
 } from "../../market-report.ts";
@@ -17,6 +18,19 @@ export class MarketReportStoreError extends Error {
 }
 
 type EastmoneyBucket = Env["EASTMONEY"];
+const MAX_MARKET_REPORT_BYTES = 512 * 1024;
+
+export async function readMarketReportFinalization(
+  bucket: EastmoneyBucket | undefined,
+  reportDate: string,
+): Promise<MarketReportFinalizationContract> {
+  const snapshot = await readMarketReport(bucket, reportDate);
+  return {
+    focus_text: snapshot.focus_text,
+    cached_at: snapshot.cached_at,
+    finalized_at: snapshot.finalized_at,
+  };
+}
 
 export async function readMarketReport(
   bucket: EastmoneyBucket | undefined,
@@ -79,7 +93,11 @@ async function writeSnapshot(
   key: string,
   snapshot: MarketReportSnapshotContract,
 ): Promise<void> {
-  const object = await bucket.put(key, JSON.stringify(snapshot), {
+  const body = JSON.stringify(snapshot);
+  if (new TextEncoder().encode(body).byteLength > MAX_MARKET_REPORT_BYTES) {
+    throw new MarketReportStoreError(400, "市场点评定稿数据过大，请裁剪后重试");
+  }
+  const object = await bucket.put(key, body, {
     httpMetadata: {
       contentType: "application/json; charset=utf-8",
       cacheControl: "private, no-store",

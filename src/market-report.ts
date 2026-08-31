@@ -127,9 +127,20 @@ export const marketReportSnapshotSchema = reportDataSchema.extend({
   finalized_at: isoDateTime.nullable(),
 });
 
+export const marketReportFinalizationSchema = z
+  .object({
+    focus_text: z.string(),
+    cached_at: isoDateTime,
+    finalized_at: isoDateTime.nullable(),
+  })
+  .strict();
+
 export type ReportDataContract = z.infer<typeof reportDataSchema>;
 export type MarketReportSnapshotContract = z.infer<
   typeof marketReportSnapshotSchema
+>;
+export type MarketReportFinalizationContract = z.infer<
+  typeof marketReportFinalizationSchema
 >;
 
 export function marketReportObjectKey(reportDate: string): string {

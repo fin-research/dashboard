@@ -9,7 +9,7 @@ Worker Assets 只承载随应用版本一起构建、发布的前端资源。资
 ```text
 Browser
 ├→ Svelte pages / components / charts
-├→ /data/market-report/*、/data/industry、/data/stock-summary ──→ Data Worker
+├→ /data/* 单一上游映射资源 ────────────────────────────────→ Data Worker
 ├→ /api/market-report ──→ R2 市场点评定稿 JSON
 ├→ /fund-report/* ──────→ R2 HTML 日报
 ├→ /data/* ─────────────→ TypeScript Data Worker
@@ -31,7 +31,8 @@ Local credit Excel ──────→ local parser → Neon credit
 
 - `src/routes/` 负责页面装配、路由参数和 HTTP 边界，不承载复杂业务计算。
 - `src/App.svelte` 保留市场点评的整体报告装配。
-- `src/api.ts` 直接读取同源 `/data/*` 分段资源，并只用 Dashboard `/api/market-report` 读取或保存人工定稿。
+- `src/api.ts` 对同源 `/data/*` 原始资源做一次请求编排，并只用 Dashboard `/api/market-report` 读取定稿元数据或手动保存定稿。
+- `src/market-report-resources.ts` 在浏览器内完成市场点评的筛选、合并与口径换算，产出的唯一 `ReportData` 同时供视觉版和文字版使用。
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
@@ -54,7 +55,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ### 市场点评
 
-浏览器并发请求 `/data/market-report/*`、`/data/industry` 和 `/data/stock-summary`，再在 `src/api.ts` 组装规范报告；一级发行在行业资源给出上一交易日后单独请求。市场数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。浏览器另以 `GET /api/market-report?date=` 只读取已有 R2 定稿并合并 `focus_text`；无定稿时继续展示实时分段数据。`PUT /api/market-report` 保存完整报告和人工定稿的今日聚焦。
+浏览器在一次加载中并发请求 OMO、CFETS、国债、期货、两融、行业、股票收评、一级发行、今日成交和收藏报价；今日成交与收藏报价的代码合并去重后只批量请求一次债券基础信息。`src/market-report-resources.ts` 加工出唯一规范报告，视觉版与文字版共用，不重复请求。市场数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。浏览器另以 `GET /api/market-report?date=` 只读取 R2 定稿的聚焦与时间元数据；无定稿时继续展示实时数据。只有手动 `PUT /api/market-report` 才上传已裁剪的规范快照并写 R2。
 
 ### 市场热点
 

@@ -27,7 +27,7 @@ function snapshot() {
     turnover_change_yi: 200,
     industries: [{ name: "银行", change_pct: 1.2, market_cap_yuan: 9.8e12 }],
     industry_data_date: "2026-08-25",
-    primary_summary: { current_amount: 50, change_amount: 10 },
+    primary_summary: { current_amount: 0, change_amount: 0 },
     primary_issues: [],
     secondary_bonds: [],
     inventory_bonds: [],
@@ -37,9 +37,29 @@ function snapshot() {
   };
 }
 
+function marginRows() {
+  return [
+    {
+      DIM_DATE: "2026-08-22",
+      TOTAL_RZRQYE: 2e12,
+      TOTAL_RZYE: 1.99e12,
+      TOTAL_RQYE: 1e10,
+    },
+    {
+      DIM_DATE: "2026-08-21",
+      TOTAL_RZRQYE: 1.999e12,
+      TOTAL_RZYE: 1.9891e12,
+      TOTAL_RQYE: 9.9e9,
+    },
+  ];
+}
+
 function directResponse(target) {
   const url = new URL(String(target), "https://example.test");
-  if (url.pathname === "/api/market-report") return Response.json(snapshot());
+  if (url.pathname === "/api/market-report") {
+    const { focus_text, cached_at, finalized_at } = snapshot();
+    return Response.json({ focus_text, cached_at, finalized_at });
+  }
   if (url.pathname === "/data/industry") {
     return Response.json({
       dataDate: "2026-08-25",
@@ -53,48 +73,59 @@ function directResponse(target) {
   if (url.pathname === "/data/stock-summary") {
     return Response.json({ paragraphs: snapshot().stock_paragraphs });
   }
-  if (url.pathname === "/data/market-report/omo") {
-    return Response.json({ omoOperations: [] });
+  if (url.pathname === "/data/omo") return Response.json({ data: [] });
+  if (url.pathname === "/data/cfets") {
+    return Response.json({ cfetsCapitalTable: [] });
   }
-  if (url.pathname === "/data/market-report/funding") {
-    return Response.json({ fundingRates: [] });
+  if (url.pathname === "/data/bond-top-case") {
+    return Response.json({ data: [] });
   }
-  if (url.pathname === "/data/market-report/government-bonds") {
-    return Response.json({ governmentBonds: [] });
+  if (url.pathname === "/data/futures-latest") {
+    return Response.json({ futuresContractLatestTradeProtoList: [] });
   }
-  if (url.pathname === "/data/market-report/futures") {
-    return Response.json({ futures: [] });
+  if (url.pathname === "/data/margin") {
+    return Response.json({ data: marginRows() });
   }
-  if (url.pathname === "/data/market-report/margin") {
-    const margin = snapshot().margin;
+  if (url.pathname === "/data/primary-issues") {
+    assert.equal(url.searchParams.get("startDate"), "2026-08-22");
+    return Response.json({ data: { list: [] } });
+  }
+  if (url.pathname === "/data/today-trades") {
     return Response.json({
-      margin: {
-        dataDate: margin.data_date,
-        totalBalanceYi: margin.total,
-        totalChangeYi: margin.total_change,
-        financingBalanceYi: margin.financing,
-        financingChangeYi: margin.financing_change,
-        securitiesLendingBalanceYi: margin.securities_lending,
-        securitiesLendingChangeYi: margin.securities_lending_change,
-      },
+      list: [
+        {
+          bondUniCode: 123,
+          bondShortName: "26测试01",
+          remainingTenor: "3Y",
+          tradeYield: "2.10",
+          cbYte: "2.00",
+        },
+      ],
     });
   }
-  if (url.pathname === "/data/market-report/primary") {
+  if (url.pathname === "/data/favorite-quotes") {
     return Response.json({
-      primarySummary: { currentAmount: 50, changeAmount: 10 },
-      primaryIssues: [],
+      list: [
+        {
+          bondUniCode: 123,
+          bondShortName: "26测试01",
+          remainingTenor: "3Y",
+          remainingTenorDay: 1095,
+          cbYield: "2.00",
+          bidYield: "2.01",
+          ofrYield: "2.02",
+        },
+      ],
     });
   }
-  if (url.pathname === "/data/market-report/secondary") {
-    return Response.json({ secondaryBonds: [] });
-  }
-  if (url.pathname === "/data/market-report/inventory") {
-    return Response.json({ inventoryBonds: [] });
+  if (url.pathname === "/data/bond-infos") {
+    assert.equal(url.searchParams.get("codes"), "123");
+    return Response.json({ data: [{ bondUniCode: 123, comShortName: "测试公司" }] });
   }
   throw new Error(`unexpected request: ${target}`);
 }
 
-test("市场点评由浏览器拆分读取 Data REST，Dashboard 只读取定稿", async (context) => {
+test("浏览器一次拉取原始资源并加工为视觉与文字共享报告", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   const calls = [];
@@ -104,19 +135,26 @@ test("市场点评由浏览器拆分读取 Data REST，Dashboard 只读取定稿
   };
 
   const report = await fetchReport("2026-08-25", true);
-
+  const dataUrls = calls
+    .map((call) => String(call.url))
+    .filter((url) => url.startsWith("/data/"));
+  assert.equal(dataUrls.length, 12);
+  assert.equal(dataUrls.filter((url) => url.startsWith("/data/cfets?")).length, 2);
+  assert.equal(dataUrls.filter((url) => url.startsWith("/data/bond-infos?")).length, 1);
+  assert.ok(dataUrls.every((url) => !url.includes("/data/market-report/")));
+  assert.ok(dataUrls.every((url) => !url.includes("/data/graphql")));
   assert.equal(
-    calls.filter((call) => String(call.url).includes("/data/market-report/")).length,
-    8,
+    calls.filter((call) => String(call.url) === "/api/market-report?date=2026-08-25").length,
+    1,
   );
-  assert.ok(calls.some((call) => String(call.url) === "/api/market-report?date=2026-08-25"));
-  assert.ok(calls.every((call) => !String(call.url).includes("/data/graphql")));
   assert.equal(report.equities[0].change_pct, 0.4);
-  assert.equal(report.primary_summary.current_amount, 50);
+  assert.equal(report.primary_summary.current_amount, 0);
+  assert.equal(report.secondary_bonds[0].issuer, "测试公司");
+  assert.equal(report.inventory_bonds[0].bid_yield, 2.01);
   assert.equal(report.cached_at, snapshot().cached_at);
 });
 
-test("拆分请求不再附带 GraphQL refresh 参数", async (context) => {
+test("原始资源请求不附带 GraphQL refresh 参数", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   const requestedUrls = [];
@@ -150,7 +188,7 @@ test("保存定稿只提交规范报告与今日聚焦", async (context) => {
   assert.equal(saved.finalized_at, "2026-08-25T16:00:00+08:00");
 });
 
-test("Data 分段接口错误时前端显示业务错误", async (context) => {
+test("原始 Data 接口错误时前端显示业务错误", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url) =>

@@ -5,11 +5,11 @@
 ### 市场点评
 
 - 报告日期按 `Asia/Shanghai` 解释；开盘前默认日期逻辑由 `src/report-date.ts` 统一维护。
-- 浏览器直接请求 Data API 的 `/market-report/*` 分段 REST、`/industry` 和 `/stock-summary`，在 `src/api.ts` 组装为统一报告契约；市场数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。
-- Dashboard Worker 只按报告日读取 `market-briefing/YYYY-MM-DD.json` 中的人工定稿；浏览器将其 `focus_text` 与最新分段市场数据合并。保存时才覆盖完整报告与定稿，视觉版与文字版始终读取同一份前端报告契约。
+- 浏览器一次请求 Data API 的单一上游映射资源，在 `src/market-report-resources.ts` 完成筛选、合并和口径换算；市场数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。
+- Dashboard Worker 普通读取只返回 R2 定稿的 `focus_text` 与时间元数据；手动保存时才覆盖裁剪后的完整规范报告与定稿。视觉版与文字版始终读取同一份前端报告契约，不分别取数。
 - OMO 文字输出按报告日过滤规范字段 `operation_date`；排序和数字格式由视觉版与文字版共享派生层统一维护。
-- 一级发行只使用报告日和上一交易日数据。同日、同类型、同发行人的多期限合并、东财排除和缺失票息规范由 Data API 完成；视觉与文字版直接消费 `primary_issues`。
-- 二级成交的公募债名、五年期限和东财排除由 Data API 完成；Dashboard 仅继续使用 Theil-Sen / MAD 残差过滤不可比成交。
+- 一级发行只使用报告日和上一交易日数据。同日、同类型、同发行人的多期限合并、东财排除和缺失票息规范由浏览器共享加工层完成；视觉与文字版直接消费 `primary_issues`。
+- 二级成交的债券基础信息批量补全、公募债名、五年期限和东财排除由浏览器共享加工层完成；视图派生层继续使用 Theil-Sen / MAD 残差过滤不可比成交。
 
 ### 市场热点
 

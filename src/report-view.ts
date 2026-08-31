@@ -1,4 +1,4 @@
-// Project the API's normalized market-report contract into visual view objects.
+// Project the browser-normalized market-report contract into visual view objects.
 
 import { median } from "./rows.ts";
 import type {

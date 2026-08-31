@@ -59,13 +59,13 @@ test("前端文字报告使用规范契约复刻核心段落", () => {
   assert.ok(report.includes("180天-25东财G1-估值1.55%-成交1.56%(+1.25bp)"));
 });
 
-test("一级发行与二级行情只展示服务端筛选结果", () => {
+test("一级发行与二级行情只展示共享加工层筛选结果", () => {
   const report = buildTextReport(data);
   assert.ok(!report.includes("东方财富证券"));
   assert.ok(report.includes("国投证券"));
 });
 
-test("一级发行展示服务端已合并的发行腿", () => {
+test("一级发行展示共享加工层已合并的发行腿", () => {
   const input = structuredClone(data);
   input.primary_issues[2] = { ...input.primary_issues[2], bond_names: ["26丙01", "26丙02"], tenors: ["3年", "5年"], coupons: [1.7, 2.28], amount: 42.4 };
   const report = buildTextReport(input);

@@ -7,16 +7,18 @@
 浏览器或 Dashboard Worker 通过同源 `/data/*` 访问独立 Data Worker：
 
 - `GET /data/config`：默认报告配置。
-- `GET /data/market-report/{omo|funding|government-bonds|futures|margin|secondary|inventory}?date=YYYY-MM-DD`：市场点评独立分段资源。
+- `GET /data/omo?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`、`GET /data/cfets?date=YYYY-MM-DD&source=DR|DIBO`：OMO 与资金利率原始映射。
+- `GET /data/bond-top-case?date=YYYY-MM-DD`、`GET /data/futures-latest`、`GET /data/margin?date=YYYY-MM-DD`：国债、期货与两融原始映射。
 - `GET /data/industry?date=YYYY-MM-DD`：行业、主要指数、成交额及可用交易日。
-- `GET /data/market-report/primary?date=YYYY-MM-DD&previousDate=YYYY-MM-DD`：报告日与上一交易日的一级发行汇总和明细。
+- `GET /data/primary-issues?date=YYYY-MM-DD&startDate=YYYY-MM-DD`：一级发行原始映射。
+- `GET /data/today-trades?limit=300`、`GET /data/favorite-quotes?limit=100`、`GET /data/bond-infos?codes=...`：今日成交、收藏报价与批量债券基础信息原始映射。
 - `GET /data/stock-summary?date=YYYY-MM-DD`：A 股收评标题、时间与前两段。
 - `GET /data/news?date=YYYY-MM-DD&important=true&pageSize=40` 与 `GET /data/news/{id}`：今日聚焦的 DM 新闻列表和正文。
 - `POST /data/graphql`：仅保留 Choice 等兼容查询；市场点评不得使用其聚合字段。
 
 本地 Vite 完整保留 `/data` 前缀并代理到 `DATA_PROXY_TARGET`。线上由独立数据服务处理，Dashboard Worker 不注册这些路由。
 
-市场点评分段字段的变化必须与 `src/api.ts` 组装、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 GraphQL 市场报告聚合，也不要为视觉版或文字版增加单独的数据源。
+原始资源字段变化必须与 `src/api.ts` 请求编排、`src/market-report-resources.ts` 加工、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/market-report/*` 或 GraphQL 市场报告聚合，也不要为视觉版或文字版增加单独的数据源。
 
 研究辅助由浏览器直接 `POST /data/graphql`，使用 `choiceEdb(edbIds, startDate,
 endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `function + fields + rows`
@@ -28,8 +30,8 @@ endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `func
 
 ### 市场点评
 
-- `GET /api/market-report?date=YYYY-MM-DD`：只读取已有 R2 定稿；无定稿返回 404，不请求 Data API。
-- `PUT /api/market-report?date=YYYY-MM-DD`：同源保存完整规范报告与今日聚焦定稿，覆盖当天对象。
+- `GET /api/market-report?date=YYYY-MM-DD`：只返回已有 R2 定稿的 `focus_text`、`cached_at`、`finalized_at`；无定稿返回 404，不请求 Data API，也不向浏览器重复传输历史市场数据。
+- `PUT /api/market-report?date=YYYY-MM-DD`：仅在用户手动保存时，同源接收浏览器已加工并经 Schema 裁剪的规范报告与今日聚焦，覆盖当天对象；原始上游响应不得写入 R2，序列化快照上限为 512 KiB。
 
 ### 市场热点
 

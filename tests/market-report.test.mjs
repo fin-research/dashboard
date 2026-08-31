@@ -4,6 +4,7 @@ import test from "node:test";
 import { fetchReport } from "../src/api.ts";
 import {
   readMarketReport,
+  readMarketReportFinalization,
   saveMarketReport,
 } from "../src/lib/server/market-report.ts";
 
@@ -31,7 +32,7 @@ function reportData() {
     turnover_change_yi: null,
     industries: [],
     industry_data_date: "2026-08-25",
-    primary_summary: { current_amount: 0, change_amount: null },
+    primary_summary: { current_amount: 0, change_amount: 0 },
     primary_issues: [],
     secondary_bonds: [],
     inventory_bonds: [],
@@ -73,48 +74,44 @@ function directDataResponse(target) {
   if (url.pathname === "/data/stock-summary") {
     return Response.json({ paragraphs: ["第一段", "第二段"] });
   }
-  if (url.pathname === "/data/market-report/omo") {
-    return Response.json({ omoOperations: [] });
+  if (url.pathname === "/data/omo") return Response.json({ data: [] });
+  if (url.pathname === "/data/cfets") {
+    return Response.json({ cfetsCapitalTable: [] });
   }
-  if (url.pathname === "/data/market-report/funding") {
-    return Response.json({ fundingRates: [] });
+  if (url.pathname === "/data/bond-top-case") {
+    return Response.json({ data: [] });
   }
-  if (url.pathname === "/data/market-report/government-bonds") {
-    return Response.json({ governmentBonds: [] });
+  if (url.pathname === "/data/futures-latest") {
+    return Response.json({ futuresContractLatestTradeProtoList: [] });
   }
-  if (url.pathname === "/data/market-report/futures") {
-    return Response.json({ futures: [] });
-  }
-  if (url.pathname === "/data/market-report/margin") {
+  if (url.pathname === "/data/margin") {
     return Response.json({
-      margin: {
-        dataDate: "2026-08-22",
-        totalBalanceYi: 20000,
-        totalChangeYi: 10,
-        financingBalanceYi: 19900,
-        financingChangeYi: 9,
-        securitiesLendingBalanceYi: 100,
-        securitiesLendingChangeYi: 1,
-      },
+      data: [
+        {
+          DIM_DATE: "2026-08-22",
+          TOTAL_RZRQYE: 2e12,
+          TOTAL_RZYE: 1.99e12,
+          TOTAL_RQYE: 1e10,
+        },
+        {
+          DIM_DATE: "2026-08-21",
+          TOTAL_RZRQYE: 1.999e12,
+          TOTAL_RZYE: 1.9891e12,
+          TOTAL_RQYE: 9.9e9,
+        },
+      ],
     });
   }
-  if (url.pathname === "/data/market-report/primary") {
-    assert.equal(url.searchParams.get("previousDate"), "2026-08-22");
-    return Response.json({
-      primarySummary: { currentAmount: 0, changeAmount: null },
-      primaryIssues: [],
-    });
+  if (url.pathname === "/data/primary-issues") {
+    assert.equal(url.searchParams.get("startDate"), "2026-08-22");
+    return Response.json({ data: { list: [] } });
   }
-  if (url.pathname === "/data/market-report/secondary") {
-    return Response.json({ secondaryBonds: [] });
-  }
-  if (url.pathname === "/data/market-report/inventory") {
-    return Response.json({ inventoryBonds: [] });
-  }
+  if (url.pathname === "/data/today-trades") return Response.json({ list: [] });
+  if (url.pathname === "/data/favorite-quotes") return Response.json({ list: [] });
   throw new Error(`unexpected request: ${target}`);
 }
 
-test("浏览器拆分请求 Data REST 并且不走 Dashboard 聚合或 GraphQL", async (context) => {
+test("浏览器直读原始 Data REST 并加工，不走聚合或 GraphQL", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   const calls = [];
@@ -128,13 +125,13 @@ test("浏览器拆分请求 Data REST 并且不走 Dashboard 聚合或 GraphQL",
   assert.equal(result.margin.total, 20000);
   assert.deepEqual(result.stock_paragraphs, ["第一段", "第二段"]);
   assert.equal(result.focus_text, "");
-  assert.equal(calls.filter((target) => target.includes("/data/market-report/")).length, 8);
+  assert.equal(calls.filter((target) => target.includes("/data/market-report/")).length, 0);
   assert.ok(calls.some((target) => target.includes("/data/industry?")));
-  assert.ok(calls.some((target) => target.includes("/data/stock-summary?")));
+  assert.ok(calls.some((target) => target.includes("/data/primary-issues?")));
   assert.ok(calls.every((target) => !target.includes("/data/graphql")));
 });
 
-test("人工定稿写入 R2 后可独立读取，不触发 Data API", async () => {
+test("人工定稿才写入裁剪后的 R2 快照，普通读取只返回定稿元数据", async () => {
   const bucket = memoryBucket();
   const saved = await saveMarketReport(
     bucket,
@@ -147,8 +144,29 @@ test("人工定稿写入 R2 后可独立读取，不触发 Data API", async () =
 
   const stored = await readMarketReport(bucket, "2026-08-25");
   assert.deepEqual(stored, saved);
-  assert.equal(
-    JSON.parse(bucket.objects.get("market-briefing/2026-08-25.json")).focus_text,
-    "定稿判断",
+  const finalization = await readMarketReportFinalization(bucket, "2026-08-25");
+  assert.deepEqual(finalization, {
+    focus_text: "定稿判断",
+    cached_at: saved.cached_at,
+    finalized_at: saved.finalized_at,
+  });
+  const raw = JSON.parse(bucket.objects.get("market-briefing/2026-08-25.json"));
+  assert.equal(raw.focus_text, "定稿判断");
+  assert.equal("todayTrades" in raw, false);
+  assert.equal("favoriteQuotes" in raw, false);
+  assert.equal("bondInfos" in raw, false);
+});
+
+test("过大的定稿快照在写入 R2 前被拒绝", async () => {
+  const bucket = memoryBucket();
+  await assert.rejects(
+    saveMarketReport(
+      bucket,
+      "2026-08-25",
+      reportData(),
+      "超长内容".repeat(150_000),
+    ),
+    (error) => error.status === 400 && /数据过大/.test(error.message),
   );
+  assert.equal(bucket.objects.size, 0);
 });
