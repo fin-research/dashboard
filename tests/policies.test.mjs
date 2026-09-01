@@ -7,7 +7,11 @@ import {
   commentaryContentSchema,
   policyCategoryLabels,
 } from "../src/lib/policies.ts";
+import { parseResearchContent } from "../src/lib/report-content.ts";
+import { fetchDataNewsDetail } from "../src/lib/server/data-news.ts";
 import {
+  loadResearchCommentaryDetail,
+  loadResearchReportMetadata,
   loadPolicyTimeline,
   saveGeneratedCommentary,
 } from "../src/lib/server/policy-repository.ts";
@@ -60,6 +64,57 @@ test("政策页面只手动生成点评，政策与研报聚合由后台 Workflo
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_article/);
   assert.match(migration, /association_method IN \('ai', 'manual'\)/);
   assert.match(migration, /policy_id TEXT UNIQUE/);
+});
+
+test("研报与点评使用独立深链并从政策页面进入", async () => {
+  const [policyPage, articlePage, commentaryPage] = await Promise.all([
+    readFile(new URL("../src/routes/policy-tracking/+page.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/routes/articles/[id]/+page.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/routes/commentaries/[id]/+page.svelte", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(policyPage, /\/articles\/\$\{encodeURIComponent\(article\.id\)\}/);
+  assert.match(policyPage, /\/commentaries\/\$\{encodeURIComponent\(policy\.commentary\.id\)\}/);
+  assert.match(articlePage, /\/api\/articles\/\$\{encodeURIComponent\(data\.id\)\}/);
+  assert.match(articlePage, /研报正文/);
+  assert.match(commentaryPage, /\/api\/commentaries\/\$\{encodeURIComponent\(data\.id\)\}/);
+  assert.match(commentaryPage, /查看对应政策/);
+});
+
+test("研报正文以纯文本块安全呈现标题、列表和段落", () => {
+  const blocks = parseResearchContent("## 核心结论\n\n1. 第一项\n2、第二项\n\n正文第一行\n正文第二行");
+  assert.deepEqual(blocks, [
+    { kind: "heading", level: 2, text: "核心结论" },
+    { kind: "list", ordered: true, items: ["第一项", "第二项"] },
+    { kind: "paragraph", text: "正文第一行\n正文第二行" },
+  ]);
+});
+
+test("研报详情复用 DATA Service Binding 并只读取正文和原文链接", async () => {
+  let requestUrl = "";
+  const detail = await fetchDataNewsDetail({
+    DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
+    DATA: {
+      async fetch(request) {
+        requestUrl = request.url;
+        return Response.json({ content: "研报正文", link: "https://example.com/report" });
+      },
+    },
+  }, "A1");
+
+  assert.equal(detail.content, "研报正文");
+  assert.equal(detail.link, "https://example.com/report");
+  assert.equal(requestUrl, "https://eastmoney.hasbai.xyz/data/news/A1?fields=content,link");
+});
+
+test("研报和点评详情仓储返回对应政策上下文", async () => {
+  const report = await loadResearchReportMetadata(fakeDetailDatabase(), "A1");
+  const commentary = await loadResearchCommentaryDetail(fakeDetailDatabase(), "C1");
+
+  assert.equal(report.title, "房地产新政点评");
+  assert.deepEqual(report.policies.map((policy) => policy.id), ["P1"]);
+  assert.equal(commentary.commentary.id, "C1");
+  assert.equal(commentary.policy.category, "real_estate");
 });
 
 test("AI 点评保存时模型、Prompt 版本和生成时间绑定到正确列", async () => {
@@ -185,6 +240,49 @@ function fakePolicyDatabase() {
             }] };
           }
           throw new Error(`unexpected SQL: ${sql}`);
+        },
+      };
+    },
+  };
+}
+
+function fakeDetailDatabase() {
+  return {
+    prepare(sql) {
+      return {
+        bind() {
+          return this;
+        },
+        async first() {
+          if (/FROM article/.test(sql)) {
+            return {
+              id: "A1", title: "房地产新政点评", author: "东财证券",
+              summary: "研报摘要", published_at: "2026-09-01T20:00:00+08:00",
+              link: "https://example.com/report",
+            };
+          }
+          if (/FROM research_commentary/.test(sql)) {
+            return {
+              id: "C1", policy_id: "P1", commentary_type: "policy_tracking",
+              event_name: "房地产信贷管理新政", sources: "中国人民银行",
+              event_published_at: "2026-09-01", commentary_date: "2026-09-01",
+              event_summary: "事件摘要", commentary: "政策点评", recommendation: "应对建议",
+              model: "gpt-5.6-luna", prompt_version: "policy-commentary-v1",
+              generated_at: "2026-09-01T12:00:00Z", edited: 0,
+              updated_at: "2026-09-01T12:00:00Z", policy_title: "房地产信贷管理新政",
+              policy_summary: "政策摘要", policy_category: "real_estate", policy_date: "2026-09-01",
+            };
+          }
+          throw new Error(`unexpected first SQL: ${sql}`);
+        },
+        async all() {
+          if (/FROM policy_article/.test(sql)) {
+            return { results: [{
+              id: "P1", title: "房地产信贷管理新政", summary: "政策摘要",
+              category: "real_estate", policy_date: "2026-09-01",
+            }] };
+          }
+          throw new Error(`unexpected all SQL: ${sql}`);
         },
       };
     },

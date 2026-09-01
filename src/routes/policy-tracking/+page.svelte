@@ -291,7 +291,7 @@
                           <div><strong>{article.author || "未标注机构"}</strong><span>{formatDate(article.publishedAt.slice(0, 10))}</span>
                             {#if article.associationMethod === "ai"}<span class="ai-badge">AI {article.confidence === "high" ? "高置信" : "中置信"}</span>{:else}<span class="manual-badge">人工确认</span>{/if}
                           </div>
-                          {#if article.link}<a href={article.link} target="_blank" rel="noreferrer">{article.title}</a>{:else}<p>{article.title}</p>{/if}
+                          <a href={`/articles/${encodeURIComponent(article.id)}`}>{article.title}</a>
                           {#if article.rationale}<small>{article.rationale}</small>{/if}
                         </li>
                       {/each}
@@ -301,7 +301,7 @@
 
                 <section class="commentary-section">
                   <div class="section-heading"><h3>研究点评</h3><div class="heading-actions">
-                    {#if policy.commentary}<button type="button" onclick={() => openCommentaryEditor(policy)}>编辑</button>{/if}
+                    {#if policy.commentary}<a class="detail-link" href={`/commentaries/${encodeURIComponent(policy.commentary.id)}`}>查看完整点评</a><button type="button" onclick={() => openCommentaryEditor(policy)}>编辑</button>{/if}
                     <button class="primary-action" type="button" disabled={generatingPolicyId === policy.id || policy.articles.length === 0} onclick={() => generateCommentary(policy)}>
                       {generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成初版" : "AI 生成点评初版"}
                     </button>
@@ -398,7 +398,7 @@
   .category--fiscal { color: #027a48; background: #ecfdf3; }
   .category--capital_market { color: #6941c6; background: #f4f3ff; }
   .department { color: #475467; background: #f2f4f7; }
-  .policy-card-title { margin: 14px 0 10px; font-size: 1.25rem; line-height: 1.4; font-weight: bolder; }
+  .policy-card-title { margin: 14px 0 10px; scroll-margin-top: 100px; font-size: 1.25rem; line-height: 1.4; font-weight: bolder; }
   .policy-summary { margin: 0; color: #344054; font-size: 1rem; line-height: 1.75; }
   .policy-sections { display: grid; gap: 22px; margin-top: 24px; padding-top: 22px; border-top: 1px solid #eaecf0; }
   .section-heading { min-height: 44px; justify-content: space-between; gap: 12px; }
@@ -406,6 +406,9 @@
   .section-heading h3 span { color: #667085; font-size: .875rem; }
   .section-heading button { min-height: 40px; }
   .heading-actions { flex-wrap: wrap; gap: 8px; }
+  .detail-link { display: inline-flex; min-height: 44px; align-items: center; padding: 0 12px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; font-size: .875rem; font-weight: bold; text-decoration: none; }
+  .detail-link:hover { border-color: #2f6fd6; background: #f5f9ff; }
+  .detail-link:focus-visible { outline: 3px solid rgba(47, 111, 214, .28); outline-offset: 2px; }
   .news-list, .article-list { display: grid; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
   .news-list li { display: grid; grid-template-columns: 98px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 12px; border-radius: 8px; background: #f8fafc; }
   .news-list time, .article-list small { color: #667085; font-size: .8125rem; font-variant-numeric: tabular-nums; }
@@ -414,7 +417,7 @@
   .article-list li { min-width: 0; padding: 14px; border: 1px solid #e4e7ec; border-radius: 8px; background: #fff; }
   .article-list li > div { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-bottom: 7px; }
   .article-list li > div > span { color: #667085; font-size: .8125rem; }
-  .article-list li p, .article-list li a { display: block; margin: 0 0 8px; font-weight: bold; line-height: 1.5; }
+  .article-list li a { display: block; margin: 0 0 8px; font-weight: bold; line-height: 1.5; }
   .article-list li > small { display: block; line-height: 1.5; }
   .ai-badge { color: #175cd3 !important; background: #eff4ff; }
   .manual-badge { color: #027a48 !important; background: #ecfdf3; }

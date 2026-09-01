@@ -43,7 +43,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
 - `/trading-research` 的授信管理通过 `/api/credit` 读取 Neon `credit` 日报；总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
-- `/policy-tracking` 只读 ingest Workflow 已聚合的政策与自动研报关系；人工调整关系和手动生成/编辑政策点评通过同源 `/api/policies/*` 写 D1。页面加载和筛选不调用模型。
+- `/policy-tracking` 只读 ingest Workflow 已聚合的政策与自动研报关系；人工调整关系和手动生成/编辑政策点评通过同源 `/api/policies/*` 写 D1。页面加载和筛选不调用模型。关联研报与点评分别使用 `/articles/[id]`、`/commentaries/[id]` 独立深链；研报详情通过 Worker 的 `DATA` Service Binding 获取正文，点评详情只读 D1。
 
 ## 服务端模块
 
@@ -51,6 +51,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。
 - `src/lib/server/market-briefing.ts` 通过 `DATA` Service Binding 分别从 `/data/stock-summary`、`/data/news` 和新闻详情取材；新闻详情保持最多 5 个并发，在 Dashboard Worker 组装提示词并生成今日聚焦。
 - `src/lib/server/market-report.ts` 负责完整定稿的按日 R2 读取与手动覆盖，读取和写入都经同一快照 Schema 校验，不查询 Data API。
+- `src/lib/server/data-news.ts` 通过 `DATA` Service Binding 有界读取并校验单篇研报正文，供研报详情和政策点评生成复用。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器，使用 provider-specific Responses API 固定执行 `custom-opencode` → `custom-codex` 顺序 fallback。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。

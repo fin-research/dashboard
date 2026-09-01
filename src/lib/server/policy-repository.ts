@@ -5,6 +5,8 @@ import type {
   PolicyCategory,
   PolicyEvent,
   PolicyNews,
+  RelatedPolicySummary,
+  ResearchCommentaryDetail,
   ResearchCommentary,
 } from "$lib/policies";
 
@@ -77,6 +79,21 @@ interface SearchRow {
   summary: string;
   published_at: string;
   link: string | null;
+}
+
+interface RelatedPolicyRow {
+  id: string;
+  title: string;
+  summary: string;
+  category: PolicyCategory;
+  policy_date: string;
+}
+
+interface CommentaryDetailRow extends CommentaryRow {
+  policy_title: string;
+  policy_summary: string;
+  policy_category: PolicyCategory;
+  policy_date: string;
 }
 
 interface GenerationNewsRow {
@@ -213,6 +230,64 @@ export async function searchPolicyArticles(
     publishedAt: row.published_at,
     link: row.link,
   }));
+}
+
+export async function loadResearchReportMetadata(
+  database: Env["DB"],
+  articleId: string,
+): Promise<ArticleSearchResult & { policies: RelatedPolicySummary[] }> {
+  const article = await database.prepare(`
+    SELECT id, title, author, summary, published_at, link
+    FROM article
+    WHERE id = ? AND summary IS NOT NULL
+  `).bind(articleId).first<SearchRow>();
+  if (!article) throw new PolicyRepositoryError(404, "研报不存在");
+
+  const policyResult = await database.prepare(`
+    SELECT pe.id, pe.title, pe.summary, pe.category, pe.policy_date
+    FROM policy_article pa
+    JOIN policy_event pe ON pe.id = pa.policy_id
+    WHERE pa.article_id = ? AND pa.relation_status = 'linked'
+    ORDER BY pe.policy_date DESC, pe.id DESC
+  `).bind(articleId).all<RelatedPolicyRow>();
+  const policies = ((policyResult.results ?? []) as RelatedPolicyRow[]).map(relatedPolicyFromRow);
+  return {
+    id: article.id,
+    title: article.title,
+    author: article.author,
+    summary: article.summary,
+    publishedAt: article.published_at,
+    link: article.link,
+    policies,
+  };
+}
+
+export async function loadResearchCommentaryDetail(
+  database: Env["DB"],
+  commentaryId: string,
+): Promise<ResearchCommentaryDetail> {
+  const row = await database.prepare(`
+    SELECT rc.id, rc.policy_id, rc.commentary_type, rc.event_name, rc.sources,
+           rc.event_published_at, rc.commentary_date, rc.event_summary,
+           rc.commentary, rc.recommendation, rc.model, rc.prompt_version,
+           rc.generated_at, rc.edited, rc.updated_at,
+           pe.title AS policy_title, pe.summary AS policy_summary,
+           pe.category AS policy_category, pe.policy_date
+    FROM research_commentary rc
+    JOIN policy_event pe ON pe.id = rc.policy_id
+    WHERE rc.id = ?
+  `).bind(commentaryId).first<CommentaryDetailRow>();
+  if (!row) throw new PolicyRepositoryError(404, "研究点评不存在");
+  return {
+    commentary: commentaryFromRow(row),
+    policy: {
+      id: row.policy_id,
+      title: row.policy_title,
+      summary: row.policy_summary,
+      category: row.policy_category,
+      policyDate: row.policy_date,
+    },
+  };
 }
 
 export async function saveManualPolicyArticles(
@@ -475,6 +550,16 @@ function commentaryFromRow(row: CommentaryRow): ResearchCommentary {
     generatedAt: row.generated_at,
     edited: row.edited === 1,
     updatedAt: row.updated_at,
+  };
+}
+
+function relatedPolicyFromRow(row: RelatedPolicyRow): RelatedPolicySummary {
+  return {
+    id: row.id,
+    title: row.title,
+    summary: row.summary,
+    category: row.category,
+    policyDate: row.policy_date,
   };
 }
 

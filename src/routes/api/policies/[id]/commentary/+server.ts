@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { commentaryContentSchema } from "$lib/policies";
 import { BondLedgerUploadError, validateSameOrigin } from "$lib/server/bond-ledger";
+import { DataNewsError } from "$lib/server/data-news";
 import {
   generatePolicyCommentary,
   PolicyCommentaryError,
@@ -49,6 +50,7 @@ function errorResponse(
 ): Response {
   const status =
     error instanceof BondLedgerUploadError ||
+    error instanceof DataNewsError ||
     error instanceof PolicyRepositoryError ||
     error instanceof PolicyCommentaryError
       ? error.status
@@ -57,6 +59,7 @@ function errorResponse(
         : 500;
   const message =
     error instanceof BondLedgerUploadError ||
+    error instanceof DataNewsError ||
     error instanceof PolicyRepositoryError ||
     error instanceof PolicyCommentaryError
       ? error.message

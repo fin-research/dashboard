@@ -93,6 +93,24 @@ export interface ArticleSearchResult {
   link: string | null;
 }
 
+export interface RelatedPolicySummary {
+  id: string;
+  title: string;
+  summary: string;
+  category: PolicyCategory;
+  policyDate: string;
+}
+
+export interface ResearchReportDetail extends ArticleSearchResult {
+  content: string;
+  policies: RelatedPolicySummary[];
+}
+
+export interface ResearchCommentaryDetail {
+  commentary: ResearchCommentary;
+  policy: RelatedPolicySummary;
+}
+
 export const policyCategoryLabels: Record<PolicyCategory, string> = {
   monetary: "货币政策",
   fiscal: "财政政策",
