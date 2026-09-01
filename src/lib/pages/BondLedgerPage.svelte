@@ -15,9 +15,11 @@
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import MetricIcon from "../../components/MetricIcon.svelte";
+  import ModuleCard from "../../components/ModuleCard.svelte";
   import { exportReportImage } from "../../export";
   import {
     emptyBondLedgerReport,
+    previousBusinessWeekRange,
     weekRange,
   } from "$lib/bond-ledger/analytics";
   import {
@@ -49,6 +51,7 @@
   import { globalMessages } from "$lib/global-messages";
   import { portal } from "$lib/portal";
   import type { MetricIconName } from "../../view-model";
+  import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
   const INITIAL_REPORT_DATE = currentReportDate();
@@ -86,7 +89,6 @@
   let reportSurface: HTMLElement;
 
   $: current = analytics.currentPerformance;
-  $: isDefaultWeek = isCurrentWeek(startDate, endDate);
   $: rangeMonths = [rangeMonthLeft, shiftMonth(rangeMonthLeft, 1)];
   $: managedFile =
     remoteFiles.find((file) => file.date === selectedManagedDate) ?? null;
@@ -130,7 +132,7 @@
       icon: "bond" as MetricIconName,
     },
     {
-      label: "年初至今收益率",
+      label: "年化收益率",
       value: formatDecimalPercent(analytics.ytdAnnualizedReturn),
       detail: signedMetric(
         analytics.metricDeltas.ytdAnnualizedReturn,
@@ -142,7 +144,7 @@
       icon: "equity" as MetricIconName,
     },
     {
-      label: isDefaultWeek ? "本周损益" : "区间损益",
+      label: "本周营收",
       value: formatSignedWan(analytics.rangeProfit),
       detail: signedMetric(
         analytics.metricDeltas.rangeProfit,
@@ -154,7 +156,7 @@
       icon: "profit" as MetricIconName,
     },
     {
-      label: isDefaultWeek ? "本周交易" : "区间交易",
+      label: "本周交易",
       value: `${analytics.transactionCount} 只`,
       detail: signedMetric(
         analytics.metricDeltas.transactionCount,
@@ -178,7 +180,7 @@
     const generation = ++syncGeneration;
     const syncMessageId = loadingRecords
       ? ""
-      : globalMessages.info("正在读取数据库周报", {
+      : globalMessages.info("正在读取二级池数据", {
           key: "bond-ledger-sync",
           title: "数据刷新中",
           duration: 30_000,
@@ -188,13 +190,13 @@
       if (generation !== syncGeneration) return;
       remoteFiles = inventory.files;
       databaseLedgerDates = inventory.databaseDates;
-      const currentWeek = weekRange(currentReportDate());
+      const previousWeek = previousBusinessWeekRange(currentReportDate());
       const resolved = resolveAvailableRange(
         databaseLedgerDates,
         startDate,
         endDate,
-        currentWeek.startDate,
-        currentWeek.endDate,
+        previousWeek.startDate,
+        previousWeek.endDate,
       );
       if (!resolved) {
         analytics = emptyBondLedgerReport();
@@ -205,7 +207,7 @@
         endDate = resolved.endDate;
         rangeMonthLeft = monthStart(startDate);
         globalMessages.warning(
-          `所选范围无线上台账，已回退至 ${startDate}—${endDate}`,
+          `所选范围无线上台账，已回退至上周一到上周五：${startDate}—${endDate}`,
           {
             key: "bond-ledger-range-fallback",
             title: "日期范围已调整",
@@ -219,7 +221,7 @@
       if (generation !== syncGeneration) return;
       globalMessages.error(
         error instanceof Error ? error.message : String(error),
-        { key: "bond-ledger-error", title: "周报读取失败", duration: 8000 },
+        { key: "bond-ledger-error", title: "二级池读取失败", duration: 8000 },
       );
       analytics = emptyBondLedgerReport();
     } finally {
@@ -324,7 +326,7 @@
   async function removeRemoteLedger(remote: RemoteBondLedgerFile): Promise<void> {
     if (deleting) return;
     const confirmed = window.confirm(
-      `删除 ${remote.date} 的周报数据库数据？原始 Excel 仍保留在 R2 归档。`,
+      `删除 ${remote.date} 的二级池数据库数据？原始 Excel 仍保留在 R2 归档。`,
     );
     if (!confirmed) return;
     deleting = true;
@@ -429,14 +431,14 @@
     try {
       await exportReportImage(reportSurface, endDate, {
         captureClass: true,
-        filename: `资金管理部-二级池周报-${startDate}至${endDate}.png`,
+        filename: `资金管理部-二级池-${startDate}至${endDate}.png`,
       });
-      globalMessages.success("二级池周报图片已导出", {
+      globalMessages.success("二级池图片已导出", {
         key: "bond-ledger-export",
         title: "导出完成",
       });
     } catch (error) {
-      console.error("导出二级池周报失败", error);
+      console.error("导出二级池失败", error);
       globalMessages.error(
         error instanceof Error ? error.message : String(error),
         { key: "bond-ledger-export", title: "导出失败" },
@@ -455,12 +457,6 @@
 
   function isSelectedDate(date: string): boolean {
     return isWithin(date, startDate, endDate);
-  }
-
-  function isCurrentWeek(start: string, end: string): boolean {
-    if (!start || !end) return false;
-    const range = weekRange(currentReportDate());
-    return start === range.startDate && end >= start && end <= range.endDate;
   }
 
   function isWithin(date: string, start: string, end: string): boolean {
@@ -498,8 +494,8 @@
 <svelte:window onclick={closeRangeFromWindow} />
 
 <svelte:head>
-  <title>{embedded ? "二级池周报 · 交易研究工作台" : "二级池周报 · 资金管理部"}</title>
-  <meta name="description" content="二级资金池周报" />
+  <title>{embedded ? "二级池 · 交易研究工作台" : "二级池 · 资金管理部"}</title>
+  <meta name="description" content="二级资金池" />
   <meta name="theme-color" content="#f6f8fb" />
 </svelte:head>
 
@@ -515,7 +511,7 @@
         <h1>
           <span>资金管理部</span>
           <span class="ledger-title-dot" aria-hidden="true">•</span>
-          <span class="ledger-title-subject">二级池周报</span>
+          <span class="ledger-title-subject">二级池</span>
         </h1>
       </div>
 
@@ -599,7 +595,7 @@
     {#if loadingRecords}
       <main class="ledger-loading" aria-live="polite">
         <span class="loading-orbit" aria-hidden="true"></span>
-        <strong>正在读取数据库周报</strong>
+        <strong>正在读取二级池数据</strong>
       </main>
     {:else if !analytics.hasData}
       <main class="ledger-empty">
@@ -609,7 +605,7 @@
             <path d="M31 6v8h8M16 23h16M16 29h16M16 35h10" />
           </svg>
         </div>
-        <h2>数据库暂无周报数据</h2>
+        <h2>数据库暂无二级池数据</h2>
         <button type="button" onclick={openManagement}>打开台账管理</button>
       </main>
     {:else}
@@ -620,7 +616,6 @@
               label={card.label}
               value={card.value}
               detail={card.detail.value}
-              detailPrefix="较上周 "
               detailSuffix={card.detail.unit}
               detailTone={deltaClass(card.delta)}
               tone={METRIC_TONES[index] ?? "primary"}
@@ -632,57 +627,51 @@
         </section>
 
         <div class="ledger-chart-grid">
-          <section class="dashboard-panel ledger-panel ledger-panel--trend" aria-labelledby="return-trend-title">
-            <header class="panel-heading ledger-panel-heading">
-              <h2 id="return-trend-title">规模&amp;收益率走势</h2>
+          <ModuleCard class="ledger-panel ledger-panel--trend" labelledBy="return-trend-title">
+            <PanelHeading id="return-trend-title" title="规模&收益率走势">
               <div class="ledger-trend-legend" role="list" aria-label="图例">
                 <span role="listitem"><i class="ledger-legend-line ledger-legend-line--scale" aria-hidden="true"></i>规模</span>
                 <span role="listitem"><i class="ledger-legend-line ledger-legend-line--return" aria-hidden="true"></i>年化收益率</span>
                 <span role="listitem"><i class="ledger-legend-line ledger-legend-line--range" aria-hidden="true"></i>所选区间</span>
               </div>
-            </header>
+            </PanelHeading>
             <ChartHost
               renderer={renderBondScaleReturnTrend}
               args={[analytics.performanceTrend, startDate, endDate]}
               ariaLabel="二级池规模与业务口径年化收益率走势"
               className="ledger-chart ledger-chart--trend"
             />
-          </section>
+          </ModuleCard>
 
-          <section class="dashboard-panel ledger-panel" aria-labelledby="holding-type-title">
-            <header class="panel-heading ledger-panel-heading">
-              <h2 id="holding-type-title">持仓分布</h2>
-            </header>
+          <ModuleCard class="ledger-panel" labelledBy="holding-type-title">
+            <PanelHeading id="holding-type-title" title="持仓分布" />
             <ChartHost
               renderer={renderHoldingDistribution}
               args={[analytics.holdingTypes]}
               ariaLabel="按债券类型统计的持仓分布饼图"
               className="ledger-chart ledger-chart--category"
             />
-          </section>
+          </ModuleCard>
 
-          <section class="dashboard-panel ledger-panel" aria-labelledby="maturity-title">
-            <header class="panel-heading ledger-panel-heading">
-              <h2 id="maturity-title">期限分布</h2>
-            </header>
+          <ModuleCard class="ledger-panel" labelledBy="maturity-title">
+            <PanelHeading id="maturity-title" title="期限分布" />
             <ChartHost
               renderer={renderMaturityDistribution}
               args={[analytics.maturityBuckets]}
               ariaLabel="按剩余期限统计的持仓规模直方图"
               className="ledger-chart ledger-chart--maturity"
             />
-          </section>
+          </ModuleCard>
         </div>
 
-        <section class="dashboard-panel ledger-panel" aria-labelledby="transactions-title">
-          <header class="panel-heading ledger-panel-heading ledger-panel-heading--transactions">
-            <h2 id="transactions-title">成交明细</h2>
+        <ModuleCard class="ledger-panel" labelledBy="transactions-title">
+          <PanelHeading id="transactions-title" title="成交明细">
             <div class="transaction-summary" aria-label="成交汇总">
               <span><i class="transaction-dot transaction-dot--buy"></i>买入 <strong>{formatYi(analytics.transactionTotals.买入)}</strong></span>
               <span><i class="transaction-dot transaction-dot--sell"></i>卖出 <strong>{formatYi(analytics.transactionTotals.卖出)}</strong></span>
               <span><i class="transaction-dot transaction-dot--maturity"></i>到期 <strong>{formatYi(analytics.transactionTotals.到期)}</strong></span>
             </div>
-          </header>
+          </PanelHeading>
           <div class="ledger-table-wrap">
             <table class="ledger-table ledger-table--transactions">
               <thead>
@@ -713,7 +702,7 @@
               </tbody>
             </table>
           </div>
-        </section>
+        </ModuleCard>
 
       </main>
     {/if}

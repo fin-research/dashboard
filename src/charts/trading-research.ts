@@ -425,6 +425,7 @@ export function renderLiquidityRateChart(
   description: string,
   unit: "%" | "bp",
   decimals = 2,
+  showLegend = true,
 ): void {
   const values = series.flatMap((item) =>
     item.points.map((point) => point.value),
@@ -441,16 +442,24 @@ export function renderLiquidityRateChart(
       formatter: (params: unknown) =>
         formatLiquidityRateTooltip(params, unit, decimals),
     },
-    legend: {
-      top: 0,
-      type: "scroll",
-      textStyle: {
-        color: colors.ink,
-        fontFamily,
-        fontSize: Math.max(chartTextSize - 1, 12),
-      },
+    legend: showLegend
+      ? {
+          top: 0,
+          type: "scroll",
+          textStyle: {
+            color: colors.ink,
+            fontFamily,
+            fontSize: Math.max(chartTextSize - 1, 12),
+          },
+        }
+      : undefined,
+    grid: {
+      left: 18,
+      right: 20,
+      top: showLegend ? 42 : 16,
+      bottom: 24,
+      containLabel: true,
     },
-    grid: { left: 18, right: 20, top: 42, bottom: 24, containLabel: true },
     xAxis: {
       type: "time",
       boundaryGap: false,

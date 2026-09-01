@@ -34,19 +34,19 @@
   );
   const liquiditySpreadSeries = $derived([
     {
-      name: "R007－DR007",
+      name: "压力利差",
       color: "#d92d20",
       points: spreadPoints(byKey.get("r007"), byKey.get("dr007")),
     },
   ] satisfies LiquidityRateChartSeries[]);
   const curveSpreadSeries = $derived([
     {
-      name: "10Y－1Y",
+      name: "中短端",
       color: "#6941c6",
       points: spreadPoints(byKey.get("cgb-10y"), byKey.get("cgb-1y")),
     },
     {
-      name: "30Y－10Y",
+      name: "超长端",
       color: "#0ba5ec",
       points: spreadPoints(byKey.get("cgb-30y"), byKey.get("cgb-10y")),
     },
@@ -92,6 +92,7 @@
     label: string;
     value: string;
     detail: string;
+    detailTone: string;
     tone: "blue" | "teal" | "orange" | "purple";
   } {
     const series = byKey.get(key);
@@ -102,20 +103,24 @@
     return {
       label,
       value: latest ? latest.value.toFixed(series?.decimals ?? 4) : "—",
-      detail: loading
-        ? "数据加载中"
-        : latest
-          ? `${formatBp(changeBp)} · ${latest.date}`
-          : "暂无可用数据",
+      detail: loading ? "" : formatBp(changeBp),
+      detailTone: deltaTone(changeBp),
       tone,
     };
   }
 
   function formatBp(value: number | null): string {
-    if (value === null || !Number.isFinite(value)) return "较前值 —";
+    if (value === null || !Number.isFinite(value)) return "";
     const normalized = Math.abs(value) < 0.005 ? 0 : value;
-    const sign = normalized > 0 ? "+" : "";
-    return `较前值 ${sign}${normalized.toFixed(2)} bp`;
+    const sign = normalized >= 0 ? "+" : "−";
+    return `${sign}${Math.abs(normalized).toFixed(2)} bp`;
+  }
+
+  function deltaTone(value: number | null): string {
+    if (value === null || !Number.isFinite(value) || Math.abs(value) < 0.005) {
+      return "tone-flat";
+    }
+    return value > 0 ? "tone-up" : "tone-down";
   }
 </script>
 
@@ -133,6 +138,7 @@
         value={item.value}
         unit="%"
         detail={item.detail}
+        detailTone={item.detailTone}
         tone={item.tone}
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "funds" }}
@@ -157,14 +163,13 @@
   <div class="tr-liquidity-secondary">
     <section aria-labelledby="liquidity-spread-title">
       <header>
-        <h3 id="liquidity-spread-title">R007－DR007</h3>
-        <span>非银流动性压力</span>
+        <h3 id="liquidity-spread-title">非银流动性压力</h3>
       </header>
       {#if liquiditySpreadSeries[0]?.points.length}
         <ChartHost
           renderer={renderLiquidityRateChart}
-          args={[liquiditySpreadSeries, "R007减DR007利差", "bp", 2]}
-          ariaLabel="R007减DR007利差，反映非银流动性压力"
+          args={[liquiditySpreadSeries, "非银流动性压力利差", "bp", 2, false]}
+          ariaLabel="非银流动性压力利差走势"
           className="tr-liquidity-mini-chart"
         />
       {:else}
@@ -174,14 +179,13 @@
 
     <section aria-labelledby="curve-spread-title">
       <header>
-        <h3 id="curve-spread-title">10Y－1Y、30Y－10Y</h3>
-        <span>收益率曲线</span>
+        <h3 id="curve-spread-title">期限利差</h3>
       </header>
       {#if curveSpreadSeries.some((series) => series.points.length > 0)}
         <ChartHost
           renderer={renderLiquidityRateChart}
-          args={[curveSpreadSeries, "国债收益率曲线期限利差", "bp", 2]}
-          ariaLabel="10年减1年及30年减10年国债收益率曲线利差"
+          args={[curveSpreadSeries, "国债期限利差", "bp", 2]}
+          ariaLabel="国债中短端与超长端期限利差走势"
           className="tr-liquidity-mini-chart"
         />
       {:else}

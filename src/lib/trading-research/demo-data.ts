@@ -62,8 +62,8 @@ export const workbenchViews: Array<{
   },
   {
     id: "bond",
-    label: "二级池周报",
-    title: "二级池周报",
+    label: "二级池",
+    title: "二级池",
     context: "逐日收益、持仓结构与成交复盘",
     icon: "bond",
   },

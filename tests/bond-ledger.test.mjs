@@ -7,6 +7,7 @@ import {
   buildBondLedgerAnalytics,
   calculateBusinessAnnualizedReturn,
   calculateBusinessAnnualizedReturnTrend,
+  previousBusinessWeekRange,
   weekRange,
 } from "../src/lib/bond-ledger/analytics.ts";
 import {
@@ -294,6 +295,10 @@ test("业务收益率按交易日单日收益率算术平均乘 252 年化", () 
     startDate: "2026-08-17",
     endDate: "2026-08-20",
   });
+  assert.deepEqual(previousBusinessWeekRange("2026-09-01"), {
+    startDate: "2026-08-24",
+    endDate: "2026-08-28",
+  });
 });
 
 test("上传先写入 bond-ledger 临时 key，再启动 Workflow", async () => {
@@ -534,18 +539,18 @@ test("Workflow 状态统一映射为处理中、成功或失败", async () => {
   );
 });
 
-test("日期范围无台账时只回退到本周已有台账区间", () => {
+test("默认范围无台账时回退到上周一至上周五", () => {
   assert.deepEqual(
     resolveAvailableRange(
-      ["2026-06-30", "2026-08-18", "2026-08-20"],
+      ["2026-06-30", "2026-08-25", "2026-08-27"],
       "2026-09-01",
       "2026-09-04",
-      "2026-08-17",
-      "2026-08-23",
+      "2026-08-24",
+      "2026-08-28",
     ),
     {
-      startDate: "2026-08-18",
-      endDate: "2026-08-20",
+      startDate: "2026-08-24",
+      endDate: "2026-08-28",
       fellBack: true,
     },
   );
@@ -554,8 +559,8 @@ test("日期范围无台账时只回退到本周已有台账区间", () => {
       ["2026-06-30", "2026-08-14"],
       "2026-09-01",
       "2026-09-04",
-      "2026-08-17",
-      "2026-08-23",
+      "2026-08-24",
+      "2026-08-28",
     ),
     null,
   );

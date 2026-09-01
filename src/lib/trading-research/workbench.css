@@ -381,6 +381,28 @@ body:has(.tr-workbench) {
   display: none;
 }
 
+.tr-as-of {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.tr-as-of .tr-workbench-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 1.125rem;
+}
+
+.tr-as-of strong {
+  color: var(--tr-text);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: bold;
+}
+
 .tr-topbar__actions > .ledger-actions,
 .tr-topbar__actions > .model-actions,
 .tr-topbar__actions > .tr-credit-toolbar {
@@ -515,20 +537,16 @@ body:has(.tr-workbench) {
 
 .tr-liquidity-secondary header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   gap: 10px;
 }
 
 .tr-liquidity-secondary h3 {
   margin: 0;
   color: var(--tr-text);
-  font-size: 0.875rem;
-}
-
-.tr-liquidity-secondary header span {
-  color: var(--tr-muted);
-  font-size: 0.75rem;
+  font-size: 1rem;
+  font-weight: bold;
 }
 
 .tr-liquidity-mini-chart {

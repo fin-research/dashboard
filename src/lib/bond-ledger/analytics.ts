@@ -230,6 +230,17 @@ export function weekRange(referenceDate: string): {
   };
 }
 
+export function previousBusinessWeekRange(referenceDate: string): {
+  startDate: string;
+  endDate: string;
+} {
+  const currentWeek = weekRange(referenceDate);
+  return {
+    startDate: addDays(currentWeek.startDate, -7),
+    endDate: addDays(currentWeek.startDate, -3),
+  };
+}
+
 export function calculateBusinessAnnualizedReturn(
   performance: LedgerPerformanceRow[],
   throughDate?: string,

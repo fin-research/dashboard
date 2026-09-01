@@ -30,7 +30,7 @@ test("交易研究工作台提供七个 path 标签页并保留稳定深链", ()
       "授信管理",
       "研究辅助",
       "流程中心",
-      "二级池周报",
+      "二级池",
       "融资择时模型",
     ],
   );
@@ -321,6 +321,14 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(financing, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
   assert.match(financing, /<ModuleCard/);
   assert.match(financing, /PanelHeading from "\$lib\/trading-research\/PanelHeading\.svelte"/);
+  assert.match(bond, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
+  assert.match(bond, /<ModuleCard/);
+  assert.match(bond, /PanelHeading from "\$lib\/trading-research\/PanelHeading\.svelte"/);
+  assert.doesNotMatch(bond, /class="dashboard-panel ledger-panel/);
+  assert.match(bond, /label: "年化收益率"/);
+  assert.match(bond, /label: "本周营收"/);
+  assert.match(bond, /label: "本周交易"/);
+  assert.doesNotMatch(bond, /detailPrefix="较上周 /);
   assert.match(moduleCard, /class=\{`module-card tr-panel/);
   assert.match(moduleCard, /border:\s*1px solid var\(--tr-border/);
   assert.match(moduleCard, /border-radius:\s*var\(--tr-radius-card/);
@@ -374,8 +382,10 @@ test("研究辅助从 Dashboard API 读取 Neon 并展示利率资金面与宏�
   assert.doesNotMatch(research, /36项指标|近18个月|覆盖国内增长|4项指标/);
   assert.match(liquidity, /title="利率与资金面"/);
   assert.match(liquidity, /MetricCard/);
-  assert.match(liquidity, /R007－DR007/);
-  assert.match(liquidity, /10Y－1Y、30Y－10Y/);
+  assert.match(liquidity, />非银流动性压力<\/h3>/);
+  assert.match(liquidity, />期限利差<\/h3>/);
+  assert.match(liquidity, /detailTone=\{item\.detailTone\}/);
+  assert.doesNotMatch(liquidity, /较前值|latest\.date|R007－DR007|10Y－1Y|30Y－10Y/);
   assert.match(liquidity, /renderLiquidityRateChart/);
   assert.match(card, /indicator\.name/);
   assert.match(card, /更新于 \$\{latest\.date\}/);
@@ -388,6 +398,7 @@ test("研究辅助从 Dashboard API 读取 Neon 并展示利率资金面与宏�
   assert.match(styles, /\.tr-economic-grid\s*\{[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.tr-liquidity-metrics\s*\{[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.tr-liquidity-secondary\s*\{[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.tr-as-of \.tr-workbench-icon\s*\{[\s\S]*?width:\s*1\.125rem/);
   assert.match(styles, /\.tr-economic-card__change--up\s*\{[\s\S]*?var\(--color-up\)/);
   assert.match(styles, /\.tr-economic-card__change--down\s*\{[\s\S]*?var\(--color-down\)/);
   assert.doesNotMatch(styles, /\.tr-economic-card footer\s*\{[^}]*border-top/);

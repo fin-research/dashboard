@@ -78,8 +78,8 @@ export function resolveAvailableRange(
   );
   if (!fallbackDates.length) return null;
   return {
-    startDate: fallbackDates[0] as string,
-    endDate: fallbackDates.at(-1) as string,
+    startDate: fallbackStart,
+    endDate: fallbackEnd,
     fellBack: true,
   };
 }
