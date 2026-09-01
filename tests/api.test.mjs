@@ -85,7 +85,11 @@ function directResponse(target) {
     });
   }
   if (url.pathname === "/data/cfets") {
-    return Response.json([]);
+    return Response.json(
+      url.searchParams.get("source") === "DR"
+        ? [{ bondCode: "DR007" }]
+        : [],
+    );
   }
   if (url.pathname === "/data/bond-top-case") {
     return Response.json([]);
@@ -148,7 +152,12 @@ test("浏览器一次拉取原始资源并加工为视觉与文字共享报告",
     return directResponse(url);
   };
 
-  const report = await fetchReport("2026-08-25", true);
+  const report = await fetchReport(
+    "2026-08-25",
+    true,
+    undefined,
+    "2026-08-25",
+  );
   const dataUrls = calls
     .map((call) => String(call.url))
     .filter((url) => url.startsWith("/data/"));
@@ -167,13 +176,18 @@ test("浏览器一次拉取原始资源并加工为视觉与文字共享报告",
   assert.equal(report.omo_operations[0].interest_rate, null);
   assert.equal(report.futures[0].last_price, null);
   assert.equal(report.futures[0].change_pct, null);
+  assert.deepEqual(report.funding_rates, [{
+    code: "DR007",
+    rate: null,
+    change_bp: null,
+  }]);
   assert.equal(report.primary_summary.current_amount, 0);
   assert.equal(report.secondary_bonds[0].issuer, "测试公司");
   assert.equal(report.inventory_bonds[0].bid_yield, 2.01);
   assert.equal(report.cached_at, report.generated_at);
 });
 
-test("普通读取只请求 Data 原始资源，不读取旧 market-report", async (context) => {
+test("当日读取只请求 Data 原始资源，不读取 market-report 定稿", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   const requestedUrls = [];
@@ -182,13 +196,71 @@ test("普通读取只请求 Data 原始资源，不读取旧 market-report", asy
     return directResponse(url);
   };
 
-  const report = await fetchReport("2026-08-25", false);
+  const report = await fetchReport(
+    "2026-08-25",
+    false,
+    undefined,
+    "2026-08-25",
+  );
 
   assert.equal(report.report_date, "2026-08-25");
   assert.equal(report.focus_text, "");
   assert.equal(report.finalized_at, null);
   assert.equal(report.equities[0].name, "上证指数");
   assert.ok(requestedUrls.every((url) => !url.startsWith("/api/market-report?")));
+});
+
+test("历史日期只读取完整 R2 定稿，不再请求 Data 原始资源", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const finalized = {
+    ...snapshot(),
+    report_date: "2026-08-31",
+    generated_at: "2026-08-31T15:00:00+08:00",
+    industry_data_date: "2026-08-31",
+    focus_text: "历史定稿判断",
+    cached_at: "2026-08-31T16:00:00+08:00",
+    finalized_at: "2026-08-31T16:00:00+08:00",
+  };
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return Response.json(finalized);
+  };
+
+  const report = await fetchReport(
+    "2026-08-31",
+    false,
+    undefined,
+    "2026-09-01",
+  );
+
+  assert.deepEqual(calls, ["/api/market-report?date=2026-08-31"]);
+  assert.equal(report.focus_text, "历史定稿判断");
+  assert.equal(report.finalized_at, "2026-08-31T16:00:00+08:00");
+});
+
+test("历史日期没有定稿时显示明确错误，不回退到实时 Data", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return Response.json({
+      detail: "2026-08-31 尚无市场点评定稿",
+      error: {
+        code: "REPORT_NOT_FINALIZED",
+        source: "Dashboard R2",
+        stage: "snapshot_read",
+      },
+    }, { status: 404 });
+  };
+
+  await assert.rejects(
+    fetchReport("2026-08-31", false, undefined, "2026-09-01"),
+    /REPORT_NOT_FINALIZED.*Dashboard R2.*snapshot_read/,
+  );
+  assert.deepEqual(calls, ["/api/market-report?date=2026-08-31"]);
 });
 
 test("当日 A股收评尚未发布时保留其他模块并返回空股市段落", async (context) => {
@@ -209,7 +281,12 @@ test("当日 A股收评尚未发布时保留其他模块并返回空股市段落
     return directResponse(url);
   };
 
-  const report = await fetchReport("2026-08-25", false);
+  const report = await fetchReport(
+    "2026-08-25",
+    false,
+    undefined,
+    "2026-08-25",
+  );
   assert.deepEqual(report.stock_paragraphs, []);
   assert.equal(report.equities[0].name, "上证指数");
 });
@@ -233,7 +310,7 @@ test("A股收评的其他 404 错误不得静默降级", async (context) => {
   };
 
   await assert.rejects(
-    fetchReport("2026-08-25", false),
+    fetchReport("2026-08-25", false, undefined, "2026-08-25"),
     /\/data\/stock-summary 请求失败.*UPSTREAM_SCHEMA_MISMATCH/,
   );
 });
@@ -246,7 +323,7 @@ test("原始资源请求不附带 GraphQL refresh 参数", async (context) => {
     requestedUrls.push(String(url));
     return directResponse(url);
   };
-  await fetchReport("2026-08-25", false);
+  await fetchReport("2026-08-25", false, undefined, "2026-08-25");
   assert.ok(requestedUrls.every((url) => !url.includes("refresh=")));
 });
 
@@ -293,7 +370,7 @@ test("原始 Data 接口错误时前端显示业务错误", async (context) => {
         }, { status: 503 })
       : directResponse(url);
   await assert.rejects(
-    fetchReport("2026-08-25", false),
+    fetchReport("2026-08-25", false, undefined, "2026-08-25"),
     /\/data\/industry 请求失败.*Choice 数据源不可用.*equities\.0\.close.*undefined/,
   );
 });

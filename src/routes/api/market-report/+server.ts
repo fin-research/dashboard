@@ -1,9 +1,20 @@
 import {
   MarketReportStoreError,
+  readMarketReport,
   saveMarketReport,
 } from "$lib/server/market-report";
 import { validateSameOrigin } from "$lib/server/bond-ledger";
 import type { RequestHandler } from "./$types";
+
+export const GET: RequestHandler = async ({ platform, url }) => {
+  try {
+    const reportDate = requiredDate(url);
+    const snapshot = await readMarketReport(platform?.env.EASTMONEY, reportDate);
+    return Response.json(snapshot, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return errorResponse(error, url, "read");
+  }
+};
 
 export const PUT: RequestHandler = async ({ request, platform, url }) => {
   try {
@@ -30,7 +41,13 @@ function requiredDate(url: URL): string {
     Number.isNaN(parsed.valueOf()) ||
     !parsed.toISOString().startsWith(value)
   ) {
-    throw new MarketReportStoreError(400, "报告日期必须是 YYYY-MM-DD");
+    throw new MarketReportStoreError(
+      400,
+      "报告日期必须是 YYYY-MM-DD",
+      "INVALID_REPORT_DATE",
+      "request_validation",
+      "Dashboard API",
+    );
   }
   return value;
 }
@@ -49,10 +66,20 @@ function errorResponse(error: unknown, url: URL, action: string): Response {
   }
   return Response.json(
     {
-      error:
-        error instanceof MarketReportStoreError
-          ? error.message
-          : "市场点评处理失败，请稍后重试",
+      detail: error instanceof MarketReportStoreError
+        ? error.message
+        : "市场点评处理失败，请稍后重试",
+      error: error instanceof MarketReportStoreError
+        ? {
+            code: error.code,
+            source: error.source,
+            stage: error.stage,
+          }
+        : {
+            code: "UNEXPECTED_ERROR",
+            source: "Dashboard API",
+            stage: `snapshot_${action}`,
+          },
     },
     { status, headers: { "Cache-Control": "no-store" } },
   );

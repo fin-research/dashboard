@@ -1,5 +1,5 @@
-// Legacy browser-cache utility. The production market-briefing page now uses
-// the Worker-backed daily R2 cache and no longer imports this module.
+// Legacy browser-cache utility. The production market-briefing page no longer
+// imports this module: current-day data is live, historical dates use finalized R2 snapshots.
 import type { ReportData } from "./types";
 
 const REPORT_CACHE_PREFIX = "dm-market-report:data:v1:";

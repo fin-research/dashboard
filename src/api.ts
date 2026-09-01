@@ -23,6 +23,7 @@ import {
   marketReportSnapshotSchema,
   reportDataSchema,
 } from "./market-report.ts";
+import { currentReportDate } from "./report-date.ts";
 import {
   buildReportData,
   dayOffset,
@@ -109,7 +110,17 @@ export async function fetchReport(
   reportDate: string,
   _refresh: boolean,
   signal?: AbortSignal,
+  currentDate = currentReportDate(),
 ): Promise<MarketReportSnapshot> {
+  if (reportDate < currentDate) {
+    const query = new URLSearchParams({ date: reportDate });
+    return getJson(
+      `/api/market-report?${query}`,
+      marketReportSnapshotSchema,
+      signal,
+    );
+  }
+
   const omoQuery = new URLSearchParams({
     startDate: dayOffset(reportDate, -35),
     endDate: reportDate,

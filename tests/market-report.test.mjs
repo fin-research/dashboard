@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { fetchReport } from "../src/api.ts";
 import {
+  readMarketReport,
   saveMarketReport,
 } from "../src/lib/server/market-report.ts";
 
@@ -117,7 +118,12 @@ test("浏览器直读原始 Data REST 并加工，不走聚合或 GraphQL", asyn
     return directDataResponse(String(target));
   };
 
-  const result = await fetchReport("2026-08-25", false);
+  const result = await fetchReport(
+    "2026-08-25",
+    false,
+    undefined,
+    "2026-08-25",
+  );
   assert.equal(result.report_date, "2026-08-25");
   assert.equal(result.margin.total, 20000);
   assert.deepEqual(result.stock_paragraphs, ["第一段", "第二段"]);
@@ -145,6 +151,23 @@ test("人工定稿才写入裁剪后的 R2 快照", async () => {
   assert.equal("todayTrades" in raw, false);
   assert.equal("favoriteQuotes" in raw, false);
   assert.equal("bondInfos" in raw, false);
+
+  const stored = await readMarketReport(bucket, "2026-08-25");
+  assert.deepEqual(stored, saved);
+});
+
+test("读取不存在或损坏的历史定稿时返回明确错误", async () => {
+  const bucket = memoryBucket();
+  await assert.rejects(
+    readMarketReport(bucket, "2026-08-25"),
+    (error) => error.status === 404 && error.code === "REPORT_NOT_FINALIZED",
+  );
+
+  bucket.objects.set("market-briefing/2026-08-25.json", "{bad-json");
+  await assert.rejects(
+    readMarketReport(bucket, "2026-08-25"),
+    (error) => error.status === 503 && error.code === "FINALIZED_SNAPSHOT_INVALID",
+  );
 });
 
 test("过大的定稿快照在写入 R2 前被拒绝", async () => {

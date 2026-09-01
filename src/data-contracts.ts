@@ -40,7 +40,7 @@ export const omoOperationSchema = z.object({
   operationName: z.string(),
   duration: z.string(),
   interestRate: nullableNumericValue,
-  operationAmount: numericValue,
+  operationAmount: nullableNumericValue,
 });
 const omoRowsSchema = z.array(omoOperationSchema);
 const legacyOmoSchema = z.object({ data: z.array(z.unknown()) });
@@ -52,8 +52,8 @@ export const omoOperationsSchema = directOrLegacyList(
 
 export const cfetsRateSchema = z.object({
   bondCode: z.string(),
-  weightedYield: numericValue,
-  weightedYieldUpDownValueBp: numericValue,
+  weightedYield: nullableNumericValue,
+  weightedYieldUpDownValueBp: nullableNumericValue,
 });
 const cfetsRowsSchema = z.array(cfetsRateSchema);
 const legacyCfetsSchema = z.object({ cfetsCapitalTable: z.array(z.unknown()) });

@@ -33,7 +33,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 - `src/routes/` 负责页面装配、路由参数和 HTTP 边界，不承载复杂业务计算。
 - `src/App.svelte` 保留市场点评的整体报告装配。
-- `src/api.ts` 对同源 `/data/*` 原始资源做一次请求编排，用 `fields` 请求最小 DTO 并经 Zod 校验；普通加载不读取 Dashboard 聚合或 R2，只有手动保存定稿才 PUT `/api/market-report`。
+- `src/api.ts` 按上海日期分流：当天对同源 `/data/*` 原始资源做一次请求编排，用 `fields` 请求最小 DTO 并经 Zod 校验；历史日期只 GET 完整 R2 定稿；只有手动保存定稿才 PUT `/api/market-report`。
 - `src/market-report-resources.ts` 在浏览器内完成市场点评的筛选、合并与口径换算，产出的唯一 `ReportData` 同时供视觉版和文字版使用。
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
@@ -45,7 +45,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。
 - `src/lib/server/market-briefing.ts` 通过 `DATA` Service Binding 分别从 `/data/stock-summary`、`/data/news` 和新闻详情取材；新闻详情保持最多 5 个并发，在 Dashboard Worker 组装提示词并生成今日聚焦。
-- `src/lib/server/market-report.ts` 只负责手动保存时按日覆盖 R2 定稿，不提供读取接口，也不查询 Data API。
+- `src/lib/server/market-report.ts` 负责完整定稿的按日 R2 读取与手动覆盖，读取和写入都经同一快照 Schema 校验，不查询 Data API。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器，使用 provider-specific Responses API 固定执行 `custom-opencode` → `custom-codex` 顺序 fallback。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
@@ -57,7 +57,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ### 市场点评
 
-浏览器在一次加载中并发请求 OMO、CFETS、国债、期货、两融、行业、股票收评、一级发行、今日成交和收藏报价；每个请求只选择实际使用字段并校验最小 DTO。今日成交与收藏报价的代码合并去重后只批量请求一次债券基础信息，代码集合来自当次响应，不是硬编码清单；基础信息只返回连接、展示和结构化类型筛选所需五个字段。公募公司债使用 `bondType` 与 `bondOfferingType` 判断，不按债券简称字母猜测。`src/market-report-resources.ts` 加工出唯一规范报告，视觉版与文字版共用，不重复请求。市场数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。浏览器不再请求旧的 `GET /api/market-report`；只有手动 `PUT /api/market-report` 才上传已裁剪的规范快照并写 R2。
+当天浏览器在一次加载中并发请求 OMO、CFETS、国债、期货、两融、行业、股票收评、一级发行、今日成交和收藏报价；每个请求只选择实际使用字段并校验最小 DTO。今日成交与收藏报价的代码合并去重后只批量请求一次债券基础信息，代码集合来自当次响应，不是硬编码清单；基础信息只返回连接、展示和结构化类型筛选所需五个字段。公募公司债使用 `bondType` 与 `bondOfferingType` 判断，不按债券简称字母猜测。`src/market-report-resources.ts` 加工出唯一规范报告，视觉版与文字版共用，不重复请求。历史日期不重放上述上游调用，而是一次 GET 完整 R2 定稿；只有手动 PUT 才上传已裁剪的规范快照并写 R2。市场原始数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。
 
 ### 市场热点
 
