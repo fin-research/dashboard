@@ -278,11 +278,20 @@ export const sellSideSummaryUpdateSchema = z
   })
   .strict();
 
+export const financingModelVersionSchema = z
+  .object({
+    runId: z.string().uuid(),
+    asOfDate: z.string().date(),
+    generatedAt: z.string().min(1),
+  })
+  .strict();
+
 export const financingModelReportSchema = z
   .object({
     snapshot: financingModelSnapshotSchema,
     conclusion: conclusionSchema,
     sellSide: sellSidePayloadSchema.nullable(),
+    versions: z.array(financingModelVersionSchema).min(1),
   })
   .strict();
 
@@ -301,6 +310,9 @@ export type TimingDecisionRecord = z.infer<typeof timingDecisionRecordSchema>;
 export type SellSidePayload = z.infer<typeof sellSidePayloadSchema>;
 export type SellSideSummaryUpdate = z.infer<
   typeof sellSideSummaryUpdateSchema
+>;
+export type FinancingModelVersion = z.infer<
+  typeof financingModelVersionSchema
 >;
 export type FinancingModelReport = z.infer<typeof financingModelReportSchema>;
 

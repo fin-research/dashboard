@@ -5,12 +5,14 @@
     id,
     title,
     wrap = false,
+    controlsInline = false,
     accent = "",
     children,
   }: {
     id: string;
     title: string;
     wrap?: boolean;
+    controlsInline?: boolean;
     accent?: string;
     children?: Snippet;
   } = $props();
@@ -18,6 +20,7 @@
 
 <div
   class:tr-panel-heading--wrap={wrap}
+  class:tr-panel-heading--controls-inline={controlsInline}
   class="tr-panel-heading"
   style={accent ? `--panel-heading-accent: ${accent}` : ""}
 >
@@ -73,6 +76,15 @@
   .tr-panel-heading--wrap .tr-panel-heading__controls {
     width: 100%;
     overflow-x: auto;
+  }
+
+  .tr-panel-heading--controls-inline {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .tr-panel-heading--controls-inline .tr-panel-heading__controls {
+    justify-content: flex-end;
   }
 
   @media (max-width: 720px) {

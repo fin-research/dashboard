@@ -188,6 +188,20 @@
   ];
   $: returnRiskCards = [
     {
+      label: "收益率（含免税）",
+      value: formatDecimalPercent(current?.ytdAnnualizedReturn ?? null),
+      detail: current ? `截至 ${shortDate(current.date)}` : "",
+      tone: "teal" as const,
+      icon: "profit" as MetricIconName,
+    },
+    {
+      label: "收益率（不含免税）",
+      value: formatDecimalPercent(current?.ytdExTaxAnnualizedReturn ?? null),
+      detail: current ? `截至 ${shortDate(current.date)}` : "",
+      tone: "blue" as const,
+      icon: "equity" as MetricIconName,
+    },
+    {
       label: "波动率",
       value: formatDecimalPercent(
         analytics.returnRiskMetrics.annualizedVolatility,
@@ -539,7 +553,11 @@
     troughDate: string | null,
   ): string {
     if (!troughDate) return "区间内未出现回撤";
-    return `${peakDate ?? "区间起点"}—${troughDate}`;
+    return `${peakDate ? shortDate(peakDate) : "区间起点"} - ${shortDate(troughDate)}`;
+  }
+
+  function shortDate(value: string): string {
+    return value.slice(5).replace("-", "/");
   }
 </script>
 

@@ -196,11 +196,12 @@ export function renderFinancingDriverRadar(
     setEmpty(host, "驱动结构暂缺");
     return;
   }
+  const scale = financingDriverRadarScale(rows);
   setChart(host, {
     animationDuration: 180,
     aria: {
       enabled: true,
-      description: "融资择时六维驱动结构雷达图，五十分为中性，越高越支持发行",
+      description: `融资择时六维驱动结构雷达图，五十分为中性，越高越支持发行；当前坐标范围为${scale.min}至${scale.max}，原始分数未调整`,
     },
     color: [chartBlue, colors.zero],
     legend: {
@@ -232,7 +233,11 @@ export function renderFinancingDriverRadar(
       startAngle: 90,
       shape: "polygon",
       splitNumber: 4,
-      indicator: rows.map((row) => ({ name: row.display_name, min: 0, max: 100 })),
+      indicator: rows.map((row) => ({
+        name: row.display_name,
+        min: scale.min,
+        max: scale.max,
+      })),
       axisName: { ...forecastAxisLabel, color: colors.ink },
       axisLine: { lineStyle: { color: colors.line } },
       splitLine: { lineStyle: { color: "rgba(128, 148, 177, 0.24)" } },
@@ -262,6 +267,20 @@ export function renderFinancingDriverRadar(
       },
     ],
   });
+}
+
+export function financingDriverRadarScale(
+  rows: FinancingModelSnapshot["driver_structure"],
+): { min: number; max: number } {
+  const maxDeviation = Math.max(
+    ...rows.map((row) => Math.abs(row.support_score - 50)),
+    0,
+  );
+  const halfSpan = Math.min(
+    50,
+    Math.max(10, Math.ceil((maxDeviation + 2) / 5) * 5),
+  );
+  return { min: 50 - halfSpan, max: 50 + halfSpan };
 }
 
 export function renderFinancingDriverContributions(

@@ -28,14 +28,23 @@
     timingDecisionRecordSchema,
     type FinancingModelConclusion,
     type FinancingModelReport,
+    type FinancingModelVersion,
     type TimingDecisionRecord,
   } from "$lib/financing-model";
   import { globalMessages } from "$lib/global-messages";
   import { portal } from "$lib/portal";
   import type { MetricIconName } from "../../view-model";
 
+  const VERSION_TIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
   let report: FinancingModelReport | null = null;
   let loading = true;
+  let loadingVersion = false;
   let saving = false;
   let savingSellSide = false;
   let savingDecision = false;
@@ -51,6 +60,7 @@
   let editDecisionRunId = "";
   let editDecisionAction = "";
   let editDecisionOutcome = "";
+  let selectedRunId = "";
   let decisionHistory: TimingDecisionRecord[] = [];
 
   $: snapshot = report?.snapshot ?? null;
@@ -61,6 +71,7 @@
   $: recommendedScenario =
     productRecommendation?.scenarios.find((scenario) => scenario.is_recommended) ??
     null;
+  $: versions = report?.versions ?? [];
   $: businessMetrics = snapshot
     ? [
         {
@@ -162,15 +173,51 @@
       if (!historyResponse.ok) {
         throw new Error(historyPayload.error || "择时决策记录读取失败");
       }
-      report = parseFinancingModelReport(reportPayload);
+      applyReport(parseFinancingModelReport(reportPayload));
       decisionHistory = timingDecisionHistorySchema.parse(historyPayload);
-      resetConclusionEditor();
-      resetSellSideEditor();
-      closeDecisionEditor();
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
       loading = false;
+    }
+  }
+
+  function applyReport(nextReport: FinancingModelReport): void {
+    report = nextReport;
+    selectedRunId = nextReport.snapshot.run_id;
+    futureWindowDetailsOpen = false;
+    editingConclusion = false;
+    editingSellSide = false;
+    resetConclusionEditor();
+    resetSellSideEditor();
+    closeDecisionEditor();
+  }
+
+  async function loadVersion(event: Event): Promise<void> {
+    if (!report || loadingVersion) return;
+    const nextRunId = (event.currentTarget as HTMLSelectElement).value;
+    if (!nextRunId || nextRunId === report.snapshot.run_id) return;
+    const previousRunId = report.snapshot.run_id;
+    selectedRunId = nextRunId;
+    loadingVersion = true;
+    try {
+      const response = await fetch(
+        `/api/financing-model?run=${encodeURIComponent(nextRunId)}`,
+        { headers: { Accept: "application/json" } },
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "融资择时模型版本读取失败");
+      }
+      applyReport(parseFinancingModelReport(payload));
+    } catch (error) {
+      selectedRunId = previousRunId;
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "financing-model-version", title: "版本切换失败" },
+      );
+    } finally {
+      loadingVersion = false;
     }
   }
 
@@ -187,7 +234,7 @@
 
   function useBaseConclusion(): void {
     if (!snapshot) return;
-    editVerdict = snapshot.base_conclusion.verdict;
+    editVerdict = snapshot.prediction.recommendation_label;
     editNarrative = snapshot.base_conclusion.narrative;
   }
 
@@ -434,6 +481,17 @@
     return `${year}年${Number(month)}月${Number(day)}日`;
   }
 
+  function versionLabel(
+    version: FinancingModelVersion,
+    availableVersions: FinancingModelVersion[],
+  ): string {
+    const sameDateCount = availableVersions.filter(
+      (candidate) => candidate.asOfDate === version.asOfDate,
+    ).length;
+    if (sameDateCount === 1) return version.asOfDate;
+    return `${version.asOfDate} · ${VERSION_TIME_FORMATTER.format(new Date(version.generatedAt))}`;
+  }
+
 </script>
 
 <svelte:head>
@@ -464,20 +522,23 @@
       use:portal={embedded ? "#tr-topbar-actions" : null}
     >
       {#if snapshot}
-        <div class="model-as-of">
+        <label class="model-version-control">
           <svg viewBox="0 0 20 20" aria-hidden="true">
             <path d="M4 6.5h12M6.5 3v3M13.5 3v3M4 4.5h12v12H4z" />
           </svg>
-          <span>截至</span>
-          <time datetime={snapshot.as_of_date}>{displayDate(snapshot.as_of_date)}</time>
-        </div>
+          <span>日期版本</span>
+          <select
+            aria-label="融资择时模型日期版本"
+            value={selectedRunId}
+            onchange={loadVersion}
+            disabled={loadingVersion}
+          >
+            {#each versions as version (version.runId)}
+              <option value={version.runId}>{versionLabel(version, versions)}</option>
+            {/each}
+          </select>
+        </label>
       {/if}
-      <button class="refresh-control" type="button" onclick={loadReport} disabled={loading}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.4-2.2L20 9M4 15l2.5 2.2A7 7 0 0 0 17.9 15" />
-        </svg>
-        {loading ? "刷新中" : "刷新数据"}
-      </button>
     </div>
   </header>
 
@@ -519,7 +580,7 @@
         </ModuleCard>
 
         <ModuleCard class="conclusion-card" labelledBy="overall-conclusion-title">
-            <PanelHeading id="overall-conclusion-title" title="整体结论">
+            <PanelHeading id="overall-conclusion-title" title="整体结论" controlsInline>
               {#if !editingConclusion}
                 <button class="icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -884,8 +945,7 @@
 
   .model-title-block,
   .model-actions,
-  .model-as-of,
-  .refresh-control,
+  .model-version-control,
   .editor-actions,
   .section-actions {
     display: flex;
@@ -940,8 +1000,7 @@
   }
 
   .model-back svg,
-  .model-as-of svg,
-  .refresh-control svg {
+  .model-version-control svg {
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -958,8 +1017,7 @@
     gap: 8px;
   }
 
-  .model-as-of,
-  .refresh-control {
+  .model-version-control {
     min-height: 44px;
     gap: 7px;
     padding: 0 12px;
@@ -970,25 +1028,30 @@
     box-shadow: var(--shadow-card);
   }
 
-  .model-as-of svg,
-  .refresh-control svg {
+  .model-version-control svg {
     width: 18px;
+    flex: 0 0 18px;
   }
 
-  .refresh-control {
-    cursor: pointer;
+  .model-version-control span {
     font-weight: bold;
-    transition:
-      border-color 160ms ease,
-      background 160ms ease;
+    white-space: nowrap;
   }
 
-  .refresh-control:hover:not(:disabled) {
-    border-color: var(--brand);
-    background: var(--brand-soft);
+  .model-version-control select {
+    min-width: 168px;
+    height: 42px;
+    padding: 0 28px 0 4px;
+    border: 0;
+    color: var(--text-1);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    font-weight: bold;
   }
 
-  .refresh-control:disabled,
+  .model-version-control select:disabled,
   .primary-button:disabled {
     cursor: wait;
     opacity: 0.62;
@@ -1700,6 +1763,7 @@
   button:focus-visible,
   a:focus-visible,
   input:focus-visible,
+  select:focus-visible,
   textarea:focus-visible {
     outline: 3px solid color-mix(in srgb, var(--color-primary) 34%, transparent);
     outline-offset: 2px;
@@ -1759,13 +1823,17 @@
     }
 
     .model-actions {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      display: flex;
     }
 
-    .model-as-of {
-      justify-content: center;
+    .model-version-control {
+      width: 100%;
       min-width: 0;
+    }
+
+    .model-version-control select {
+      min-width: 0;
+      flex: 1;
     }
 
     .driver-grid,
@@ -1815,19 +1883,8 @@
   }
 
   @media (max-width: 520px) {
-    .model-as-of span {
+    .model-version-control span {
       display: none;
-    }
-
-    .refresh-control {
-      width: 44px;
-      justify-content: center;
-      padding: 0;
-      font-size: 0;
-    }
-
-    .refresh-control svg {
-      width: 20px;
     }
 
     .validation-grid {
@@ -1837,7 +1894,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     .model-back,
-    .refresh-control,
     .icon-button,
     .window-details-toggle,
     .window-details-toggle svg {

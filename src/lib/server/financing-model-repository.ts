@@ -37,6 +37,7 @@ interface FinancingModelRow extends QueryResultRow {
   narrative: string;
   conclusion_updated_at: string | null;
   sell_side_payload: unknown | null;
+  versions: unknown;
 }
 
 export async function loadFinancingModelReport(
@@ -168,7 +169,29 @@ export async function loadFinancingModelReport(
            'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
          )
        END AS conclusion_updated_at,
-       sell_side.payload AS sell_side_payload
+       sell_side.payload AS sell_side_payload,
+       COALESCE(
+         (
+           SELECT jsonb_agg(
+             jsonb_build_object(
+               'runId', version_run.id,
+               'asOfDate', to_char(version_run.as_of_date, 'YYYY-MM-DD'),
+               'generatedAt', to_char(
+                 version_run.generated_at AT TIME ZONE 'UTC',
+                 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+               )
+             )
+             ORDER BY version_run.as_of_date DESC, version_run.generated_at DESC
+           )
+           FROM (
+             SELECT id, as_of_date, generated_at
+             FROM financing_model.model_run
+             ORDER BY as_of_date DESC, generated_at DESC
+             LIMIT 100
+           ) AS version_run
+         ),
+         '[]'::jsonb
+       ) AS versions
      FROM financing_model.model_run AS run
      LEFT JOIN LATERAL (
        SELECT COALESCE(
@@ -266,19 +289,23 @@ export async function loadFinancingModelReport(
 
   try {
     const snapshot = financingModelSnapshotSchema.parse(row.snapshot);
+    const conclusionEdited = row.conclusion_updated_at !== null;
     return financingModelReportSchema.parse({
       snapshot,
       conclusion: {
-        verdict: row.verdict,
+        verdict: conclusionEdited
+          ? row.verdict
+          : snapshot.prediction.recommendation_label,
         preferredWindow: row.preferred_window,
         narrative: row.narrative,
-        edited: row.conclusion_updated_at !== null,
+        edited: conclusionEdited,
         updatedAt: row.conclusion_updated_at,
       },
       sellSide:
         row.sell_side_payload === null
           ? null
           : sellSidePayloadSchema.parse(row.sell_side_payload),
+      versions: row.versions,
     });
   } catch (error) {
     throw new FinancingModelDatabaseError(

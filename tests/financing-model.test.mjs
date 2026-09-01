@@ -179,6 +179,16 @@ function sellSidePayload() {
   };
 }
 
+function versions() {
+  return [
+    {
+      runId: snapshot().run_id,
+      asOfDate: snapshot().as_of_date,
+      generatedAt: snapshot().generated_at,
+    },
+  ];
+}
+
 test("融资择时报告契约接受模型、人工结论和卖方观点", () => {
   const report = parseFinancingModelReport({
     snapshot: snapshot(),
@@ -190,11 +200,13 @@ test("融资择时报告契约接受模型、人工结论和卖方观点", () =>
       updatedAt: "2026-08-24T03:10:00.000Z",
     },
     sellSide: sellSidePayload(),
+    versions: versions(),
   });
 
   assert.equal(report.snapshot.prediction.deviation_bp, 1.71);
   assert.equal(report.conclusion.edited, true);
   assert.equal(report.sellSide.views.length, 4);
+  assert.equal(report.versions[0].asOfDate, "2026-08-24");
   assert.match(report.sellSide.logicSummary, /长端利率方向/);
 });
 
@@ -342,6 +354,7 @@ test("历史卖方交叉验证快照读取时整合为单段逻辑汇总", () =>
       updatedAt: null,
     },
     sellSide: legacy,
+    versions: versions(),
   });
 
   assert.equal(
@@ -351,10 +364,11 @@ test("历史卖方交叉验证快照读取时整合为单段逻辑汇总", () =>
   assert.equal(report.sellSide.edited, false);
 });
 
-test("读取时使用 model_run 当前结论并保留基础结论", async () => {
+test("未人工编辑时整体结论跟随正式发行建议并返回日期版本", async () => {
   const client = {
     async query(sql, parameters) {
       assert.match(sql, /financing_model\.model_run/);
+      assert.match(sql, /AS versions/);
       assert.deepEqual(parameters, [null]);
       return {
         rows: [
@@ -365,6 +379,7 @@ test("读取时使用 model_run 当前结论并保留基础结论", async () => 
             narrative: "基础结论",
             conclusion_updated_at: null,
             sell_side_payload: null,
+            versions: versions(),
           },
         ],
       };
@@ -373,9 +388,35 @@ test("读取时使用 model_run 当前结论并保留基础结论", async () => 
 
   const report = await loadFinancingModelReport(client);
 
-  assert.equal(report.conclusion.verdict, "推荐发行");
+  assert.equal(report.conclusion.verdict, "择机发行");
   assert.equal(report.conclusion.edited, false);
   assert.equal(report.sellSide, null);
+  assert.equal(report.versions[0].runId, snapshot().run_id);
+});
+
+test("人工编辑过的整体结论保持优先", async () => {
+  const client = {
+    async query() {
+      return {
+        rows: [
+          {
+            snapshot: snapshot(),
+            verdict: "暂缓发行",
+            preferred_window: "等待确认",
+            narrative: "人工判断等待更明确的成本窗口。",
+            conclusion_updated_at: "2026-08-24T04:00:00.000Z",
+            sell_side_payload: null,
+            versions: versions(),
+          },
+        ],
+      };
+    },
+  };
+
+  const report = await loadFinancingModelReport(client);
+
+  assert.equal(report.conclusion.verdict, "暂缓发行");
+  assert.equal(report.conclusion.edited, true);
 });
 
 test("整体结论 PATCH 增量更新 model_run 当前结论", async () => {
@@ -565,7 +606,11 @@ test("融资模型页面按决策三行展示并提供品种推荐和验证说�
   assert.doesNotMatch(page, /因子贡献（\+ 支持发行）/);
   assert.match(page, /窗口处于\{snapshot\.prediction\.window_zone\}区间/);
   assert.match(page, /正值支持发行/);
+  assert.match(page, /aria-label="融资择时模型日期版本"/);
+  assert.match(page, /\/api\/financing-model\?run=/);
+  assert.doesNotMatch(page, /刷新数据/);
   assert.match(page, /aria-label="编辑整体结论"/);
+  assert.match(page, /title="整体结论" controlsInline/);
   assert.match(page, /aria-label="编辑卖方逻辑汇总"/);
   assert.match(page, /report\.sellSide\.logicSummary/);
   assert.match(page, /class=\{`sell-side-grid sell-side-grid--\$\{/);
@@ -596,6 +641,10 @@ test("融资模型页面按决策三行展示并提供品种推荐和验证说�
   assert.match(page, /role="tooltip"/);
   assert.match(page, /validation\.tscv\.sample_count \?\? validation\.tscv\.validation_samples/);
   assert.match(chart, /name: "正号代表支持发行（融资成本低）"/);
+  assert.match(chart, /financingDriverRadarScale\(rows\)/);
+  assert.match(chart, /min: scale\.min/);
+  assert.match(chart, /max: scale\.max/);
+  assert.match(chart, /Math\.ceil\(\(maxDeviation \+ 2\) \/ 5\) \* 5/);
   assert.match(chart, /splitLine: \{ show: false \}/);
   assert.doesNotMatch(chart, /支持发行（降低成本）/);
   assert.doesNotMatch(chart, /showBackground|backgroundStyle/);
