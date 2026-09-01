@@ -41,7 +41,7 @@ Worker 通过 `HYPERDRIVE` 访问 `bond` schema：
 Worker 只绑定私有 `eastmoney` R2 bucket，并通过固定小写前缀隔离对象：
 
 - `bond-ledger/YYYY-MM-DD.xlsx`：二级池台账定稿。同日重新上传覆盖当天对象；上传解析阶段暂存于 `bond-ledger/.pending/<uuid>.xlsx`，Workflow 成功后归档并删除临时对象。页面统计不得通过下载 R2 文件重新计算。
-- `market-briefing/YYYY-MM-DD.json`：市场点评人工定稿快照，只包含规范报告字段、今日聚焦和定稿时间，不含原始上游响应；只有显式保存定稿才覆盖当天对象，普通读取和刷新不写 R2，GET 只向浏览器返回聚焦与时间元数据。
+- `market-briefing/YYYY-MM-DD.json`：市场点评人工定稿快照，只包含规范报告字段、今日聚焦和定稿时间，不含原始上游响应；只有显式保存定稿才覆盖当天对象，普通加载不读写 R2。
 - `fund-reports/YYYY-MM-DD.html`：资金日报。同一天再次上传会替换该日报；读取路由不得接受任意对象 key。
 
 资金日报当前不需要 D1/Neon 索引：上传文件名已经提供日期，公开 URL 和 R2 key 都可由日期直接确定；历史列表只枚举 `fund-reports/` 固定前缀并过滤严格日期文件名。需要审批或同日报告的版本历史时再增加独立元数据模型。

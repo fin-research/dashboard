@@ -1,23 +1,9 @@
 import {
   MarketReportStoreError,
-  readMarketReportFinalization,
   saveMarketReport,
 } from "$lib/server/market-report";
 import { validateSameOrigin } from "$lib/server/bond-ledger";
 import type { RequestHandler } from "./$types";
-
-export const GET: RequestHandler = async ({ platform, url }) => {
-  try {
-    const reportDate = requiredDate(url);
-    const snapshot = await readMarketReportFinalization(
-      platform?.env.EASTMONEY,
-      reportDate,
-    );
-    return Response.json(snapshot, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    return errorResponse(error, url, "read");
-  }
-};
 
 export const PUT: RequestHandler = async ({ request, platform, url }) => {
   try {

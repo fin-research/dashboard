@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import {
+  DataApiRequestError,
+  dataApiErrorCode,
+  formatDataApiError,
+} from "./data-api-error.ts";
+
+import {
   bondInfosSchema,
   cfetsRatesSchema,
   favoriteQuotesSchema,
@@ -14,7 +20,6 @@ import {
   todayTradesSchema,
 } from "./data-contracts.ts";
 import {
-  marketReportFinalizationSchema,
   marketReportSnapshotSchema,
   reportDataSchema,
 } from "./market-report.ts";
@@ -30,10 +35,6 @@ import type {
   ReportData,
 } from "./types";
 
-const apiErrorSchema = z.object({
-  detail: z.string().optional(),
-  error: z.string().optional(),
-});
 const marketBriefingSchema = z.object({
   report_date: z.string(),
   content: z.string(),
@@ -47,33 +48,46 @@ async function getJson<T>(
   method = "GET",
   body?: unknown,
 ): Promise<T> {
-  const response = await fetch(url, {
-    method,
-    signal,
-    headers: {
-      Accept: "application/json",
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-    },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method,
+      signal,
+      headers: {
+        Accept: "application/json",
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    throw new DataApiRequestError(0, `${url.split("?")[0]} 请求失败：${detail}`);
+  }
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
-    throw new Error(
-      response.ok ? `${url.split("?")[0]} 返回的不是有效 JSON` : "上游数据读取失败",
+    throw new DataApiRequestError(
+      response.status,
+      `${url.split("?")[0]} ${response.ok ? "返回的不是有效 JSON" : `请求失败（HTTP ${response.status}，响应不是有效 JSON）`}`,
     );
   }
   if (!response.ok) {
-    const error = apiErrorSchema.safeParse(payload);
-    throw new Error(
-      (error.success && (error.data.detail || error.data.error)) ||
-        "上游数据读取失败",
+    throw new DataApiRequestError(
+      response.status,
+      formatDataApiError(url, response.status, payload),
+      dataApiErrorCode(payload),
     );
   }
   const parsed = schema.safeParse(payload);
   if (!parsed.success) {
-    throw new Error(`${url.split("?")[0]} 返回数据不符合接口 Schema`);
+    const issues = parsed.error.issues.slice(0, 5)
+      .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.code}`)
+      .join("；");
+    throw new DataApiRequestError(
+      response.status,
+      `${url.split("?")[0]} 返回数据不符合接口 Schema：${issues}`,
+    );
   }
   return parsed.data;
 }
@@ -110,6 +124,20 @@ export async function fetchReport(
     industrySnapshotSchema,
     signal,
   );
+  const stockPromise = getJson(
+    `/data/stock-summary?date=${reportDate}&fields=title,time,paragraphs`,
+    stockSummarySchema,
+    signal,
+  ).catch((error: unknown) => {
+    if (
+      error instanceof DataApiRequestError
+      && error.status === 404
+      && error.code === "RESOURCE_NOT_AVAILABLE"
+    ) {
+      return { title: "", time: null, paragraphs: [] };
+    }
+    throw error;
+  });
   const primaryPromise = industryPromise.then(async (industry) => {
     const previousDate = previousTradingDate(industry, reportDate);
     const primaryQuery = new URLSearchParams({
@@ -168,7 +196,6 @@ export async function fetchReport(
     todayTradesPayload,
     favoriteQuotesPayload,
     bondInfosPayload,
-    stored,
   ] = await Promise.all([
     getJson(`/data/omo?${omoQuery}`, omoOperationsSchema, signal),
     getJson(
@@ -191,11 +218,7 @@ export async function fetchReport(
       futuresQuotesSchema,
       signal,
     ),
-    getJson(
-      `/data/stock-summary?date=${reportDate}&fields=title,time,paragraphs`,
-      stockSummarySchema,
-      signal,
-    ),
+    stockPromise,
     getJson(
       `/data/margin?date=${reportDate}&fields=DIM_DATE,TOTAL_RZRQYE,TOTAL_RZYE,TOTAL_RQYE`,
       marginBalancesSchema,
@@ -206,7 +229,6 @@ export async function fetchReport(
     todayTradesPromise,
     favoriteQuotesPromise,
     bondInfosPromise,
-    readStoredSnapshot(reportDate, signal),
   ]);
 
   const generatedAt = new Date().toISOString();
@@ -231,31 +253,10 @@ export async function fetchReport(
   );
   return marketReportSnapshotSchema.parse({
     ...report,
-    focus_text: stored?.focus_text ?? "",
-    cached_at: stored?.cached_at ?? generatedAt,
-    finalized_at: stored?.finalized_at ?? null,
+    focus_text: "",
+    cached_at: generatedAt,
+    finalized_at: null,
   });
-}
-
-async function readStoredSnapshot(
-  reportDate: string,
-  signal?: AbortSignal,
-): Promise<{
-  focus_text: string;
-  cached_at: string;
-  finalized_at: string | null;
-} | null> {
-  const query = new URLSearchParams({ date: reportDate });
-  const response = await fetch(`/api/market-report?${query}`, {
-    signal,
-    headers: { Accept: "application/json" },
-  });
-  if (response.status === 404 || !response.ok) return null;
-  try {
-    return marketReportFinalizationSchema.parse(await response.json());
-  } catch {
-    return null;
-  }
 }
 
 export async function saveMarketReport(

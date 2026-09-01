@@ -3,8 +3,6 @@ import test from "node:test";
 
 import { fetchReport } from "../src/api.ts";
 import {
-  readMarketReport,
-  readMarketReportFinalization,
   saveMarketReport,
 } from "../src/lib/server/market-report.ts";
 
@@ -58,9 +56,6 @@ function memoryBucket() {
 
 function directDataResponse(target) {
   const url = new URL(target, "https://example.test");
-  if (url.pathname === "/api/market-report") {
-    return Response.json({ error: "该日期尚无市场点评定稿" }, { status: 404 });
-  }
   if (url.pathname === "/data/industry") {
     return Response.json({
       dataDate: "2026-08-25",
@@ -128,12 +123,13 @@ test("浏览器直读原始 Data REST 并加工，不走聚合或 GraphQL", asyn
   assert.deepEqual(result.stock_paragraphs, ["第一段", "第二段"]);
   assert.equal(result.focus_text, "");
   assert.equal(calls.filter((target) => target.includes("/data/market-report/")).length, 0);
+  assert.equal(calls.filter((target) => target.includes("/api/market-report")).length, 0);
   assert.ok(calls.some((target) => target.includes("/data/industry?")));
   assert.ok(calls.some((target) => target.includes("/data/primary-issues?")));
   assert.ok(calls.every((target) => !target.includes("/data/graphql")));
 });
 
-test("人工定稿才写入裁剪后的 R2 快照，普通读取只返回定稿元数据", async () => {
+test("人工定稿才写入裁剪后的 R2 快照", async () => {
   const bucket = memoryBucket();
   const saved = await saveMarketReport(
     bucket,
@@ -144,14 +140,6 @@ test("人工定稿才写入裁剪后的 R2 快照，普通读取只返回定稿�
   assert.equal(saved.focus_text, "定稿判断");
   assert.ok(saved.finalized_at);
 
-  const stored = await readMarketReport(bucket, "2026-08-25");
-  assert.deepEqual(stored, saved);
-  const finalization = await readMarketReportFinalization(bucket, "2026-08-25");
-  assert.deepEqual(finalization, {
-    focus_text: "定稿判断",
-    cached_at: saved.cached_at,
-    finalized_at: saved.finalized_at,
-  });
   const raw = JSON.parse(bucket.objects.get("market-briefing/2026-08-25.json"));
   assert.equal(raw.focus_text, "定稿判断");
   assert.equal("todayTrades" in raw, false);

@@ -2,7 +2,6 @@ import {
   marketReportObjectKey,
   marketReportSnapshotSchema,
   reportDataSchema,
-  type MarketReportFinalizationContract,
   type MarketReportSnapshotContract,
   type ReportDataContract,
 } from "../../market-report.ts";
@@ -19,30 +18,6 @@ export class MarketReportStoreError extends Error {
 
 type EastmoneyBucket = Env["EASTMONEY"];
 const MAX_MARKET_REPORT_BYTES = 512 * 1024;
-
-export async function readMarketReportFinalization(
-  bucket: EastmoneyBucket | undefined,
-  reportDate: string,
-): Promise<MarketReportFinalizationContract> {
-  const snapshot = await readMarketReport(bucket, reportDate);
-  return {
-    focus_text: snapshot.focus_text,
-    cached_at: snapshot.cached_at,
-    finalized_at: snapshot.finalized_at,
-  };
-}
-
-export async function readMarketReport(
-  bucket: EastmoneyBucket | undefined,
-  reportDate: string,
-): Promise<MarketReportSnapshotContract> {
-  const storage = requireBucket(bucket);
-  const snapshot = await readSnapshot(storage, marketReportObjectKey(reportDate));
-  if (!snapshot) {
-    throw new MarketReportStoreError(404, "该日期尚无市场点评定稿");
-  }
-  return snapshot;
-}
 
 export async function saveMarketReport(
   bucket: EastmoneyBucket | undefined,
@@ -72,20 +47,6 @@ export async function saveMarketReport(
   });
   await writeSnapshot(storage, marketReportObjectKey(reportDate), snapshot);
   return snapshot;
-}
-
-async function readSnapshot(
-  bucket: EastmoneyBucket,
-  key: string,
-): Promise<MarketReportSnapshotContract | null> {
-  const object = await bucket.get(key);
-  if (!object) return null;
-  try {
-    return marketReportSnapshotSchema.parse(await object.json());
-  } catch (error) {
-    console.error(JSON.stringify({ event: "market_report_cache_invalid", key }));
-    return null;
-  }
 }
 
 async function writeSnapshot(

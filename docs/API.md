@@ -25,18 +25,24 @@
 
 原始资源字段变化必须与 `src/api.ts` 请求编排、`src/market-report-resources.ts` 加工、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/market-report/*` 或 GraphQL 市场报告聚合，也不要为视觉版或文字版增加单独的数据源。
 
+Data 错误响应保留安全诊断字段，前端错误消息展示接口路径、HTTP 状态、错误码、数据源、
+处理阶段及限长后的 Schema issue。`stock-summary` 当日尚未发布时返回 404，页面以空股市
+段落继续加载其他模块；稀疏 OMO/期货数值以 `null` 表示，不转换为 0。
+
 研究辅助由浏览器直接 `POST /data/graphql`，使用 `choiceEdb(edbIds, startDate,
 endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `function + fields + rows`
 表格结构。该请求不经过 Dashboard `/api/*`，也不由 Dashboard Worker 代理拼装业务数据。
 
-浏览器直接读取 Data REST 市场数据；Dashboard REST 只读取或保存人工定稿。研究辅助仍直接使用既有 Data API Choice GraphQL。今日聚焦、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
+浏览器直接读取 Data REST 市场数据；Dashboard REST 只在手工操作时保存人工定稿，不提供定稿读取。研究辅助仍直接使用既有 Data API Choice GraphQL。今日聚焦、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
 
 ## Dashboard Worker `/api/*`
 
 ### 市场点评
 
-- `GET /api/market-report?date=YYYY-MM-DD`：只返回已有 R2 定稿的 `focus_text`、`cached_at`、`finalized_at`；无定稿返回 404，不请求 Data API，也不向浏览器重复传输历史市场数据。
 - `PUT /api/market-report?date=YYYY-MM-DD`：仅在用户手动保存时，同源接收浏览器已加工并经 Schema 裁剪的规范报告与今日聚焦，覆盖当天对象；原始上游响应不得写入 R2，序列化快照上限为 512 KiB。
+
+`/api/market-report` 不再提供 GET；普通加载不会读取 R2。保存成功后的定稿时间由 PUT
+响应更新当前页面状态。
 
 ### 市场热点
 

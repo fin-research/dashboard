@@ -7,17 +7,20 @@ const numericValue = z
     z.string().trim().regex(/^-?\d+(?:\.\d+)?$/),
   ])
   .transform(Number);
-const nullableNumericValue = z
-  .union([
-    finiteNumber,
-    z.string().trim().regex(/^-?\d+(?:\.\d+)?$/),
-    z.literal("--"),
-    z.literal(""),
-    z.null(),
-  ])
-  .transform((value) => value === null || value === "--" || value === ""
-    ? null
-    : Number(value));
+const nullableNumericValue = z.preprocess(
+  (value) => value === undefined ? null : value,
+  z
+    .union([
+      finiteNumber,
+      z.string().trim().regex(/^-?\d+(?:\.\d+)?$/),
+      z.literal("--"),
+      z.literal(""),
+      z.null(),
+    ])
+    .transform((value) => value === null || value === "--" || value === ""
+      ? null
+      : Number(value)),
+);
 const identifier = z
   .union([z.string().min(1), z.number().int().finite()])
   .transform(String);
@@ -78,8 +81,8 @@ export const governmentBondsSchema = directOrLegacyList(
 
 export const futuresQuoteSchema = z.object({
   contractCode: z.string(),
-  lastPrice: numericValue,
-  upDownValuePct: numericValue,
+  lastPrice: nullableNumericValue,
+  upDownValuePct: nullableNumericValue,
 });
 const futuresRowsSchema = z.array(futuresQuoteSchema);
 const legacyFuturesSchema = z.object({

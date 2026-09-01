@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { formatDataApiError } from "../../data-api-error.ts";
 import type { MarketBriefing } from "../../types";
 import { generateAiGatewayObject } from "./ai-gateway.ts";
 
@@ -341,24 +342,43 @@ async function fetchDataJson<T>(
       : await fetch(request);
   } catch (error) {
     const name = error instanceof Error ? error.name : "";
+    const endpoint = new URL(url).pathname;
     if (name === "TimeoutError" || name === "AbortError") {
-      throw new MarketBriefingError(504, "新闻数据读取超时，请稍后重试");
+      throw new MarketBriefingError(504, `${endpoint} 读取超时（${name}）`);
     }
-    throw new MarketBriefingError(503, "新闻数据读取失败，请稍后重试");
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    throw new MarketBriefingError(503, `${endpoint} 读取失败：${detail}`);
   }
   if (!response.ok) {
-    await response.body?.cancel();
-    throw new MarketBriefingError(503, "新闻数据读取失败，请稍后重试");
+    let errorPayload: unknown;
+    try {
+      errorPayload = await response.json();
+    } catch {
+      errorPayload = null;
+    }
+    throw new MarketBriefingError(
+      response.status === 404 ? 404 : 503,
+      formatDataApiError(url, response.status, errorPayload),
+    );
   }
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
-    throw new MarketBriefingError(503, "新闻数据格式无效，请稍后重试");
+    throw new MarketBriefingError(
+      503,
+      `${new URL(url).pathname} 返回的不是有效 JSON`,
+    );
   }
   const parsed = schema.safeParse(payload);
   if (!parsed.success) {
-    throw new MarketBriefingError(503, "新闻数据格式无效，请稍后重试");
+    const issues = parsed.error.issues.slice(0, 5)
+      .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.code}`)
+      .join("；");
+    throw new MarketBriefingError(
+      503,
+      `${new URL(url).pathname} 返回数据不符合接口 Schema：${issues}`,
+    );
   }
   return parsed.data;
 }
