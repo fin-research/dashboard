@@ -26,6 +26,12 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
         tradeYield: 2.30,
         cbYte: 2.20,
       },
+      {
+        bondUniCode: "104",
+        remainingTenor: "1Y",
+        tradeYield: null,
+        cbYte: 1.90,
+      },
   ];
   const favoriteQuotes = [
       {
@@ -37,7 +43,7 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
         ofrYield: 2.02,
       },
   ];
-  assert.deepEqual(referencedBondCodes(todayTrades, favoriteQuotes), ["101", "102", "103"]);
+  assert.deepEqual(referencedBondCodes(todayTrades, favoriteQuotes), ["101", "102", "103", "104"]);
 
   const report = buildReportData({
     reportDate: "2026-08-25",
@@ -138,6 +144,7 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
         { bondUniCode: "101", bondShortName: "26测试01", comShortName: "测试公司", bondType: 37, bondOfferingType: 1 },
         { bondUniCode: "102", bondShortName: "26东财01", comShortName: "东方财富", bondType: 37, bondOfferingType: 1 },
         { bondUniCode: "103", bondShortName: "26私募01", comShortName: "私募公司", bondType: 37, bondOfferingType: 2 },
+        { bondUniCode: "104", bondShortName: "26缺失01", comShortName: "缺失公司", bondType: 37, bondOfferingType: 1 },
       ],
   });
 

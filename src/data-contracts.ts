@@ -142,7 +142,7 @@ export const todayTradeSchema = z.object({
   bondUniCode: identifier,
   remainingTenor: z.string(),
   cbYte: nullableNumericValue.optional(),
-  tradeYield: numericValue,
+  tradeYield: nullableNumericValue,
   tradeYieldSubCb: nullableNumericValue.optional(),
 });
 const todayRowsSchema = z.array(todayTradeSchema);

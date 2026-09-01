@@ -28,7 +28,7 @@
 
 Data 错误响应保留安全诊断字段，前端错误消息展示接口路径、HTTP 状态、错误码、数据源、
 处理阶段及限长后的 Schema issue。`stock-summary` 当日尚未发布时返回 404，页面以空股市
-段落继续加载其他模块；稀疏 OMO/CFETS/期货数值以 `null` 表示，不转换为 0。
+段落继续加载其他模块；稀疏 OMO/CFETS/期货数值和今日成交收益率以 `null` 表示，不转换为 0。
 
 研究辅助浏览器只调用 Dashboard `GET /api/economic-indicators` 读取 Neon。Choice `GET /data/choice/edb` 与 DM `GET /data/cfets-histories` 只供首次本地全历史回填和每日定时增量任务使用，页面加载不消耗上游查询额度。
 
