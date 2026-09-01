@@ -228,6 +228,7 @@ function isBondLedgerReport(value: unknown): value is BondLedgerReport {
     Array.isArray(value.maturityBuckets) &&
     Array.isArray(value.transactions) &&
     isRecord(value.transactionTotals) &&
+    isRecord(value.returnRiskMetrics) &&
     isRecord(value.metricDeltas)
   );
 }

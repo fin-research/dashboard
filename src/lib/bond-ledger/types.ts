@@ -99,6 +99,17 @@ export interface MaturityBucketStat {
   positionCount: number;
 }
 
+export interface ReturnRiskMetrics {
+  periodReturn: number | null;
+  annualizedVolatility: number | null;
+  maxDrawdown: number | null;
+  returnVolatilityRatio: number | null;
+  positiveDayRatio: number | null;
+  validDayCount: number;
+  maxDrawdownPeakDate: string | null;
+  maxDrawdownTroughDate: string | null;
+}
+
 export interface BondLedgerAnalytics {
   selectedLedgers: BondLedgerSource[];
   latestLedger: BondLedgerSource | null;
@@ -113,6 +124,7 @@ export interface BondLedgerAnalytics {
   rangeProfit: number | null;
   rangeAnnualizedReturn: number | null;
   ytdAnnualizedReturn: number | null;
+  returnRiskMetrics: ReturnRiskMetrics;
   transactionCount: number;
   metricDeltas: {
     marketValue: number | null;
@@ -139,6 +151,7 @@ export interface BondLedgerReport {
   rangeProfit: number | null;
   rangeAnnualizedReturn: number | null;
   ytdAnnualizedReturn: number | null;
+  returnRiskMetrics: ReturnRiskMetrics;
   transactionCount: number;
   metricDeltas: BondLedgerAnalytics["metricDeltas"];
   effectiveStartDate: string | null;

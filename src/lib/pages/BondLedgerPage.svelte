@@ -168,6 +168,41 @@
       icon: "trade" as MetricIconName,
     },
   ];
+  $: returnRiskCards = [
+    {
+      label: "区间收益率",
+      value: formatDecimalPercent(analytics.returnRiskMetrics.periodReturn),
+      detail: `${analytics.returnRiskMetrics.validDayCount} 个有效交易日`,
+      tone: "teal" as const,
+      icon: "profit" as MetricIconName,
+    },
+    {
+      label: "年化波动率",
+      value: formatDecimalPercent(
+        analytics.returnRiskMetrics.annualizedVolatility,
+      ),
+      detail: "按 252 个交易日年化",
+      tone: "purple" as const,
+      icon: "equity" as MetricIconName,
+    },
+    {
+      label: "最大回撤",
+      value: formatDrawdown(analytics.returnRiskMetrics.maxDrawdown),
+      detail: drawdownPeriod(
+        analytics.returnRiskMetrics.maxDrawdownPeakDate,
+        analytics.returnRiskMetrics.maxDrawdownTroughDate,
+      ),
+      tone: "red" as const,
+      icon: "bond" as MetricIconName,
+    },
+    {
+      label: "收益波动比",
+      value: formatRatio(analytics.returnRiskMetrics.returnVolatilityRatio),
+      detail: `盈利天数占比 ${formatDecimalPercent(analytics.returnRiskMetrics.positiveDayRatio)}`,
+      tone: "orange" as const,
+      icon: "leverage" as MetricIconName,
+    },
+  ];
 
   onMount(() => {
     void refreshReport(true);
@@ -489,6 +524,23 @@
   function sign(value: number): string {
     return value > 0 ? "+" : value < 0 ? "−" : "";
   }
+
+  function formatDrawdown(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) return "—";
+    return value === 0 ? "0.00%" : `−${(value * 100).toFixed(2)}%`;
+  }
+
+  function formatRatio(value: number | null): string {
+    return value === null || !Number.isFinite(value) ? "—" : value.toFixed(2);
+  }
+
+  function drawdownPeriod(
+    peakDate: string | null,
+    troughDate: string | null,
+  ): string {
+    if (!troughDate) return "区间内未出现回撤";
+    return `${peakDate ?? "区间起点"}—${troughDate}`;
+  }
 </script>
 
 <svelte:window onclick={closeRangeFromWindow} />
@@ -625,6 +677,24 @@
             />
           {/each}
         </section>
+
+        <ModuleCard class="ledger-panel" labelledBy="return-risk-title">
+          <PanelHeading id="return-risk-title" title="收益与风险指标" />
+          <div class="ledger-return-risk-grid">
+            {#each returnRiskCards as card (card.label)}
+              <MetricCard
+                label={card.label}
+                value={card.value}
+                detail={card.detail}
+                tone={card.tone}
+                iconComponent={MetricIcon}
+                iconProps={{ icon: card.icon }}
+                iconPosition="start"
+                compact
+              />
+            {/each}
+          </div>
+        </ModuleCard>
 
         <div class="ledger-chart-grid">
           <ModuleCard class="ledger-panel ledger-panel--trend" labelledBy="return-trend-title">

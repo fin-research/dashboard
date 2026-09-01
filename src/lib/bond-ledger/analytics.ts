@@ -9,6 +9,7 @@ import type {
   LedgerTransaction,
   LedgerTransactionSide,
   MaturityBucketStat,
+  ReturnRiskMetrics,
 } from "./types";
 
 const DAY_MS = 86_400_000;
@@ -95,6 +96,13 @@ export function buildBondLedgerAnalytics(
     latestLedger.performance,
     effectiveEndDate,
   );
+  const returnRiskMetrics = effectiveStartDate
+    ? calculateReturnRiskMetrics(
+        latestLedger.performance,
+        effectiveStartDate,
+        effectiveEndDate,
+      )
+    : emptyReturnRiskMetrics();
   const comparisonStartDate = effectiveStartDate
     ? addDays(effectiveStartDate, -7)
     : null;
@@ -152,6 +160,7 @@ export function buildBondLedgerAnalytics(
     rangeProfit,
     rangeAnnualizedReturn,
     ytdAnnualizedReturn,
+    returnRiskMetrics,
     transactionCount,
     metricDeltas: {
       marketValue: difference(
@@ -206,6 +215,7 @@ export function toBondLedgerReport(
     rangeProfit: analytics.rangeProfit,
     rangeAnnualizedReturn: analytics.rangeAnnualizedReturn,
     ytdAnnualizedReturn: analytics.ytdAnnualizedReturn,
+    returnRiskMetrics: analytics.returnRiskMetrics,
     transactionCount: analytics.transactionCount,
     metricDeltas: analytics.metricDeltas,
     effectiveStartDate: analytics.effectiveStartDate,
@@ -279,6 +289,76 @@ export function calculateBusinessAnnualizedReturnTrend(
             : null,
       };
     });
+}
+
+export function calculateReturnRiskMetrics(
+  performance: LedgerPerformanceRow[],
+  startDate: string,
+  endDate: string,
+): ReturnRiskMetrics {
+  const dailyReturns = performance
+    .filter((row) => row.date >= startDate && row.date <= endDate)
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .flatMap((row) => {
+      if (row.principal <= 0 || !Number.isFinite(row.dailyRevenue)) return [];
+      const value = row.dailyRevenue / row.principal;
+      return Number.isFinite(value) && value > -1
+        ? [{ date: row.date, value }]
+        : [];
+    });
+  if (!dailyReturns.length) return emptyReturnRiskMetrics();
+
+  const validDayCount = dailyReturns.length;
+  const meanDailyReturn =
+    sum(dailyReturns.map(({ value }) => value)) / validDayCount;
+  const periodReturn = dailyReturns.reduce(
+    (wealth, { value }) => wealth * (1 + value),
+    1,
+  ) - 1;
+  const annualizedVolatility =
+    validDayCount >= 2
+      ? sampleStandardDeviation(
+          dailyReturns.map(({ value }) => value),
+          meanDailyReturn,
+        ) * Math.sqrt(BUSINESS_TRADING_DAYS)
+      : null;
+  const returnVolatilityRatio =
+    annualizedVolatility !== null && annualizedVolatility > 0
+      ? (meanDailyReturn * BUSINESS_TRADING_DAYS) / annualizedVolatility
+      : null;
+
+  let wealth = 1;
+  let peak = 1;
+  let peakDate: string | null = null;
+  let maxDrawdown = 0;
+  let maxDrawdownPeakDate: string | null = null;
+  let maxDrawdownTroughDate: string | null = null;
+  for (const point of dailyReturns) {
+    wealth *= 1 + point.value;
+    if (wealth >= peak) {
+      peak = wealth;
+      peakDate = point.date;
+      continue;
+    }
+    const drawdown = (peak - wealth) / peak;
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown;
+      maxDrawdownPeakDate = peakDate;
+      maxDrawdownTroughDate = point.date;
+    }
+  }
+
+  return {
+    periodReturn,
+    annualizedVolatility,
+    maxDrawdown,
+    returnVolatilityRatio,
+    positiveDayRatio:
+      dailyReturns.filter(({ value }) => value > 0).length / validDayCount,
+    validDayCount,
+    maxDrawdownPeakDate,
+    maxDrawdownTroughDate,
+  };
 }
 
 function calculateRangeProfit(
@@ -490,6 +570,7 @@ function emptyAnalytics(
     rangeProfit: null,
     rangeAnnualizedReturn: null,
     ytdAnnualizedReturn: null,
+    returnRiskMetrics: emptyReturnRiskMetrics(),
     transactionCount: 0,
     metricDeltas: {
       marketValue: null,
@@ -503,6 +584,19 @@ function emptyAnalytics(
     reconciliationGap: null,
     effectiveStartDate: null,
     effectiveEndDate: null,
+  };
+}
+
+function emptyReturnRiskMetrics(): ReturnRiskMetrics {
+  return {
+    periodReturn: null,
+    annualizedVolatility: null,
+    maxDrawdown: null,
+    returnVolatilityRatio: null,
+    positiveDayRatio: null,
+    validDayCount: 0,
+    maxDrawdownPeakDate: null,
+    maxDrawdownTroughDate: null,
   };
 }
 
@@ -563,4 +657,11 @@ function daysBetween(start: string, end: string): number {
 
 function sum(values: number[]): number {
   return values.reduce((total, value) => total + value, 0);
+}
+
+function sampleStandardDeviation(values: number[], mean: number): number {
+  return Math.sqrt(
+    values.reduce((total, value) => total + (value - mean) ** 2, 0) /
+      (values.length - 1),
+  );
 }

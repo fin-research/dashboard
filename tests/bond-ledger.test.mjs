@@ -7,6 +7,7 @@ import {
   buildBondLedgerAnalytics,
   calculateBusinessAnnualizedReturn,
   calculateBusinessAnnualizedReturnTrend,
+  calculateReturnRiskMetrics,
   previousBusinessWeekRange,
   weekRange,
 } from "../src/lib/bond-ledger/analytics.ts";
@@ -299,6 +300,48 @@ test("业务收益率按交易日单日收益率算术平均乘 252 年化", () 
     startDate: "2026-08-24",
     endDate: "2026-08-28",
   });
+});
+
+test("收益与风险指标按所选区间有效日收益率统一派生", () => {
+  const before = performanceRow("2026-08-14", 0, 1_000);
+  before.dailyRevenue = 500;
+  const monday = performanceRow("2026-08-17", 0, 1_000);
+  monday.dailyRevenue = 10;
+  const tuesday = performanceRow("2026-08-18", 0, 1_000);
+  tuesday.dailyRevenue = -10;
+  const wednesday = performanceRow("2026-08-19", 0, 1_000);
+  wednesday.dailyRevenue = 20;
+
+  const metrics = calculateReturnRiskMetrics(
+    [before, monday, tuesday, wednesday],
+    "2026-08-17",
+    "2026-08-19",
+  );
+  const dailyReturns = [0.01, -0.01, 0.02];
+  const mean = dailyReturns.reduce((total, value) => total + value, 0) / 3;
+  const sampleVolatility = Math.sqrt(
+    dailyReturns.reduce(
+      (total, value) => total + (value - mean) ** 2,
+      0,
+    ) / 2,
+  );
+
+  assert.ok(Math.abs(metrics.periodReturn - 0.019898) < 1e-12);
+  assert.ok(
+    Math.abs(metrics.annualizedVolatility - sampleVolatility * Math.sqrt(252)) <
+      1e-12,
+  );
+  assert.ok(Math.abs(metrics.maxDrawdown - 0.01) < 1e-12);
+  assert.ok(
+    Math.abs(
+      metrics.returnVolatilityRatio -
+        (mean * 252) / (sampleVolatility * Math.sqrt(252)),
+    ) < 1e-12,
+  );
+  assert.equal(metrics.positiveDayRatio, 2 / 3);
+  assert.equal(metrics.validDayCount, 3);
+  assert.equal(metrics.maxDrawdownPeakDate, "2026-08-17");
+  assert.equal(metrics.maxDrawdownTroughDate, "2026-08-18");
 });
 
 test("上传先写入 bond-ledger 临时 key，再启动 Workflow", async () => {
