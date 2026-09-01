@@ -337,6 +337,58 @@ test("收益与风险指标按所选区间有效日收益率统一派生", () =>
   assert.equal(metrics.maxDrawdownTroughDate, "2026-08-18");
 });
 
+test("收益率与波动率较上周变动采用向前七天的同口径比较", () => {
+  const rows = [
+    performanceRow("2026-08-10", 0, 1_000),
+    performanceRow("2026-08-11", 0, 1_000),
+    performanceRow("2026-08-12", 0, 1_000),
+    performanceRow("2026-08-17", 0, 1_000),
+    performanceRow("2026-08-18", 0, 1_000),
+    performanceRow("2026-08-19", 0, 1_000),
+  ];
+  [10, -10, 10, 20, -20, 20].forEach((dailyRevenue, index) => {
+    rows[index].dailyRevenue = dailyRevenue;
+  });
+  rows[2].ytdAnnualizedReturn = 0.02;
+  rows[2].ytdExTaxAnnualizedReturn = 0.018;
+  rows[5].ytdAnnualizedReturn = 0.023;
+  rows[5].ytdExTaxAnnualizedReturn = 0.019;
+
+  const analytics = buildBondLedgerAnalytics(
+    [ledger("2026-08-19", rows, [positionRow()])],
+    "2026-08-17",
+    "2026-08-19",
+  );
+  const currentVolatility = calculateReturnRiskMetrics(
+    rows,
+    "2026-08-17",
+    "2026-08-19",
+  ).annualizedVolatility;
+  const previousVolatility = calculateReturnRiskMetrics(
+    rows,
+    "2026-08-10",
+    "2026-08-12",
+  ).annualizedVolatility;
+
+  assert.equal(typeof currentVolatility, "number");
+  assert.equal(typeof previousVolatility, "number");
+  assert.equal(typeof analytics.metricDeltas.annualizedVolatility, "number");
+  assert.ok(
+    Math.abs(analytics.metricDeltas.reportedYtdAnnualizedReturn - 0.003) <
+      1e-12,
+  );
+  assert.ok(
+    Math.abs(analytics.metricDeltas.reportedYtdExTaxAnnualizedReturn - 0.001) <
+      1e-12,
+  );
+  assert.ok(
+    Math.abs(
+      analytics.metricDeltas.annualizedVolatility -
+        (currentVolatility - previousVolatility),
+    ) < 1e-12,
+  );
+});
+
 test("规模收益走势按交易户和可供户拆分且收益贡献可加总", () => {
   const monday = performanceRow("2026-08-24", 0, 1_000);
   monday.marketValue = 1_100;

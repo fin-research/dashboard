@@ -56,6 +56,10 @@ test("二级池成交明细表统一使用 1rem 字号", async () => {
     styles,
     /\.ledger-table--transactions :is\(th, td\)\s*\{[\s\S]*?font-size:\s*1rem/,
   );
+  assert.match(
+    styles,
+    /\.ledger-panel--risk \.ledger-return-risk-grid\s*\{[\s\S]*?align-content:\s*stretch;[\s\S]*?grid-auto-rows:\s*minmax\(0, 1fr\)/,
+  );
 });
 
 test("演示交易汇总严格由迁入的十笔交易派生", () => {
@@ -338,7 +342,10 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(bond, /role="radiogroup" aria-label="账户范围"/);
   assert.match(bond, /交易户/);
   assert.match(bond, /可供户/);
-  assert.doesNotMatch(bond, /detailPrefix="较上周 /);
+  assert.match(bond, /detailPrefix: "较上周 "/);
+  assert.match(bond, /reportedYtdAnnualizedReturn/);
+  assert.match(bond, /reportedYtdExTaxAnnualizedReturn/);
+  assert.match(bond, /metricDeltas\.annualizedVolatility/);
   assert.match(moduleCard, /class=\{`module-card tr-panel/);
   assert.match(moduleCard, /border:\s*1px solid var\(--tr-border/);
   assert.match(moduleCard, /border-radius:\s*var\(--tr-radius-card/);

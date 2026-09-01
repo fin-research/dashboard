@@ -190,14 +190,18 @@
     {
       label: "收益率（含免税）",
       value: formatDecimalPercent(current?.ytdAnnualizedReturn ?? null),
-      detail: current ? `截至 ${shortDate(current.date)}` : "",
+      ...weeklyPercentageDelta(
+        analytics.metricDeltas.reportedYtdAnnualizedReturn,
+      ),
       tone: "teal" as const,
       icon: "profit" as MetricIconName,
     },
     {
       label: "收益率（不含免税）",
       value: formatDecimalPercent(current?.ytdExTaxAnnualizedReturn ?? null),
-      detail: current ? `截至 ${shortDate(current.date)}` : "",
+      ...weeklyPercentageDelta(
+        analytics.metricDeltas.reportedYtdExTaxAnnualizedReturn,
+      ),
       tone: "blue" as const,
       icon: "equity" as MetricIconName,
     },
@@ -206,7 +210,9 @@
       value: formatDecimalPercent(
         analytics.returnRiskMetrics.annualizedVolatility,
       ),
-      detail: "按 252 个交易日年化",
+      ...weeklyPercentageDelta(
+        analytics.metricDeltas.annualizedVolatility,
+      ),
       tone: "purple" as const,
       icon: "equity" as MetricIconName,
     },
@@ -217,6 +223,9 @@
         analytics.returnRiskMetrics.maxDrawdownPeakDate,
         analytics.returnRiskMetrics.maxDrawdownTroughDate,
       ),
+      detailPrefix: "",
+      detailSuffix: "",
+      detailTone: "",
       tone: "red" as const,
       icon: "bond" as MetricIconName,
     },
@@ -543,6 +552,21 @@
     return value > 0 ? "+" : value < 0 ? "−" : "";
   }
 
+  function weeklyPercentageDelta(value: number | null): {
+    detail: string;
+    detailPrefix: string;
+    detailSuffix: string;
+    detailTone: string;
+  } {
+    const detail = signedMetric(value, 0.01, 2, "pct");
+    return {
+      detail: detail.value,
+      detailPrefix: "较上周 ",
+      detailSuffix: detail.unit,
+      detailTone: deltaClass(value),
+    };
+  }
+
   function formatDrawdown(value: number | null): string {
     if (value === null || !Number.isFinite(value)) return "—";
     return value === 0 ? "0.00%" : `−${(value * 100).toFixed(2)}%`;
@@ -736,6 +760,9 @@
                   label={card.label}
                   value={card.value}
                   detail={card.detail}
+                  detailPrefix={card.detailPrefix}
+                  detailSuffix={card.detailSuffix}
+                  detailTone={card.detailTone}
                   tone={card.tone}
                   iconComponent={MetricIcon}
                   iconProps={{ icon: card.icon }}

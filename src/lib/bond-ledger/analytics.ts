@@ -128,6 +128,14 @@ export function buildBondLedgerAnalytics(
           comparisonEndDate,
         )
       : null;
+  const previousReturnRiskMetrics =
+    comparisonStartDate && comparisonEndDate
+      ? calculateReturnRiskMetrics(
+          latestLedger.performance,
+          comparisonStartDate,
+          comparisonEndDate,
+        )
+      : emptyReturnRiskMetrics();
   const previousTransactions =
     comparisonStartDate && comparisonEndDate
       ? storedTransactions
@@ -192,6 +200,18 @@ export function buildBondLedgerAnalytics(
               comparisonEndDate,
             )
           : null,
+      ),
+      reportedYtdAnnualizedReturn: difference(
+        currentPerformance?.ytdAnnualizedReturn,
+        previousPerformance?.ytdAnnualizedReturn,
+      ),
+      reportedYtdExTaxAnnualizedReturn: difference(
+        currentPerformance?.ytdExTaxAnnualizedReturn,
+        previousPerformance?.ytdExTaxAnnualizedReturn,
+      ),
+      annualizedVolatility: difference(
+        returnRiskMetrics.annualizedVolatility,
+        previousReturnRiskMetrics.annualizedVolatility,
       ),
       rangeProfit: difference(rangeProfit, previousRangeProfit),
       transactionCount:
@@ -629,6 +649,9 @@ function emptyAnalytics(
       leverage: null,
       modifiedDuration: null,
       ytdAnnualizedReturn: null,
+      reportedYtdAnnualizedReturn: null,
+      reportedYtdExTaxAnnualizedReturn: null,
+      annualizedVolatility: null,
       rangeProfit: null,
       transactionCount: null,
     },

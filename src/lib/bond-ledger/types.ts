@@ -148,6 +148,9 @@ export interface BondLedgerAnalytics {
     leverage: number | null;
     modifiedDuration: number | null;
     ytdAnnualizedReturn: number | null;
+    reportedYtdAnnualizedReturn: number | null;
+    reportedYtdExTaxAnnualizedReturn: number | null;
+    annualizedVolatility: number | null;
     rangeProfit: number | null;
     transactionCount: number | null;
   };

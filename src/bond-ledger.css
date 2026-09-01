@@ -304,7 +304,8 @@
 
 .ledger-panel--risk .ledger-return-risk-grid {
   flex: 1;
-  align-content: start;
+  align-content: stretch;
+  grid-auto-rows: minmax(0, 1fr);
 }
 
 .ledger-trend-toolbar {
