@@ -36,6 +36,7 @@ export type EconomicIndicatorSeriesGroup = Omit<
 export type EconomicIndicatorSnapshot = {
   syncedAt: string;
   groups: EconomicIndicatorSeriesGroup[];
+  liquidityRates: EconomicIndicatorSeries[];
 };
 
 export const ECONOMIC_INDICATOR_GROUPS: EconomicIndicatorGroup[] = [
@@ -131,6 +132,22 @@ export const ECONOMIC_INDICATOR_GROUPS: EconomicIndicatorGroup[] = [
   },
 ];
 
+export const LIQUIDITY_RATE_INDICATORS: EconomicIndicatorDefinition[] = [
+  indicator("reverse-repo-7d", "7D逆回购利率", "E1715081", "%", 2, "日频"),
+  indicator("dr001", "DR001", "E1300003", "%", 4, "日频"),
+  indicator("dr007", "DR007", "E1300004", "%", 4, "日频"),
+  indicator("r007", "R007", "E1704420", "%", 4, "日频"),
+  indicator("ncd-aaa-1y", "1Y AAA NCD", "E1713049", "%", 3, "日频"),
+  indicator("cgb-1y", "1Y国债", "E1000172", "%", 4, "日频"),
+  indicator("cgb-10y", "10Y国债", "E1000180", "%", 4, "日频"),
+  indicator("cgb-30y", "30Y国债", "E1000183", "%", 4, "日频"),
+];
+
+export const ALL_ECONOMIC_INDICATORS = [
+  ...ECONOMIC_INDICATOR_GROUPS.flatMap((group) => group.indicators),
+  ...LIQUIDITY_RATE_INDICATORS,
+];
+
 const rowSchema = z.object({
   code: z.string(),
   date: z.string(),
@@ -144,6 +161,7 @@ const responseSchema = z.object({
 });
 
 const MAX_CHART_POINTS = 96;
+const MAX_LIQUIDITY_CHART_POINTS = 420;
 
 function indicator(
   key: string,
@@ -181,6 +199,13 @@ export function emptyEconomicIndicatorGroups(): EconomicIndicatorSeriesGroup[] {
   }));
 }
 
+export function emptyLiquidityRateSeries(): EconomicIndicatorSeries[] {
+  return LIQUIDITY_RATE_INDICATORS.map((definition) => ({
+    ...definition,
+    points: [],
+  }));
+}
+
 export function mapEconomicIndicatorRows(
   rows: Array<z.infer<typeof rowSchema>>,
 ): EconomicIndicatorSeriesGroup[] {
@@ -210,6 +235,23 @@ export function mapEconomicIndicatorRows(
   }));
 }
 
+export function mapLiquidityRateRows(
+  rows: Array<z.infer<typeof rowSchema>>,
+): EconomicIndicatorSeries[] {
+  const rowsByCode = rowsByIndicatorCode(rows);
+  return LIQUIDITY_RATE_INDICATORS.map((definition) => ({
+    ...definition,
+    points: (rowsByCode.get(definition.code) ?? [])
+      .slice()
+      .sort((left, right) => left.date.localeCompare(right.date))
+      .slice(-MAX_LIQUIDITY_CHART_POINTS)
+      .map((point) => ({
+        date: point.date,
+        value: point.value * (definition.factor ?? 1) + (definition.offset ?? 0),
+      })),
+  }));
+}
+
 export async function fetchEconomicIndicatorSnapshot(
   signal?: AbortSignal,
 ): Promise<EconomicIndicatorSnapshot> {
@@ -227,6 +269,7 @@ export async function fetchEconomicIndicatorSnapshot(
   return {
     syncedAt: payload.syncedAt,
     groups: mapEconomicIndicatorRows(payload.rows),
+    liquidityRates: mapLiquidityRateRows(payload.rows),
   };
 }
 
@@ -300,6 +343,20 @@ function downsample(points: EconomicIndicatorPoint[]): EconomicIndicatorPoint[] 
     Math.round((index * lastIndex) / (MAX_CHART_POINTS - 1)),
   );
   return [...new Set(selected)].map((index) => points[index]!);
+}
+
+function rowsByIndicatorCode(
+  rows: Array<z.infer<typeof rowSchema>>,
+): Map<string, EconomicIndicatorPoint[]> {
+  const rowsByCode = new Map<string, EconomicIndicatorPoint[]>();
+  for (const row of rows) {
+    const rawValue = typeof row.value === "number" ? row.value : Number(row.value);
+    if (!Number.isFinite(rawValue)) continue;
+    const points = rowsByCode.get(row.code) ?? [];
+    points.push({ date: row.date, value: rawValue });
+    rowsByCode.set(row.code, points);
+  }
+  return rowsByCode;
 }
 
 function isoDate(value: Date): string {

@@ -11,12 +11,14 @@ import {
 } from "../src/lib/trading-research/demo-data.ts";
 import {
   ECONOMIC_INDICATOR_GROUPS,
+  LIQUIDITY_RATE_INDICATORS,
   economicIndicatorChange,
   economicIndicatorRange,
   formatEconomicDataRefresh,
   formatEconomicIndicatorChange,
   formatEconomicIndicatorTooltip,
   mapEconomicIndicatorRows,
+  mapLiquidityRateRows,
 } from "../src/lib/trading-research/economic-indicators.ts";
 
 test("交易研究工作台提供七个 path 标签页并保留稳定深链", () => {
@@ -122,6 +124,35 @@ test("经济指标按九类四项配置并应用必要口径换算", () => {
   assert.equal(formatEconomicIndicatorChange(0.30000000000000027, 1), "+0.3");
   assert.equal(formatEconomicIndicatorChange(-12, 0), "-12");
   assert.equal(formatEconomicIndicatorChange(null, 1), "—");
+});
+
+test("利率与资金面使用核验后的 EDB ID 并保留完整日频对齐窗口", () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      LIQUIDITY_RATE_INDICATORS.map((indicator) => [
+        indicator.name,
+        indicator.code,
+      ]),
+    ),
+    {
+      "7D逆回购利率": "E1715081",
+      DR001: "E1300003",
+      DR007: "E1300004",
+      R007: "E1704420",
+      "1Y AAA NCD": "E1713049",
+      "1Y国债": "E1000172",
+      "10Y国债": "E1000180",
+      "30Y国债": "E1000183",
+    },
+  );
+  const rates = mapLiquidityRateRows([
+    { code: "E1300004", date: "2026-08-29", value: 1.4 },
+    { code: "E1300004", date: "2026-08-31", value: "1.45" },
+  ]);
+  assert.deepEqual(rates.find((series) => series.key === "dr007").points, [
+    { date: "2026-08-29", value: 1.4 },
+    { date: "2026-08-31", value: 1.45 },
+  ]);
 });
 
 test("经济指标 tooltip 只显示发布日期和数值", () => {
@@ -326,19 +357,26 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(design, /禁止先在页面内实现/);
 });
 
-test("研究辅助从 Dashboard API 读取 Neon 并使用专用走势卡", async () => {
-  const [research, card, dataClient, styles] = await Promise.all([
+test("研究辅助从 Dashboard API 读取 Neon 并展示利率资金面与宏观指标", async () => {
+  const [research, liquidity, card, dataClient, styles] = await Promise.all([
     readFile(new URL("../src/lib/trading-research/ResearchView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/LiquidityRatesPanel.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/EconomicIndicatorCard.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/economic-indicators.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/workbench.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(research, /经济数据走势/);
+  assert.match(research, /宏观指标/);
+  assert.match(research, /<LiquidityRatesPanel rates=\{liquidityRates\}/);
   assert.match(research, /group\.type/);
   assert.match(research, /use:portal=\{"#tr-topbar-actions"\}/);
   assert.match(research, /<span>数据更新<\/span>/);
   assert.doesNotMatch(research, /36项指标|近18个月|覆盖国内增长|4项指标/);
+  assert.match(liquidity, /title="利率与资金面"/);
+  assert.match(liquidity, /MetricCard/);
+  assert.match(liquidity, /R007－DR007/);
+  assert.match(liquidity, /10Y－1Y、30Y－10Y/);
+  assert.match(liquidity, /renderLiquidityRateChart/);
   assert.match(card, /indicator\.name/);
   assert.match(card, /更新于 \$\{latest\.date\}/);
   assert.match(card, /indicator\.frequency/);
@@ -348,6 +386,8 @@ test("研究辅助从 Dashboard API 读取 Neon 并使用专用走势卡", async
   assert.match(dataClient, /fetch\("\/api\/economic-indicators"/);
   assert.doesNotMatch(dataClient, /\/data\/graphql|choiceEdb/);
   assert.match(styles, /\.tr-economic-grid\s*\{[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.tr-liquidity-metrics\s*\{[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.tr-liquidity-secondary\s*\{[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.tr-economic-card__change--up\s*\{[\s\S]*?var\(--color-up\)/);
   assert.match(styles, /\.tr-economic-card__change--down\s*\{[\s\S]*?var\(--color-down\)/);
   assert.doesNotMatch(styles, /\.tr-economic-card footer\s*\{[^}]*border-top/);

@@ -36,6 +36,12 @@ export type EconomicIndicatorTrendPoint = {
   value: number;
 };
 
+export type LiquidityRateChartSeries = {
+  name: string;
+  color: string;
+  points: readonly EconomicIndicatorTrendPoint[];
+};
+
 export type WorkbenchSeriesHistory = {
   dates: readonly string[];
   series: ReadonlyArray<{
@@ -411,4 +417,122 @@ export function renderEconomicIndicatorTrend(
     ],
   };
   setChart(host, option);
+}
+
+export function renderLiquidityRateChart(
+  host: HTMLElement,
+  series: readonly LiquidityRateChartSeries[],
+  description: string,
+  unit: "%" | "bp",
+  decimals = 2,
+): void {
+  const values = series.flatMap((item) =>
+    item.points.map((point) => point.value),
+  );
+  const crossesZero =
+    values.length > 0 && Math.min(...values) < 0 && Math.max(...values) > 0;
+  const option: ChartOption = {
+    animationDuration: 240,
+    aria: { enabled: true, description },
+    color: series.map((item) => item.color),
+    tooltip: {
+      ...tooltip,
+      trigger: "axis",
+      formatter: (params: unknown) =>
+        formatLiquidityRateTooltip(params, unit, decimals),
+    },
+    legend: {
+      top: 0,
+      type: "scroll",
+      textStyle: {
+        color: colors.ink,
+        fontFamily,
+        fontSize: Math.max(chartTextSize - 1, 12),
+      },
+    },
+    grid: { left: 18, right: 20, top: 42, bottom: 24, containLabel: true },
+    xAxis: {
+      type: "time",
+      boundaryGap: false,
+      axisLabel: {
+        ...axisLabel,
+        formatter: (value: number) => {
+          const date = new Date(value);
+          return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+        },
+      },
+      axisLine: { lineStyle: { color: colors.line } },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: "value",
+      scale: unit === "%",
+      name: unit,
+      nameTextStyle: axisLabel,
+      axisLabel: {
+        ...axisLabel,
+        formatter: (value: number) => value.toFixed(unit === "bp" ? 0 : 2),
+      },
+      splitLine: { lineStyle: gridLine },
+    },
+    series: series.map((item) => ({
+      name: item.name,
+      type: "line",
+      smooth: 0.18,
+      showSymbol: false,
+      connectNulls: false,
+      lineStyle: { width: 2 },
+      emphasis: { focus: "series" },
+      data: item.points.map((point) => [point.date, point.value]),
+      markLine:
+        unit === "bp" && crossesZero
+          ? {
+              silent: true,
+              symbol: "none",
+              data: [{ yAxis: 0 }],
+              label: { show: false },
+              lineStyle: { color: colors.zero, type: "dashed", width: 1 },
+            }
+          : undefined,
+    })),
+  };
+  setChart(host, option);
+}
+
+function formatLiquidityRateTooltip(
+  params: unknown,
+  unit: string,
+  decimals: number,
+): string {
+  if (!Array.isArray(params) || params.length === 0) return "";
+  const first = params[0] as { axisValueLabel?: unknown };
+  const rows = params.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const item = entry as {
+      marker?: unknown;
+      seriesName?: unknown;
+      value?: unknown;
+      data?: unknown;
+    };
+    const raw = Array.isArray(item.data)
+      ? item.data[1]
+      : Array.isArray(item.value)
+        ? item.value[1]
+        : item.data ?? item.value;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return [];
+    return [
+      `<div>${String(item.marker ?? "")}${escapeChartText(item.seriesName)}：${value.toFixed(decimals)} ${unit}</div>`,
+    ];
+  });
+  return `<div>${escapeChartText(first.axisValueLabel)}</div>${rows.join("")}`;
+}
+
+function escapeChartText(value: unknown): string {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }

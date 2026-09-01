@@ -7,6 +7,10 @@ import {
   loadEconomicIndicators,
   persistEconomicIndicators,
 } from "../src/lib/server/economic-indicators-repository.ts";
+import {
+  fetchChoiceEconomicIndicatorRows,
+  fetchDmFundingRateRows,
+} from "../src/lib/server/economic-indicator-sync.ts";
 
 test("经济指标仓储按指标和Choice发布日期返回近18个月数据", async () => {
   const calls = [];
@@ -59,7 +63,7 @@ test("经济指标仓储空表返回明确404", async () => {
   );
 });
 
-test("手动同步在单事务和 advisory lock 内完整替换发布日序列", async () => {
+test("增量同步在单事务和 advisory lock 内只做 upsert", async () => {
   const calls = [];
   const client = {
     async query(sql, values) {
@@ -84,19 +88,99 @@ test("手动同步在单事务和 advisory lock 内完整替换发布日序列",
   assert.deepEqual(result, { rowCount: 2, asOf: "2026-07-31" });
   assert.equal(calls[0].sql, "BEGIN");
   assert.match(calls[1].sql, /pg_advisory_xact_lock/);
-  assert.equal(calls[2].sql, "DELETE FROM public.edb");
-  assert.match(calls[3].sql, /ON CONFLICT \(indicator_code, observation_date\)/);
-  assert.match(calls[3].sql, /published_date = EXCLUDED\.published_date/);
+  assert.doesNotMatch(calls.map((call) => call.sql).join("\n"), /DELETE FROM public\.edb/);
+  assert.match(calls[2].sql, /ON CONFLICT \(indicator_code, observation_date\)/);
+  assert.match(calls[2].sql, /published_date = EXCLUDED\.published_date/);
   assert.equal(calls.at(-1).sql, "COMMIT");
 });
 
-test("经济指标数据库链路和付费手动同步受静态契约约束", async () => {
-  const [migration, publishedDateMigration, observationDateMigration, route, script, client] = await Promise.all([
+test("全量同步只替换目标指标并保留表内其他数据", async () => {
+  const calls = [];
+  const client = {
+    async query(sql, values) {
+      calls.push({ sql, values });
+      return { rowCount: sql.includes("INSERT INTO public.edb") ? 1 : null, rows: [] };
+    },
+  };
+  await persistEconomicIndicators(
+    client,
+    [{
+      code: "E1000172",
+      observationDate: "2026-08-31",
+      date: "2026-08-31",
+      value: 1.2232,
+    }],
+    { replaceCodes: ["E1000172"] },
+  );
+  assert.match(calls[2].sql, /DELETE FROM public\.edb WHERE indicator_code = ANY/);
+  assert.deepEqual(calls[2].values, [["E1000172"]]);
+  assert.match(calls[3].sql, /INSERT INTO public\.edb/);
+});
+
+test("增量 Choice 同步按频率拆分回看窗口并排除 DM 资金利率", async () => {
+  const requests = [];
+  const result = await fetchChoiceEconomicIndicatorRows(
+    async (path, searchParams) => {
+      requests.push({ path, searchParams: new URLSearchParams(searchParams) });
+      const codes = searchParams.get("edbIds").split(",");
+      const rows = [];
+      if (codes.includes("E1715081")) {
+        rows.push({ code: "E1715081", date: "2026-08-31", RESULT: 1.4 });
+      }
+      if (codes.includes("EMM00121996")) {
+        rows.push({
+          code: "EMM00121996",
+          date: "2026-08-01",
+          PUBLISHDATE: "20260831",
+          RESULT: 49.3,
+        });
+      }
+      return { function: "EDB", fields: ["code", "date", "RESULT"], rows };
+    },
+    "incremental",
+    new Date("2026-08-31T16:00:00.000Z"),
+  );
+  assert.ok(requests.length > 3);
+  assert.ok(requests.every((request) => request.path === "/choice/edb"));
+  assert.ok(requests.every((request) => request.searchParams.get("options") === "IsPublishDate=1,FixDate=0"));
+  assert.ok(requests.every((request) => request.searchParams.get("edbIds").split(",").length <= 8));
+  assert.ok(requests.every((request) => !request.searchParams.get("edbIds").includes("E1300003")));
+  assert.equal(result.range.endDate, "2026-09-01");
+  assert.equal(result.rows.find((row) => row.code === "E1715081").date, "2026-08-31");
+});
+
+test("DM 历史资金利率映射为 EDB 指标代码并以北京时间落日", async () => {
+  const result = await fetchDmFundingRateRows(
+    async (_path, searchParams) => ({
+      hasNextPage: false,
+      rows: [{
+        bondCode: searchParams.get("bondCode"),
+        capitalTime: Date.parse("2026-08-31T08:00:00.000Z"),
+        weightedYield: 1.42,
+      }],
+    }),
+    "incremental",
+    new Date("2026-08-31T16:00:00.000Z"),
+  );
+  assert.equal(result.pageCount, 3);
+  assert.deepEqual(
+    result.rows.map((row) => row.code),
+    ["E1300003", "E1300004", "E1704420"],
+  );
+  assert.ok(result.rows.every((row) => row.date === "2026-08-31"));
+});
+
+test("经济指标数据库、增量 Cron 和本地全量回填受静态契约约束", async () => {
+  const [migration, publishedDateMigration, observationDateMigration, route, script, sync, scheduled, worker, wrangler, client] = await Promise.all([
     readFile(new URL("../edb-migrations/0001_create_edb.sql", import.meta.url), "utf8"),
     readFile(new URL("../edb-migrations/0002_use_published_date.sql", import.meta.url), "utf8"),
     readFile(new URL("../edb-migrations/0003_preserve_observation_date.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/api/economic-indicators/+server.ts", import.meta.url), "utf8"),
     readFile(new URL("../scripts/update-economic-indicators.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/server/economic-indicator-sync.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/economic-indicator-scheduled.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/entry.ts", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/economic-indicators.ts", import.meta.url), "utf8"),
   ]);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.edb/);
@@ -107,18 +191,22 @@ test("经济指标数据库链路和付费手动同步受静态契约约束", as
   assert.match(route, /withPostgres/);
   assert.match(route, /loadEconomicIndicators/);
   assert.match(script, /--apply/);
-  assert.match(script, /\/choice\/data-statistics/);
-  assert.match(script, /\/choice\/edb/);
-  assert.match(script, /IsPublishDate=1/);
-  assert.doesNotMatch(script, /IsPublishDate=0/);
-  assert.match(script, /row\.PUBLISHDATE/);
-  assert.match(script, /choicePublishedDate/);
-  assert.match(script, /definition\.frequency === "日频"/);
-  assert.match(script, /publishDateProxyByCode/);
-  assert.match(script, /\["EMI01737210", "EMM00072301"\]/);
-  assert.match(script, /seriesPeriodKey/);
-  assert.match(script, /observationDate/);
-  assert.doesNotMatch(script, /retry|setInterval/);
+  assert.match(script, /--full/);
+  assert.match(script, /fetchDmFundingRateRows/);
+  assert.match(sync, /\/choice\/edb/);
+  assert.match(sync, /\/cfets-histories/);
+  assert.match(sync, /IsPublishDate=1/);
+  assert.doesNotMatch(sync, /IsPublishDate=0/);
+  assert.match(sync, /row\.PUBLISHDATE/);
+  assert.match(sync, /choicePublishedDate/);
+  assert.match(sync, /publishDateProxyByCode/);
+  assert.match(sync, /\["EMI01737210", "EMM00072301"\]/);
+  assert.match(sync, /observationDate/);
+  assert.doesNotMatch(`${script}\n${sync}`, /retry|setInterval/);
+  assert.match(scheduled, /"incremental"/);
+  assert.match(scheduled, /persistEconomicIndicators/);
+  assert.match(worker, /scheduled\(controller, env, context\)/);
+  assert.match(wrangler, /"crons": \["0 16 \* \* \*"\]/);
   assert.match(client, /fetch\("\/api\/economic-indicators"/);
   assert.doesNotMatch(client, /\/data\/graphql|choiceEdb/);
 });

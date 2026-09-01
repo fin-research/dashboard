@@ -13,6 +13,7 @@
 
 - `GET /data/config`：默认报告配置。
 - `GET /data/omo?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`、`GET /data/cfets?date=YYYY-MM-DD&source=DR|DIBO`：OMO 与资金利率原始映射。
+- `GET /data/cfets-histories?bondCode=DR001&endCapitalTime=...&limit=100`：DM 单个资金利率的倒序分页历史，供研究数据回填和增量任务使用。
 - `GET /data/bond-top-case?date=YYYY-MM-DD`、`GET /data/futures-latest`、`GET /data/margin?date=YYYY-MM-DD`：国债、期货与两融原始映射。
 - `GET /data/industry?date=YYYY-MM-DD`：行业、主要指数、成交额及可用交易日。
 - `GET /data/primary-issues?date=YYYY-MM-DD&startDate=YYYY-MM-DD`：一级发行原始映射。
@@ -29,11 +30,9 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 处理阶段及限长后的 Schema issue。`stock-summary` 当日尚未发布时返回 404，页面以空股市
 段落继续加载其他模块；稀疏 OMO/CFETS/期货数值以 `null` 表示，不转换为 0。
 
-研究辅助由浏览器直接 `POST /data/graphql`，使用 `choiceEdb(edbIds, startDate,
-endDate, options)` 一次读取 36 个经济指标；响应使用统一的 `function + fields + rows`
-表格结构。该请求不经过 Dashboard `/api/*`，也不由 Dashboard Worker 代理拼装业务数据。
+研究辅助浏览器只调用 Dashboard `GET /api/economic-indicators` 读取 Neon。Choice `GET /data/choice/edb` 与 DM `GET /data/cfets-histories` 只供首次本地全历史回填和每日定时增量任务使用，页面加载不消耗上游查询额度。
 
-浏览器在当天直接读取 Data REST 市场数据；历史日期通过 Dashboard REST 读取完整人工定稿。研究辅助仍直接使用既有 Data API Choice GraphQL。今日聚焦、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
+浏览器在当天直接读取 Data REST 市场数据；历史日期通过 Dashboard REST 读取完整人工定稿。今日聚焦、研究辅助、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
 
 ## Dashboard Worker `/api/*`
 

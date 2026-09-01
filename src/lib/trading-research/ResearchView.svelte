@@ -4,16 +4,19 @@
   import { portal } from "../portal";
   import ModuleCard from "../../components/ModuleCard.svelte";
   import EconomicIndicatorCard from "./EconomicIndicatorCard.svelte";
+  import LiquidityRatesPanel from "./LiquidityRatesPanel.svelte";
   import PanelHeading from "./PanelHeading.svelte";
   import SectionHeading from "./SectionHeading.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import {
     emptyEconomicIndicatorGroups,
+    emptyLiquidityRateSeries,
     fetchEconomicIndicatorSnapshot,
     formatEconomicDataRefresh,
   } from "./economic-indicators";
 
   let groups = $state(emptyEconomicIndicatorGroups());
+  let liquidityRates = $state(emptyLiquidityRateSeries());
   let syncedAt = $state("");
   let loading = $state(true);
   let error = $state("");
@@ -30,6 +33,7 @@
         requestController.signal,
       );
       groups = snapshot.groups;
+      liquidityRates = snapshot.liquidityRates;
       syncedAt = snapshot.syncedAt;
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -54,8 +58,10 @@
 {/if}
 
 <div class="tr-view-stack tr-economic-view">
+  <LiquidityRatesPanel rates={liquidityRates} {loading} />
+
   <section aria-labelledby="economic-indicators-title">
-    <SectionHeading id="economic-indicators-title" title="经济数据走势" />
+    <SectionHeading id="economic-indicators-title" title="宏观指标" />
   </section>
 
   {#if error}

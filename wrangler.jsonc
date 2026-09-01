@@ -19,6 +19,9 @@
   "placement": {
     "mode": "smart"
   },
+  "triggers": {
+    "crons": ["0 16 * * *"]
+  },
   "routes": [
     {
       "pattern": "eastmoney.hasbai.xyz/*",

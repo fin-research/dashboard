@@ -38,7 +38,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
-- `/trading-research` 的授信管理通过 `/api/credit` 读取 Neon `credit` 日报；总览复用其最新可用额度。研究辅助由浏览器直接查询同源 `/data/graphql` 的 Choice EDB 字段，不经过 Dashboard `/api/*`；交易和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
+- `/trading-research` 的授信管理通过 `/api/credit` 读取 Neon `credit` 日报；总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 
 ## 服务端模块
 
@@ -79,15 +79,13 @@ quant pipeline → 本地结构化结果 → Neon `financing_model.model_run` �
 
 授信链路：本地 Excel → `scripts/import-credit-workbook.ts` 解析“授信一览表”和“授信周报” → Neon `credit.institution` / `credit.item`；浏览器 `/trading-research/credit` → `/api/credit` → Hyperdrive → Neon。读取、周报比较、日历事件和自动保存的服务端确认结果均来自数据库。
 
-研究辅助链路：浏览器 `/trading-research/research` → 同源 `/data/graphql` → Data API
-`choiceEdb` → Choice EDB。一次页面加载用一个 GraphQL 请求读取 36 个指标的近 18 个月观测，
-前端只负责两项明确展示换算和走势图抽样，不经过 Dashboard Worker 后端路由。
+研究辅助链路：Choice EDB + DM `/cfets-histories` → dashboard 首次本地全历史回填 / 每日 00:00 增量 Cron → Neon `public.edb`；浏览器 `/trading-research/research` → `/api/economic-indicators` → Hyperdrive → 最近 18 个月快照。前端负责明确的展示换算、利差派生和走势图抽样，不直接调用付费或办公网上游。
 
 交易和流程中心当前仍由冻结数据 → `src/lib/trading-research/demo-data.ts` → 对应只读视图；`/bond` 与 `/financing-model` 的同一页面组件同时装配到工作台子路径。
 
 工作台路由使用真实 path：`/trading-research`、`/trading-research/trading`、`/trading-research/credit`、`/trading-research/research`、`/trading-research/workflow`、`/trading-research/bond`、`/trading-research/financing-model`。不使用 `?view=`；原 `/bond`、`/financing-model` 保留。
 
-后续：交易与流程业务数据库 → 服务端接口 → dashboard 浏览器。浏览器不得直连数据库；研究辅助直连的是统一 Data API 而不是数据库。所有授信数据只写 `credit` schema，不交叉写入 `bond` 或 `financing_model`。
+后续：交易与流程业务数据库 → 服务端接口 → dashboard 浏览器。浏览器不得直连数据库或研究数据上游。所有授信数据只写 `credit` schema，不交叉写入 `bond` 或 `financing_model`。
 
 ## 依赖规则
 

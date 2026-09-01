@@ -58,6 +58,7 @@ export async function loadEconomicIndicators(
 export async function persistEconomicIndicators(
   client: DatabaseClient,
   rows: EconomicIndicatorSyncRow[],
+  options: { replaceCodes?: readonly string[] } = {},
 ): Promise<{ rowCount: number; asOf: string }> {
   if (!rows.length) throw new Error("经济指标同步结果为空");
   for (const row of rows) {
@@ -74,11 +75,20 @@ export async function persistEconomicIndicators(
   await client.query("BEGIN");
   try {
     await client.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended('public.edb.manual_sync', 0))",
+      "SELECT pg_advisory_xact_lock(hashtextextended('public.edb.sync', 0))",
     );
-    await client.query("DELETE FROM public.edb");
-    const result = await client.query(
-      `INSERT INTO public.edb (
+    if (options.replaceCodes?.length) {
+      const replaceCodes = [...new Set(options.replaceCodes)];
+      await client.query(
+        "DELETE FROM public.edb WHERE indicator_code = ANY($1::text[])",
+        [replaceCodes],
+      );
+    }
+    let rowCount = 0;
+    for (let offset = 0; offset < rows.length; offset += INSERT_BATCH_SIZE) {
+      const batch = rows.slice(offset, offset + INSERT_BATCH_SIZE);
+      const result = await client.query(
+        `INSERT INTO public.edb (
          indicator_code, observation_date, published_date, value, synced_at
        )
        SELECT
@@ -98,11 +108,13 @@ export async function persistEconomicIndicators(
          published_date = EXCLUDED.published_date,
          value = EXCLUDED.value,
          synced_at = clock_timestamp()`,
-      [JSON.stringify(rows)],
-    );
+        [JSON.stringify(batch)],
+      );
+      rowCount += result.rowCount ?? batch.length;
+    }
     await client.query("COMMIT");
     return {
-      rowCount: result.rowCount ?? rows.length,
+      rowCount,
       asOf: rows.reduce(
         (latest, row) => (row.date > latest ? row.date : latest),
         rows[0]!.date,
@@ -117,3 +129,5 @@ export async function persistEconomicIndicators(
 type EconomicIndicatorQueryRow = EconomicIndicatorDatabaseRow & {
   synced_at: string;
 };
+
+const INSERT_BATCH_SIZE = 2_000;
