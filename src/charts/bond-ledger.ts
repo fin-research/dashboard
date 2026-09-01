@@ -2,7 +2,8 @@ import { calculateBusinessAnnualizedReturnTrend } from "../lib/bond-ledger/analy
 import { formatYield } from "../lib/bond-ledger/format";
 import type {
   HoldingTypeStat,
-  LedgerPerformanceRow,
+  LedgerTrendAccount,
+  LedgerTrendPoint,
   MaturityBucketStat,
 } from "../lib/bond-ledger/types";
 import {
@@ -34,9 +35,10 @@ const ledgerAxisLabel = {
 
 export function renderBondScaleReturnTrend(
   host: HTMLElement,
-  points: LedgerPerformanceRow[],
+  points: LedgerTrendPoint[],
   startDate: string,
   endDate: string,
+  account: LedgerTrendAccount,
 ): void {
   if (!points.length) {
     setEmpty(host, "规模与收益率走势数据暂缺");
@@ -52,12 +54,23 @@ export function renderBondScaleReturnTrend(
       ? returns[index]
       : null,
   );
+  const returnLabel = account === "all" ? "年化收益率" : "年化收益贡献";
+  const validReturns = returns.filter(
+    (value): value is number => value !== null && Number.isFinite(value),
+  );
+  const returnAxisMin =
+    account === "all" || !validReturns.length
+      ? 0
+      : Math.min(0, Math.floor(Math.min(...validReturns)));
+  const returnAxisMax =
+    account === "all" || !validReturns.length
+      ? 4
+      : Math.max(4, Math.ceil(Math.max(...validReturns)));
   setChart(host, {
     animationDuration: 240,
     aria: {
       enabled: true,
-      description:
-        "二级资金池规模面积图与业务口径年化收益率双轴折线图，所选日期范围使用强调色",
+      description: `二级资金池规模面积图与业务口径${returnLabel}双轴折线图，所选日期范围使用强调色`,
     },
     color: [...FIN_OPS_CHART_PALETTE],
     grid: { left: 18, right: 18, top: 28, bottom: 4, containLabel: true },
@@ -73,7 +86,7 @@ export function renderBondScaleReturnTrend(
         return [
           `<strong>${escapeHtml(point.date)}</strong>`,
           `规模 ${(point.marketValue / 100_000_000).toFixed(2)} 亿元`,
-          `年化收益率 ${annualizedReturn === null ? "—" : `${(annualizedReturn * 100).toFixed(3)}%`}`,
+          `${returnLabel} ${annualizedReturn === null ? "—" : `${(annualizedReturn * 100).toFixed(3)}%`}`,
           `当日损益 ${(point.dailyRevenue / 10_000).toFixed(1)} 万元`,
         ].join("<br>");
       },
@@ -103,9 +116,9 @@ export function renderBondScaleReturnTrend(
       },
       {
         type: "value",
-        name: "年化收益率",
-        min: 0,
-        max: 4,
+        name: returnLabel,
+        min: returnAxisMin,
+        max: returnAxisMax,
         interval: 1,
         axisLine: { show: false },
         axisTick: { show: false },
@@ -139,7 +152,7 @@ export function renderBondScaleReturnTrend(
         },
       },
       {
-        name: "年化收益率",
+        name: returnLabel,
         type: "line",
         yAxisIndex: 1,
         data: returns,

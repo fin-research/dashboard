@@ -8,6 +8,7 @@ import {
 import type {
   BondLedgerReport,
   BondLedgerSource,
+  LedgerAccountDailySummary,
   LedgerPerformanceRow,
   LedgerPositionRow,
   LedgerTransaction,
@@ -393,6 +394,7 @@ export async function loadBondLedgerReport(
   endDate: string,
 ): Promise<BondLedgerReport> {
   const comparisonStartDate = shiftDate(startDate, -7);
+  const historyStartDate = `${startDate.slice(0, 4)}-01-01`;
   const ledgerDatesResult = await client.query<{ date: string }>(
     `SELECT to_char(report_date, 'YYYY-MM-DD') AS date
      FROM bond.ledger_upload
@@ -461,6 +463,18 @@ export async function loadBondLedgerReport(
      ORDER BY report_date, row_number`,
     [comparisonStartDate, endDate],
   );
+  const accountTrendResult = await client.query<AccountTrendRow>(
+    `SELECT
+       to_char(report_date, 'YYYY-MM-DD') AS date,
+       account,
+       sum(market_value)::double precision AS market_value,
+       sum(daily_profit)::double precision AS daily_profit
+     FROM bond.daily_position
+     WHERE report_date BETWEEN $1::date AND $2::date
+     GROUP BY report_date, account
+     ORDER BY report_date, account`,
+    [historyStartDate, endDate],
+  );
   const transactionsResult = await client.query<TransactionRow>(
     `SELECT
        to_char(report_date, 'YYYY-MM-DD') AS date,
@@ -479,6 +493,9 @@ export async function loadBondLedgerReport(
   const performance = performanceResult.rows.map(performanceFromRow);
   const positions = positionsResult.rows.map(positionFromRow);
   const transactions = transactionsResult.rows.map(transactionFromRow);
+  const accountDailySummaries = accountTrendResult.rows.map(
+    accountTrendFromRow,
+  );
   const positionsByDate = new Map<string, LedgerPositionRow[]>();
   for (const position of positions) {
     const rows = positionsByDate.get(position.reportDate) ?? [];
@@ -491,7 +508,13 @@ export async function loadBondLedgerReport(
     positions: positionsByDate.get(date) ?? [],
   }));
   return toBondLedgerReport(
-    buildBondLedgerAnalytics(sources, startDate, endDate, transactions),
+    buildBondLedgerAnalytics(
+      sources,
+      startDate,
+      endDate,
+      transactions,
+      accountDailySummaries,
+    ),
   );
 }
 
@@ -764,6 +787,13 @@ interface TransactionRow extends QueryResultRow {
   realized_profit: number | null;
 }
 
+interface AccountTrendRow extends QueryResultRow {
+  date: string;
+  account: string;
+  market_value: number;
+  daily_profit: number;
+}
+
 function importCountResult(row: ImportCountRow): PersistBondLedgerResult {
   return {
     reportDate: row.report_date as string,
@@ -835,6 +865,17 @@ function transactionFromRow(row: TransactionRow): LedgerTransaction {
     quantity: toFiniteNumber(row.quantity),
     faceAmount: toFiniteNumber(row.face_amount),
     realizedProfit: toNullableNumber(row.realized_profit),
+  };
+}
+
+function accountTrendFromRow(
+  row: AccountTrendRow,
+): LedgerAccountDailySummary {
+  return {
+    date: row.date,
+    account: row.account,
+    marketValue: toFiniteNumber(row.market_value),
+    dailyProfit: toFiniteNumber(row.daily_profit),
   };
 }
 

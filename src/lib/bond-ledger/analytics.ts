@@ -3,9 +3,11 @@ import type {
   BondLedgerReport,
   BondLedgerSource,
   HoldingTypeStat,
+  LedgerAccountDailySummary,
   LedgerPerformanceRow,
   LedgerPositionDetail,
   LedgerPositionRow,
+  LedgerTrendPoint,
   LedgerTransaction,
   LedgerTransactionSide,
   MaturityBucketStat,
@@ -39,6 +41,7 @@ export function buildBondLedgerAnalytics(
   startDate: string,
   endDate: string,
   storedTransactions?: LedgerTransaction[],
+  storedAccountDailySummaries?: LedgerAccountDailySummary[],
 ): BondLedgerAnalytics {
   const selectedLedgers = ledgers
     .filter((ledger) => ledger.date >= startDate && ledger.date <= endDate)
@@ -103,6 +106,11 @@ export function buildBondLedgerAnalytics(
         effectiveEndDate,
       )
     : emptyReturnRiskMetrics();
+  const accountPerformanceTrends = buildAccountPerformanceTrends(
+    latestLedger.performance.filter((row) => row.date <= effectiveEndDate),
+    ledgers,
+    storedAccountDailySummaries,
+  );
   const comparisonStartDate = effectiveStartDate
     ? addDays(effectiveStartDate, -7)
     : null;
@@ -146,6 +154,7 @@ export function buildBondLedgerAnalytics(
     performanceTrend: latestLedger.performance.filter(
       (row) => row.date <= effectiveEndDate,
     ),
+    accountPerformanceTrends,
     rangePerformance,
     currentPositions: currentPositions.sort(
       (left, right) => right.marketValue - left.marketValue,
@@ -208,6 +217,7 @@ export function toBondLedgerReport(
     hasData: analytics.latestLedger !== null,
     currentPerformance: analytics.currentPerformance,
     performanceTrend: analytics.performanceTrend,
+    accountPerformanceTrends: analytics.accountPerformanceTrends,
     holdingTypes: analytics.holdingTypes,
     maturityBuckets: analytics.maturityBuckets,
     transactions: analytics.transactions,
@@ -262,7 +272,7 @@ export function calculateBusinessAnnualizedReturn(
 }
 
 export function calculateBusinessAnnualizedReturnTrend(
-  performance: LedgerPerformanceRow[],
+  performance: LedgerTrendPoint[],
   throughDate?: string,
 ): Array<{ date: string; value: number | null }> {
   let dailyReturnSum = 0;
@@ -311,10 +321,6 @@ export function calculateReturnRiskMetrics(
   const validDayCount = dailyReturns.length;
   const meanDailyReturn =
     sum(dailyReturns.map(({ value }) => value)) / validDayCount;
-  const periodReturn = dailyReturns.reduce(
-    (wealth, { value }) => wealth * (1 + value),
-    1,
-  ) - 1;
   const annualizedVolatility =
     validDayCount >= 2
       ? sampleStandardDeviation(
@@ -322,11 +328,6 @@ export function calculateReturnRiskMetrics(
           meanDailyReturn,
         ) * Math.sqrt(BUSINESS_TRADING_DAYS)
       : null;
-  const returnVolatilityRatio =
-    annualizedVolatility !== null && annualizedVolatility > 0
-      ? (meanDailyReturn * BUSINESS_TRADING_DAYS) / annualizedVolatility
-      : null;
-
   let wealth = 1;
   let peak = 1;
   let peakDate: string | null = null;
@@ -349,16 +350,66 @@ export function calculateReturnRiskMetrics(
   }
 
   return {
-    periodReturn,
     annualizedVolatility,
     maxDrawdown,
-    returnVolatilityRatio,
-    positiveDayRatio:
-      dailyReturns.filter(({ value }) => value > 0).length / validDayCount,
     validDayCount,
     maxDrawdownPeakDate,
     maxDrawdownTroughDate,
   };
+}
+
+export function buildAccountPerformanceTrends(
+  performance: LedgerPerformanceRow[],
+  ledgers: BondLedgerSource[],
+  storedSummaries?: LedgerAccountDailySummary[],
+): BondLedgerAnalytics["accountPerformanceTrends"] {
+  const summaries = storedSummaries ?? summarizeAccountPositions(ledgers);
+  const summariesByDate = new Map<string, LedgerAccountDailySummary[]>();
+  for (const summary of summaries) {
+    const rows = summariesByDate.get(summary.date) ?? [];
+    rows.push(summary);
+    summariesByDate.set(summary.date, rows);
+  }
+  const availableStartDate = summaries
+    .filter((summary) => accountType(summary.account) === "available")
+    .map((summary) => summary.date)
+    .sort()
+    .at(0) ?? null;
+  const trading: LedgerTrendPoint[] = [];
+  const available: LedgerTrendPoint[] = [];
+
+  for (const row of performance) {
+    const dailySummaries = summariesByDate.get(row.date) ?? [];
+    const tradingSummary = dailySummaries.find(
+      (summary) => accountType(summary.account) === "trading",
+    );
+    const availableSummary = dailySummaries.find(
+      (summary) => accountType(summary.account) === "available",
+    );
+
+    if (!availableStartDate) {
+      trading.push(toTrendPoint(row));
+      continue;
+    }
+    if (row.date < availableStartDate) {
+      trading.push(toTrendPoint(row));
+      available.push({
+        date: row.date,
+        principal: row.principal,
+        marketValue: 0,
+        dailyRevenue: 0,
+      });
+      continue;
+    }
+    if (tradingSummary) {
+      trading.push(accountTrendPoint(row, tradingSummary));
+    }
+    if (availableSummary) {
+      available.push(accountTrendPoint(row, availableSummary));
+    }
+  }
+
+  return { trading, available };
 }
 
 function calculateRangeProfit(
@@ -561,6 +612,7 @@ function emptyAnalytics(
     latestLedger: null,
     currentPerformance: null,
     performanceTrend: [],
+    accountPerformanceTrends: { trading: [], available: [] },
     rangePerformance: [],
     currentPositions: [],
     holdingTypes: [],
@@ -589,15 +641,61 @@ function emptyAnalytics(
 
 function emptyReturnRiskMetrics(): ReturnRiskMetrics {
   return {
-    periodReturn: null,
     annualizedVolatility: null,
     maxDrawdown: null,
-    returnVolatilityRatio: null,
-    positiveDayRatio: null,
     validDayCount: 0,
     maxDrawdownPeakDate: null,
     maxDrawdownTroughDate: null,
   };
+}
+
+function accountTrendPoint(
+  performance: LedgerPerformanceRow,
+  summary: LedgerAccountDailySummary,
+): LedgerTrendPoint {
+  return {
+    date: performance.date,
+    principal: performance.principal,
+    marketValue: summary.marketValue,
+    dailyRevenue: summary.dailyProfit,
+  };
+}
+
+function summarizeAccountPositions(
+  ledgers: BondLedgerSource[],
+): LedgerAccountDailySummary[] {
+  const summaries = new Map<string, LedgerAccountDailySummary>();
+  for (const ledger of ledgers) {
+    for (const position of ledger.positions) {
+      const key = `${ledger.date}\u0000${position.account}`;
+      const summary = summaries.get(key) ?? {
+        date: ledger.date,
+        account: position.account,
+        marketValue: 0,
+        dailyProfit: 0,
+      };
+      summary.marketValue += position.marketValue;
+      summary.dailyProfit += position.dailyProfit;
+      summaries.set(key, summary);
+    }
+  }
+  return [...summaries.values()];
+}
+
+function toTrendPoint(performance: LedgerPerformanceRow): LedgerTrendPoint {
+  return {
+    date: performance.date,
+    principal: performance.principal,
+    marketValue: performance.marketValue,
+    dailyRevenue: performance.dailyRevenue,
+  };
+}
+
+function accountType(account: string): "trading" | "available" | null {
+  const normalized = account.replaceAll(" ", "");
+  if (normalized.endsWith("交易户")) return "trading";
+  if (normalized.endsWith("可供户")) return "available";
+  return null;
 }
 
 function addRangeProfit(

@@ -224,6 +224,9 @@ function isBondLedgerReport(value: unknown): value is BondLedgerReport {
   return (
     typeof value.hasData === "boolean" &&
     Array.isArray(value.performanceTrend) &&
+    isRecord(value.accountPerformanceTrends) &&
+    Array.isArray(value.accountPerformanceTrends.trading) &&
+    Array.isArray(value.accountPerformanceTrends.available) &&
     Array.isArray(value.holdingTypes) &&
     Array.isArray(value.maturityBuckets) &&
     Array.isArray(value.transactions) &&

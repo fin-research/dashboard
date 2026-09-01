@@ -329,10 +329,12 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(bond, /label: "本周营收"/);
   assert.match(bond, /label: "本周交易"/);
   assert.match(bond, /title="收益与风险指标"/);
-  assert.match(bond, /label: "区间收益率"/);
-  assert.match(bond, /label: "年化波动率"/);
+  assert.match(bond, /label: "波动率"/);
   assert.match(bond, /label: "最大回撤"/);
-  assert.match(bond, /label: "收益波动比"/);
+  assert.doesNotMatch(bond, /label: "区间收益率"|label: "收益波动比"/);
+  assert.match(bond, /role="radiogroup" aria-label="账户范围"/);
+  assert.match(bond, /交易户/);
+  assert.match(bond, /可供户/);
   assert.doesNotMatch(bond, /detailPrefix="较上周 /);
   assert.match(moduleCard, /class=\{`module-card tr-panel/);
   assert.match(moduleCard, /border:\s*1px solid var\(--tr-border/);

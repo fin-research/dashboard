@@ -277,9 +277,16 @@
 
 .ledger-return-risk-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   margin-top: 14px;
+}
+
+.ledger-performance-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+  align-items: stretch;
+  gap: 12px;
 }
 
 .ledger-chart-grid {
@@ -295,8 +302,50 @@
   flex-direction: column;
 }
 
-.ledger-panel--trend {
-  grid-column: 1 / -1;
+.ledger-panel--risk .ledger-return-risk-grid {
+  flex: 1;
+  align-content: start;
+}
+
+.ledger-trend-toolbar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  overflow-x: auto;
+}
+
+.ledger-account-filter {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.ledger-account-filter label {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: normal;
+}
+
+.ledger-account-filter label.active {
+  color: var(--text-1);
+  font-weight: bold;
+}
+
+.ledger-account-filter input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brand);
 }
 
 .ledger-trend-legend {
@@ -307,6 +356,7 @@
   color: var(--muted);
   font-size: 1rem;
   font-weight: normal;
+  margin-left: auto;
   white-space: nowrap;
 }
 
@@ -750,8 +800,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .ledger-panel--trend {
-    grid-column: 1;
+  .ledger-performance-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ledger-return-risk-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -795,16 +849,12 @@
     min-height: 320px;
   }
 
-  .ledger-panel--trend .ledger-panel-heading {
-    align-items: flex-start;
-    flex-direction: column;
+  .ledger-trend-toolbar {
+    gap: 16px;
   }
 
   .ledger-trend-legend {
-    width: 100%;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    margin-left: 0;
+    flex-wrap: nowrap;
   }
 
   .ledger-panel-heading--transactions {
@@ -844,6 +894,10 @@
 
   .ledger-management-content {
     padding: 14px;
+  }
+
+  .ledger-return-risk-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .ledger-management-toolbar {

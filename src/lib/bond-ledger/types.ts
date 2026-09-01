@@ -11,6 +11,22 @@ export interface LedgerPerformanceRow {
   ytdExTaxAnnualizedReturn: number | null;
 }
 
+export interface LedgerTrendPoint {
+  date: string;
+  principal: number;
+  marketValue: number;
+  dailyRevenue: number;
+}
+
+export type LedgerTrendAccount = "all" | "trading" | "available";
+
+export interface LedgerAccountDailySummary {
+  date: string;
+  account: string;
+  marketValue: number;
+  dailyProfit: number;
+}
+
 export interface LedgerPositionRow {
   reportDate: string;
   rowNumber: number;
@@ -100,11 +116,8 @@ export interface MaturityBucketStat {
 }
 
 export interface ReturnRiskMetrics {
-  periodReturn: number | null;
   annualizedVolatility: number | null;
   maxDrawdown: number | null;
-  returnVolatilityRatio: number | null;
-  positiveDayRatio: number | null;
   validDayCount: number;
   maxDrawdownPeakDate: string | null;
   maxDrawdownTroughDate: string | null;
@@ -115,6 +128,10 @@ export interface BondLedgerAnalytics {
   latestLedger: BondLedgerSource | null;
   currentPerformance: LedgerPerformanceRow | null;
   performanceTrend: LedgerPerformanceRow[];
+  accountPerformanceTrends: Record<
+    Exclude<LedgerTrendAccount, "all">,
+    LedgerTrendPoint[]
+  >;
   rangePerformance: LedgerPerformanceRow[];
   currentPositions: LedgerPositionDetail[];
   holdingTypes: HoldingTypeStat[];
@@ -144,6 +161,7 @@ export interface BondLedgerReport {
   hasData: boolean;
   currentPerformance: LedgerPerformanceRow | null;
   performanceTrend: LedgerPerformanceRow[];
+  accountPerformanceTrends: BondLedgerAnalytics["accountPerformanceTrends"];
   holdingTypes: HoldingTypeStat[];
   maturityBuckets: MaturityBucketStat[];
   transactions: LedgerTransaction[];

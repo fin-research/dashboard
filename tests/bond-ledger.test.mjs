@@ -5,6 +5,7 @@ import { utils, write } from "xlsx";
 
 import {
   buildBondLedgerAnalytics,
+  buildAccountPerformanceTrends,
   calculateBusinessAnnualizedReturn,
   calculateBusinessAnnualizedReturnTrend,
   calculateReturnRiskMetrics,
@@ -326,22 +327,48 @@ test("收益与风险指标按所选区间有效日收益率统一派生", () =>
     ) / 2,
   );
 
-  assert.ok(Math.abs(metrics.periodReturn - 0.019898) < 1e-12);
   assert.ok(
     Math.abs(metrics.annualizedVolatility - sampleVolatility * Math.sqrt(252)) <
       1e-12,
   );
   assert.ok(Math.abs(metrics.maxDrawdown - 0.01) < 1e-12);
-  assert.ok(
-    Math.abs(
-      metrics.returnVolatilityRatio -
-        (mean * 252) / (sampleVolatility * Math.sqrt(252)),
-    ) < 1e-12,
-  );
-  assert.equal(metrics.positiveDayRatio, 2 / 3);
   assert.equal(metrics.validDayCount, 3);
   assert.equal(metrics.maxDrawdownPeakDate, "2026-08-17");
   assert.equal(metrics.maxDrawdownTroughDate, "2026-08-18");
+});
+
+test("规模收益走势按交易户和可供户拆分且收益贡献可加总", () => {
+  const monday = performanceRow("2026-08-24", 0, 1_000);
+  monday.marketValue = 1_100;
+  monday.dailyRevenue = 10;
+  const tuesday = performanceRow("2026-08-25", 0, 1_000);
+  tuesday.marketValue = 1_300;
+  tuesday.dailyRevenue = 5;
+  const trends = buildAccountPerformanceTrends(
+    [monday, tuesday],
+    [
+      ledger("2026-08-24", [monday], [
+        positionRow({ account: "财务资金-交易户", marketValue: 1_100, dailyProfit: 10 }),
+      ]),
+      ledger("2026-08-25", [monday, tuesday], [
+        positionRow({ account: "财务资金-交易户", marketValue: 900, dailyProfit: 3 }),
+        positionRow({ account: "财务资金-可供户", marketValue: 400, dailyProfit: 2 }),
+      ]),
+    ],
+  );
+
+  assert.deepEqual(trends.trading, [
+    { date: "2026-08-24", principal: 1_000, marketValue: 1_100, dailyRevenue: 10 },
+    { date: "2026-08-25", principal: 1_000, marketValue: 900, dailyRevenue: 3 },
+  ]);
+  assert.deepEqual(trends.available, [
+    { date: "2026-08-24", principal: 1_000, marketValue: 0, dailyRevenue: 0 },
+    { date: "2026-08-25", principal: 1_000, marketValue: 400, dailyRevenue: 2 },
+  ]);
+  assert.equal(
+    trends.trading[1].dailyRevenue + trends.available[1].dailyRevenue,
+    tuesday.dailyRevenue,
+  );
 });
 
 test("上传先写入 bond-ledger 临时 key，再启动 Workflow", async () => {
@@ -670,7 +697,7 @@ function positionRow(overrides = {}) {
     rowNumber: 1,
     team: "资金管理部",
     investmentManager: "测试经理",
-    account: "交易户",
+    account: overrides.account ?? "交易户",
     code: overrides.code ?? "TEST.IB",
     market: "银行间",
     name: overrides.name ?? "测试债券",
@@ -693,7 +720,7 @@ function positionRow(overrides = {}) {
     couponIncome: 0,
     taxExemptIncome: 0,
     realizedProfit: overrides.realizedProfit ?? null,
-    dailyProfit: 1,
+    dailyProfit: overrides.dailyProfit ?? 1,
     ytdProfit: 2,
     fullPriceCost: 98,
   };

@@ -37,7 +37,10 @@
     formatYears,
     formatYi,
   } from "$lib/bond-ledger/format";
-  import type { BondLedgerReport } from "$lib/bond-ledger/types";
+  import type {
+    BondLedgerReport,
+    LedgerTrendAccount,
+  } from "$lib/bond-ledger/types";
   import {
     archiveBondLedgerFile,
     deleteRemoteBondLedger,
@@ -64,6 +67,14 @@
     "red",
     "cyan",
   ] as const;
+  const TREND_ACCOUNT_OPTIONS: Array<{
+    value: LedgerTrendAccount;
+    label: string;
+  }> = [
+    { value: "all", label: "全部" },
+    { value: "trading", label: "交易户" },
+    { value: "available", label: "可供户" },
+  ];
 
   let analytics: BondLedgerReport = emptyBondLedgerReport();
   let remoteFiles: RemoteBondLedgerFile[] = [];
@@ -83,6 +94,7 @@
   let exportLabel = "导出图片";
   let exportTimer: number | null = null;
   let syncGeneration = 0;
+  let trendAccount: LedgerTrendAccount = "all";
   let batchInput: HTMLInputElement;
   let reuploadInput: HTMLInputElement;
   let managementDialog: HTMLDialogElement;
@@ -99,6 +111,12 @@
   $: selectedManagedDateHasLedger = databaseLedgerDates.includes(
     selectedManagedDate,
   );
+  $: trendPoints =
+    trendAccount === "all"
+      ? analytics.performanceTrend
+      : analytics.accountPerformanceTrends[trendAccount];
+  $: trendReturnLabel =
+    trendAccount === "all" ? "年化收益率" : "年化收益贡献";
   $: metricCards = [
     {
       label: "当前规模",
@@ -170,14 +188,7 @@
   ];
   $: returnRiskCards = [
     {
-      label: "区间收益率",
-      value: formatDecimalPercent(analytics.returnRiskMetrics.periodReturn),
-      detail: `${analytics.returnRiskMetrics.validDayCount} 个有效交易日`,
-      tone: "teal" as const,
-      icon: "profit" as MetricIconName,
-    },
-    {
-      label: "年化波动率",
+      label: "波动率",
       value: formatDecimalPercent(
         analytics.returnRiskMetrics.annualizedVolatility,
       ),
@@ -194,13 +205,6 @@
       ),
       tone: "red" as const,
       icon: "bond" as MetricIconName,
-    },
-    {
-      label: "收益波动比",
-      value: formatRatio(analytics.returnRiskMetrics.returnVolatilityRatio),
-      detail: `盈利天数占比 ${formatDecimalPercent(analytics.returnRiskMetrics.positiveDayRatio)}`,
-      tone: "orange" as const,
-      icon: "leverage" as MetricIconName,
     },
   ];
 
@@ -530,10 +534,6 @@
     return value === 0 ? "0.00%" : `−${(value * 100).toFixed(2)}%`;
   }
 
-  function formatRatio(value: number | null): string {
-    return value === null || !Number.isFinite(value) ? "—" : value.toFixed(2);
-  }
-
   function drawdownPeriod(
     peakDate: string | null,
     troughDate: string | null,
@@ -678,40 +678,58 @@
           {/each}
         </section>
 
-        <ModuleCard class="ledger-panel" labelledBy="return-risk-title">
-          <PanelHeading id="return-risk-title" title="收益与风险指标" />
-          <div class="ledger-return-risk-grid">
-            {#each returnRiskCards as card (card.label)}
-              <MetricCard
-                label={card.label}
-                value={card.value}
-                detail={card.detail}
-                tone={card.tone}
-                iconComponent={MetricIcon}
-                iconProps={{ icon: card.icon }}
-                iconPosition="start"
-                compact
-              />
-            {/each}
-          </div>
-        </ModuleCard>
-
-        <div class="ledger-chart-grid">
+        <div class="ledger-performance-grid">
           <ModuleCard class="ledger-panel ledger-panel--trend" labelledBy="return-trend-title">
             <PanelHeading id="return-trend-title" title="规模&收益率走势">
-              <div class="ledger-trend-legend" role="list" aria-label="图例">
-                <span role="listitem"><i class="ledger-legend-line ledger-legend-line--scale" aria-hidden="true"></i>规模</span>
-                <span role="listitem"><i class="ledger-legend-line ledger-legend-line--return" aria-hidden="true"></i>年化收益率</span>
-                <span role="listitem"><i class="ledger-legend-line ledger-legend-line--range" aria-hidden="true"></i>所选区间</span>
+              <div class="ledger-trend-toolbar">
+                <div class="ledger-account-filter" role="radiogroup" aria-label="账户范围">
+                  {#each TREND_ACCOUNT_OPTIONS as option (option.value)}
+                    <label class:active={trendAccount === option.value}>
+                      <input
+                        type="radio"
+                        name="ledger-trend-account"
+                        value={option.value}
+                        bind:group={trendAccount}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  {/each}
+                </div>
+                <div class="ledger-trend-legend" role="list" aria-label="图例">
+                  <span role="listitem"><i class="ledger-legend-line ledger-legend-line--scale" aria-hidden="true"></i>规模</span>
+                  <span role="listitem"><i class="ledger-legend-line ledger-legend-line--return" aria-hidden="true"></i>{trendReturnLabel}</span>
+                  <span role="listitem"><i class="ledger-legend-line ledger-legend-line--range" aria-hidden="true"></i>所选区间</span>
+                </div>
               </div>
             </PanelHeading>
             <ChartHost
               renderer={renderBondScaleReturnTrend}
-              args={[analytics.performanceTrend, startDate, endDate]}
-              ariaLabel="二级池规模与业务口径年化收益率走势"
+              args={[trendPoints, startDate, endDate, trendAccount]}
+              ariaLabel={`二级池${TREND_ACCOUNT_OPTIONS.find((option) => option.value === trendAccount)?.label ?? "全部"}规模与${trendReturnLabel}走势`}
               className="ledger-chart ledger-chart--trend"
             />
           </ModuleCard>
+
+          <ModuleCard class="ledger-panel ledger-panel--risk" labelledBy="return-risk-title">
+            <PanelHeading id="return-risk-title" title="收益与风险指标" />
+            <div class="ledger-return-risk-grid">
+              {#each returnRiskCards as card (card.label)}
+                <MetricCard
+                  label={card.label}
+                  value={card.value}
+                  detail={card.detail}
+                  tone={card.tone}
+                  iconComponent={MetricIcon}
+                  iconProps={{ icon: card.icon }}
+                  iconPosition="start"
+                  compact
+                />
+              {/each}
+            </div>
+          </ModuleCard>
+        </div>
+
+        <div class="ledger-chart-grid">
 
           <ModuleCard class="ledger-panel" labelledBy="holding-type-title">
             <PanelHeading id="holding-type-title" title="持仓分布" />
