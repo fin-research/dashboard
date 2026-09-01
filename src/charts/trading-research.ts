@@ -36,6 +36,26 @@ export type EconomicIndicatorTrendPoint = {
   value: number;
 };
 
+export type WorkbenchSeriesHistory = {
+  dates: readonly string[];
+  series: ReadonlyArray<{
+    name: string;
+    values: readonly number[];
+    color?: string;
+  }>;
+};
+
+function workbenchSeriesColor(
+  series: WorkbenchSeriesHistory["series"][number],
+  index: number,
+): string {
+  return (
+    series.color ??
+    WORKBENCH_CHART_PALETTE[index % WORKBENCH_CHART_PALETTE.length] ??
+    WORKBENCH_CHART_PALETTE[0]
+  );
+}
+
 type WorkbenchHistory = {
   dates: readonly string[];
   series: Array<{ name: string; values: readonly number[] }>;
@@ -64,9 +84,12 @@ export function renderWorkbenchBarChart(
       type: "value",
       min: 0,
       max,
+      name: unit,
+      nameGap: 8,
+      nameTextStyle: axisLabel,
       axisLabel: {
         ...axisLabel,
-        formatter: (value: number) => `${value}${unit}`,
+        formatter: (value: number) => `${value}`,
       },
       axisLine: { show: false },
       axisTick: { show: false },
@@ -110,6 +133,7 @@ export function renderWorkbenchBarChart(
               symbol: "none",
               data: thresholds.map((value) => ({ xAxis: value })),
               label: {
+                show: false,
                 color: colors.muted,
                 fontFamily,
                 fontSize: Math.max(chartTextSize - 2, 12),
@@ -120,6 +144,114 @@ export function renderWorkbenchBarChart(
           : undefined,
       },
     ],
+  };
+  setChart(host, option);
+}
+
+export function renderWorkbenchTrendChart(
+  host: HTMLElement,
+  history: WorkbenchSeriesHistory,
+  description: string,
+  unit: string,
+): void {
+  const option: ChartOption = {
+    animationDuration: 240,
+    aria: { enabled: true, description },
+    color: history.series.map(workbenchSeriesColor),
+    tooltip: {
+      ...tooltip,
+      trigger: "axis",
+      valueFormatter: (value: unknown) => `${Number(value).toFixed(1)}${unit}`,
+    },
+    legend: {
+      top: 0,
+      textStyle: {
+        color: colors.ink,
+        fontFamily,
+        fontSize: chartTextSize,
+        fontWeight: "normal",
+      },
+    },
+    grid: { left: 18, right: 20, top: 48, bottom: 28, containLabel: true },
+    xAxis: {
+      type: "category",
+      data: [...history.dates],
+      boundaryGap: false,
+      axisLabel,
+      axisLine: { lineStyle: { color: colors.line } },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: "value",
+      scale: true,
+      name: unit,
+      nameTextStyle: axisLabel,
+      axisLabel,
+      splitLine: { lineStyle: gridLine },
+    },
+    series: history.series.map((series, index) => ({
+      name: series.name,
+      type: "line",
+      smooth: true,
+      showSymbol: false,
+      lineStyle: { width: 2.5 },
+      areaStyle: {
+        color: `${workbenchSeriesColor(series, index)}14`,
+      },
+      data: [...series.values],
+    })),
+  };
+  setChart(host, option);
+}
+
+export function renderWorkbenchStackedBarChart(
+  host: HTMLElement,
+  history: WorkbenchSeriesHistory,
+  description: string,
+  unit: string,
+): void {
+  const option: ChartOption = {
+    animationDuration: 240,
+    aria: { enabled: true, description },
+    color: history.series.map(workbenchSeriesColor),
+    tooltip: {
+      ...tooltip,
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      valueFormatter: (value: unknown) => `${Number(value).toFixed(1)}${unit}`,
+    },
+    legend: {
+      top: 0,
+      textStyle: {
+        color: colors.ink,
+        fontFamily,
+        fontSize: chartTextSize,
+        fontWeight: "normal",
+      },
+    },
+    grid: { left: 18, right: 20, top: 48, bottom: 28, containLabel: true },
+    xAxis: {
+      type: "category",
+      data: [...history.dates],
+      axisLabel,
+      axisLine: { lineStyle: { color: colors.line } },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: "value",
+      name: unit,
+      nameTextStyle: axisLabel,
+      axisLabel,
+      splitLine: { lineStyle: gridLine },
+    },
+    series: history.series.map((series) => ({
+      name: series.name,
+      type: "bar",
+      stack: "成交金额",
+      barMaxWidth: 26,
+      itemStyle: { borderRadius: [3, 3, 0, 0] },
+      data: [...series.values],
+    })),
   };
   setChart(host, option);
 }

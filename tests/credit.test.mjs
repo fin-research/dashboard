@@ -373,7 +373,10 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.match(view, /<ol class="tr-credit-news-list">/);
   assert.doesNotMatch(view, /使用额度变动/);
   assert.match(view, /打印 \/ 导出 PDF/);
-  assert.doesNotMatch(view, /高使用率机构|授信预警|tr-result-count|一览表全口径|数据截至/);
+  assert.match(view, /label="30日内到期"/);
+  assert.match(view, /label="授信额度使用率"/);
+  assert.match(view, /title="授信预警"/);
+  assert.doesNotMatch(view, /高使用率机构|tr-result-count|一览表全口径|数据截至/);
   assert.doesNotMatch(demoData, /demoCreditLines|creditSummary|creditAlerts|CREDIT-USAGE|CREDIT-EXPIRY/);
 });
 

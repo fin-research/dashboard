@@ -105,7 +105,12 @@
   }
 
   .research-metric-card--compact {
+    justify-content: flex-start;
     padding-block: 6px;
+  }
+
+  .research-metric-card--compact .research-metric-card__balance {
+    display: none;
   }
 
   .research-metric-card--blue,

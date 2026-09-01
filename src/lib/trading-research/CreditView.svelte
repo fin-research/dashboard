@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
 
+  import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
+  import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import { portal } from "../portal.ts";
   import {
     fetchCreditReport,
@@ -30,6 +32,13 @@
 
   type CreditTab = "overview" | "calendar" | "weekly";
   type CalendarFilter = "all" | CreditCalendarEvent["type"];
+  type CreditAlert = {
+    id: string;
+    level: "critical" | "high" | "medium" | "low";
+    label: string;
+    meta: string;
+    text: string;
+  };
   type SortKey =
     | "sourceRow"
     | "institutionName"
@@ -105,6 +114,66 @@
 
   const weeklyNews = $derived.by(() => {
     return report?.weeklyNews.map(formatCreditWeeklyNews) ?? [];
+  });
+
+  const creditUsageRows = $derived.by(() =>
+    (report?.institutions ?? [])
+      .filter(
+        (institution) =>
+          institution.status === "approved" &&
+          institution.utilization != null &&
+          institution.totalLimit != null &&
+          institution.totalLimit > 0,
+      )
+      .sort((left, right) =>
+        (right.utilization ?? 0) - (left.utilization ?? 0),
+      )
+      .slice(0, 10)
+      .map((institution) => ({
+        label: institution.institutionName,
+        value: institution.utilization ?? 0,
+        color:
+          (institution.utilization ?? 0) >= 80
+            ? "#d92d20"
+            : (institution.utilization ?? 0) >= 60
+              ? "#f79009"
+              : "#2f6fed",
+      })),
+  );
+
+  const creditAlerts = $derived.by(() => {
+    const currentReport = report;
+    if (!currentReport) return [];
+    const alerts: CreditAlert[] = [];
+    for (const institution of currentReport.institutions) {
+      const utilization = institution.utilization ?? 0;
+      if (institution.status === "approved" && utilization >= 60) {
+        alerts.push({
+          id: `usage-${institution.institutionName}`,
+          level: utilization >= 80 ? "critical" : "medium",
+          label: utilization >= 80 ? "额度预警" : "额度关注",
+          meta: `${utilization.toFixed(1)}%`,
+          text: `${institution.institutionName}授信额度使用率达到${utilization.toFixed(1)}%，${utilization >= 80 ? "已超过80%预警线" : "已超过60%关注线"}`,
+        });
+      }
+      if (institution.expiryDate) {
+        const remainingDays = daysBetween(
+          currentReport.summary.reportDate,
+          institution.expiryDate,
+        );
+        if (remainingDays >= 0 && remainingDays <= 30) {
+          alerts.push({
+            id: `expiry-${institution.institutionName}`,
+            level: remainingDays <= 7 ? "critical" : "high",
+            label: "到期预警",
+            meta: `${remainingDays}天`,
+            text: `${institution.institutionName}授信将在${remainingDays}天内到期，需安排续作材料`,
+          });
+        }
+      }
+    }
+    const order = { critical: 0, high: 1, medium: 2, low: 3 } as const;
+    return alerts.sort((left, right) => order[left.level] - order[right.level]);
   });
 
   const calendarCells = $derived.by(() => {
@@ -562,12 +631,51 @@
   {:else if activeTab === "overview"}
     <section aria-labelledby="credit-metrics-title">
       <SectionHeading id="credit-metrics-title" title="授信总览" />
-      <div class="tr-metric-grid">
-        <MetricCard label="授信总额" value={formatAmount(report.summary.totalLimit)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" />
-        <MetricCard label="已用额度" value={formatAmount(report.summary.totalUsed)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" />
-        <MetricCard label="可用额度" value={formatAmount(report.summary.totalAvailable)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" />
+      <div class="tr-metric-grid tr-metric-grid--five">
+        <MetricCard label="授信总额" value={report.summary.totalLimit.toFixed(1)} unit="亿元" detail={`涵盖${report.summary.institutionCount}家机构`} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
+        <MetricCard label="已用额度" value={report.summary.totalUsed.toFixed(1)} unit="亿元" detail={`可用 ${report.summary.totalAvailable.toFixed(1)}亿元`} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
+        <MetricCard label="可用额度" value={report.summary.totalAvailable.toFixed(1)} unit="亿元" detail="可支持后续业务安排" iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
+        <MetricCard label="30日内到期" value={String(report.summary.expiringWithin30Days)} unit="笔" detail="需关注续作安排" iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="red" compact />
+        <MetricCard label="授信额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" detail={report.previousSummary ? `${report.summary.utilization - report.previousSummary.utilization >= 0 ? "+" : ""}${(report.summary.utilization - report.previousSummary.utilization).toFixed(1)}个百分点较上期` : `${report.summary.approvedCount}家已获批`} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact />
       </div>
     </section>
+
+    <div class="tr-two-column tr-two-column--credit">
+      <ModuleCard labelledBy="credit-usage-title">
+        <PanelHeading id="credit-usage-title" title="授信额度使用率">
+          <Badge tone="warning">60%关注 · 80%预警</Badge>
+        </PanelHeading>
+        {#if creditUsageRows.length}
+          <ChartHost
+            renderer={renderWorkbenchBarChart}
+            args={[creditUsageRows, "授信机构额度使用率及60%和80%阈值", "%", 100, [60, 80]]}
+            ariaLabel="授信机构额度使用率及60%和80%阈值横向柱状图"
+            className="tr-chart-host"
+          />
+        {:else}
+          <p class="tr-empty-state">暂无可展示的已获批授信使用率</p>
+        {/if}
+      </ModuleCard>
+
+      <ModuleCard labelledBy="credit-alerts-title">
+        <PanelHeading id="credit-alerts-title" title="授信预警">
+          <Badge tone={creditAlerts.length ? "warning" : "success"}>{creditAlerts.length} 项</Badge>
+        </PanelHeading>
+        <div class="tr-alert-list tr-credit-alert-list">
+          {#each creditAlerts as alert (alert.id)}
+            <article class={`tr-alert tr-alert--${alert.level}`}>
+              <span class="tr-alert__icon" aria-hidden="true"><WorkbenchIcon name="warning" /></span>
+              <div>
+                <div class="tr-alert__meta"><strong>{alert.label}</strong><span>{alert.meta}</span></div>
+                <p>{alert.text}</p>
+              </div>
+            </article>
+          {:else}
+            <p class="tr-empty-state">当前无额度使用率或30日内到期预警</p>
+          {/each}
+        </div>
+      </ModuleCard>
+    </div>
 
     <ModuleCard labelledBy="credit-table-title">
       <PanelHeading id="credit-table-title" title="授信一览表" wrap>

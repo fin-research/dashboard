@@ -10,7 +10,6 @@
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import WorkflowView from "./WorkflowView.svelte";
   import {
-    demoMeta,
     normalizeWorkbenchView,
     workbenchViewPath,
     workbenchViews,
@@ -28,11 +27,6 @@
   const activeView = $derived(
     workbenchViews.find((view) => view.id === activeViewId) ?? workbenchViews[0],
   );
-  const activeDate = $derived.by(() => {
-    if (activeViewId === "trading") return demoMeta.tradingAsOf;
-    if (activeViewId === "overview") return "多基准日";
-    return null;
-  });
 
   afterNavigate(() => {
     mobileDrawerOpen = false;
@@ -110,9 +104,6 @@
       </div>
     </div>
     <div class="tr-topbar__meta">
-      {#if activeDate}
-        <span class="tr-as-of"><WorkbenchIcon name="calendar" /><span>数据截至</span><strong>{activeDate}</strong></span>
-      {/if}
       <div id="tr-topbar-actions" class="tr-topbar__actions"></div>
     </div>
   </header>

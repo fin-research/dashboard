@@ -295,8 +295,7 @@ body:has(.tr-workbench) {
 }
 
 .tr-topbar__title,
-.tr-topbar__meta,
-.tr-as-of {
+.tr-topbar__meta {
   display: flex;
   align-items: center;
 }
@@ -403,32 +402,6 @@ body:has(.tr-workbench) {
   .tr-topbar__actions > .tr-credit-toolbar {
     width: 100%;
   }
-}
-
-.tr-as-of {
-  min-height: 38px;
-  gap: 8px;
-  padding: 0 12px;
-  border: 1px solid var(--tr-border);
-  border-radius: var(--tr-radius-control);
-  background: var(--tr-surface);
-  font-size: 0.875rem;
-}
-
-.tr-as-of {
-  color: var(--tr-muted);
-}
-
-.tr-as-of svg {
-  width: 18px;
-  height: 18px;
-  color: var(--tr-primary);
-}
-
-.tr-as-of strong {
-  color: var(--tr-text-2);
-  font-weight: bold;
-  font-variant-numeric: tabular-nums;
 }
 
 #tr-workbench-main {
@@ -719,6 +692,12 @@ body:has(.tr-workbench) {
   gap: 16px;
 }
 
+.tr-three-column {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: 16px;
+}
+
 .tr-two-column--trading {
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
 }
@@ -807,6 +786,46 @@ body:has(.tr-workbench) {
   font-size: 0.875rem;
 }
 
+.tr-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tr-filter-chips button,
+.tr-alert-action {
+  min-height: 44px;
+  padding: 7px 12px;
+  border: 1px solid var(--tr-border);
+  border-radius: var(--tr-radius-control);
+  color: var(--tr-text-2);
+  background: var(--tr-surface);
+  font-size: 0.875rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.tr-filter-chips button.active {
+  border-color: color-mix(in srgb, var(--tr-primary) 42%, var(--tr-border));
+  color: var(--tr-primary-deep);
+  background: var(--tr-primary-soft);
+}
+
+.tr-alert-action {
+  min-height: 36px;
+  margin-top: 8px;
+  padding-block: 5px;
+  color: var(--tr-primary-deep);
+}
+
+.tr-empty-state {
+  margin: 0;
+  padding: 22px 12px;
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
 .tr-ranking-list {
   display: grid;
   gap: 8px;
@@ -861,7 +880,8 @@ body:has(.tr-workbench) {
 }
 
 .tr-table-controls input,
-.tr-table-controls select {
+.tr-table-controls select,
+.tr-table-action {
   min-height: 44px;
   border: 1px solid var(--tr-border-strong);
   border-radius: var(--tr-radius-control);
@@ -877,6 +897,14 @@ body:has(.tr-workbench) {
 
 .tr-table-controls select {
   padding: 0 32px 0 11px;
+  cursor: pointer;
+}
+
+.tr-table-action {
+  padding-inline: 13px;
+  color: var(--tr-primary-deep);
+  background: var(--tr-primary-soft);
+  font-weight: bold;
   cursor: pointer;
 }
 
@@ -952,6 +980,10 @@ body:has(.tr-workbench) {
 .tr-data-table .is-numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.tr-trade-table {
+  min-width: 1320px;
 }
 
 .tr-empty-cell {
@@ -1052,6 +1084,156 @@ body:has(.tr-workbench) {
   height: 210px;
 }
 
+.tr-concentration-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tr-concentration-stats > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border-radius: var(--tr-radius-control);
+  background: var(--tr-surface-muted);
+  text-align: center;
+}
+
+.tr-concentration-stats span {
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+}
+
+.tr-concentration-stats strong {
+  color: var(--tr-text);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-parser-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.tr-parser-input,
+.tr-parser-result {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tr-parser-input > label,
+.tr-parser-result__head > strong,
+.tr-ticket-draft > strong,
+.tr-collateral-checklist > strong {
+  color: var(--tr-text-2);
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.tr-parser-input textarea {
+  width: 100%;
+  min-height: 190px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid var(--tr-border-strong);
+  border-radius: var(--tr-radius-control);
+  color: var(--tr-text-2);
+  background: var(--tr-surface-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.tr-primary-action,
+.tr-secondary-action {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--tr-primary);
+  border-radius: var(--tr-radius-control);
+  color: #ffffff;
+  background: var(--tr-primary);
+  font-size: 0.875rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.tr-secondary-action {
+  color: var(--tr-primary-deep);
+  background: var(--tr-primary-soft);
+}
+
+.tr-collateral-checklist,
+.tr-ticket-draft,
+.tr-parser-empty {
+  padding: 13px;
+  border: 1px solid var(--tr-border);
+  border-radius: var(--tr-radius-control);
+  background: var(--tr-surface-muted);
+}
+
+.tr-collateral-checklist {
+  display: grid;
+  gap: 4px;
+}
+
+.tr-collateral-checklist span,
+.tr-ticket-draft p,
+.tr-parser-empty {
+  margin: 0;
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.tr-parser-result__head {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tr-entity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.tr-entity-grid > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid var(--tr-border);
+  border-radius: var(--tr-radius-control);
+}
+
+.tr-entity-grid dt {
+  color: var(--tr-muted);
+  font-size: 0.875rem;
+}
+
+.tr-entity-grid dd {
+  margin: 0;
+  color: var(--tr-text-2);
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.tr-ticket-draft {
+  display: grid;
+  gap: 5px;
+}
+
+.tr-credit-alert-list {
+  max-height: 350px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
 .tr-credit-toolbar {
   display: flex;
   align-items: center;
@@ -1104,6 +1286,10 @@ body:has(.tr-workbench) {
   gap: 8px;
   color: var(--tr-muted);
   font-size: 1rem;
+}
+
+.tr-credit-toolbar__actions label > span {
+  white-space: nowrap;
 }
 
 .tr-credit-toolbar__actions select {
@@ -1718,7 +1904,8 @@ body:has(.tr-workbench) {
 @media (max-width: 1180px) {
   .tr-two-column,
   .tr-two-column--trading,
-  .tr-two-column--credit {
+  .tr-two-column--credit,
+  .tr-parser-grid {
     grid-template-columns: 1fr;
   }
 

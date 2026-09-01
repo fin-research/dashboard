@@ -164,6 +164,7 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
   assert.match(page, /href=\{workbenchViewPath\(view\.id\)\}/);
   assert.match(page, /<BondLedgerPage embedded \/>/);
   assert.match(page, /<FinancingModelPage embedded \/>/);
+  assert.doesNotMatch(page, /数据截至|activeDate|demoMeta/);
   assert.doesNotMatch(page, /\?view=|tr-context-strip|演示数据|静态演示|未来统一/);
   assert.match(route, /workbenchViews\.find/);
   assert.match(styles, /\.tr-table-scroll\s*\{[\s\S]*?overflow-x:\s*auto/);
@@ -189,13 +190,14 @@ test("工作台数据图表统一通过 ChartHost 和 ECharts renderer", async (
     readFile(new URL("../src/lib/trading-research/WorkbenchIcon.svelte", import.meta.url), "utf8"),
   ]);
 
-  for (const view of [overview, trading]) {
+  for (const view of [overview, trading, credit]) {
     assert.match(view, /<ChartHost/);
   }
   assert.match(research, /<EconomicIndicatorCard/);
-  assert.doesNotMatch(credit, /<ChartHost/);
   assert.match(credit, /tr-credit-calendar/);
   assert.match(charts, /renderWorkbenchBarChart/);
+  assert.match(charts, /renderWorkbenchTrendChart/);
+  assert.match(charts, /renderWorkbenchStackedBarChart/);
   assert.match(charts, /renderWorkbenchHistoryChart/);
   assert.match(charts, /renderWorkbenchCurveChart/);
   assert.match(charts, /renderEconomicIndicatorTrend/);
@@ -205,6 +207,44 @@ test("工作台数据图表统一通过 ChartHost 和 ECharts renderer", async (
   assert.match(styles, /\.tr-workbench-icon\s*\{/);
   assert.match(icon, /class=\{`tr-workbench-icon/);
   assert.doesNotMatch(styles, /\.tr-(progress|distribution-bar|usage-fill|curve-list)\b/);
+});
+
+test("总览、交易管理和授信总览补齐参考模块且不暴露数据性质", async () => {
+  const [overview, trading, credit] = await Promise.all([
+    readFile(new URL("../src/lib/trading-research/OverviewView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/TradingView.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/trading-research/CreditView.svelte", import.meta.url), "utf8"),
+  ]);
+
+  for (const title of [
+    "资金存量指标",
+    "授信概览",
+    "二级资金池概览",
+    "融入/融出存量趋势",
+    "品种分布",
+    "期限分布",
+    "预警中心",
+  ]) {
+    assert.match(overview, new RegExp(title.replace("/", "\\/")));
+  }
+  for (const title of [
+    "纯信用占比",
+    "实时交易记录",
+    "押券风控",
+    "近15日两类业务成交趋势",
+    "交易对手集中度排名",
+    "交易解析",
+  ]) {
+    assert.match(trading, new RegExp(title));
+  }
+  assert.match(trading, /全部方向/);
+  assert.match(trading, /金额从高到低/);
+  assert.match(trading, /30%单一对手关注线/);
+  assert.match(credit, /label="30日内到期"/);
+  assert.match(credit, /label="授信额度使用率"/);
+  assert.match(credit, /title="授信预警"/);
+  assert.match(credit, /\[60, 80\]/);
+  assert.doesNotMatch(`${overview}\n${trading}\n${credit}`, /演示数据|静态演示|演示版本/);
 });
 
 test("市场点评、工作台与并入模块复用统一指标卡和结构组件", async () => {

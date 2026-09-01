@@ -105,20 +105,21 @@ export type DemoTrade = {
   term: string;
   rate: number;
   collateral: string;
+  collateralRisk: "不适用" | "资料待补录";
   status: "已成交" | "待确认";
 };
 
 export const demoTrades: DemoTrade[] = [
-  { id: "T20260807001", time: "09:32", direction: "融入", product: "同业拆借", counterparty: "招商银行", amount: 5, term: "7D", rate: 1.85, collateral: "—", status: "已成交" },
-  { id: "T20260807002", time: "09:45", direction: "融入", product: "同业拆借", counterparty: "工商银行", amount: 3, term: "14D", rate: 1.92, collateral: "—", status: "已成交" },
-  { id: "T20260807003", time: "10:10", direction: "融出", product: "质押式回购", counterparty: "中信证券", amount: 2, term: "隔夜", rate: 1.65, collateral: "国债", status: "已成交" },
-  { id: "T20260807004", time: "10:28", direction: "融入", product: "同业拆借", counterparty: "建设银行", amount: 8, term: "7D", rate: 1.83, collateral: "—", status: "已成交" },
-  { id: "T20260807005", time: "10:55", direction: "融出", product: "同业拆借", counterparty: "华泰证券", amount: 1.5, term: "7D", rate: 1.88, collateral: "—", status: "已成交" },
-  { id: "T20260807006", time: "11:05", direction: "融出", product: "质押式回购", counterparty: "农业银行", amount: 10, term: "1M", rate: 1.95, collateral: "利率债", status: "待确认" },
-  { id: "T20260807007", time: "11:22", direction: "融入", product: "同业拆借", counterparty: "交通银行", amount: 4, term: "隔夜", rate: 1.62, collateral: "—", status: "已成交" },
-  { id: "T20260807008", time: "13:15", direction: "融出", product: "质押式回购", counterparty: "国泰君安", amount: 3, term: "14D", rate: 1.9, collateral: "国债", status: "已成交" },
-  { id: "T20260807009", time: "14:02", direction: "融入", product: "同业拆借", counterparty: "兴业银行", amount: 6, term: "7D", rate: 1.86, collateral: "—", status: "已成交" },
-  { id: "T20260807010", time: "14:30", direction: "融出", product: "质押式回购", counterparty: "浦发银行", amount: 2.5, term: "隔夜", rate: 1.6, collateral: "信用债", status: "待确认" },
+  { id: "T20260807001", time: "09:32", direction: "融入", product: "同业拆借", counterparty: "招商银行", amount: 5, term: "7D", rate: 1.85, collateral: "—", collateralRisk: "不适用", status: "已成交" },
+  { id: "T20260807002", time: "09:45", direction: "融入", product: "同业拆借", counterparty: "工商银行", amount: 3, term: "14D", rate: 1.92, collateral: "—", collateralRisk: "不适用", status: "已成交" },
+  { id: "T20260807003", time: "10:10", direction: "融出", product: "质押式回购", counterparty: "中信证券", amount: 2, term: "隔夜", rate: 1.65, collateral: "国债", collateralRisk: "资料待补录", status: "已成交" },
+  { id: "T20260807004", time: "10:28", direction: "融入", product: "同业拆借", counterparty: "建设银行", amount: 8, term: "7D", rate: 1.83, collateral: "—", collateralRisk: "不适用", status: "已成交" },
+  { id: "T20260807005", time: "10:55", direction: "融出", product: "同业拆借", counterparty: "华泰证券", amount: 1.5, term: "7D", rate: 1.88, collateral: "—", collateralRisk: "不适用", status: "已成交" },
+  { id: "T20260807006", time: "11:05", direction: "融出", product: "质押式回购", counterparty: "农业银行", amount: 10, term: "1M", rate: 1.95, collateral: "利率债", collateralRisk: "资料待补录", status: "待确认" },
+  { id: "T20260807007", time: "11:22", direction: "融入", product: "同业拆借", counterparty: "交通银行", amount: 4, term: "隔夜", rate: 1.62, collateral: "—", collateralRisk: "不适用", status: "已成交" },
+  { id: "T20260807008", time: "13:15", direction: "融出", product: "质押式回购", counterparty: "国泰君安", amount: 3, term: "14D", rate: 1.9, collateral: "国债", collateralRisk: "资料待补录", status: "已成交" },
+  { id: "T20260807009", time: "14:02", direction: "融入", product: "同业拆借", counterparty: "兴业银行", amount: 6, term: "7D", rate: 1.86, collateral: "—", collateralRisk: "不适用", status: "已成交" },
+  { id: "T20260807010", time: "14:30", direction: "融出", product: "质押式回购", counterparty: "浦发银行", amount: 2.5, term: "隔夜", rate: 1.6, collateral: "信用债", collateralRisk: "资料待补录", status: "待确认" },
 ];
 
 export function computeTradingSummary(trades: DemoTrade[]) {
@@ -153,6 +154,72 @@ export const fundingOverview = {
   total: 328,
 } as const;
 
+export const overviewCreditFallback = {
+  reportDate: "2026-08-21",
+  institutionCount: 120,
+  approvedCount: 110,
+  totalLimit: 3448.35,
+  totalUsed: 1022.5955,
+  totalAvailable: 2425.7545,
+  utilization: 29.7,
+  expiringWithin30Days: 8,
+} as const;
+
+export const secondaryPoolSnapshot = {
+  principal: 55.2,
+  marketValue: 55.34,
+  annualizedReturn: 2.45,
+  dailyRevenue: 94.88,
+  positionCount: 49,
+} as const;
+
+export const fundingTrend = {
+  dates: [
+    "07-01", "07-04", "07-07", "07-10", "07-13", "07-16", "07-19",
+    "07-22", "07-25", "07-28", "07-31", "08-03", "08-05", "08-06", "08-07",
+  ],
+  series: [
+    {
+      name: "融入",
+      values: [176.4, 178.8, 174.6, 179.2, 181.5, 180.1, 182.8, 184.3, 181.9, 183.7, 186.1, 184.6, 183.2, 185.0, 185.2],
+      color: "#f79009",
+    },
+    {
+      name: "融出",
+      values: [131.2, 133.8, 135.1, 132.4, 136.7, 138.5, 137.3, 139.8, 141.1, 140.4, 139.6, 141.7, 140.9, 131.8, 142.8],
+      color: "#2f6fed",
+    },
+  ],
+} as const;
+
+export const tradeVolumeHistory = {
+  dates: [
+    "07-20", "07-21", "07-22", "07-23", "07-24", "07-27", "07-28", "07-29",
+    "07-30", "07-31", "08-03", "08-04", "08-05", "08-06", "08-07",
+  ],
+  series: [
+    {
+      name: "同业拆借（纯信用）",
+      values: [24.2, 21.8, 28.5, 23.1, 26.4, 30.2, 22.7, 25.9, 31.4, 27.6, 29.8, 24.6, 26.1, 28.9, 27.5],
+      color: "#2f6fed",
+    },
+    {
+      name: "拆出（质押式回购）",
+      values: [12.6, 14.3, 11.8, 16.2, 13.5, 15.1, 18.4, 12.9, 14.8, 16.7, 13.2, 17.5, 15.6, 19.1, 17.5],
+      color: "#f79009",
+    },
+  ],
+} as const;
+
+export const termDistribution = ["隔夜", "7D", "14D", "1M", "3M", "6M", "1Y"].map(
+  (term) => ({
+    label: term,
+    value: demoTrades
+      .filter((trade) => trade.term === term)
+      .reduce((sum, trade) => sum + trade.amount, 0),
+  }),
+);
+
 export type DemoAlert = {
   id: string;
   level: "critical" | "high" | "medium" | "low";
@@ -164,6 +231,9 @@ export type DemoAlert = {
 
 export const overviewAlerts: DemoAlert[] = [
   { id: "ALR-002", level: "high", category: "交易", owner: "资金交易岗", eventAt: "2026-08-07 14:35", text: "质押式回购拆出待确认2笔、合计12.5亿元，需完成押券准入与估值折算复核" },
+  { id: "ALR-004", level: "medium", category: "市场", owner: "研究岗", eventAt: "2026-08-07 13:00", text: "DR007较前值下行0.59个基点，关注跨月前资金面变化" },
+  { id: "ALR-006", level: "low", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "部分机构授信额度使用率超过60%关注线，需核对后续业务安排" },
+  { id: "ALR-007", level: "high", category: "授信", owner: "授信管理岗", eventAt: "2026-08-21 09:00", text: "未来30日存在授信到期事项，需提前安排续作材料" },
 ];
 
 export type DemoRate = {
