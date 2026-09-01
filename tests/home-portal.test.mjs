@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("首页按指定顺序提供六个业务入口并自适应换行", async () => {
+test("首页提供政策跟踪等七个业务入口并自适应换行", async () => {
   const [page, globalStyles] = await Promise.all([
     readFile(new URL("../src/routes/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
@@ -30,9 +30,13 @@ test("首页按指定顺序提供六个业务入口并自适应换行", async ()
   );
   assert.match(
     page,
+    /<a class="tool-card tool-card--policies" href="\/policy-tracking">[\s\S]*?<h2>政策跟踪<\/h2>/,
+  );
+  assert.match(
+    page,
     /<a class="tool-card tool-card--management" href="\/management">[\s\S]*?<h2>管理<\/h2>/,
   );
-  assert.equal((page.match(/class="tool-card /g) ?? []).length, 6);
+  assert.equal((page.match(/class="tool-card /g) ?? []).length, 7);
   assert.ok(
     page.indexOf('href="/fund-report"') < page.indexOf('href="/market-briefing"'),
   );

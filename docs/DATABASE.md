@@ -2,13 +2,16 @@
 
 Schema 和字段以 migration 与代码为事实来源。本文件只记录长期边界和一致性规则。
 
-## D1：文章证据与热点快照
+## D1：文章证据、政策跟踪与热点快照
 
 生产绑定为 `DB`，数据库名 `eastmoney`。当前运行时关注：
 
 - `article`：文章元数据、摘要和重要性；不保存正文。
 - `keyword`：按 `(article_id, ordinal)` 保存结构化主题、事实、解读和影响。
 - `hotspot_snapshot`：追加保存完整热点响应、输入指纹、生成时间、模型和已经解析的证据范围。
+- `policy_event` / `policy_news`：由 ingest 的 Policy Workflow 写入规范政策卡片与原始资讯证据；Dashboard 只读取。
+- `policy_article`：政策与 article 的多对多关系。AI 自动关系保存置信度与依据；Dashboard 人工关联或排除写为 `manual`，后续 AI 不覆盖。
+- `research_commentary`：通用标准化点评，类型覆盖时事快评、政策跟踪和海外事件；当前政策页以 `policy_id UNIQUE` 保证每项政策至多一条点评，并保存 AI 初版和人工修订状态。
 
 `daily_hotspot` 与 `hotspot_cache` 是历史 migration 中的旧结构，不应作为新功能的运行时入口。最新读取统一走 `hotspot_snapshot`。
 
@@ -18,6 +21,7 @@ Schema 和字段以 migration 与代码为事实来源。本文件只记录长�
 - 本地开发默认使用本地 D1；`pnpm dev` 不同步远端数据。
 - `pnpm db:sync:remote` 仅做显式的有限增量同步；不要把它加入普通启动流程。
 - 快照为追加记录，不原地覆盖历史生成结果。
+- 政策聚合只由 ingest Workflow 执行；政策点评只由页面人工点击生成，不设自动生成任务。
 
 ## Neon：二级池台账
 

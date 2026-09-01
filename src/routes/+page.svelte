@@ -146,6 +146,33 @@
         </span>
       </a>
 
+      <a class="tool-card tool-card--policies" href="/policy-tracking">
+        <span class="tool-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M6 3v18M6 6h11l-2.5 3L17 12H6" />
+            <circle cx="6" cy="6" r="2" />
+            <circle cx="6" cy="12" r="2" />
+            <circle cx="6" cy="18" r="2" />
+          </svg>
+        </span>
+        <span class="card-visual card-visual--policies" aria-hidden="true">
+          <svg viewBox="0 0 180 100">
+            <path d="M34 10v80M34 22h104l-18 16 18 16H34M34 68h75l-14 12 14 12H34" />
+            <circle cx="34" cy="22" r="6" />
+            <circle cx="34" cy="68" r="6" />
+          </svg>
+        </span>
+        <span class="tool-copy">
+          <h2>政策跟踪</h2>
+        </span>
+        <span class="tool-action">
+          打开政策跟踪
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>
+        </span>
+      </a>
+
       <a class="tool-card tool-card--trading-research" href="/trading-research">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -263,6 +290,7 @@
     --peach: #ffc9a9;
     --mint: #a9e8d2;
     --lilac: #dfceff;
+    --sage: #c8e6d2;
     min-height: 100dvh;
     background: var(--background);
   }
@@ -422,6 +450,11 @@
   .tool-card--hotspots {
     background: var(--blue);
     box-shadow: 0 24px 54px rgba(31, 119, 183, 0.16);
+  }
+
+  .tool-card--policies {
+    background: var(--sage);
+    box-shadow: 0 24px 54px rgba(31, 122, 75, 0.14);
   }
 
   .tool-card--workspace {

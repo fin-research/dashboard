@@ -51,6 +51,14 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 - 滚动请求：`{"mode":"rolling","rollingCount":20}`，数量必须为 8–100 的整数。
 - 日期请求：`{"mode":"range","startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}`。
 
+### 政策跟踪
+
+- `GET /api/policies?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&category=...`：读取 ingest Workflow 已聚合的政策时间轴，包含原始政策资讯、已关联研报和一对一点评；不调用 AI。
+- `GET /api/policies/articles?q=...`：按标题、机构或摘要检索可关联 article。
+- `PUT /api/policies/{id}/articles`：人工确认完整研报 ID 集合；未选择的现有自动关系记为人工排除，后续 Workflow 不覆盖。
+- `POST /api/policies/{id}/commentary`：用户手动触发。Worker 通过 `DATA` Service Binding 以最多 5 路并发读取已关联研报正文，与政策资讯一起调用 AI Gateway 并保存政策点评初版，成功为 201。
+- `PUT /api/policies/{id}/commentary`：保存标准化点评字段的人工修订。
+
 ### 今日聚焦
 
 - `POST /api/market-briefing?date=YYYY-MM-DD`：日期缺省时使用上海时区当天。

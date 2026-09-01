@@ -26,6 +26,10 @@ quant pipeline ──────────→ Neon financing_model
 Browser /financing-model → Worker → Hyperdrive → financing_model
                                   └→ AI Search MCP → AI Gateway
 
+ingest Cron → PolicyWorkflow → D1 policy_event / policy_news / policy_article
+Browser /policy-tracking → Dashboard Worker → D1
+                                      └→ manual commentary generation → DATA + AI Gateway
+
 Local credit Excel ──────→ local parser → Neon credit
 ```
 
@@ -39,6 +43,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
 - `/trading-research` 的授信管理通过 `/api/credit` 读取 Neon `credit` 日报；总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
+- `/policy-tracking` 只读 ingest Workflow 已聚合的政策与自动研报关系；人工调整关系和手动生成/编辑政策点评通过同源 `/api/policies/*` 写 D1。页面加载和筛选不调用模型。
 
 ## 服务端模块
 
