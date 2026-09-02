@@ -306,8 +306,8 @@
                       class:is-loading={generatingPolicyId === policy.id}
                       type="button"
                       disabled={generatingPolicyId === policy.id || policy.articles.length === 0}
-                      aria-label={generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
-                      title={generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
+                      aria-label={policy.articles.length === 0 ? "请先关联至少一篇研报" : generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
+                      title={policy.articles.length === 0 ? "请先关联至少一篇研报后生成政策点评初版" : generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
                       onclick={() => generateCommentary(policy)}
                     >
                       <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -396,12 +396,12 @@
   .page-state--error { color: #b42318; }
   .spinner { width: 24px; height: 24px; border: 3px solid #dbe8fb; border-top-color: #2f6fd6; border-radius: 50%; animation: spin 800ms linear infinite; }
   .timeline { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-  .timeline-item { display: grid; grid-template-columns: 126px minmax(0, 1fr); gap: 22px; }
+  .timeline-item { display: grid; grid-template-columns: 126px minmax(0, 1fr); gap: 2rem; }
   .timeline-date { position: relative; padding-top: 18px; text-align: right; }
   .timeline-date time { color: #344054; font-size: .875rem; font-weight: bold; font-variant-numeric: tabular-nums; }
-  .timeline-date::after { position: absolute; top: 30px; right: -23px; bottom: -30px; width: 1px; background: #cbd5e1; content: ""; }
+  .timeline-date::after { position: absolute; top: 30px; right: -33px; bottom: -30px; width: 1px; background: #cbd5e1; content: ""; }
   .timeline-item:last-child .timeline-date::after { display: none; }
-  .timeline-date span { position: absolute; z-index: 2; top: 24px; right: -28px; width: 11px; height: 11px; border: 3px solid #f6f8fb; border-radius: 50%; background: #2f6fd6; box-shadow: 0 0 0 1px #2f6fd6; }
+  .timeline-date span { position: absolute; z-index: 2; top: 24px; right: -38px; width: 11px; height: 11px; border: 3px solid #f6f8fb; border-radius: 50%; background: #2f6fd6; box-shadow: 0 0 0 1px #2f6fd6; }
   :global(.policy-card) { padding: 24px; }
   .policy-meta { flex-wrap: wrap; gap: 8px; }
   .policy-meta span, .ai-badge, .manual-badge, .commentary-title span { padding: 4px 8px; border-radius: 6px; font-size: .75rem; font-weight: bold; }
@@ -419,8 +419,8 @@
   .section-heading h3 span { color: #667085; font-size: .875rem; }
   .section-heading button { min-height: 40px; }
   .heading-actions { flex-wrap: wrap; gap: 8px; }
-  .ai-generate-button { display: inline-grid; width: 44px; min-width: 44px; min-height: 44px; place-items: center; padding: 3px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; background: #f5f9ff; cursor: pointer; }
-  .section-title .ai-generate-button { min-height: 44px; }
+  .ai-generate-button { display: inline-grid; width: 32px; min-width: 32px; min-height: 32px; place-items: center; padding: 3px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; background: #f5f9ff; cursor: pointer; }
+  .section-title .ai-generate-button { min-height: 32px; }
   .ai-generate-button:hover:not(:disabled), .ai-generate-button:focus-visible { border-color: #2f6fd6; color: #175cd3; background: #eef4ff; }
   .ai-generate-button:disabled { cursor: wait; opacity: .58; }
   .ai-generate-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }

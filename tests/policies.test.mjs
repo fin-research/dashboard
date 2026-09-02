@@ -57,9 +57,10 @@ test("政策页面只手动生成点评，政策与研报聚合由后台 Workflo
   ]);
 
   assert.match(page, /class="ai-generate-button"/);
-  assert.match(page, /aria-label=\{generatingPolicyId === policy\.id \? "AI 生成中" : policy\.commentary \? "重新生成政策点评初版" : "AI 生成点评初版"\}/);
+  assert.match(page, /aria-label=\{policy\.articles\.length === 0 \? "请先关联至少一篇研报"/);
   assert.match(page, /<p class="empty-text">尚未生成<\/p>/);
   assert.match(page, /\.timeline \{ display: grid; gap: 12px;/);
+  assert.match(page, /\.timeline-item \{ display: grid; grid-template-columns: 126px minmax\(0, 1fr\); gap: 2rem;/);
   assert.match(page, />调整关联</);
   assert.doesNotMatch(page, /\/api\/policies\/aggregate/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_event/);
