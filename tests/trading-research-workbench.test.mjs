@@ -10,7 +10,9 @@ import {
   workbenchViews,
 } from "../src/lib/trading-research/demo-data.ts";
 import {
+  ALL_ECONOMIC_INDICATORS,
   ECONOMIC_INDICATOR_GROUPS,
+  LIABILITY_REPORT_RATE_INDICATORS,
   LIQUIDITY_RATE_INDICATORS,
   economicIndicatorChange,
   economicIndicatorRange,
@@ -157,6 +159,18 @@ test("利率与资金面使用核验后的 EDB ID 并保留完整日频对齐窗
     { date: "2026-08-29", value: 1.4 },
     { date: "2026-08-31", value: 1.45 },
   ]);
+});
+
+test("负债周报利率指标进入统一 public.edb 定时同步清单", () => {
+  assert.deepEqual(
+    LIABILITY_REPORT_RATE_INDICATORS.map((indicator) => indicator.code),
+    [
+      "E1707781", "E1707782", "E1707783", "E1707785",
+      "E1000172", "E1000174", "E1000176",
+      "E1704281", "E1704282", "E1704283", "E1704284",
+    ],
+  );
+  assert.equal(new Set(ALL_ECONOMIC_INDICATORS.map((indicator) => indicator.code)).size, 54);
 });
 
 test("经济指标 tooltip 只显示发布日期和数值", () => {

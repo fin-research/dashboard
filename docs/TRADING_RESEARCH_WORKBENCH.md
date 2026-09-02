@@ -10,7 +10,7 @@
 
 - 交易数据与资金存量：`dashboard/app.js` 中的冻结演示快照，基准时点为 `2026-08-07 15:00`。
 - 授信数据：本地 Excel 的“授信一览表”和“授信周报”Sheet，经 `pnpm credit:import` 按明确的报告日期写入 Neon；源 Excel 不提交到仓库。
-- 研究数据：36 个国内外宏观序列，以及利率与资金面的 8 个日频序列。数据库保存上游可得全历史，页面读取最近 18 个月 Neon 快照；DR001、DR007、R007 使用 DM 历史接口，其余使用 Choice EDB。
+- 研究数据：36 个国内外宏观序列、利率与资金面的 8 个日频序列，以及负债周报使用的 11 个利率序列（其中 1Y 国债与研究序列复用同一代码），合计 54 个唯一指标。数据库保存上游可得全历史，页面读取最近 18 个月 Neon 快照；DR001、DR007、R007 使用 DM 历史接口，其余使用 Choice EDB。
 - 流程中心：沿用原项目的交易流程与授信周报流程结构，当前任务卡仍由演示数据组装，只用于展示状态流转布局。
 
 原项目的 `source-data/` Excel、登录、局域网 FastAPI、PostgreSQL、Nginx、账号权限和管理员页面均未迁入。源 Excel 含受控业务数据，不应提交到 dashboard 仓库。
@@ -122,9 +122,9 @@ pnpm edb:db:migrate
 pnpm edb:update -- --apply --full
 ```
 
-`edb:update` 默认使用生产 Data API，可通过 `DATA_API_BASE_URL` 或 `DATA_PROXY_TARGET` 覆盖；命令不自动重试，缺少 `--apply` 会在网络和数据库操作前退出。`--full` 从 1899-01-01 查询 Choice，并完整分页 DM 历史，在单事务内只替换本次 44 项指标；数据库以指标与观测期作为记录主键，同时保存真实发布日期供页面展示。
+`edb:update` 默认使用生产 Data API，可通过 `DATA_API_BASE_URL` 或 `DATA_PROXY_TARGET` 覆盖；命令不自动重试，缺少 `--apply` 会在网络和数据库操作前退出。`--full` 从 1899-01-01 查询 Choice，并完整分页 DM 历史，在单事务内只替换本次 54 项唯一指标；数据库以指标与观测期作为记录主键，同时保存真实发布日期供页面展示。负债周报只读同一张 `public.edb`，不再在生成周报时单独调用 Choice EDB。
 
-线上 Cron 使用 `0 16 * * *`（Cloudflare Cron 为 UTC，即北京时间每日 00:00）。Cron 只幂等创建 `economic-indicator-sync` Workflow 实例，实例 ID 为 `economic-indicator-sync-<scheduledTime>`；Cron 投递和 Workflow 步骤均不自动重试，Choice EDB、DM 三个资金利率和 Neon 写入任一步失败都会记录实例 ID、步骤和错误并立即结束，需人工从 Workflow 控制台或 Wrangler 重启。成功实例保留 30 天，失败实例保留 90 天，可查看步骤、错误和重启位置。它只做增量 upsert：Choice 日频/不定期、月频、季频分别回看 14、400、800 天；DM 三个资金利率各取最新一页。全历史下载和分页绝不放入 Worker 定时任务。
+线上 Cron 使用 `0 16 * * *`（Cloudflare Cron 为 UTC，即北京时间每日 00:00）。Cron 只幂等创建 `economic-indicator-sync` Workflow 实例，实例 ID 为 `economic-indicator-sync-<scheduledTime>`；Cron 投递和 Workflow 步骤均不自动重试，Choice EDB、DM 三个资金利率和 Neon 写入任一步失败都会记录实例 ID、步骤和错误并立即结束，需人工从 Workflow 控制台或 Wrangler 重启。成功实例保留 30 天，失败实例保留 90 天，可查看步骤、错误和重启位置。它只做增量 upsert：Choice 普通日频/不定期回看 14 天，负债周报日频和月频回看 400 天，季频回看 800 天；DM 三个资金利率各取最新一页。负债周报序列因此可由首次增量运行补齐年度区间；全历史下载和分页绝不放入 Worker 定时任务。
 
 运维排查与人工重跑：
 

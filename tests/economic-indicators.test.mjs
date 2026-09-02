@@ -48,7 +48,9 @@ test("经济指标仓储按指标和Choice发布日期返回近18个月数据", 
   });
   assert.match(calls[0].sql, /published_date/);
   assert.match(calls[0].sql, /FROM public\.edb/);
+  assert.match(calls[0].sql, /indicator_code = ANY\(\$1::text\[\]\)/);
   assert.match(calls[0].sql, /interval '18 months'/);
+  assert.equal(calls[0].values[0].length, 44);
 });
 
 test("经济指标仓储空表返回明确404", async () => {
@@ -146,6 +148,8 @@ test("增量 Choice 同步按频率拆分回看窗口并排除 DM 资金利率",
   assert.ok(requests.every((request) => request.searchParams.get("options") === "IsPublishDate=1,FixDate=0"));
   assert.ok(requests.every((request) => request.searchParams.get("edbIds").split(",").length <= 8));
   assert.ok(requests.every((request) => !request.searchParams.get("edbIds").includes("E1300003")));
+  const liabilityRateRequest = requests.find((request) => request.searchParams.get("edbIds").includes("E1707781"));
+  assert.equal(liabilityRateRequest.searchParams.get("startDate"), "2025-07-28");
   assert.equal(result.range.endDate, "2026-09-01");
   assert.equal(result.rows.find((row) => row.code === "E1715081").date, "2026-08-31");
 });

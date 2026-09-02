@@ -9,6 +9,7 @@ export type EconomicIndicatorDefinition = {
   frequency: "日频" | "月频" | "季频" | "不定期";
   factor?: number;
   offset?: number;
+  incrementalLookbackDays?: number;
 };
 
 export type EconomicIndicatorPoint = {
@@ -143,10 +144,29 @@ export const LIQUIDITY_RATE_INDICATORS: EconomicIndicatorDefinition[] = [
   indicator("cgb-30y", "30Y国债", "E1000183", "%", 4, "日频"),
 ];
 
-export const ALL_ECONOMIC_INDICATORS = [
+export const LIABILITY_REPORT_RATE_INDICATORS: EconomicIndicatorDefinition[] = [
+  liabilityRateIndicator("broker-aaa-minus-1y", "中债证券公司债AAA- 1Y", "E1707781"),
+  liabilityRateIndicator("broker-aaa-minus-2y", "中债证券公司债AAA- 2Y", "E1707782"),
+  liabilityRateIndicator("broker-aaa-minus-3y", "中债证券公司债AAA- 3Y", "E1707783"),
+  liabilityRateIndicator("broker-aaa-minus-5y", "中债证券公司债AAA- 5Y", "E1707785"),
+  liabilityRateIndicator("cgb-1y-liability", "中债国债1Y", "E1000172"),
+  liabilityRateIndicator("cgb-3y-liability", "中债国债3Y", "E1000174"),
+  liabilityRateIndicator("cgb-5y-liability", "中债国债5Y", "E1000176"),
+  liabilityRateIndicator("state-bank-ncd-3m", "国有行同业存单3M", "E1704281"),
+  liabilityRateIndicator("state-bank-ncd-6m", "国有行同业存单6M", "E1704282"),
+  liabilityRateIndicator("state-bank-ncd-9m", "国有行同业存单9M", "E1704283"),
+  liabilityRateIndicator("state-bank-ncd-1y", "国有行同业存单1Y", "E1704284"),
+];
+
+export const DASHBOARD_ECONOMIC_INDICATORS = uniqueIndicatorDefinitions([
   ...ECONOMIC_INDICATOR_GROUPS.flatMap((group) => group.indicators),
   ...LIQUIDITY_RATE_INDICATORS,
-];
+]);
+
+export const ALL_ECONOMIC_INDICATORS = uniqueIndicatorDefinitions([
+  ...DASHBOARD_ECONOMIC_INDICATORS,
+  ...LIABILITY_REPORT_RATE_INDICATORS,
+]);
 
 const rowSchema = z.object({
   code: z.string(),
@@ -174,6 +194,20 @@ function indicator(
   offset?: number,
 ): EconomicIndicatorDefinition {
   return { key, name, code, unit, decimals, frequency, factor, offset };
+}
+
+function uniqueIndicatorDefinitions(
+  definitions: EconomicIndicatorDefinition[],
+): EconomicIndicatorDefinition[] {
+  return [...new Map(definitions.map((definition) => [definition.code, definition])).values()];
+}
+
+function liabilityRateIndicator(
+  key: string,
+  name: string,
+  code: string,
+): EconomicIndicatorDefinition {
+  return { ...indicator(key, name, code, "%", 4, "日频"), incrementalLookbackDays: 400 };
 }
 
 export function economicIndicatorRange(now = new Date()): {

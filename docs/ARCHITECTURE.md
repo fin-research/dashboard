@@ -42,7 +42,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，必须复用共享口径而不是建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
-- `/trading-research` 的授信管理通过 `/api/credit` 读取 Neon `credit` 日报；总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
+- `/trading-research` 的授信管理通过 `/api/credit` 读取 Neon `credit` 日报；总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；融资工作台的负债周报也只读这张公共表。Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 - `/policy-tracking` 只读 ingest Workflow 已聚合的政策与自动研报关系；人工调整关系和手动生成/编辑政策点评通过同源 `/api/policies/*` 写 D1。页面加载和筛选不调用模型。关联研报与点评分别使用 `/articles/[id]`、`/commentaries/[id]` 独立深链；研报详情通过 Worker 的 `DATA` Service Binding 获取正文，点评详情只读 D1。
 
 ## 服务端模块
@@ -85,7 +85,7 @@ quant pipeline → 本地结构化结果 → Neon `financing_model.model_run` �
 
 授信链路：本地 Excel → `scripts/import-credit-workbook.ts` 解析“授信一览表”和“授信周报” → Neon `credit.institution` / `credit.item`；浏览器 `/trading-research/credit` → `/api/credit` → Hyperdrive → Neon。读取、周报比较、日历事件和自动保存的服务端确认结果均来自数据库。
 
-研究辅助链路：Choice EDB + DM `/cfets-histories` → dashboard 首次本地全历史回填 / 每日 00:00 增量 Cron → Neon `public.edb`；浏览器 `/trading-research/research` → `/api/economic-indicators` → Hyperdrive → 最近 18 个月快照。前端负责明确的展示换算、利差派生和走势图抽样，不直接调用付费或办公网上游。
+统一 EDB 链路：Choice EDB + DM `/cfets-histories` → dashboard 首次本地全历史回填 / 每日 00:00 增量 Cron → Neon `public.edb`；浏览器 `/trading-research/research` → `/api/economic-indicators` → Hyperdrive → 最近 18 个月快照，融资工作台负债周报则由服务端经同一 Hyperdrive 读取所需年度序列。前端负责明确的展示换算、利差派生和走势图抽样，不直接调用付费或办公网上游。
 
 交易和流程中心当前仍由冻结数据 → `src/lib/trading-research/demo-data.ts` → 对应只读视图；`/bond` 与 `/financing-model` 的同一页面组件同时装配到工作台子路径。
 

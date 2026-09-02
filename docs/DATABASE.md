@@ -2,6 +2,10 @@
 
 Schema 和字段以 migration 与代码为事实来源。本文件只记录长期边界和一致性规则。
 
+## Neon：统一 EDB
+
+`public.edb` 是跨应用共享的经济与利率原始观测表，主键为 `(indicator_code, observation_date)`，同时保留上游发布日期 `published_date` 和同步时间 `synced_at`。Dashboard 的每日 00:00 Workflow 是唯一线上写入方，增量更新研究辅助及融资负债周报所需的 54 个唯一指标；融资应用只读，不维护平行 EDB 表或在页面/周报生成动作中请求 Choice EDB。
+
 ## D1：文章证据、政策跟踪与热点快照
 
 生产绑定为 `DB`，数据库名 `eastmoney`。当前运行时关注：

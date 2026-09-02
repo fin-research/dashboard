@@ -274,32 +274,28 @@ function choiceRequestBatches(
     return batches;
   }
 
-  return [
-    {
-      definitions: CHOICE_ECONOMIC_INDICATORS.filter(
-        (definition) =>
-          definition.frequency === "日频" ||
-          definition.frequency === "不定期",
-      ),
-      startDate: daysBefore(endDate, 14),
-    },
-    {
-      definitions: CHOICE_ECONOMIC_INDICATORS.filter(
-        (definition) => definition.frequency === "月频",
-      ),
-      startDate: daysBefore(endDate, 400),
-    },
-    {
-      definitions: CHOICE_ECONOMIC_INDICATORS.filter(
-        (definition) => definition.frequency === "季频",
-      ),
-      startDate: daysBefore(endDate, 800),
-    },
-  ]
-    .filter((batch) => batch.definitions.length > 0)
-    .flatMap((batch) => chunkChoiceDefinitions(batch.definitions, 8).map(
-      (definitions) => ({ definitions, startDate: batch.startDate }),
-    ));
+  const definitionsByLookback = new Map<number, EconomicIndicatorDefinition[]>();
+  for (const definition of CHOICE_ECONOMIC_INDICATORS) {
+    const lookbackDays = definition.incrementalLookbackDays ?? (
+      definition.frequency === "月频"
+        ? 400
+        : definition.frequency === "季频"
+          ? 800
+          : 14
+    );
+    const definitions = definitionsByLookback.get(lookbackDays) ?? [];
+    definitions.push(definition);
+    definitionsByLookback.set(lookbackDays, definitions);
+  }
+
+  return [...definitionsByLookback.entries()]
+    .sort(([left], [right]) => left - right)
+    .flatMap(([lookbackDays, definitions]) =>
+      chunkChoiceDefinitions(definitions, 8).map((chunk) => ({
+        definitions: chunk,
+        startDate: daysBefore(endDate, lookbackDays),
+      })),
+    );
 }
 
 function chunkChoiceDefinitions(
