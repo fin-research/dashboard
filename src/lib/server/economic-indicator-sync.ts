@@ -8,6 +8,10 @@ import type { EconomicIndicatorSyncRow } from "./economic-indicators-repository.
 
 export type EconomicIndicatorSyncMode = "full" | "incremental";
 
+export type EconomicIndicatorSyncParams = {
+  scheduledTime: number;
+};
+
 export type DataApiRequest = (
   path: string,
   searchParams: URLSearchParams,

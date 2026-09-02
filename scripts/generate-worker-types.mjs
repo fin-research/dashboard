@@ -26,5 +26,8 @@ const withoutBuildImport = generated.replace(
 ).replace(
   /Workflow<Parameters<import\("\.\/worker\/entry"\)\.BondLedgerImportWorkflow\['run'\]>\[0\]\['payload'\]>/,
   'Workflow<import("./src/lib/bond-ledger/types").BondLedgerImportParams>',
+).replace(
+  /Workflow<Parameters<import\("\.\/worker\/entry"\)\.EconomicIndicatorSyncWorkflow\['run'\]>\[0\]\['payload'\]>/,
+  'Workflow<import("./src/lib/server/economic-indicator-sync").EconomicIndicatorSyncParams>',
 );
 await writeFile(declarationUrl, withoutBuildImport);

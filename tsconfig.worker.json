@@ -16,6 +16,8 @@
   },
   "include": [
     "worker/bond-ledger-workflow.ts",
+    "worker/economic-indicator-scheduled.ts",
+    "worker/economic-indicator-workflow.ts",
     "worker-configuration.d.ts"
   ]
 }

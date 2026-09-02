@@ -61,6 +61,11 @@
       "binding": "BOND_LEDGER_IMPORT",
       "name": "bond-ledger-import",
       "class_name": "BondLedgerImportWorkflow"
+    },
+    {
+      "binding": "ECONOMIC_INDICATOR_SYNC",
+      "name": "economic-indicator-sync",
+      "class_name": "EconomicIndicatorSyncWorkflow"
     }
   ],
   "observability": {

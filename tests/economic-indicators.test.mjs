@@ -11,6 +11,7 @@ import {
   fetchChoiceEconomicIndicatorRows,
   fetchDmFundingRateRows,
 } from "../src/lib/server/economic-indicator-sync.ts";
+import { economicIndicatorWorkflowInstanceId } from "../worker/economic-indicator-scheduled.ts";
 
 test("经济指标仓储按指标和Choice发布日期返回近18个月数据", async () => {
   const calls = [];
@@ -171,7 +172,7 @@ test("DM 历史资金利率映射为 EDB 指标代码并以北京时间落日", 
 });
 
 test("经济指标数据库、增量 Cron 和本地全量回填受静态契约约束", async () => {
-  const [migration, publishedDateMigration, observationDateMigration, route, script, sync, scheduled, worker, wrangler, client] = await Promise.all([
+  const [migration, publishedDateMigration, observationDateMigration, route, script, sync, scheduled, workflow, worker, wrangler, client] = await Promise.all([
     readFile(new URL("../edb-migrations/0001_create_edb.sql", import.meta.url), "utf8"),
     readFile(new URL("../edb-migrations/0002_use_published_date.sql", import.meta.url), "utf8"),
     readFile(new URL("../edb-migrations/0003_preserve_observation_date.sql", import.meta.url), "utf8"),
@@ -179,6 +180,7 @@ test("经济指标数据库、增量 Cron 和本地全量回填受静态契约�
     readFile(new URL("../scripts/update-economic-indicators.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/server/economic-indicator-sync.ts", import.meta.url), "utf8"),
     readFile(new URL("../worker/economic-indicator-scheduled.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/economic-indicator-workflow.ts", import.meta.url), "utf8"),
     readFile(new URL("../worker/entry.ts", import.meta.url), "utf8"),
     readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/economic-indicators.ts", import.meta.url), "utf8"),
@@ -202,11 +204,24 @@ test("经济指标数据库、增量 Cron 和本地全量回填受静态契约�
   assert.match(sync, /publishDateProxyByCode/);
   assert.match(sync, /\["EMI01737210", "EMM00072301"\]/);
   assert.match(sync, /observationDate/);
-  assert.doesNotMatch(`${script}\n${sync}`, /retry|setInterval/);
-  assert.match(scheduled, /"incremental"/);
-  assert.match(scheduled, /persistEconomicIndicators/);
+  assert.match(scheduled, /ECONOMIC_INDICATOR_SYNC/);
+  assert.match(scheduled, /economicIndicatorWorkflowInstanceId/);
+  assert.match(scheduled, /retention/);
+  assert.match(workflow, /class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint/);
+  assert.match(workflow, /fetch Choice EDB incremental/);
+  assert.match(workflow, /fetch DM funding history incremental/);
+  assert.match(workflow, /persist Neon economic indicators/);
+  assert.match(workflow, /backoff: "exponential"/);
+  assert.match(workflow, /workflowInstanceId/);
+  assert.match(worker, /EconomicIndicatorSyncWorkflow/);
   assert.match(worker, /scheduled\(controller, env, context\)/);
   assert.match(wrangler, /"crons": \["0 16 \* \* \*"\]/);
+  assert.match(wrangler, /"binding": "ECONOMIC_INDICATOR_SYNC"/);
+  assert.match(wrangler, /"name": "economic-indicator-sync"/);
   assert.match(client, /fetch\("\/api\/economic-indicators"/);
   assert.doesNotMatch(client, /\/data\/graphql|choiceEdb/);
+  assert.equal(
+    economicIndicatorWorkflowInstanceId(Date.parse("2026-09-01T16:00:00Z")),
+    "economic-indicator-sync-1788278400000",
+  );
 });
