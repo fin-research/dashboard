@@ -10,8 +10,12 @@ import {
 import { parseResearchContent } from "../src/lib/report-content.ts";
 import { fetchDataNewsDetail } from "../src/lib/server/data-news.ts";
 import {
+  stripCommentarySourceLinks,
+} from "../src/lib/policy-commentary-output.ts";
+import {
   loadResearchCommentaryDetail,
   loadResearchReportMetadata,
+  loadPolicyNewsDetail,
   loadPolicyTimeline,
   loadCommentaryGenerationContext,
   saveGeneratedCommentary,
@@ -37,6 +41,27 @@ test("政策点评标准化字段通过运行时 Schema 校验", () => {
     articleIds: ["A1", "A2"],
   });
   assert.equal(policyCategoryLabels.real_estate, "房地产");
+});
+
+test("政策点评 Prompt 遵循资金部时事快评规范并移除来源链接", async () => {
+  const prompt = await readFile(
+    new URL("../src/lib/server/policy-commentary.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(prompt, /POLICY_COMMENTARY_PROMPT_VERSION = "policy-commentary-v3"/);
+  assert.match(prompt, /全文控制在一页纸以内/);
+  assert.match(prompt, /eventSummary：只写一段，120 字以内/);
+  assert.match(prompt, /commentary：固定写 3 点编号分析/);
+  assert.match(prompt, /recommendation：必须以“融资发行方面，”开头/);
+  assert.match(prompt, /不得包含 URL、Markdown 链接、来源脚注或来源列表/);
+  assert.match(prompt, /风格样例仅用于学习结构与密度/);
+  assert.equal(
+    stripCommentarySourceLinks(
+      "详见[政策原文](https://example.com/policy)及 https://example.com/review。结论不变。",
+    ),
+    "详见政策原文及。结论不变。",
+  );
 });
 
 test("政策时间轴一次装配政策资讯、自动研报关系与一对一点评", async () => {
@@ -88,15 +113,20 @@ test("无关联研报时仍可装配政策点评生成上下文", async () => {
   assert.deepEqual(context.articles, []);
 });
 
-test("研报与点评使用独立深链并从政策页面进入", async () => {
-  const [policyPage, articlePage, commentaryPage] = await Promise.all([
+test("政策资讯、研报与点评使用独立深链并从政策页面进入", async () => {
+  const [policyPage, newsPage, articlePage, commentaryPage] = await Promise.all([
     readFile(new URL("../src/routes/policy-tracking/+page.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/routes/news/[id]/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/articles/[id]/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/commentaries/[id]/+page.svelte", import.meta.url), "utf8"),
   ]);
 
+  assert.match(policyPage, /\/news\/\$\{encodeURIComponent\(item\.id\)\}/);
   assert.match(policyPage, /\/articles\/\$\{encodeURIComponent\(article\.id\)\}/);
   assert.match(policyPage, /\/commentaries\/\$\{encodeURIComponent\(policy\.commentary\.id\)\}/);
+  assert.match(newsPage, /\/api\/news\/\$\{encodeURIComponent\(data\.id\)\}/);
+  assert.match(newsPage, /DM 原文/);
+  assert.match(newsPage, /查看政策原文/);
   assert.match(articlePage, /\/api\/articles\/\$\{encodeURIComponent\(data\.id\)\}/);
   assert.match(articlePage, /研报正文/);
   assert.match(commentaryPage, /\/api\/commentaries\/\$\{encodeURIComponent\(data\.id\)\}/);
@@ -137,6 +167,15 @@ test("研报和点评详情仓储返回对应政策上下文", async () => {
   assert.deepEqual(report.policies.map((policy) => policy.id), ["P1"]);
   assert.equal(commentary.commentary.id, "C1");
   assert.equal(commentary.policy.category, "real_estate");
+});
+
+test("统一新闻资讯详情返回 DM 原文、政策原文链接和关联政策", async () => {
+  const detail = await loadPolicyNewsDetail(fakePolicyNewsDetailDatabase(), "N1");
+
+  assert.equal(detail.title, "房地产信贷管理新政发布");
+  assert.equal(detail.content, "DM 政策资讯原文");
+  assert.equal(detail.link, "https://example.com/policy");
+  assert.equal(detail.policy.id, "P1");
 });
 
 test("AI 点评保存时模型、Prompt 版本和生成时间绑定到正确列", async () => {
@@ -345,6 +384,36 @@ function fakeDetailDatabase() {
             }] };
           }
           throw new Error(`unexpected all SQL: ${sql}`);
+        },
+      };
+    },
+  };
+}
+
+function fakePolicyNewsDetailDatabase() {
+  return {
+    prepare(sql) {
+      return {
+        bind() {
+          return this;
+        },
+        async first() {
+          if (/FROM policy_news pn/.test(sql)) {
+            return {
+              sentiment_id: "N1",
+              news_id: "NEWS1",
+              title: "房地产信贷管理新政发布",
+              published_at: "2026-09-01T19:00:00+08:00",
+              content: "DM 政策资讯原文",
+              link: "https://example.com/policy",
+              policy_id: "P1",
+              policy_title: "房地产信贷管理新政",
+              policy_summary: "政策摘要",
+              policy_category: "real_estate",
+              policy_date: "2026-09-01",
+            };
+          }
+          throw new Error(`unexpected first SQL: ${sql}`);
         },
       };
     },

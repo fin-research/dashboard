@@ -276,7 +276,7 @@
                   <ol class="news-list">
                     {#each policy.news as item}
                       <li><time datetime={item.publishedAt}>{formatTime(item.publishedAt)}</time>
-                        {#if item.link}<a href={item.link} target="_blank" rel="noreferrer">{item.title}</a>{:else}<span>{item.title}</span>{/if}
+                        <a href={`/news/${encodeURIComponent(item.id)}`}>{item.title}</a>
                       </li>
                     {/each}
                   </ol>

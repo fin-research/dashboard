@@ -3,16 +3,15 @@
 
   import ModuleCard from "../../../components/ModuleCard.svelte";
   import DetailPageShell from "$lib/policy-tracking/DetailPageShell.svelte";
+  import DocumentBody from "$lib/policy-tracking/DocumentBody.svelte";
   import type { ResearchReportDetail } from "$lib/policies";
   import { policyCategoryLabels } from "$lib/policies";
-  import { parseResearchContent } from "$lib/report-content";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
   let report = $state<ResearchReportDetail | null>(null);
   let loading = $state(true);
   let errorMessage = $state("");
-  let blocks = $derived.by(() => parseResearchContent(report?.content ?? ""));
 
   onMount(() => { void loadReport(); });
 
@@ -77,16 +76,7 @@
 
         <ModuleCard class="report-content" labelledBy="report-body-title">
           <h2 id="report-body-title">研报正文</h2>
-          <article class="document-body">
-            {#each blocks as block}
-              {#if block.kind === "heading"}
-                {#if block.level === 2}<h2>{block.text}</h2>{:else}<h3>{block.text}</h3>{/if}
-              {:else if block.kind === "list"}
-                {#if block.ordered}<ol>{#each block.items as item}<li>{item}</li>{/each}</ol>
-                {:else}<ul>{#each block.items as item}<li>{item}</li>{/each}</ul>{/if}
-              {:else}<p>{block.text}</p>{/if}
-            {/each}
-          </article>
+          <DocumentBody content={report.content} />
         </ModuleCard>
       </div>
 
@@ -127,11 +117,6 @@
   .source-link { width: fit-content; gap: 7px; margin-top: 18px; text-decoration: none; }
   .source-link svg { width: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
   #report-body-title, aside h2 { margin: 0 0 18px; font-size: 1.125rem; }
-  .document-body { max-width: 760px; margin: 0 auto; color: #344054; font-size: 1rem; line-height: 1.9; }
-  .document-body h2 { margin: 32px 0 12px; color: #172033; font-size: 1.25rem; }
-  .document-body h3 { margin: 26px 0 10px; color: #172033; font-size: 1.125rem; }
-  .document-body p { margin: 0 0 18px; white-space: pre-wrap; }
-  .document-body ol, .document-body ul { display: grid; gap: 10px; margin: 0 0 20px; padding-left: 24px; }
   .policy-list { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
   .policy-list li { padding-bottom: 14px; border-bottom: 1px solid #e4e7ec; }
   .policy-list li:last-child { padding-bottom: 0; border-bottom: 0; }
@@ -142,6 +127,6 @@
   .policy-list p, .empty-text { margin: 7px 0 0; color: #667085; font-size: .875rem; line-height: 1.6; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (max-width: 900px) { .report-layout { grid-template-columns: 1fr; } aside { order: -1; } }
-  @media (max-width: 620px) { :global(.report-hero), :global(.report-content) { padding: 16px; } #report-title { font-size: 1.25rem; } .document-body { line-height: 1.8; } }
+  @media (max-width: 620px) { :global(.report-hero), :global(.report-content) { padding: 16px; } #report-title { font-size: 1.25rem; } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } .page-state button, .source-link { transition: none; } }
 </style>

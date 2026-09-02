@@ -58,6 +58,7 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 - `PUT /api/policies/{id}/articles`：人工确认完整研报 ID 集合；未选择的现有自动关系记为人工排除，后续 Workflow 不覆盖。
 - `POST /api/policies/{id}/commentary`：用户手动触发。Worker 通过 `DATA` Service Binding 以最多 5 路并发读取已关联研报正文（可为空），与政策资讯一起调用启用 Responses `web_search` 的 AI Gateway，并保存使用政策点评专用 `max` effort 生成的政策点评初版，成功为 201。
 - `PUT /api/policies/{id}/commentary`：保存标准化点评字段的人工修订。
+- `GET /api/news/{id}`：按 DM `sentiment_id` 读取已聚合政策资讯的标题、时间、DM 原文、政策原文链接与关联政策；对应统一新闻资讯页面 `/news/{id}`。
 - `GET /api/articles/{id}`：读取研报 D1 元数据、已关联政策，并通过 `DATA` Service Binding 读取正文；对应独立页面 `/articles/{id}`。
 - `GET /api/commentaries/{id}`：按点评 ID 读取标准化点评与对应政策；对应独立页面 `/commentaries/{id}`。
 

@@ -5,6 +5,7 @@ import type {
   PolicyCategory,
   PolicyEvent,
   PolicyNews,
+  PolicyNewsDetail,
   RelatedPolicySummary,
   ResearchCommentaryDetail,
   ResearchCommentary,
@@ -84,6 +85,20 @@ interface RelatedPolicyRow {
   title: string;
   summary: string;
   category: PolicyCategory;
+  policy_date: string;
+}
+
+interface PolicyNewsDetailRow {
+  sentiment_id: string;
+  news_id: string | null;
+  title: string;
+  published_at: string;
+  content: string | null;
+  link: string | null;
+  policy_id: string;
+  policy_title: string;
+  policy_summary: string;
+  policy_category: PolicyCategory;
   policy_date: string;
 }
 
@@ -257,6 +272,40 @@ export async function loadResearchReportMetadata(
     publishedAt: article.published_at,
     link: article.link,
     policies,
+  };
+}
+
+export async function loadPolicyNewsDetail(
+  database: Env["DB"],
+  sentimentId: string,
+): Promise<PolicyNewsDetail> {
+  const row = await database.prepare(`
+    SELECT pn.sentiment_id, pn.news_id, pn.title, pn.published_at,
+           pn.content, pn.link, pe.id AS policy_id, pe.title AS policy_title,
+           pe.summary AS policy_summary, pe.category AS policy_category,
+           pe.policy_date
+    FROM policy_news pn
+    JOIN policy_event pe ON pe.id = pn.policy_id
+    WHERE pn.sentiment_id = ? AND pn.aggregation_status = 'grouped'
+  `).bind(sentimentId).first<PolicyNewsDetailRow>();
+  if (!row) throw new PolicyRepositoryError(404, "政策资讯不存在");
+  if (!row.content?.trim()) {
+    throw new PolicyRepositoryError(422, "政策资讯正文尚未完整入库");
+  }
+  return {
+    id: row.sentiment_id,
+    newsId: row.news_id,
+    title: row.title,
+    publishedAt: row.published_at,
+    content: row.content,
+    link: row.link,
+    policy: {
+      id: row.policy_id,
+      title: row.policy_title,
+      summary: row.policy_summary,
+      category: row.policy_category,
+      policyDate: row.policy_date,
+    },
   };
 }
 

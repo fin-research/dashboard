@@ -99,6 +99,11 @@ export interface RelatedPolicySummary {
   policyDate: string;
 }
 
+export interface PolicyNewsDetail extends PolicyNews {
+  content: string;
+  policy: RelatedPolicySummary;
+}
+
 export interface ResearchReportDetail extends ArticleSearchResult {
   content: string;
   policies: RelatedPolicySummary[];
