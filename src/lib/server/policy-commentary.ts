@@ -11,7 +11,7 @@ import {
   saveGeneratedCommentary,
 } from "./policy-repository";
 
-export const POLICY_COMMENTARY_PROMPT_VERSION = "policy-commentary-v1";
+export const POLICY_COMMENTARY_PROMPT_VERSION = "policy-commentary-v2";
 const ARTICLE_DETAIL_CONCURRENCY = 5;
 
 const generatedCommentarySchema = z.object({
@@ -20,9 +20,9 @@ const generatedCommentarySchema = z.object({
   recommendation: z.string().min(20).max(6_000),
 }).strict();
 
-const COMMENTARY_INSTRUCTIONS = `你是东方财富证券资金管理部的专业研究员。请根据输入的政策原始资讯和已经确认关联的卖方研报，生成“政策跟踪”点评初版。
+const COMMENTARY_INSTRUCTIONS = `你是东方财富证券资金管理部的专业研究员。请根据输入的政策原始资讯、已经确认关联的卖方研报（如有）以及联网搜索到的可靠公开资料，生成“政策跟踪”点评初版。
 
-必须只使用输入材料，不搜索、不补写无法验证的数字或事实。政策资讯用于确认政策事实，研报用于吸收分析框架和分歧；不得把研报观点写成官方表述。若材料之间存在分歧，应明确保留。
+政策资讯用于确认政策事实，研报用于吸收分析框架和分歧，联网搜索用于补充最新背景和核验关键事实。必须区分官方政策、卖方观点和公开资料，不得把研报或搜索结果写成官方表述。不得编造无法验证的数字或事实；若材料之间存在分歧，应明确保留，并优先采用权威、较新的来源。
 
 eventSummary 写一段结论先行的事件摘要，突出政策动作、直接变化和最重要的市场含义。commentary 写 2—5 条编号分析，每条格式为“1. 小标题”另起一行写正文，覆盖政策变化、传导机制、资产或融资影响和后续验证条件。recommendation 写对资金管理、负债融资或投资交易可执行的应对建议，不写泛泛表态。
 
@@ -71,13 +71,14 @@ export async function generatePolicyCommentary(
     {
       promptCacheKey: `policy-tracking:${POLICY_COMMENTARY_PROMPT_VERSION}`,
       requestTimeoutMs: 300_000,
-      taskType: "analysis",
+      taskType: "policy_commentary",
+      tools: [{ type: "web_search" }],
       metadata: {
         policy_id: policyId,
         policy_date: context.policy.policyDate,
         article_count: articles.length,
         prompt_version: POLICY_COMMENTARY_PROMPT_VERSION,
-        tags: "policy-tracking,commentary,manual-generation",
+        tags: "policy-tracking,commentary,manual-generation,web-search",
       },
     },
   );

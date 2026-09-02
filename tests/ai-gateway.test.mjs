@@ -138,8 +138,37 @@ test("reasoning effort is fixed by task type", () => {
   assert.deepEqual(AI_GATEWAY_REASONING_EFFORT_BY_TASK, {
     generation: "high",
     analysis: "high",
+    policy_commentary: "max",
     summary: "low",
   });
+});
+
+test("policy commentary enables Responses web search with max reasoning effort", async () => {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return responsesOutput({ ok: true });
+  };
+
+  const { value } = await withoutAiLogs(() =>
+    generateAiGatewayObject(
+      credentials,
+      [{ role: "user", content: "policy" }],
+      z.object({ ok: z.boolean() }).strict(),
+      "policy_commentary",
+      {
+        ...options,
+        taskType: "policy_commentary",
+        tools: [{ type: "web_search" }],
+      },
+      fetcher,
+    ),
+  );
+
+  assert.deepEqual(value, { ok: true });
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.reasoning.effort, "max");
+  assert.deepEqual(body.tools, [{ type: "web_search" }]);
 });
 
 test("retryable primary failure falls back once to direct custom-codex", async () => {

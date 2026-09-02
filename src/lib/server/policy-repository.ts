@@ -372,9 +372,6 @@ export async function loadCommentaryGenerationContext(
   if (newsRows.length === 0 || newsRows.some((item) => !item.content)) {
     throw new PolicyRepositoryError(422, "政策资讯正文尚未完整入库");
   }
-  if (articleRows.length === 0) {
-    throw new PolicyRepositoryError(422, "请等待或确认至少一篇关联研报后再生成点评");
-  }
   return {
     policy: {
       id: policy.id,

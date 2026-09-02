@@ -9,6 +9,7 @@ export const AI_GATEWAY_FALLBACK_PROVIDER = "custom-codex" as const;
 export const AI_GATEWAY_REASONING_EFFORT_BY_TASK = {
   generation: "high",
   analysis: "high",
+  policy_commentary: "max",
   summary: "low",
 } as const;
 
@@ -25,11 +26,16 @@ export interface AiGatewayMessage {
   content: string;
 }
 
+export interface AiGatewayTool {
+  type: "web_search";
+}
+
 export interface AiGatewayOptions {
   metadata: Record<string, string | number | boolean>;
   promptCacheKey: string;
   requestTimeoutMs: number;
   taskType: AiGatewayTaskType;
+  tools?: readonly AiGatewayTool[];
 }
 
 export interface AiGatewayAttemptFailure {
@@ -280,6 +286,7 @@ async function runProvider<OUTPUT>(
         prompt_cache_key: promptCacheKey,
         ...(prompt.instructions ? { instructions: prompt.instructions } : {}),
         reasoning: { effort: reasoningEffort, summary: "auto" },
+        ...(options.tools && options.tools.length > 0 ? { tools: options.tools } : {}),
         text: {
           format: {
             type: "json_schema",

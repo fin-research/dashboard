@@ -13,6 +13,7 @@ import {
   loadResearchCommentaryDetail,
   loadResearchReportMetadata,
   loadPolicyTimeline,
+  loadCommentaryGenerationContext,
   saveGeneratedCommentary,
 } from "../src/lib/server/policy-repository.ts";
 
@@ -57,7 +58,8 @@ test("政策页面只手动生成点评，政策与研报聚合由后台 Workflo
   ]);
 
   assert.match(page, /class="ai-generate-button"/);
-  assert.match(page, /aria-label=\{policy\.articles\.length === 0 \? "请先关联至少一篇研报"/);
+  assert.match(page, /disabled=\{generatingPolicyId === policy\.id\}/);
+  assert.doesNotMatch(page, /请先关联至少一篇研报/);
   assert.match(page, /<p class="empty-text">尚未生成<\/p>/);
   assert.match(page, /\.timeline \{ display: grid; gap: 12px;/);
   assert.match(page, /\.timeline-item \{ display: grid; grid-template-columns: 126px minmax\(0, 1fr\); gap: 2rem;/);
@@ -68,6 +70,16 @@ test("政策页面只手动生成点评，政策与研报聚合由后台 Workflo
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_article/);
   assert.match(migration, /association_method IN \('ai', 'manual'\)/);
   assert.match(migration, /policy_id TEXT UNIQUE/);
+});
+
+test("无关联研报时仍可装配政策点评生成上下文", async () => {
+  const context = await loadCommentaryGenerationContext(
+    fakeCommentaryGenerationDatabase(),
+    "P1",
+  );
+
+  assert.equal(context.news.length, 1);
+  assert.deepEqual(context.articles, []);
 });
 
 test("研报与点评使用独立深链并从政策页面进入", async () => {
@@ -244,6 +256,48 @@ function fakePolicyDatabase() {
             }] };
           }
           throw new Error(`unexpected SQL: ${sql}`);
+        },
+      };
+    },
+  };
+}
+
+function fakeCommentaryGenerationDatabase() {
+  return {
+    prepare(sql) {
+      return {
+        bind() {
+          return this;
+        },
+        async first() {
+          if (/FROM policy_event/.test(sql)) {
+            return {
+              id: "P1",
+              title: "房地产信贷管理新政",
+              summary: "政策摘要",
+              category: "real_estate",
+              departments_json: JSON.stringify(["中国人民银行"]),
+              policy_date: "2026-09-01",
+              first_news_at: "2026-09-01T19:00:00+08:00",
+              last_news_at: "2026-09-01T19:00:00+08:00",
+              updated_at: "2026-09-01T11:30:00Z",
+            };
+          }
+          throw new Error(`unexpected first SQL: ${sql}`);
+        },
+        async all() {
+          if (/FROM policy_news/.test(sql)) {
+            return {
+              results: [{
+                id: "N1",
+                title: "新政发布",
+                published_at: "2026-09-01T19:00:00+08:00",
+                content: "政策正文",
+              }],
+            };
+          }
+          if (/FROM policy_article/.test(sql)) return { results: [] };
+          throw new Error(`unexpected all SQL: ${sql}`);
         },
       };
     },
