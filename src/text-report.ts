@@ -51,6 +51,33 @@ ${focusText}
 `;
 }
 
+export interface TextReportLine {
+  text: string;
+  bold: boolean;
+}
+
+export function buildTextReportLines(
+  data: ReportData,
+  focusText = "",
+): TextReportLine[] {
+  const tradedInventoryLines = new Set(
+    data.inventory_bonds
+      .filter((row) => row.trade_yield !== null)
+      .map(emBondLine),
+  );
+  let inInventorySection = false;
+  return buildTextReport(data, focusText)
+    .split("\n")
+    .map((text) => {
+      if (text.startsWith("东财存量债券:")) inInventorySection = true;
+      else if (text.startsWith("【")) inInventorySection = false;
+      return {
+        text,
+        bold: inInventorySection && tradedInventoryLines.has(text),
+      };
+    });
+}
+
 export function briefOmo(rows: OmoOperation[], reportDate: string): string {
   const dayRows = rows.filter(
     (row) => row.operation_date === reportDate,
@@ -61,7 +88,7 @@ export function briefOmo(rows: OmoOperation[], reportDate: string): string {
   const drain = dayRows
     .filter((row) => (row.amount_yi ?? 0) < 0)
     .sort((left, right) => right.amount_yi! - left.amount_yi!);
-  let text = "中国央行今日开展";
+  let text = inject.length ? "中国央行今日开展" : "今日未开展逆回购操作";
   inject.forEach((row, index) => {
     if (index === 1) text += "，并开展";
     else if (index > 1) text += "、";
@@ -200,12 +227,16 @@ function secondaryMarket(rows: SecondaryBond[]): string {
 
 function emBonds(rows: InventoryPoint[]): string {
   const candidates = [...rows].sort((left, right) => left.tenor_years - right.tenor_years);
-  const lines = candidates.map((item) => {
-    let line = `${item.tenor_label.replaceAll("D", "天").replaceAll("Y", "年")}-${item.bond_name || "--"}-估值${compact(item.valuation)}%`;
-    const trade = emTradeText(item); if (trade) line += `-${trade}`; return line;
-  });
+  const lines = candidates.map(emBondLine);
   if (lines.length === 1) lines.push("今日暂无。");
   return lines.join("\n");
+}
+
+function emBondLine(item: InventoryPoint): string {
+  let line = `${item.tenor_label.replaceAll("D", "天").replaceAll("Y", "年")}-${item.bond_name || "--"}-估值${compact(item.valuation)}%`;
+  const trade = emTradeText(item);
+  if (trade) line += `-${trade}`;
+  return line;
 }
 
 function emTradeText(row: InventoryPoint): string {

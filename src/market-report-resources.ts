@@ -327,6 +327,7 @@ function normalizeSecondary(rows: EnrichedTodayTrade[]): ReportData["secondary_b
     if (
       row.bondType !== 37 ||
       row.bondOfferingType !== 1 ||
+      row.sciTechInnoBondStatus !== 0 ||
       isEastmoney(bondName) ||
       isEastmoney(issuer) ||
       tenorYears === null ||

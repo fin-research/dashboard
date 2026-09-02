@@ -180,6 +180,7 @@ export const bondInfoSchema = z.object({
   comShortName: z.string(),
   bondType: numericValue,
   bondOfferingType: numericValue,
+  sciTechInnoBondStatus: numericValue,
 });
 const bondInfoRowsSchema = z.array(bondInfoSchema);
 const legacyBondInfoSchema = z.object({ data: z.array(z.unknown()) });

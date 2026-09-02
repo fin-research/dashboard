@@ -32,6 +32,12 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
         tradeYield: null,
         cbYte: 1.90,
       },
+      {
+        bondUniCode: "105",
+        remainingTenor: "4.98Y",
+        tradeYield: 1.735,
+        cbYte: 1.734,
+      },
   ];
   const favoriteQuotes = [
       {
@@ -43,7 +49,7 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
         ofrYield: 2.02,
       },
   ];
-  assert.deepEqual(referencedBondCodes(todayTrades, favoriteQuotes), ["101", "102", "103", "104"]);
+  assert.deepEqual(referencedBondCodes(todayTrades, favoriteQuotes), ["101", "102", "103", "104", "105"]);
 
   const report = buildReportData({
     reportDate: "2026-08-25",
@@ -141,10 +147,11 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
     todayTrades,
     favoriteQuotes,
     bondInfos: [
-        { bondUniCode: "101", bondShortName: "26测试01", comShortName: "测试公司", bondType: 37, bondOfferingType: 1 },
-        { bondUniCode: "102", bondShortName: "26东财01", comShortName: "东方财富", bondType: 37, bondOfferingType: 1 },
-        { bondUniCode: "103", bondShortName: "26私募01", comShortName: "私募公司", bondType: 37, bondOfferingType: 2 },
-        { bondUniCode: "104", bondShortName: "26缺失01", comShortName: "缺失公司", bondType: 37, bondOfferingType: 1 },
+        { bondUniCode: "101", bondShortName: "26测试01", comShortName: "测试公司", bondType: 37, bondOfferingType: 1, sciTechInnoBondStatus: 0 },
+        { bondUniCode: "102", bondShortName: "26东财01", comShortName: "东方财富", bondType: 37, bondOfferingType: 1, sciTechInnoBondStatus: 0 },
+        { bondUniCode: "103", bondShortName: "26私募01", comShortName: "私募公司", bondType: 37, bondOfferingType: 2, sciTechInnoBondStatus: 0 },
+        { bondUniCode: "104", bondShortName: "26缺失01", comShortName: "缺失公司", bondType: 37, bondOfferingType: 1, sciTechInnoBondStatus: 0 },
+        { bondUniCode: "105", bondShortName: "26中证K2", comShortName: "中信证券", bondType: 37, bondOfferingType: 1, sciTechInnoBondStatus: 1 },
       ],
   });
 
@@ -164,6 +171,7 @@ test("浏览器共享加工层从原始资源构造完整规范报告", () => {
   assert.deepEqual(report.primary_issues[0].tenors, ["180天", "1年"]);
   assert.equal(report.secondary_bonds.length, 1);
   assert.equal(report.secondary_bonds[0].issuer, "测试公司");
+  assert.ok(!report.secondary_bonds.some((item) => item.bond_name === "26中证K2"));
   assert.equal(report.inventory_bonds[0].bid_yield, 2.01);
 });
 
@@ -187,6 +195,7 @@ test("东财债券零 Bid/Ofr 归一为空但债券仍保留", () => {
     bondInfos: [{
       bondUniCode: "101", bondShortName: "25东财G1",
       comShortName: "东方财富证券", bondType: 37, bondOfferingType: 1,
+      sciTechInnoBondStatus: 0,
     }],
   });
   assert.equal(report.inventory_bonds.length, 1);

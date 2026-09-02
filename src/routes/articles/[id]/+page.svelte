@@ -74,7 +74,7 @@
           {/if}
         </ModuleCard>
 
-        <ModuleCard class="report-content" labelledBy="report-body-title">
+        <ModuleCard class="research-report-content" labelledBy="report-body-title">
           <h2 id="report-body-title">研报正文</h2>
           <DocumentBody content={report.content} />
         </ModuleCard>
@@ -109,7 +109,7 @@
   .spinner { width: 22px; height: 22px; border: 3px solid #d8e2f0; border-top-color: #2f6fd6; border-radius: 50%; animation: spin .8s linear infinite; }
   .report-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
   .report-column { display: grid; gap: 20px; min-width: 0; }
-  :global(.report-hero), :global(.report-content) { padding: 24px; }
+  :global(.report-hero), :global(.research-report-content) { padding: 24px; }
   .report-meta { display: flex; flex-wrap: wrap; gap: 8px 18px; color: #667085; font-size: .875rem; }
   .report-meta span { color: #2f6fd6; font-weight: bold; }
   #report-title { margin: 14px 0 12px; font-size: 1.5rem; line-height: 1.45; }
@@ -127,6 +127,6 @@
   .policy-list p, .empty-text { margin: 7px 0 0; color: #667085; font-size: .875rem; line-height: 1.6; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (max-width: 900px) { .report-layout { grid-template-columns: 1fr; } aside { order: -1; } }
-  @media (max-width: 620px) { :global(.report-hero), :global(.report-content) { padding: 16px; } #report-title { font-size: 1.25rem; } }
+  @media (max-width: 620px) { :global(.report-hero), :global(.research-report-content) { padding: 16px; } #report-title { font-size: 1.25rem; } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } .page-state button, .source-link { transition: none; } }
 </style>

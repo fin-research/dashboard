@@ -503,6 +503,10 @@ h1 {
   white-space: pre-wrap;
 }
 
+.text-report pre strong {
+  font-weight: bold;
+}
+
 .dashboard-panel {
   position: relative;
   display: flex;

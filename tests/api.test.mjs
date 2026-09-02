@@ -130,7 +130,7 @@ function directResponse(target) {
     assert.equal(url.searchParams.get("codes"), "123");
     assert.equal(
       url.searchParams.get("fields"),
-      "bondUniCode,bondShortName,comShortName,bondType,bondOfferingType",
+      "bondUniCode,bondShortName,comShortName,bondType,bondOfferingType,sciTechInnoBondStatus",
     );
     return Response.json([{
       bondUniCode: "123",
@@ -138,6 +138,7 @@ function directResponse(target) {
       comShortName: "测试公司",
       bondType: 37,
       bondOfferingType: 1,
+      sciTechInnoBondStatus: 0,
     }]);
   }
   throw new Error(`unexpected request: ${target}`);

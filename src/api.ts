@@ -189,7 +189,7 @@ export async function fetchReport(
     if (codes.length === 0) return [];
     const bondQuery = new URLSearchParams({
       codes: codes.join(","),
-      fields: "bondUniCode,bondShortName,comShortName,bondType,bondOfferingType",
+      fields: "bondUniCode,bondShortName,comShortName,bondType,bondOfferingType,sciTechInnoBondStatus",
     });
     return getJson(`/data/bond-infos?${bondQuery}`, bondInfosSchema, signal);
   });

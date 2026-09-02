@@ -129,6 +129,8 @@ test("政策资讯、研报与点评使用独立深链并从政策页面进入",
   assert.match(newsPage, /查看政策原文/);
   assert.match(articlePage, /\/api\/articles\/\$\{encodeURIComponent\(data\.id\)\}/);
   assert.match(articlePage, /研报正文/);
+  assert.doesNotMatch(articlePage, /:global\(\.report-content\)/);
+  assert.match(articlePage, /research-report-content/);
   assert.match(commentaryPage, /\/api\/commentaries\/\$\{encodeURIComponent\(data\.id\)\}/);
   assert.match(commentaryPage, /查看对应政策/);
 });

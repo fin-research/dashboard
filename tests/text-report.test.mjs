@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildTextReport } from "../src/text-report.ts";
+import {
+  buildTextReport,
+  buildTextReportLines,
+} from "../src/text-report.ts";
 
 const data = {
   report_date: "2026-08-13",
@@ -83,6 +86,29 @@ test("文字版保留零报价债券但不显示 Bid/Ofr", () => {
   assert.ok(report.includes("25东财G3-估值1.75%"));
   assert.ok(!report.includes("Bid0%"));
   assert.ok(!report.includes("Ofr0%"));
+});
+
+test("文字版加粗东财债券有成交的行", () => {
+  const tradedLine = "180天-25东财G1-估值1.55%-成交1.56%(+1.25bp)";
+  const lines = buildTextReportLines(data, tradedLine);
+  assert.deepEqual(
+    lines.filter((line) => line.bold).map((line) => line.text),
+    [tradedLine],
+  );
+});
+
+test("报告日未开展逆回购时显示完整文案", () => {
+  const input = structuredClone(data);
+  input.omo_operations = [{
+    operation_date: "2026-08-13",
+    duration: "7D",
+    operation_name: "逆回购",
+    amount_yi: -500,
+    interest_rate: 1.4,
+  }];
+  const report = buildTextReport(input);
+  assert.ok(report.includes("【央行】\n今日未开展逆回购操作；"));
+  assert.ok(!report.includes("中国央行今日开展；"));
 });
 
 test("文字版展示当前手动修改后的今日聚焦", () => {
