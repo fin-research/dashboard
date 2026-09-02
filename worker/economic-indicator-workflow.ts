@@ -1,5 +1,6 @@
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
+import { NonRetryableError } from "cloudflare:workflows";
 
 import {
   fetchChoiceEconomicIndicatorRows,
@@ -23,16 +24,6 @@ export type EconomicIndicatorSyncResult = {
   asOf: string;
 };
 
-const sourceStepConfig = {
-  retries: { limit: 4, delay: "30 seconds", backoff: "exponential" as const },
-  timeout: "5 minutes",
-} as const;
-
-const persistStepConfig = {
-  retries: { limit: 4, delay: "30 seconds", backoff: "exponential" as const },
-  timeout: "2 minutes",
-} as const;
-
 export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<
   Cloudflare.Env,
   EconomicIndicatorSyncParams
@@ -49,75 +40,89 @@ export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<
     const [choice, dm] = await Promise.all([
       step.do(
         "fetch Choice EDB incremental",
-        sourceStepConfig,
-        async (context) => {
-          const result = await fetchChoiceEconomicIndicatorRows(
-            (path, searchParams) => requestDataApi(this.env, path, searchParams),
-            "incremental",
-            new Date(scheduledTime),
-          );
-          console.log(
-            JSON.stringify({
-              event: "economic_indicators_workflow_source",
-              source: "choice-edb",
-              workflowInstanceId: event.instanceId,
-              attempt: context.attempt,
-              requestedIndicators: result.requestedCodes.length,
-              returnedIndicators: result.returnedCodes.length,
-              rowCount: result.rows.length,
-              range: result.range,
-            }),
-          );
-          return result;
-        },
+        (context) =>
+          runWithoutAutomaticRetry(
+            event.instanceId,
+            "fetch Choice EDB incremental",
+            async () => {
+              const result = await fetchChoiceEconomicIndicatorRows(
+                (path, searchParams) =>
+                  requestDataApi(this.env, path, searchParams),
+                "incremental",
+                new Date(scheduledTime),
+              );
+              console.log(
+                JSON.stringify({
+                  event: "economic_indicators_workflow_source",
+                  source: "choice-edb",
+                  workflowInstanceId: event.instanceId,
+                  attempt: context.attempt,
+                  requestedIndicators: result.requestedCodes.length,
+                  returnedIndicators: result.returnedCodes.length,
+                  rowCount: result.rows.length,
+                  range: result.range,
+                }),
+              );
+              return result;
+            },
+          ),
       ),
       step.do(
         "fetch DM funding history incremental",
-        sourceStepConfig,
-        async (context) => {
-          const result = await fetchDmFundingRateRows(
-            (path, searchParams) => requestDataApi(this.env, path, searchParams),
-            "incremental",
-            new Date(scheduledTime),
-          );
-          console.log(
-            JSON.stringify({
-              event: "economic_indicators_workflow_source",
-              source: "dm-funding-history",
-              workflowInstanceId: event.instanceId,
-              attempt: context.attempt,
-              requestedIndicators: result.requestedCodes.length,
-              returnedIndicators: result.returnedCodes.length,
-              rowCount: result.rows.length,
-              pageCount: result.pageCount,
-            }),
-          );
-          return result;
-        },
+        (context) =>
+          runWithoutAutomaticRetry(
+            event.instanceId,
+            "fetch DM funding history incremental",
+            async () => {
+              const result = await fetchDmFundingRateRows(
+                (path, searchParams) =>
+                  requestDataApi(this.env, path, searchParams),
+                "incremental",
+                new Date(scheduledTime),
+              );
+              console.log(
+                JSON.stringify({
+                  event: "economic_indicators_workflow_source",
+                  source: "dm-funding-history",
+                  workflowInstanceId: event.instanceId,
+                  attempt: context.attempt,
+                  requestedIndicators: result.requestedCodes.length,
+                  returnedIndicators: result.returnedCodes.length,
+                  rowCount: result.rows.length,
+                  pageCount: result.pageCount,
+                }),
+              );
+              return result;
+            },
+          ),
       ),
     ]);
 
     const rows: EconomicIndicatorSyncRow[] = [...choice.rows, ...dm.rows];
     const stored = await step.do(
       "persist Neon economic indicators",
-      persistStepConfig,
-      async (context) => {
-        const result = await withPostgres(
-          this.env.HYPERDRIVE?.connectionString,
-          "eastmoney-edb-workflow",
-          (client) => persistEconomicIndicators(client, rows),
-        );
-        console.log(
-          JSON.stringify({
-            event: "economic_indicators_workflow_persisted",
-            workflowInstanceId: event.instanceId,
-            attempt: context.attempt,
-            storedRows: result.rowCount,
-            asOf: result.asOf,
-          }),
-        );
-        return result;
-      },
+      (context) =>
+        runWithoutAutomaticRetry(
+          event.instanceId,
+          "persist Neon economic indicators",
+          async () => {
+            const result = await withPostgres(
+              this.env.HYPERDRIVE?.connectionString,
+              "eastmoney-edb-workflow",
+              (client) => persistEconomicIndicators(client, rows),
+            );
+            console.log(
+              JSON.stringify({
+                event: "economic_indicators_workflow_persisted",
+                workflowInstanceId: event.instanceId,
+                attempt: context.attempt,
+                storedRows: result.rowCount,
+                asOf: result.asOf,
+              }),
+            );
+            return result;
+          },
+        ),
     );
 
     const result: EconomicIndicatorSyncResult = {
@@ -140,6 +145,31 @@ export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<
     );
     return result;
   }
+}
+
+async function runWithoutAutomaticRetry<T>(
+  workflowInstanceId: string,
+  stepName: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const message = errorMessage(error);
+    console.error(
+      JSON.stringify({
+        event: "economic_indicators_workflow_step_failed",
+        workflowInstanceId,
+        step: stepName,
+        error: message,
+      }),
+    );
+    throw new NonRetryableError(`${stepName}: ${message}`);
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function requestDataApi(

@@ -46,6 +46,14 @@ export async function startEconomicIndicatorSyncWorkflow(
       );
       return id;
     } catch {
+      console.error(
+        JSON.stringify({
+          event: "economic_indicators_workflow_dispatch_failed",
+          workflowInstanceId: id,
+          scheduledTime,
+          error: errorMessage(error),
+        }),
+      );
       throw error;
     }
   }
@@ -53,7 +61,8 @@ export async function startEconomicIndicatorSyncWorkflow(
 
 /*
  * Keep the schedule entrypoint small: all external calls and database writes
- * belong to the Workflow so they are represented by durable, retryable steps.
+ * belong to the Workflow so they are represented by durable steps that can be
+ * inspected and manually restarted without automatic retries.
  */
 export async function runEconomicIndicatorScheduledSync(
   env: Cloudflare.Env,
@@ -67,4 +76,8 @@ export async function runEconomicIndicatorScheduledSync(
       scheduledTime,
     }),
   );
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

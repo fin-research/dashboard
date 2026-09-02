@@ -7,6 +7,7 @@ export { EconomicIndicatorSyncWorkflow } from "./economic-indicator-workflow.ts"
 const worker: ExportedHandler<Cloudflare.Env> = {
   fetch: svelteKitWorker.fetch,
   scheduled(controller, env, context) {
+    controller.noRetry();
     context.waitUntil(
       runEconomicIndicatorScheduledSync(env, controller.scheduledTime),
     );
