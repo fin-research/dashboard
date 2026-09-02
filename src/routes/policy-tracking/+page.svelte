@@ -300,11 +300,23 @@
                 </section>
 
                 <section class="commentary-section">
-                  <div class="section-heading"><h3>研究点评</h3><div class="heading-actions">
-                    {#if policy.commentary}<a class="detail-link" href={`/commentaries/${encodeURIComponent(policy.commentary.id)}`}>查看完整点评</a><button type="button" onclick={() => openCommentaryEditor(policy)}>编辑</button>{/if}
-                    <button class="primary-action" type="button" disabled={generatingPolicyId === policy.id || policy.articles.length === 0} onclick={() => generateCommentary(policy)}>
-                      {generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成初版" : "AI 生成点评初版"}
+                  <div class="section-heading"><div class="section-title"><h3>研究点评</h3>
+                    <button
+                      class="ai-generate-button"
+                      class:is-loading={generatingPolicyId === policy.id}
+                      type="button"
+                      disabled={generatingPolicyId === policy.id || policy.articles.length === 0}
+                      aria-label={generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
+                      title={generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
+                      onclick={() => generateCommentary(policy)}
+                    >
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="m10 2 1.1 4.2L15 8l-3.9 1.8L10 14l-1.1-4.2L5 8l3.9-1.8L10 2Z" />
+                        <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
+                      </svg>
                     </button>
+                  </div><div class="heading-actions">
+                    {#if policy.commentary}<a class="detail-link" href={`/commentaries/${encodeURIComponent(policy.commentary.id)}`}>查看完整点评</a><button type="button" onclick={() => openCommentaryEditor(policy)}>编辑</button>{/if}
                   </div></div>
                   {#if policy.commentary}
                     <article class="commentary">
@@ -314,7 +326,7 @@
                       <h4>政策点评</h4><p>{policy.commentary.commentary}</p>
                       <h4>应对建议</h4><p>{policy.commentary.recommendation}</p>
                     </article>
-                  {:else}<p class="empty-text">尚未生成政策点评初版</p>{/if}
+                  {:else}<p class="empty-text">尚未生成</p>{/if}
                 </section>
               </div>
             </ModuleCard>
@@ -383,11 +395,11 @@
   .page-state { display: flex; min-height: 240px; align-items: center; justify-content: center; gap: 14px; border: 1px solid #d8e2f0; border-radius: 10px; background: #fff; }
   .page-state--error { color: #b42318; }
   .spinner { width: 24px; height: 24px; border: 3px solid #dbe8fb; border-top-color: #2f6fd6; border-radius: 50%; animation: spin 800ms linear infinite; }
-  .timeline { display: grid; gap: 24px; margin: 0; padding: 0; list-style: none; }
+  .timeline { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
   .timeline-item { display: grid; grid-template-columns: 126px minmax(0, 1fr); gap: 22px; }
   .timeline-date { position: relative; padding-top: 18px; text-align: right; }
   .timeline-date time { color: #344054; font-size: .875rem; font-weight: bold; font-variant-numeric: tabular-nums; }
-  .timeline-date::after { position: absolute; top: 30px; right: -23px; bottom: -42px; width: 1px; background: #cbd5e1; content: ""; }
+  .timeline-date::after { position: absolute; top: 30px; right: -23px; bottom: -30px; width: 1px; background: #cbd5e1; content: ""; }
   .timeline-item:last-child .timeline-date::after { display: none; }
   .timeline-date span { position: absolute; z-index: 2; top: 24px; right: -28px; width: 11px; height: 11px; border: 3px solid #f6f8fb; border-radius: 50%; background: #2f6fd6; box-shadow: 0 0 0 1px #2f6fd6; }
   :global(.policy-card) { padding: 24px; }
@@ -402,10 +414,17 @@
   .policy-summary { margin: 0; color: #344054; font-size: 1rem; line-height: 1.75; }
   .policy-sections { display: grid; gap: 22px; margin-top: 24px; padding-top: 22px; border-top: 1px solid #eaecf0; }
   .section-heading { min-height: 44px; justify-content: space-between; gap: 12px; }
+  .section-title { display: flex; align-items: center; gap: 8px; }
   .section-heading h3 { margin: 0; font-size: 1.125rem; font-weight: bold; }
   .section-heading h3 span { color: #667085; font-size: .875rem; }
   .section-heading button { min-height: 40px; }
   .heading-actions { flex-wrap: wrap; gap: 8px; }
+  .ai-generate-button { display: inline-grid; width: 44px; min-width: 44px; min-height: 44px; place-items: center; padding: 3px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; background: #f5f9ff; cursor: pointer; }
+  .section-title .ai-generate-button { min-height: 44px; }
+  .ai-generate-button:hover:not(:disabled), .ai-generate-button:focus-visible { border-color: #2f6fd6; color: #175cd3; background: #eef4ff; }
+  .ai-generate-button:disabled { cursor: wait; opacity: .58; }
+  .ai-generate-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
+  .ai-generate-button.is-loading svg { animation: spin 1.2s linear infinite; }
   .detail-link { display: inline-flex; min-height: 44px; align-items: center; padding: 0 12px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; font-size: .875rem; font-weight: bold; text-decoration: none; }
   .detail-link:hover { border-color: #2f6fd6; background: #f5f9ff; }
   .detail-link:focus-visible { outline: 3px solid rgba(47, 111, 214, .28); outline-offset: 2px; }
