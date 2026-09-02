@@ -24,6 +24,16 @@ export type EconomicIndicatorSyncResult = {
   asOf: string;
 };
 
+const sourceStepConfig = {
+  retries: { limit: 1, delay: "1 second", backoff: "constant" as const },
+  timeout: "5 minutes",
+} as const;
+
+const persistStepConfig = {
+  retries: { limit: 1, delay: "1 second", backoff: "constant" as const },
+  timeout: "2 minutes",
+} as const;
+
 export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<
   Cloudflare.Env,
   EconomicIndicatorSyncParams
@@ -40,6 +50,7 @@ export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<
     const [choice, dm] = await Promise.all([
       step.do(
         "fetch Choice EDB incremental",
+        sourceStepConfig,
         (context) =>
           runWithoutAutomaticRetry(
             event.instanceId,
@@ -69,6 +80,7 @@ export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<
       ),
       step.do(
         "fetch DM funding history incremental",
+        sourceStepConfig,
         (context) =>
           runWithoutAutomaticRetry(
             event.instanceId,
@@ -101,6 +113,7 @@ export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<
     const rows: EconomicIndicatorSyncRow[] = [...choice.rows, ...dm.rows];
     const stored = await step.do(
       "persist Neon economic indicators",
+      persistStepConfig,
       (context) =>
         runWithoutAutomaticRetry(
           event.instanceId,
