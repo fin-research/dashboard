@@ -50,8 +50,6 @@ interface ArticleRow {
   published_at: string;
   link: string | null;
   association_method: "ai" | "manual";
-  confidence: "high" | "medium" | null;
-  rationale: string | null;
 }
 
 interface CommentaryRow {
@@ -160,7 +158,7 @@ export async function loadPolicyTimeline(
     `).bind(...policyIds).all<NewsRow>(),
     database.prepare(`
       SELECT pa.policy_id, a.id, a.title, a.author, a.summary, a.published_at, a.link,
-             pa.association_method, pa.confidence, pa.rationale
+             pa.association_method
       FROM policy_article pa
       JOIN article a ON a.id = pa.article_id
       WHERE pa.policy_id IN (${placeholders}) AND pa.relation_status = 'linked'
@@ -319,7 +317,7 @@ export async function saveManualPolicyArticles(
     statements.push(database.prepare(`
       UPDATE policy_article
       SET relation_status = 'excluded', association_method = 'manual',
-          confidence = NULL, rationale = '人工排除自动关联', updated_at = ?
+          updated_at = ?
       WHERE policy_id = ? AND article_id = ?
     `).bind(now, policyId, row.article_id));
   }
@@ -327,11 +325,11 @@ export async function saveManualPolicyArticles(
     statements.push(database.prepare(`
       INSERT INTO policy_article (
         policy_id, article_id, relation_status, association_method,
-        confidence, rationale, created_at, updated_at
-      ) VALUES (?, ?, 'linked', 'manual', NULL, '人工确认关联', ?, ?)
+        created_at, updated_at
+      ) VALUES (?, ?, 'linked', 'manual', ?, ?)
       ON CONFLICT(policy_id, article_id) DO UPDATE SET
         relation_status = 'linked', association_method = 'manual',
-        confidence = NULL, rationale = '人工确认关联', updated_at = excluded.updated_at
+        updated_at = excluded.updated_at
     `).bind(policyId, articleId, now, now));
   }
   if (statements.length > 0) await database.batch(statements);
@@ -526,8 +524,6 @@ function articleFromRow(row: ArticleRow): PolicyArticle {
     publishedAt: row.published_at,
     link: row.link,
     associationMethod: row.association_method,
-    confidence: row.confidence,
-    rationale: row.rationale,
   };
 }
 

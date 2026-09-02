@@ -289,10 +289,10 @@
                       {#each policy.articles as article}
                         <li>
                           <div><strong>{article.author || "未标注机构"}</strong><span>{formatDate(article.publishedAt.slice(0, 10))}</span>
-                            {#if article.associationMethod === "ai"}<span class="ai-badge">AI {article.confidence === "high" ? "高置信" : "中置信"}</span>{:else}<span class="manual-badge">人工确认</span>{/if}
+                            {#if article.associationMethod === "manual"}<span class="manual-badge">人工确认</span>{/if}
                           </div>
                           <a href={`/articles/${encodeURIComponent(article.id)}`}>{article.title}</a>
-                          {#if article.rationale}<small>{article.rationale}</small>{/if}
+                          <small>{article.summary}</small>
                         </li>
                       {/each}
                     </ul>
@@ -395,16 +395,19 @@
   .page-state { display: flex; min-height: 240px; align-items: center; justify-content: center; gap: 14px; border: 1px solid #d8e2f0; border-radius: 10px; background: #fff; }
   .page-state--error { color: #b42318; }
   .spinner { width: 24px; height: 24px; border: 3px solid #dbe8fb; border-top-color: #2f6fd6; border-radius: 50%; animation: spin 800ms linear infinite; }
-  .timeline { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+  .timeline { display: grid; gap: 2rem; margin: 0; padding: 0; list-style: none; }
   .timeline-item { display: grid; grid-template-columns: 126px minmax(0, 1fr); gap: 2rem; }
-  .timeline-date { position: relative; padding-top: 18px; text-align: right; }
+  .timeline-date { position: relative; display: flex; align-items: center; justify-content: flex-end; text-align: right; }
   .timeline-date time { color: #344054; font-size: .875rem; font-weight: bold; font-variant-numeric: tabular-nums; }
-  .timeline-date::after { position: absolute; top: 30px; right: -33px; bottom: -30px; width: 1px; background: #cbd5e1; content: ""; }
+  .timeline-date::before, .timeline-date::after { position: absolute; right: -1rem; width: 1px; background: #cbd5e1; content: ""; }
+  .timeline-date::before { top: 0; bottom: 50%; }
+  .timeline-date::after { top: 50%; bottom: -2rem; }
+  .timeline-item:first-child .timeline-date::before { display: none; }
   .timeline-item:last-child .timeline-date::after { display: none; }
-  .timeline-date span { position: absolute; z-index: 2; top: 24px; right: -38px; width: 11px; height: 11px; border: 3px solid #f6f8fb; border-radius: 50%; background: #2f6fd6; box-shadow: 0 0 0 1px #2f6fd6; }
+  .timeline-date span { position: absolute; z-index: 2; top: 50%; right: -1rem; width: 11px; height: 11px; border: 3px solid #f6f8fb; border-radius: 50%; background: #2f6fd6; box-shadow: 0 0 0 1px #2f6fd6; transform: translate(50%, -50%); }
   :global(.policy-card) { padding: 24px; }
   .policy-meta { flex-wrap: wrap; gap: 8px; }
-  .policy-meta span, .ai-badge, .manual-badge, .commentary-title span { padding: 4px 8px; border-radius: 6px; font-size: .75rem; font-weight: bold; }
+  .policy-meta span, .manual-badge, .commentary-title span { padding: 4px 8px; border-radius: 6px; font-size: .75rem; font-weight: bold; }
   .category { color: #175cd3; background: #eff4ff; }
   .category--real_estate { color: #b54708; background: #fffaeb; }
   .category--fiscal { color: #027a48; background: #ecfdf3; }
@@ -438,7 +441,6 @@
   .article-list li > div > span { color: #667085; font-size: .8125rem; }
   .article-list li a { display: block; margin: 0 0 8px; font-weight: bold; line-height: 1.5; }
   .article-list li > small { display: block; line-height: 1.5; }
-  .ai-badge { color: #175cd3 !important; background: #eff4ff; }
   .manual-badge { color: #027a48 !important; background: #ecfdf3; }
   .empty-text { margin: 10px 0 0; color: #667085; }
   .commentary { margin-top: 12px; padding: 20px; border: 1px solid #d8e2f0; border-radius: 8px; background: #fbfcfe; }
@@ -479,8 +481,8 @@
     .policy-header { position: static; align-items: flex-start; flex-direction: column; }
     .filters { width: 100%; justify-content: flex-start; }
     .timeline-item { grid-template-columns: 1fr; gap: 8px; }
-    .timeline-date { padding: 0; text-align: left; }
-    .timeline-date::after, .timeline-date span { display: none; }
+    .timeline-date { justify-content: flex-start; text-align: left; }
+    .timeline-date::before, .timeline-date::after, .timeline-date span { display: none; }
     .commentary dl, .form-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 620px) {

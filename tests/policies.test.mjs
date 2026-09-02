@@ -47,22 +47,26 @@ test("政策时间轴一次装配政策资讯、自动研报关系与一对一�
   assert.deepEqual(policies[0].departments, ["中国人民银行", "国家金融监督管理总局"]);
   assert.equal(policies[0].news.length, 2);
   assert.equal(policies[0].articles[0].associationMethod, "ai");
-  assert.equal(policies[0].articles[0].confidence, "high");
+  assert.equal(policies[0].articles[0].summary, "研报摘要");
   assert.equal(policies[0].commentary.type, "policy_tracking");
 });
 
 test("政策页面只手动生成点评，政策与研报聚合由后台 Workflow 提供", async () => {
-  const [page, migration] = await Promise.all([
+  const [page, migration, relationMigration] = await Promise.all([
     readFile(new URL("../src/routes/policy-tracking/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../migrations/1004_create_policy_tracking.sql", import.meta.url), "utf8"),
+    readFile(new URL("../migrations/1005_remove_policy_article_explanations.sql", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /class="ai-generate-button"/);
   assert.match(page, /disabled=\{generatingPolicyId === policy\.id\}/);
   assert.doesNotMatch(page, /请先关联至少一篇研报/);
   assert.match(page, /<p class="empty-text">尚未生成<\/p>/);
-  assert.match(page, /\.timeline \{ display: grid; gap: 12px;/);
+  assert.match(page, /\.timeline \{ display: grid; gap: 2rem;/);
   assert.match(page, /\.timeline-item \{ display: grid; grid-template-columns: 126px minmax\(0, 1fr\); gap: 2rem;/);
+  assert.match(page, /\.timeline-date \{[^}]*display: flex; align-items: center; justify-content: flex-end;/);
+  assert.match(page, /<small>\{article\.summary\}<\/small>/);
+  assert.doesNotMatch(page, /article\.confidence|article\.rationale|ai-badge/);
   assert.match(page, />调整关联</);
   assert.doesNotMatch(page, /\/api\/policies\/aggregate/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_event/);
@@ -70,6 +74,8 @@ test("政策页面只手动生成点评，政策与研报聚合由后台 Workflo
   assert.match(migration, /CREATE TABLE IF NOT EXISTS policy_article/);
   assert.match(migration, /association_method IN \('ai', 'manual'\)/);
   assert.match(migration, /policy_id TEXT UNIQUE/);
+  assert.match(relationMigration, /CREATE TABLE policy_article_next/);
+  assert.doesNotMatch(relationMigration, /confidence|rationale/);
 });
 
 test("无关联研报时仍可装配政策点评生成上下文", async () => {
@@ -232,8 +238,6 @@ function fakePolicyDatabase() {
               published_at: "2026-09-01T20:00:00+08:00",
               link: null,
               association_method: "ai",
-              confidence: "high",
-              rationale: "标题明确解读该政策",
             }] };
           }
           if (/FROM research_commentary/.test(sql)) {

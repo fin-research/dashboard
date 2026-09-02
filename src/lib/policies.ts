@@ -51,8 +51,6 @@ export interface PolicyArticle {
   publishedAt: string;
   link: string | null;
   associationMethod: "ai" | "manual";
-  confidence: "high" | "medium" | null;
-  rationale: string | null;
 }
 
 export interface ResearchCommentary extends CommentaryContent {

@@ -14,7 +14,7 @@ Schema 和字段以 migration 与代码为事实来源。本文件只记录长�
 - `keyword`：按 `(article_id, ordinal)` 保存结构化主题、事实、解读和影响。
 - `hotspot_snapshot`：追加保存完整热点响应、输入指纹、生成时间、模型和已经解析的证据范围。
 - `policy_event` / `policy_news`：由 ingest 的 Policy Workflow 写入规范政策卡片与原始资讯证据；Dashboard 只读取。
-- `policy_article`：政策与 article 的多对多关系。AI 自动关系保存置信度与依据；Dashboard 人工关联或排除写为 `manual`，后续 AI 不覆盖。
+- `policy_article`：政策与 article 的多对多关系，只保存关系状态、关联方式和时间戳，不保存模型置信度或关联理由；Dashboard 人工关联或排除写为 `manual`，后续 AI 不覆盖。
 - `research_commentary`：通用标准化点评，类型覆盖时事快评、政策跟踪和海外事件；当前政策页以 `policy_id UNIQUE` 保证每项政策至多一条点评，并保存 AI 初版和人工修订状态。
 
 `daily_hotspot` 与 `hotspot_cache` 是历史 migration 中的旧结构，不应作为新功能的运行时入口。最新读取统一走 `hotspot_snapshot`。
