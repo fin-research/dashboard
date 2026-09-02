@@ -107,7 +107,11 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
     model: "gpt-5.6-luna",
     prompt_cache_key: "probe:v1",
     instructions: "system",
-    reasoning: { effort: "low", summary: "auto" },
+    reasoning: {
+      effort: "low",
+      summary: "auto",
+      context: "current_turn",
+    },
     text: {
       format: {
         type: "json_schema",
@@ -123,10 +127,12 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
     },
     input: [{ role: "user", content: "test" }],
   });
+  assert.equal(Object.hasOwn(JSON.parse(calls[0].init.body), "include"), false);
   assert.match(logs[0], /"provider":"custom-opencode"/);
   assert.match(logs[0], /"task_type":"summary"/);
   assert.match(logs[0], /"reasoning_effort":"low"/);
   assert.match(logs[0], /"requested_reasoning_summary":"auto"/);
+  assert.match(logs[0], /"requested_reasoning_context":"current_turn"/);
   assert.match(logs[0], /"reasoning_summary_count":1/);
   assert.match(logs[0], /"reasoning_summary_text_length":32/);
   assert.match(logs[0], /"prompt_cache_key":"probe:v1"/);

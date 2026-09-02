@@ -4,7 +4,7 @@
 
 - 生成式 AI 只通过 `src/lib/server/ai-gateway.ts` 的固定 provider-specific URL 进入 AI Gateway；优先 `custom-opencode/responses`，可重试失败时回退 `custom-codex/responses`，不得使用会进入 Universal 适配层的 AI binding `run()`。Provider 密钥由 Gateway BYOK 的 `default` alias 管理，业务代码不读取上游 API Key。
 - `CF_AIG_TOKEN` 只通过 Worker Secret 注入；`CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID` 和数据服务基址是非敏感配置，但仍应通过 Worker/Vite 配置读取。
-- Responses 请求不显式传递 `store`，统一使用 `reasoning.summary="auto"` 请求可读推理摘要；这不开放原始推理过程。稳定 Prompt 放在 `instructions`，动态新闻、证据和模型快照放在末尾 `input`，并使用版本化 `prompt_cache_key` 复用上游 Prompt Cache。
+- Responses 请求不显式传递 `store`，统一设置 `reasoning.context="current_turn"`，并保留 `reasoning.summary="auto"` 请求可读推理摘要；不得设置 `include: ["reasoning.encrypted_content"]`。这不开放原始推理过程。稳定 Prompt 放在 `instructions`，动态新闻、证据和模型快照放在末尾 `input`，并使用版本化 `prompt_cache_key` 复用上游 Prompt Cache。
 - Neon 直连 `DATABASE_URL` 只供本地 migration、回填和授信 Excel 导入脚本使用；本地 `pnpm dev` 通过未跟踪的 `.env.local` 注入 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`，生产 Worker 仍只读取 `HYPERDRIVE.connectionString`。
 - quant 在本机使用 `DATABASE_URL` 追加融资择时模型快照；连接串不得经 dashboard 页面或 API 暴露。
 - Neon 开发直连从 `.env.local.example` 创建未跟踪的 `.env.local`。不要提交该文件。
@@ -31,7 +31,7 @@
 ## 数据与日志
 
 - D1 不保存文章正文；热点只读取结构化摘要和关键词。
-- Worker 日志记录事件、状态、范围、Provider 尝试次序、任务类型、effort、reasoning summary 模式、返回摘要条数与字符数、Prompt Cache token 计数、加密推理存在性、输出长度和 Gateway log ID，不记录 token、连接串、推理摘要正文、完整 AI 输入输出、完整文章正文、授信源文件路径或 Excel 内容。
+- Worker 日志记录事件、状态、范围、Provider 尝试次序、任务类型、effort、reasoning summary/context 模式、返回摘要条数与字符数、Prompt Cache token 计数、加密推理存在性、输出长度和 Gateway log ID，不记录 token、连接串、推理摘要正文、完整 AI 输入输出、完整文章正文、授信源文件路径或 Excel 内容。
 - Data/API 错误可对外返回用于排查的结构化安全诊断：接口路径、HTTP 状态、错误码、数据源、
   处理阶段，以及限长后的字段路径、收到类型和标量值。不得返回堆栈、Cookie、token、签名
   URL、连接串、完整正文或大段原始响应；详细堆栈仍只进入服务端日志。

@@ -161,7 +161,12 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
       query.prompt_cache_key,
       "market-briefing:market-briefing-v4-responses-schema",
     );
-    assert.deepEqual(query.reasoning, { effort: "high", summary: "auto" });
+    assert.deepEqual(query.reasoning, {
+      effort: "high",
+      summary: "auto",
+      context: "current_turn",
+    });
+    assert.equal(Object.hasOwn(query, "include"), false);
     assert.equal(query.text.format.type, "json_schema");
     assert.equal(query.text.format.name, "market_briefing");
     assert.equal(query.text.format.strict, true);
