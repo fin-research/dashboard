@@ -6,6 +6,8 @@ import {
   articleAssociationUpdateSchema,
   commentaryContentSchema,
   policyCategoryLabels,
+  policyImportanceLabels,
+  policyImportanceSchema,
 } from "../src/lib/policies.ts";
 import { parseResearchContent } from "../src/lib/report-content.ts";
 import { fetchDataNewsDetail } from "../src/lib/server/data-news.ts";
@@ -41,6 +43,8 @@ test("政策点评标准化字段通过运行时 Schema 校验", () => {
     articleIds: ["A1", "A2"],
   });
   assert.equal(policyCategoryLabels.real_estate, "房地产");
+  assert.equal(policyImportanceSchema.parse("important"), "important");
+  assert.equal(policyImportanceLabels.related, "关联");
 });
 
 test("政策点评 Prompt 遵循资金部时事快评规范并移除来源链接", async () => {
@@ -69,6 +73,7 @@ test("政策时间轴一次装配政策资讯、自动研报关系与一对一�
   const policies = await loadPolicyTimeline(database);
 
   assert.equal(policies.length, 1);
+  assert.equal(policies[0].importance, "related");
   assert.deepEqual(policies[0].departments, ["中国人民银行", "国家金融监督管理总局"]);
   assert.equal(policies[0].news.length, 2);
   assert.equal(policies[0].articles[0].associationMethod, "ai");
@@ -76,20 +81,27 @@ test("政策时间轴一次装配政策资讯、自动研报关系与一对一�
   assert.equal(policies[0].commentary.type, "policy_tracking");
 });
 
-test("政策页面只手动生成点评，政策与研报聚合由后台 Workflow 提供", async () => {
-  const [page, migration, relationMigration] = await Promise.all([
+test("政策页面展示重要性并使用隔离的时间轴类名", async () => {
+  const [page, migration, relationMigration, importanceMigration] = await Promise.all([
     readFile(new URL("../src/routes/policy-tracking/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../migrations/1004_create_policy_tracking.sql", import.meta.url), "utf8"),
     readFile(new URL("../migrations/1005_remove_policy_article_explanations.sql", import.meta.url), "utf8"),
+    readFile(new URL("../migrations/1014_add_policy_importance.sql", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /class="ai-generate-button"/);
   assert.match(page, /disabled=\{generatingPolicyId === policy\.id\}/);
   assert.doesNotMatch(page, /请先关联至少一篇研报/);
   assert.match(page, /<p class="empty-text">尚未生成<\/p>/);
-  assert.match(page, /\.timeline \{ display: grid; gap: 2rem;/);
-  assert.match(page, /\.timeline-item \{ display: grid; grid-template-columns: 126px minmax\(0, 1fr\); gap: 2rem;/);
+  assert.match(page, /\.policy-timeline \{ display: grid; gap: 2rem;/);
+  assert.match(page, /\.policy-timeline-item \{ display: grid; grid-template-columns: 126px minmax\(0, 1fr\); gap: 2rem;/);
+  assert.doesNotMatch(page, /class="timeline(?:-item)?"/);
   assert.match(page, /\.timeline-date \{[^}]*display: flex; align-items: center; justify-content: flex-end;/);
+  assert.match(page, /importance-chip--\$\{policy\.importance\}/);
+  assert.match(page, /policyImportanceLabels\[policy\.importance\]/);
+  assert.match(page, /\.importance-chip--important \{[^}]*color: #b42318;/);
+  assert.match(page, /\.importance-chip--related \{[^}]*color: #175cd3;/);
+  assert.match(page, /\.importance-chip--general \{[^}]*color: #475467;/);
   assert.match(page, /<small>\{article\.summary\}<\/small>/);
   assert.doesNotMatch(page, /article\.confidence|article\.rationale|ai-badge/);
   assert.match(page, />调整关联</);
@@ -101,6 +113,8 @@ test("政策页面只手动生成点评，政策与研报聚合由后台 Workflo
   assert.match(migration, /policy_id TEXT UNIQUE/);
   assert.match(relationMigration, /CREATE TABLE policy_article_next/);
   assert.doesNotMatch(relationMigration, /confidence|rationale/);
+  assert.match(importanceMigration, /ADD COLUMN importance TEXT NOT NULL DEFAULT 'general'/);
+  assert.match(importanceMigration, /'important', 'related', 'general'/);
 });
 
 test("无关联研报时仍可装配政策点评生成上下文", async () => {
@@ -256,6 +270,7 @@ function fakePolicyDatabase() {
               title: "房地产信贷管理新政",
               summary: "政策摘要",
               category: "real_estate",
+              importance: "related",
               departments_json: JSON.stringify(["中国人民银行", "国家金融监督管理总局"]),
               policy_date: "2026-09-01",
               first_news_at: "2026-09-01T19:00:00+08:00",

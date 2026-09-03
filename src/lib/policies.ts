@@ -11,6 +11,12 @@ export const policyCategorySchema = z.enum([
   "other",
 ]);
 
+export const policyImportanceSchema = z.enum([
+  "important",
+  "related",
+  "general",
+]);
+
 export const commentaryTypeSchema = z.enum([
   "current_affairs",
   "policy_tracking",
@@ -32,6 +38,7 @@ export const articleAssociationUpdateSchema = z.object({
 }).strict();
 
 export type PolicyCategory = z.infer<typeof policyCategorySchema>;
+export type PolicyImportance = z.infer<typeof policyImportanceSchema>;
 export type CommentaryType = z.infer<typeof commentaryTypeSchema>;
 export type CommentaryContent = z.infer<typeof commentaryContentSchema>;
 
@@ -68,6 +75,7 @@ export interface PolicyEvent {
   title: string;
   summary: string;
   category: PolicyCategory;
+  importance: PolicyImportance;
   departments: string[];
   policyDate: string;
   firstNewsAt: string;
@@ -123,4 +131,10 @@ export const policyCategoryLabels: Record<PolicyCategory, string> = {
   trade: "贸易政策",
   social: "民生政策",
   other: "其他政策",
+};
+
+export const policyImportanceLabels: Record<PolicyImportance, string> = {
+  important: "重要",
+  related: "关联",
+  general: "一般",
 };

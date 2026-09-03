@@ -5,6 +5,7 @@
   import { globalMessages } from "$lib/global-messages";
   import {
     policyCategoryLabels,
+    policyImportanceLabels,
     type ArticleSearchResult,
     type CommentaryContent,
     type PolicyCategory,
@@ -258,14 +259,20 @@
     {:else if policies.length === 0}
       <section class="page-state"><strong>所选范围内暂无已聚合政策</strong></section>
     {:else}
-      <ol class="timeline" aria-label="政策时间轴">
+      <ol class="policy-timeline" aria-label="政策时间轴">
         {#each policies as policy (policy.id)}
-          <li class="timeline-item">
+          <li class="policy-timeline-item">
             <div class="timeline-date"><time datetime={policy.policyDate}>{formatDate(policy.policyDate)}</time><span></span></div>
             <ModuleCard class="policy-card" labelledBy={`policy-${policy.id}`}>
-              <div class="policy-meta">
-                <span class={`category category--${policy.category}`}>{policyCategoryLabels[policy.category]}</span>
-                {#each policy.departments as department}<span class="department">{department}</span>{/each}
+              <div class="policy-card-topline">
+                <div class="policy-meta">
+                  <span class={`category category--${policy.category}`}>{policyCategoryLabels[policy.category]}</span>
+                  {#each policy.departments as department}<span class="department">{department}</span>{/each}
+                </div>
+                <span
+                  class={`importance-chip importance-chip--${policy.importance}`}
+                  aria-label={`政策重要性：${policyImportanceLabels[policy.importance]}`}
+                >{policyImportanceLabels[policy.importance]}</span>
               </div>
               <h2 class="policy-card-title" id={`policy-${policy.id}`}>{policy.title}</h2>
               <p class="policy-summary">{policy.summary}</p>
@@ -395,17 +402,18 @@
   .page-state { display: flex; min-height: 240px; align-items: center; justify-content: center; gap: 14px; border: 1px solid #d8e2f0; border-radius: 10px; background: #fff; }
   .page-state--error { color: #b42318; }
   .spinner { width: 24px; height: 24px; border: 3px solid #dbe8fb; border-top-color: #2f6fd6; border-radius: 50%; animation: spin 800ms linear infinite; }
-  .timeline { display: grid; gap: 2rem; margin: 0; padding: 0; list-style: none; }
-  .timeline-item { display: grid; grid-template-columns: 126px minmax(0, 1fr); gap: 2rem; }
+  .policy-timeline { display: grid; gap: 2rem; margin: 0; padding: 0; list-style: none; }
+  .policy-timeline-item { display: grid; grid-template-columns: 126px minmax(0, 1fr); gap: 2rem; }
   .timeline-date { position: relative; display: flex; align-items: center; justify-content: flex-end; text-align: right; }
   .timeline-date time { color: #344054; font-size: .875rem; font-weight: bold; font-variant-numeric: tabular-nums; }
   .timeline-date::before, .timeline-date::after { position: absolute; right: -1rem; width: 1px; background: #cbd5e1; content: ""; }
   .timeline-date::before { top: 0; bottom: 50%; }
   .timeline-date::after { top: 50%; bottom: -2rem; }
-  .timeline-item:first-child .timeline-date::before { display: none; }
-  .timeline-item:last-child .timeline-date::after { display: none; }
+  .policy-timeline-item:first-child .timeline-date::before { display: none; }
+  .policy-timeline-item:last-child .timeline-date::after { display: none; }
   .timeline-date span { position: absolute; z-index: 2; top: 50%; right: -1rem; width: 11px; height: 11px; border: 3px solid #f6f8fb; border-radius: 50%; background: #2f6fd6; box-shadow: 0 0 0 1px #2f6fd6; transform: translate(50%, -50%); }
   :global(.policy-card) { padding: 24px; }
+  .policy-card-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   .policy-meta { flex-wrap: wrap; gap: 8px; }
   .policy-meta span, .manual-badge, .commentary-title span { padding: 4px 8px; border-radius: 6px; font-size: .75rem; font-weight: bold; }
   .category { color: #175cd3; background: #eff4ff; }
@@ -413,6 +421,10 @@
   .category--fiscal { color: #027a48; background: #ecfdf3; }
   .category--capital_market { color: #6941c6; background: #f4f3ff; }
   .department { color: #475467; background: #f2f4f7; }
+  .importance-chip { display: inline-flex; flex: 0 0 auto; align-items: center; padding: 5px 10px; border: 1px solid; border-radius: 6px; font-size: .875rem; font-weight: bold; line-height: 1.25; }
+  .importance-chip--important { border-color: #fecdca; color: #b42318; background: #fef3f2; }
+  .importance-chip--related { border-color: #b2ddff; color: #175cd3; background: #eff8ff; }
+  .importance-chip--general { border-color: #d0d5dd; color: #475467; background: #f2f4f7; }
   .policy-card-title { margin: 14px 0 10px; scroll-margin-top: 100px; font-size: 1.25rem; line-height: 1.4; font-weight: bolder; }
   .policy-summary { margin: 0; color: #344054; font-size: 1rem; line-height: 1.75; }
   .policy-sections { display: grid; gap: 22px; margin-top: 24px; padding-top: 22px; border-top: 1px solid #eaecf0; }
@@ -480,7 +492,7 @@
   @media (max-width: 900px) {
     .policy-header { position: static; align-items: flex-start; flex-direction: column; }
     .filters { width: 100%; justify-content: flex-start; }
-    .timeline-item { grid-template-columns: 1fr; gap: 8px; }
+    .policy-timeline-item { grid-template-columns: 1fr; gap: 8px; }
     .timeline-date { justify-content: flex-start; text-align: left; }
     .timeline-date::before, .timeline-date::after, .timeline-date span { display: none; }
     .commentary dl, .form-grid { grid-template-columns: 1fr; }

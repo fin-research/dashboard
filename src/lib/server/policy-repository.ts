@@ -26,6 +26,7 @@ interface PolicyRow {
   title: string;
   summary: string;
   category: PolicyCategory;
+  importance: PolicyEvent["importance"];
   departments_json: string;
   policy_date: string;
   first_news_at: string;
@@ -150,7 +151,7 @@ export async function loadPolicyTimeline(
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const statement = database.prepare(`
-    SELECT id, title, summary, category, departments_json, policy_date,
+    SELECT id, title, summary, category, importance, departments_json, policy_date,
            first_news_at, last_news_at, updated_at
     FROM policy_event
     ${where}
@@ -200,6 +201,7 @@ export async function loadPolicyTimeline(
     title: row.title,
     summary: row.summary,
     category: row.category,
+    importance: row.importance,
     departments: parseStringArray(row.departments_json, "政策发布部门"),
     policyDate: row.policy_date,
     firstNewsAt: row.first_news_at,
