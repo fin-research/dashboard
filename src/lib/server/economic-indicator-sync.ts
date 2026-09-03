@@ -274,7 +274,10 @@ function choiceRequestBatches(
     return batches;
   }
 
-  const definitionsByLookback = new Map<number, EconomicIndicatorDefinition[]>();
+  const definitionsByRequestGroup = new Map<
+    string,
+    { lookbackDays: number; definitions: EconomicIndicatorDefinition[] }
+  >();
   for (const definition of CHOICE_ECONOMIC_INDICATORS) {
     const lookbackDays = definition.incrementalLookbackDays ?? (
       definition.frequency === "月频"
@@ -283,19 +286,31 @@ function choiceRequestBatches(
           ? 800
           : 14
     );
-    const definitions = definitionsByLookback.get(lookbackDays) ?? [];
-    definitions.push(definition);
-    definitionsByLookback.set(lookbackDays, definitions);
+    const groupKey = `${lookbackDays}:${choiceEdbCodeFamily(definition.code)}`;
+    const group = definitionsByRequestGroup.get(groupKey) ?? {
+      lookbackDays,
+      definitions: [],
+    };
+    group.definitions.push(definition);
+    definitionsByRequestGroup.set(groupKey, group);
   }
 
-  return [...definitionsByLookback.entries()]
-    .sort(([left], [right]) => left - right)
-    .flatMap(([lookbackDays, definitions]) =>
+  return [...definitionsByRequestGroup.values()]
+    .sort((left, right) => left.lookbackDays - right.lookbackDays)
+    .flatMap(({ lookbackDays, definitions }) =>
       chunkChoiceDefinitions(definitions, 8).map((chunk) => ({
         definitions: chunk,
         startDate: daysBefore(endDate, lookbackDays),
       })),
     );
+}
+
+function choiceEdbCodeFamily(code: string): string {
+  // Choice rejects a single EDB request that mixes E* domestic rate series
+  // with EM* macro/market series, even when both use the same lookback window.
+  if (/^E\d/.test(code)) return "domestic-rate";
+  if (/^EM[A-Z]\d/.test(code)) return "macro-market";
+  return code.match(/^[A-Z]+/)?.[0] ?? code;
 }
 
 function chunkChoiceDefinitions(

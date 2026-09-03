@@ -120,7 +120,7 @@ test("全量同步只替换目标指标并保留表内其他数据", async () =>
   assert.match(calls[3].sql, /INSERT INTO public\.edb/);
 });
 
-test("增量 Choice 同步按频率拆分回看窗口并排除 DM 资金利率", async () => {
+test("增量 Choice 同步按回看窗口和代码族拆批并排除 DM 资金利率", async () => {
   const requests = [];
   const result = await fetchChoiceEconomicIndicatorRows(
     async (path, searchParams) => {
@@ -148,8 +148,18 @@ test("增量 Choice 同步按频率拆分回看窗口并排除 DM 资金利率",
   assert.ok(requests.every((request) => request.searchParams.get("options") === "IsPublishDate=1,FixDate=0"));
   assert.ok(requests.every((request) => request.searchParams.get("edbIds").split(",").length <= 8));
   assert.ok(requests.every((request) => !request.searchParams.get("edbIds").includes("E1300003")));
+  assert.ok(requests.every((request) => {
+    const codes = request.searchParams.get("edbIds").split(",");
+    return !(
+      codes.some((code) => /^E\d/.test(code)) &&
+      codes.some((code) => /^EM[A-Z]\d/.test(code))
+    );
+  }));
   const liabilityRateRequest = requests.find((request) => request.searchParams.get("edbIds").includes("E1707781"));
+  const overseasMacroRequest = requests.find((request) => request.searchParams.get("edbIds").includes("EMG00152118"));
   assert.equal(liabilityRateRequest.searchParams.get("startDate"), "2025-07-28");
+  assert.equal(overseasMacroRequest.searchParams.get("startDate"), "2025-07-28");
+  assert.notEqual(liabilityRateRequest, overseasMacroRequest);
   assert.equal(result.range.endDate, "2026-09-01");
   assert.equal(result.rows.find((row) => row.code === "E1715081").date, "2026-08-31");
 });
