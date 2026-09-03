@@ -58,6 +58,15 @@ const publishDateProxyByCode = new Map<string, string>([
   ["EMM00087129", "EMM00087086"],
 ]);
 
+// Choice currently returns three isolated, reproducibly invalid observations for
+// the state-owned-bank three-month NCD rate. Match the full source tuple so a
+// corrected value for the same observation date can flow through normally.
+const knownInvalidChoiceObservations = new Set([
+  "E1704281:2026-03-06:2.575",
+  "E1704281:2026-04-03:3.75",
+  "E1704281:2026-04-15:2.575",
+]);
+
 export async function fetchChoiceEconomicIndicatorRows(
   request: DataApiRequest,
   mode: EconomicIndicatorSyncMode,
@@ -123,11 +132,17 @@ export async function fetchChoiceEconomicIndicatorRows(
         : null;
     const date = publishedDate ?? fallbackDate;
     if (!date || date > endDate) continue;
+    const value = numericField(row, "RESULT");
+    if (
+      knownInvalidChoiceObservations.has(
+        `${code}:${observationDate}:${value}`,
+      )
+    ) continue;
     const syncRow = {
       code,
       observationDate,
       date,
-      value: numericField(row, "RESULT"),
+      value,
     };
     rowsByObservation.set(seriesPeriodKey(code, observationDate), syncRow);
   }

@@ -4,7 +4,7 @@ Schema 和字段以 migration 与代码为事实来源。本文件只记录长�
 
 ## Neon：统一 EDB
 
-`public.edb` 是跨应用共享的经济与利率原始观测表，主键为 `(indicator_code, observation_date)`，同时保留上游发布日期 `published_date` 和同步时间 `synced_at`。Dashboard 的每日 00:00 Workflow 是唯一线上写入方，增量更新研究辅助及融资负债周报所需的 54 个唯一指标；融资应用只读，不维护平行 EDB 表或在页面/周报生成动作中请求 Choice EDB。
+`public.edb` 是跨应用共享的经济与利率观测表，主键为 `(indicator_code, observation_date)`，同时保留上游发布日期 `published_date` 和同步时间 `synced_at`。Dashboard 的每日 00:00 Workflow 是唯一线上写入方，增量更新研究辅助及融资负债周报所需的 54 个唯一指标；融资应用只读，不维护平行 EDB 表或在页面/周报生成动作中请求 Choice EDB。上游已确认的异常观测必须在同步写入前按完整“指标代码、观测日、源值”精确剔除，不得在读取周报时用通用离群值规则隐藏。
 
 ## D1：文章证据、政策跟踪与热点快照
 

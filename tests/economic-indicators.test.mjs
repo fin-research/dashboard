@@ -164,6 +164,37 @@ test("增量 Choice 同步按回看窗口和代码族拆批并排除 DM 资金�
   assert.equal(result.rows.find((row) => row.code === "E1715081").date, "2026-08-31");
 });
 
+test("Choice 同步仅剔除已确认的国有行同业存单异常源值并允许同日修正值入库", async () => {
+  const result = await fetchChoiceEconomicIndicatorRows(
+    async (_path, searchParams) => {
+      if (!searchParams.get("edbIds").split(",").includes("E1704281")) {
+        return { function: "EDB", fields: ["code", "date", "RESULT"], rows: [] };
+      }
+      return {
+        function: "EDB",
+        fields: ["code", "date", "RESULT"],
+        rows: [
+          { code: "E1704281", date: "2026-03-05", RESULT: 1.5 },
+          { code: "E1704281", date: "2026-03-06", RESULT: 2.575 },
+          { code: "E1704281", date: "2026-04-03", RESULT: 3.75 },
+          { code: "E1704281", date: "2026-04-15", RESULT: 2.575 },
+          { code: "E1704281", date: "2026-04-15", RESULT: 1.415 },
+        ],
+      };
+    },
+    "incremental",
+    new Date("2026-09-03T00:00:00.000Z"),
+  );
+
+  assert.deepEqual(
+    result.rows.filter((row) => row.code === "E1704281"),
+    [
+      { code: "E1704281", observationDate: "2026-03-05", date: "2026-03-05", value: 1.5 },
+      { code: "E1704281", observationDate: "2026-04-15", date: "2026-04-15", value: 1.415 },
+    ],
+  );
+});
+
 test("DM 历史资金利率映射为 EDB 指标代码并以北京时间落日", async () => {
   const result = await fetchDmFundingRateRows(
     async (_path, searchParams) => ({
