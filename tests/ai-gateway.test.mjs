@@ -143,10 +143,39 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
 test("reasoning effort is fixed by task type", () => {
   assert.deepEqual(AI_GATEWAY_REASONING_EFFORT_BY_TASK, {
     generation: "high",
+    market_briefing: "max",
     analysis: "high",
     policy_commentary: "max",
     summary: "low",
   });
+});
+
+test("market briefing enables Responses web search with max reasoning effort", async () => {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return responsesOutput({ ok: true });
+  };
+
+  const { value } = await withoutAiLogs(() =>
+    generateAiGatewayObject(
+      credentials,
+      [{ role: "user", content: "market briefing" }],
+      z.object({ ok: z.boolean() }).strict(),
+      "market_briefing",
+      {
+        ...options,
+        taskType: "market_briefing",
+        tools: [{ type: "web_search" }],
+      },
+      fetcher,
+    ),
+  );
+
+  assert.deepEqual(value, { ok: true });
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.reasoning.effort, "max");
+  assert.deepEqual(body.tools, [{ type: "web_search" }]);
 });
 
 test("policy commentary enables Responses web search with max reasoning effort", async () => {

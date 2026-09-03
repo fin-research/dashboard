@@ -4,7 +4,7 @@ import { formatDataApiError } from "../../data-api-error.ts";
 import type { MarketBriefing } from "../../types";
 import { generateAiGatewayObject } from "./ai-gateway.ts";
 
-const PROMPT_VERSION = "market-briefing-v4-responses-schema";
+const PROMPT_VERSION = "market-briefing-v5-web-search";
 const DATA_TIMEOUT_MS = 60_000;
 const marketBriefingOutputSchema = z
   .object({ content: z.string().min(1).describe("只包含两条市场聚焦正文") })
@@ -137,7 +137,7 @@ description: 为专业金融从业者撰写或改写A股与债市的当日市场
 `;
 
 /**
- * 用户提示词，与旧版后端 build_market_briefing_prompt 逐字一致。
+ * 用户提示词：以 Data Worker 材料为主，并允许模型联网补充核验。
  */
 export function buildMarketBriefingPrompt(
   reportDate: string,
@@ -145,7 +145,8 @@ export function buildMarketBriefingPrompt(
 ): string {
   return (
     `请使用随附的 market-briefing skill，根据以下 ${reportDate} ` +
-    "当天新闻撰写今日市场聚焦。只使用给定材料，不额外搜索或补写无法验证的事实。" +
+    "当天新闻撰写今日市场聚焦。优先使用给定材料，并使用已启用的 Web Search 补充和核验关键行情与驱动；" +
+    "不得补写未经给定材料或联网证据验证的事实。" +
     "严格遵守 skill 的输出格式，最终只返回两条正文。\n\n" +
     newsText
   );
@@ -252,9 +253,14 @@ export async function generateMarketBriefing(
     "market_briefing",
     {
       promptCacheKey: `market-briefing:${PROMPT_VERSION}`,
-      requestTimeoutMs: 120_000,
-      taskType: "generation",
-      metadata: { report_date: reportDate, prompt_version: PROMPT_VERSION },
+      requestTimeoutMs: 300_000,
+      taskType: "market_briefing",
+      tools: [{ type: "web_search" }],
+      metadata: {
+        report_date: reportDate,
+        prompt_version: PROMPT_VERSION,
+        tags: "market-briefing,manual-generation,web-search",
+      },
     },
   );
   const normalized = output.content.trim();

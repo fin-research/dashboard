@@ -8,6 +8,7 @@ export const AI_GATEWAY_PRIMARY_PROVIDER = "custom-opencode" as const;
 export const AI_GATEWAY_FALLBACK_PROVIDER = "custom-codex" as const;
 export const AI_GATEWAY_REASONING_EFFORT_BY_TASK = {
   generation: "high",
+  market_briefing: "max",
   analysis: "high",
   policy_commentary: "max",
   summary: "low",

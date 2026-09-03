@@ -8,12 +8,13 @@ import {
   MARKET_BRIEFING_SYSTEM,
 } from "../src/lib/server/market-briefing.ts";
 
-test("用户提示词与旧版后端 build_market_briefing_prompt 逐字一致", () => {
+test("用户提示词允许 Web Search 补充核验且禁止无证据补写", () => {
   const prompt = buildMarketBriefingPrompt("2026-08-10", "【1】正文");
   assert.equal(
     prompt,
     "请使用随附的 market-briefing skill，根据以下 2026-08-10 当天新闻撰写今日市场聚焦。" +
-      "只使用给定材料，不额外搜索或补写无法验证的事实。" +
+      "优先使用给定材料，并使用已启用的 Web Search 补充和核验关键行情与驱动；" +
+      "不得补写未经给定材料或联网证据验证的事实。" +
       "严格遵守 skill 的输出格式，最终只返回两条正文。\n\n【1】正文",
   );
 });
@@ -147,9 +148,11 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     );
     const headers = new Headers(aiCalls[0].init.headers);
     assert.equal(headers.get("cf-aig-authorization"), "Bearer test-token");
+    assert.equal(headers.get("cf-aig-request-timeout"), "300000");
     assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
       report_date: "2026-08-10",
-      prompt_version: "market-briefing-v4-responses-schema",
+      prompt_version: "market-briefing-v5-web-search",
+      tags: "market-briefing,manual-generation,web-search",
       ai_model: "gpt-5.6-luna",
       ai_provider: "custom-opencode",
       ai_provider_attempt: "primary",
@@ -159,13 +162,14 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(Object.hasOwn(query, "store"), false);
     assert.equal(
       query.prompt_cache_key,
-      "market-briefing:market-briefing-v4-responses-schema",
+      "market-briefing:market-briefing-v5-web-search",
     );
     assert.deepEqual(query.reasoning, {
-      effort: "high",
+      effort: "max",
       summary: "auto",
       context: "current_turn",
     });
+    assert.deepEqual(query.tools, [{ type: "web_search" }]);
     assert.equal(Object.hasOwn(query, "include"), false);
     assert.equal(query.text.format.type, "json_schema");
     assert.equal(query.text.format.name, "market_briefing");

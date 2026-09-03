@@ -22,7 +22,7 @@
 
 ### 今日聚焦
 
-- Dashboard Worker 通过 `DATA` Service Binding 分别请求 `/data/stock-summary`、`/data/news` 和 `/data/news/{id}`，在本项目拼接新闻素材后调用统一 AI Gateway 适配器生成纯文本。
+- Dashboard Worker 通过 `DATA` Service Binding 分别请求 `/data/stock-summary`、`/data/news` 和 `/data/news/{id}`，在本项目拼接新闻素材后调用统一 AI Gateway 适配器；生成时启用 Responses `web_search` 和今日聚焦专用 `max` reasoning effort，输出仍为两条纯文本。
 - 新闻筛选、详情合并与提示词格式属于 Dashboard Worker 契约；更改时必须同步检查 `data` 与本项目测试。
 
 ### 二级池
