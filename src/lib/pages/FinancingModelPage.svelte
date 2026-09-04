@@ -5,6 +5,7 @@
 
   import "../../app.css";
   import "../../styles.css";
+  import "../../layout-report.css";
 
   import {
     renderFinancingDriverContributions,
@@ -502,7 +503,33 @@
   />
 </svelte:head>
 
-<div class:financing-model-page--embedded={embedded} class="financing-model-page">
+{#snippet versionActions(portalTarget: string | null)}
+  <div
+    class="model-actions layout-report-screen-only"
+    use:portal={portalTarget}
+  >
+    {#if snapshot}
+      <label class="model-version-control">
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M4 6.5h12M6.5 3v3M13.5 3v3M4 4.5h12v12H4z" />
+        </svg>
+        <span>日期版本</span>
+        <select
+          aria-label="融资择时模型日期版本"
+          value={selectedRunId}
+          onchange={loadVersion}
+          disabled={loadingVersion}
+        >
+          {#each versions as version (version.runId)}
+            <option value={version.runId}>{versionLabel(version, versions)}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet standaloneHeader()}
   <a class="skip-link" href="#financing-model-report">跳至报告正文</a>
   <header class="model-header">
     <div class="model-title-block">
@@ -517,44 +544,24 @@
         <span class="model-title-subject">债券融资择时模型</span>
       </h1>
     </div>
-    <div
-      class="model-actions"
-      use:portal={embedded ? "#tr-topbar-actions" : null}
-    >
-      {#if snapshot}
-        <label class="model-version-control">
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <path d="M4 6.5h12M6.5 3v3M13.5 3v3M4 4.5h12v12H4z" />
-          </svg>
-          <span>日期版本</span>
-          <select
-            aria-label="融资择时模型日期版本"
-            value={selectedRunId}
-            onchange={loadVersion}
-            disabled={loadingVersion}
-          >
-            {#each versions as version (version.runId)}
-              <option value={version.runId}>{versionLabel(version, versions)}</option>
-            {/each}
-          </select>
-        </label>
-      {/if}
-    </div>
+    {@render versionActions(null)}
   </header>
+{/snippet}
 
+{#snippet reportContents()}
   {#if loading}
-    <main id="financing-model-report" class="loading-state" aria-busy="true">
+    <section id="financing-model-report" class="loading-state" aria-busy="true">
       <span class="spinner" aria-hidden="true"></span>
       <p>正在读取融资择时模型数据</p>
-    </main>
+    </section>
   {:else if errorMessage}
-    <main id="financing-model-report" class="error-state">
+    <section id="financing-model-report" class="error-state">
       <h2>模型数据暂不可用</h2>
       <p>{errorMessage}</p>
       <button type="button" onclick={loadReport}>重新读取</button>
-    </main>
+    </section>
   {:else if report && snapshot}
-    <main id="financing-model-report" class="report-stack">
+    <section id="financing-model-report" class="report-stack">
       <section class="decision-grid" aria-label="融资窗口与整体结论">
         <ModuleCard class="window-card" labelledBy="financing-window-title">
           <PanelHeading id="financing-window-title" title="融资窗口" />
@@ -880,32 +887,29 @@
         {/if}
       </ModuleCard>
 
-    </main>
+    </section>
   {/if}
-</div>
+{/snippet}
+
+{#if embedded}
+  {@render versionActions("#tr-topbar-actions")}
+  {@render reportContents()}
+{:else}
+  <main class="financing-model-page layout-report layout-report--financing">
+    {@render standaloneHeader()}
+    {@render reportContents()}
+  </main>
+{/if}
 
 <style>
   .financing-model-page {
-    width: min(100%, 2100px);
+    width: 100%;
+    max-width: 1080px;
     min-height: 100dvh;
     margin-inline: auto;
     padding: 12px 16px 28px;
     color: var(--text-1);
     background: var(--bg-page);
-  }
-
-  .financing-model-page--embedded {
-    min-height: 0;
-    padding: 0;
-  }
-
-  .financing-model-page--embedded .skip-link,
-  .financing-model-page--embedded .model-title-block {
-    display: none;
-  }
-
-  .financing-model-page--embedded .model-header {
-    display: none;
   }
 
   .skip-link {
@@ -1889,6 +1893,50 @@
 
     .validation-grid {
       grid-template-columns: 1fr;
+    }
+  }
+
+  @media print {
+    .model-header {
+      align-items: center;
+      flex-direction: row;
+    }
+
+    .decision-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    }
+
+    .product-layout {
+      grid-template-columns: minmax(0, 2.25fr) minmax(260px, 0.75fr);
+    }
+
+    .supporting-grid {
+      grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.8fr);
+    }
+
+    .business-metric-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .sell-side-grid--3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .sell-side-grid--4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .sell-side-grid--5 {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .sell-side-grid .sell-side-card:last-child {
+      grid-column: auto;
+    }
+
+    .report-stack > section,
+    :global(.report-stack > .tr-panel) {
+      break-inside: avoid-page;
     }
   }
 

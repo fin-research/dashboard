@@ -6,6 +6,7 @@
   import "../../app.css";
   import "../../styles.css";
   import "../../bond-ledger.css";
+  import "../../layout-report.css";
   import "../../secondary-bond-pool.css";
 
   import {
@@ -59,7 +60,7 @@
   let rangePhase: "start" | "end" = "start";
   let rangeMonthLeft = monthStart(startDate);
   let syncGeneration = 0;
-  let reportSurface: HTMLElement;
+  let reportSurface: HTMLElement | null = null;
 
   $: current = analytics.currentPerformance;
   $: currentOperating = analytics.operatingTrend.find(
@@ -197,10 +198,20 @@
 
   async function exportImage(): Promise<void> {
     if (!analytics.hasData || !analytics.auditPassed || exporting) return;
+    const surface = embedded
+      ? document.getElementById("tr-workbench-main")
+      : reportSurface;
+    if (!(surface instanceof HTMLElement)) {
+      globalMessages.error("未找到二级债券池运营周报区域", {
+        key: "secondary-bond-pool-export",
+        title: "导出失败",
+      });
+      return;
+    }
     exporting = true;
     exportLabel = "正在导出";
     try {
-      await exportReportImage(reportSurface, current?.date ?? endDate, {
+      await exportReportImage(surface, current?.date ?? endDate, {
         captureClass: true,
         filename: `资金管理部-二级债券池运营周报-${current?.date ?? endDate}.png`,
       });
@@ -278,8 +289,7 @@
   <meta name="theme-color" content="#f6f8fb" />
 </svelte:head>
 
-<div class:secondary-weekly-shell--embedded={embedded} class="secondary-weekly-shell">
-  <article bind:this={reportSurface} class="secondary-weekly-report">
+{#snippet reportContents()}
     <header class="secondary-weekly-masthead">
       <div>
         <a class="secondary-weekly-title-link" href="/" aria-label="返回市场研究门户">
@@ -291,7 +301,7 @@
       </div>
 
       <div
-        class="weekly-report-actions"
+        class="weekly-report-actions layout-report-screen-only"
         aria-label="日期范围与导出控制"
         use:portal={embedded ? "#tr-topbar-actions" : null}
       >
@@ -360,26 +370,25 @@
     </header>
 
     {#if loading}
-      <main class="secondary-weekly-state" aria-live="polite">
+      <section class="secondary-weekly-state" aria-live="polite">
         <span class="loading-orbit" aria-hidden="true"></span>
         <strong>正在读取二级池周报数据</strong>
-      </main>
+      </section>
     {:else if !analytics.hasData}
-      <main class="secondary-weekly-state">
+      <section class="secondary-weekly-state">
         <h2>所选范围暂无二级池数据</h2>
         <p>请在页头选择其他日期范围。</p>
-      </main>
+      </section>
     {:else if !analytics.auditPassed}
-      <main class="secondary-weekly-state secondary-weekly-state--audit">
+      <section class="secondary-weekly-state secondary-weekly-state--audit">
         <h2>三维对账未全部通过，暂不生成周报</h2>
         <ul>
           {#each analytics.auditChecks.filter((check) => !check.pass) as check (check.key)}
             <li>{check.label}：差额 {auditDifference(check)}</li>
           {/each}
         </ul>
-      </main>
+      </section>
     {:else}
-      <main class="secondary-weekly-main">
         <section class="secondary-weekly-metrics" aria-label="二级债券池核心指标">
           {#each metricCards as card (card.label)}
             <MetricCard
@@ -493,9 +502,18 @@
             </ModuleCard>
           </div>
         </div>
-      </main>
     {/if}
 
     <footer class="secondary-weekly-footer">资金管理部 · 二级债券池内部报告 | 数据基于输入台账，发送前请复核审计摘要</footer>
-  </article>
-</div>
+{/snippet}
+
+{#if embedded}
+  {@render reportContents()}
+{:else}
+  <main
+    bind:this={reportSurface}
+    class="secondary-weekly-report secondary-weekly-report--standalone layout-report layout-report--secondary"
+  >
+    {@render reportContents()}
+  </main>
+{/if}

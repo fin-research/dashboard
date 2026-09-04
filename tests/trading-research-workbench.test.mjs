@@ -125,10 +125,53 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
   assert.match(workbench, /<SecondaryBondPoolWeeklyPage embedded \/>/);
   assert.match(routeLoader, /workbenchRoutes/);
   assert.match(styles, /grid-template-columns:\s*minmax\(0, 1\.15fr\) minmax\(0, 0\.85fr\)/);
-  assert.match(styles, /width:\s*min\(100%, 1140px\)/);
+  assert.doesNotMatch(styles, /1140px/);
+  assert.match(page, /layout-report layout-report--secondary/);
   assert.match(styles, /grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(page, /variant="report"/);
   assert.match(page, /本周营收/);
+});
+
+test("版式报告统一使用 1080px A4 画布且工作台 main 不增加报告包装层", async () => {
+  const [layoutStyles, workbench, secondary, financing, credit, design] =
+    await Promise.all([
+      readFile(new URL("../src/layout-report.css", import.meta.url), "utf8"),
+      readFile(
+        new URL("../src/lib/trading-research/WorkbenchPage.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/lib/pages/SecondaryBondPoolWeeklyPage.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/lib/trading-research/CreditView.svelte", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../DESIGN.md", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(layoutStyles, /\.layout-report\s*\{[\s\S]*max-width:\s*1080px/);
+  assert.match(layoutStyles, /@page\s*\{[\s\S]*size:\s*A4 portrait;[\s\S]*margin:\s*0/);
+  const printRules = layoutStyles.slice(layoutStyles.indexOf("@media print"));
+  assert.match(printRules, /\.layout-report\s*\{[\s\S]*width:\s*1080px !important/);
+  assert.match(printRules, /zoom:\s*0\.734908136/);
+  assert.match(printRules, /> :not\(\.layout-report\):not\(:has\(\.layout-report\)\)/);
+
+  assert.match(workbench, /<main\s+[\s\S]*id="tr-workbench-main"/);
+  assert.doesNotMatch(workbench, /role="main"/);
+  assert.match(workbench, /class:layout-report=\{isLayoutReport\(activeViewId\)\}/);
+  assert.doesNotMatch(secondary, /secondary-weekly-shell/);
+  assert.doesNotMatch(secondary, /<article[^>]+secondary-weekly-report/);
+  assert.match(secondary, /<main[\s\S]*layout-report layout-report--secondary/);
+  assert.doesNotMatch(financing, /<div[^>]+financing-model-page/);
+  assert.match(financing, /<main class="financing-model-page layout-report layout-report--financing">/);
+  assert.match(credit, /tr-credit-weekly-report layout-report layout-report--credit/);
+  assert.match(design, /授信周报、二级债券池运营周报和融资择时模型报告统一视为版式报告/);
 });
 
 test("演示交易汇总严格由迁入的十笔交易派生", () => {
@@ -453,7 +496,8 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(workbenchPage, /id="tr-topbar-actions"/);
   assert.doesNotMatch(workbenchPage, /观测日期|见各指标卡/);
   assert.match(bond, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
-  assert.match(financing, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
+  assert.match(financing, /use:portal=\{portalTarget\}/);
+  assert.match(financing, /@render versionActions\("#tr-topbar-actions"\)/);
   assert.match(bond, /globalMessages\.(success|error|info)/);
   assert.match(financing, /globalMessages\.(success|error|info)/);
   assert.doesNotMatch(bond, /class="ledger-status"/);

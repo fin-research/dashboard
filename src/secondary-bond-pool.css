@@ -1,23 +1,16 @@
-.secondary-weekly-shell {
-  min-height: 100vh;
-  min-height: 100dvh;
+.secondary-weekly-report {
+  min-width: 0;
+  padding: 32px 36px;
   color: #0f172a;
   background: #ffffff;
 }
 
-.secondary-weekly-shell--embedded {
-  min-height: 0;
+.secondary-weekly-report--standalone {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
-.secondary-weekly-report {
-  width: min(100%, 1140px);
-  min-width: 0;
-  margin: 0 auto;
-  padding: 32px 36px;
-  background: #ffffff;
-}
-
-.secondary-weekly-shell--embedded .secondary-weekly-report {
+.secondary-weekly-report--embedded {
   padding-top: 18px;
 }
 
@@ -97,19 +90,15 @@
   stroke-width: 1.8;
 }
 
-.secondary-weekly-shell--embedded .secondary-weekly-masthead {
+.secondary-weekly-report--embedded .secondary-weekly-masthead {
   min-height: 92px;
-}
-
-.secondary-weekly-main {
-  display: grid;
-  gap: 22px;
 }
 
 .secondary-weekly-metrics {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
+  margin-bottom: 22px;
 }
 
 .secondary-weekly-columns {
@@ -341,8 +330,7 @@
 
 @media print {
   .secondary-weekly-report {
-    width: 100%;
-    padding: 0;
+    padding: 32px 36px !important;
   }
 
   .weekly-report-actions {
@@ -351,6 +339,29 @@
 
   .secondary-weekly-columns {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  }
+
+  .secondary-weekly-metrics {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .secondary-weekly-column--primary {
+    padding-right: 24px;
+    padding-bottom: 0;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 0;
+  }
+
+  .secondary-weekly-allocation-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .secondary-weekly-chart--trend {
+    height: 372px;
+  }
+
+  .secondary-weekly-chart--allocation {
+    height: 205px;
   }
 }
 

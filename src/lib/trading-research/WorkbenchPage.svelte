@@ -10,6 +10,7 @@
   import TradingView from "./TradingView.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
   import WorkflowView from "./WorkflowView.svelte";
+  import "../../layout-report.css";
   import {
     normalizeWorkbenchView,
     workbenchRoutes,
@@ -49,6 +50,10 @@
 
   function isIntegratedView(value: WorkbenchViewId): boolean {
     return value === "bond" || value === "secondary-bond-pool" || value === "financing-model";
+  }
+
+  function isLayoutReport(value: WorkbenchViewId): boolean {
+    return value === "secondary-bond-pool" || value === "financing-model";
   }
 </script>
 
@@ -136,11 +141,15 @@
   ></button>
 
   <section class="tr-workspace">
-    <div
+    <main
       id="tr-workbench-main"
       class:tr-integrated-page={isIntegratedView(activeViewId)}
+      class:layout-report={isLayoutReport(activeViewId)}
+      class:layout-report--secondary={activeViewId === "secondary-bond-pool"}
+      class:layout-report--financing={activeViewId === "financing-model"}
+      class:secondary-weekly-report={activeViewId === "secondary-bond-pool"}
+      class:secondary-weekly-report--embedded={activeViewId === "secondary-bond-pool"}
       bind:this={mainRegion}
-      role="main"
       tabindex="-1"
     >
       {#if activeViewId === "overview"}
@@ -160,6 +169,6 @@
       {:else}
         <FinancingModelPage embedded />
       {/if}
-    </div>
+    </main>
   </section>
 </div>

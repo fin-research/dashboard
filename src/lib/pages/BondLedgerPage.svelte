@@ -687,12 +687,12 @@
     </header>
 
     {#if loadingRecords}
-      <main class="ledger-loading" aria-live="polite">
+      <section class="ledger-loading" aria-live="polite">
         <span class="loading-orbit" aria-hidden="true"></span>
         <strong>正在读取二级池数据</strong>
-      </main>
+      </section>
     {:else if !analytics.hasData}
-      <main class="ledger-empty">
+      <section class="ledger-empty">
         <div class="ledger-empty-icon" aria-hidden="true">
           <svg viewBox="0 0 48 48">
             <path d="M10 6h21l7 7v29H10z" />
@@ -701,9 +701,9 @@
         </div>
         <h2>数据库暂无二级池数据</h2>
         <button type="button" onclick={openManagement}>打开台账管理</button>
-      </main>
+      </section>
     {:else}
-      <main class="ledger-main">
+      <section class="ledger-main">
         <section class="ledger-metrics" aria-label="二级池核心指标">
           {#each metricCards as card, index (card.label)}
             <MetricCard
@@ -837,7 +837,7 @@
           </div>
         </ModuleCard>
 
-      </main>
+      </section>
     {/if}
   </div>
 </div>

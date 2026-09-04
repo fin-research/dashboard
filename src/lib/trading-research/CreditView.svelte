@@ -823,7 +823,7 @@
       </ModuleCard>
     </section>
   {:else}
-    <div class="tr-credit-weekly-report">
+    <div class="tr-credit-weekly-report layout-report layout-report--credit">
       <section aria-labelledby="credit-weekly-title">
         <SectionHeading id="credit-weekly-title" title="授信周报" />
         <div class="tr-metric-grid tr-metric-grid--five">
