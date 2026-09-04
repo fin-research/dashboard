@@ -158,7 +158,7 @@ test("浏览器一次拉取原始资源并加工为视觉与文字共享报告",
     return directResponse(url);
   };
 
-  const report = await fetchReport(
+  const { report } = await fetchReport(
     "2026-08-25",
     true,
     undefined,
@@ -202,7 +202,7 @@ test("当日读取只请求 Data 原始资源，不读取 market-report 定稿",
     return directResponse(url);
   };
 
-  const report = await fetchReport(
+  const { report } = await fetchReport(
     "2026-08-25",
     false,
     undefined,
@@ -234,7 +234,7 @@ test("历史日期只读取完整 R2 定稿，不再请求 Data 原始资源", a
     return Response.json(finalized);
   };
 
-  const report = await fetchReport(
+  const { report } = await fetchReport(
     "2026-08-31",
     false,
     undefined,
@@ -265,7 +265,7 @@ test("历史日期没有定稿时回退原始 Data 重新生成", async (context
     return directResponse(url);
   };
 
-  const report = await fetchReport(
+  const { report, resourceIssues } = await fetchReport(
     "2026-08-31",
     false,
     undefined,
@@ -278,6 +278,10 @@ test("历史日期没有定稿时回退原始 Data 重新生成", async (context
   assert.ok(calls.every((url) => !url.startsWith("/data/favorite-quotes")));
   assert.equal(report.report_date, "2026-08-31");
   assert.equal(report.finalized_at, null);
+  assert.deepEqual(
+    resourceIssues.map((issue) => issue.resource),
+    ["futures", "todayTrades", "favoriteQuotes"],
+  );
 });
 
 test("历史定稿的其他读取错误不触发原始 Data 回退", async (context) => {
@@ -321,7 +325,7 @@ test("当日 A股收评尚未发布时保留其他模块并返回空股市段落
     return directResponse(url);
   };
 
-  const report = await fetchReport(
+  const { report, resourceIssues } = await fetchReport(
     "2026-08-25",
     false,
     undefined,
@@ -329,9 +333,10 @@ test("当日 A股收评尚未发布时保留其他模块并返回空股市段落
   );
   assert.deepEqual(report.stock_paragraphs, []);
   assert.equal(report.equities[0].name, "上证指数");
+  assert.deepEqual(resourceIssues.map((issue) => issue.resource), ["stock"]);
 });
 
-test("A股收评的其他 404 错误不得静默降级", async (context) => {
+test("A股收评的其他错误只降级对应资源", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url) => {
@@ -349,10 +354,16 @@ test("A股收评的其他 404 错误不得静默降级", async (context) => {
     return directResponse(url);
   };
 
-  await assert.rejects(
-    fetchReport("2026-08-25", false, undefined, "2026-08-25"),
-    /\/data\/stock-summary 请求失败.*UPSTREAM_SCHEMA_MISMATCH/,
+  const { report, resourceIssues } = await fetchReport(
+    "2026-08-25",
+    false,
+    undefined,
+    "2026-08-25",
   );
+  assert.deepEqual(report.stock_paragraphs, []);
+  assert.equal(report.equities[0].name, "上证指数");
+  assert.equal(resourceIssues[0].resource, "stock");
+  assert.match(resourceIssues[0].detail, /UPSTREAM_SCHEMA_MISMATCH/);
 });
 
 test("原始资源请求不附带 GraphQL refresh 参数", async (context) => {
@@ -390,7 +401,7 @@ test("保存定稿只提交规范报告与今日聚焦", async (context) => {
   assert.equal(saved.finalized_at, "2026-08-25T16:00:00+08:00");
 });
 
-test("原始 Data 接口错误时前端显示业务错误", async (context) => {
+test("原始 Data 单资源错误时其余市场模块继续生成", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url) =>
@@ -410,8 +421,50 @@ test("原始 Data 接口错误时前端显示业务错误", async (context) => {
           },
         }, { status: 503 })
       : directResponse(url);
-  await assert.rejects(
-    fetchReport("2026-08-25", false, undefined, "2026-08-25"),
-    /\/data\/industry 请求失败.*Choice 数据源不可用.*equities\.0\.close.*undefined/,
+  const { report, resourceIssues } = await fetchReport(
+    "2026-08-25",
+    false,
+    undefined,
+    "2026-08-25",
   );
+  assert.deepEqual(report.equities, []);
+  assert.equal(report.omo_operations[0].amount_yi, 1000);
+  assert.deepEqual(
+    resourceIssues.map((issue) => issue.resource),
+    ["industry", "primary"],
+  );
+  assert.match(resourceIssues[0].detail, /Choice 数据源不可用/);
+  assert.match(resourceIssues[0].detail, /equities\.0\.close/);
+});
+
+test("债券基础信息 503 仅使依赖债券信息的模块缺失", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url) =>
+    String(url).startsWith("/data/bond-infos?")
+      ? Response.json({
+          detail: "DM returned invalid JSON (HTTP 200)",
+          error: {
+            code: "UPSTREAM_INVALID_JSON",
+            source: "DM",
+            stage: "decode",
+          },
+        }, { status: 503 })
+      : directResponse(url);
+
+  const { report, resourceIssues } = await fetchReport(
+    "2026-08-25",
+    false,
+    undefined,
+    "2026-08-25",
+  );
+  assert.deepEqual(report.secondary_bonds, []);
+  assert.equal(report.inventory_bonds[0].bond_name, "--");
+  assert.equal(report.inventory_bonds[0].bid_yield, 2.01);
+  assert.equal(report.equities[0].name, "上证指数");
+  assert.deepEqual(
+    resourceIssues.map((issue) => issue.resource),
+    ["bondInfos"],
+  );
+  assert.match(resourceIssues[0].detail, /UPSTREAM_INVALID_JSON/);
 });

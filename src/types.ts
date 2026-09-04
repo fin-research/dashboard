@@ -127,6 +127,31 @@ export interface MarketReportSnapshot extends ReportData {
   finalized_at: string | null;
 }
 
+export type MarketReportResource =
+  | "omo"
+  | "fundingDr"
+  | "fundingDibo"
+  | "governmentBonds"
+  | "futures"
+  | "stock"
+  | "margin"
+  | "industry"
+  | "primary"
+  | "todayTrades"
+  | "favoriteQuotes"
+  | "bondInfos";
+
+export interface MarketReportResourceIssue {
+  resource: MarketReportResource;
+  label: string;
+  detail: string;
+}
+
+export interface MarketReportLoadResult {
+  report: MarketReportSnapshot;
+  resourceIssues: MarketReportResourceIssue[];
+}
+
 export interface MarketBriefing {
   report_date: string;
   content: string;

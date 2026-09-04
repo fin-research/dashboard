@@ -33,7 +33,12 @@
     reportViewFromPathname,
     type ReportView,
   } from "./report-route";
-  import type { MarketBriefing, ReportData } from "./types";
+  import type {
+    MarketBriefing,
+    MarketReportResource,
+    MarketReportResourceIssue,
+    ReportData,
+  } from "./types";
   import {
     comparableSummaryItems,
     comparableTenorRows,
@@ -81,8 +86,10 @@
   let focusFinalizedAt: string | null = null;
   let savingFocus = false;
   let savedDataJson = "";
+  let resourceIssues: MarketReportResourceIssue[] = [];
 
   $: derived = data ? deriveReport(data) : EMPTY_DERIVED;
+  $: missingResources = resourceIssues.map((issue) => issue.resource);
   $: reportDirty = Boolean(data) && (
     JSON.stringify(data) !== savedDataJson || focusText !== savedFocusText
   );
@@ -120,19 +127,28 @@
     const requestedDate = selectedDate;
     loading = true;
     errorMessage = "";
+    resourceIssues = [];
     try {
-      const [report, chartModule] = await Promise.all([
+      const [loaded, chartModule] = await Promise.all([
         fetchReport(requestedDate, refresh, request.signal),
         import("./charts"),
       ]);
       if (request.signal.aborted || selectedDate !== requestedDate) return;
+      const report = loaded.report;
       data = report;
+      resourceIssues = loaded.resourceIssues;
       focusText = report.focus_text;
       savedFocusText = report.focus_text;
       focusFinalizedAt = report.finalized_at;
       savedDataJson = JSON.stringify(report);
       charts = chartModule;
       loading = false;
+      if (resourceIssues.length) {
+        globalMessages.warning(
+          `部分数据暂缺：${resourceIssues.map((issue) => issue.label).join("、")}`,
+          { key: "market-report-partial-data", duration: 8000 },
+        );
+      }
       if (shouldWarnUnfinalizedReport(requestedDate, report.finalized_at)) {
         globalMessages.warning(
           `${requestedDate} 无市场点评定稿，已从可回溯数据源重新生成`,
@@ -144,6 +160,12 @@
         showError(error);
       }
     }
+  }
+
+  function hasResourceIssue(...resources: MarketReportResource[]): boolean {
+    return resources.some((resource) =>
+      resourceIssues.some((issue) => issue.resource === resource)
+    );
   }
 
   async function createMarketBriefing(): Promise<void> {
@@ -387,7 +409,7 @@
           aria-labelledby="visual-report-tab"
         >
           <div class="core-metrics" aria-label="核心市场指标">
-            <CoreMetrics {data} {derived} />
+            <CoreMetrics {data} {derived} {missingResources} />
           </div>
           <div class="report-content">
         <section class="dashboard-panel panel--focus" aria-labelledby="focus-title">
@@ -441,17 +463,21 @@
             <span class="panel-index">02</span>
             <h2 id="omo-title">公开市场操作</h2>
           </header>
-          <ChartHost
-            id="omo-chart"
-            renderer={charts.renderOmo}
-            args={[derived.omoHistory]}
-            ariaLabel="近十个操作日公开市场操作柱状图"
-          />
-          <div class="summary-strip" aria-label="公开市场操作汇总">
-            <SummaryStrip
-              items={omoSummaryItems(derived.omoHistory, data.report_date)}
+          {#if hasResourceIssue("omo")}
+            <div class="module-data-missing" role="status">公开市场操作数据缺失</div>
+          {:else}
+            <ChartHost
+              id="omo-chart"
+              renderer={charts.renderOmo}
+              args={[derived.omoHistory]}
+              ariaLabel="近十个操作日公开市场操作柱状图"
             />
-          </div>
+            <div class="summary-strip" aria-label="公开市场操作汇总">
+              <SummaryStrip
+                items={omoSummaryItems(derived.omoHistory, data.report_date)}
+              />
+            </div>
+          {/if}
         </section>
 
         <section class="dashboard-panel panel--rates" aria-labelledby="rates-title">
@@ -459,15 +485,30 @@
             <span class="panel-index">03</span>
             <h2 id="rates-title">固收市场</h2>
           </header>
+          {#if hasResourceIssue("fundingDr", "fundingDibo", "governmentBonds", "futures")}
+            <div class="module-data-warning" role="status">
+              {#if hasResourceIssue("fundingDr", "fundingDibo")}
+                <span>资金利率数据缺失</span>
+              {/if}
+              {#if hasResourceIssue("governmentBonds")}
+                <span>利率债成交数据缺失</span>
+              {/if}
+              {#if hasResourceIssue("futures")}
+                <span>国债期货数据缺失</span>
+              {/if}
+            </div>
+          {/if}
           <div class="indicator-grid">
             <FundMetrics metrics={derived.funds} />
           </div>
-          <ChartHost
-            id="government-chart"
-            renderer={charts.renderGovernmentCurve}
-            args={[derived.governmentBonds]}
-            ariaLabel="关键期限国债收益率曲线"
-          />
+          {#if !hasResourceIssue("governmentBonds")}
+            <ChartHost
+              id="government-chart"
+              renderer={charts.renderGovernmentCurve}
+              args={[derived.governmentBonds]}
+              ariaLabel="关键期限国债收益率曲线"
+            />
+          {/if}
         </section>
 
         <section class="dashboard-panel panel--equity" aria-labelledby="equity-title">
@@ -475,6 +516,19 @@
             <span class="panel-index">04</span>
             <h2 id="equity-title">权益市场</h2>
           </header>
+          {#if hasResourceIssue("industry", "margin", "stock")}
+            <div class="module-data-warning" role="status">
+              {#if hasResourceIssue("industry")}
+                <span>权益及行业行情数据缺失</span>
+              {/if}
+              {#if hasResourceIssue("margin")}
+                <span>融资融券数据缺失</span>
+              {/if}
+              {#if hasResourceIssue("stock")}
+                <span>A股收评数据缺失</span>
+              {/if}
+            </div>
+          {/if}
           <div class="equity-stage">
             <div class="equity-dial-stage">
               <ChartHost
@@ -514,12 +568,16 @@
             <span class="panel-index">05</span>
             <h2 id="primary-title">一级发行</h2>
           </header>
-          <div class="data-list" aria-label="一级发行列表">
-            <PrimaryTable points={derived.primary} />
-          </div>
-          <div class="summary-strip" aria-label="一级发行汇总">
-            <SummaryStrip items={primarySummaryItems(data.primary_summary)} />
-          </div>
+          {#if hasResourceIssue("primary")}
+            <div class="module-data-missing" role="status">一级发行数据缺失</div>
+          {:else}
+            <div class="data-list" aria-label="一级发行列表">
+              <PrimaryTable points={derived.primary} />
+            </div>
+            <div class="summary-strip" aria-label="一级发行汇总">
+              <SummaryStrip items={primarySummaryItems(data.primary_summary)} />
+            </div>
+          {/if}
         </section>
 
         <section
@@ -530,19 +588,23 @@
             <span class="panel-index">06</span>
             <h2 id="comparable-title">二级行情</h2>
           </header>
-          <div
-            class="data-list"
-            aria-label="1年、2年、3年和5年可比证券公司债列表"
-          >
-            <SecondaryTable
-              headers={["期限", "债券", "发行人", "成交"]}
-              rows={comparableTenorRows(derived.comparable)}
-              emptyText="今日暂无公募债成交"
-            />
-          </div>
-          <div class="summary-strip" aria-label="二级行情汇总">
-            <SummaryStrip items={comparableSummaryItems(derived.comparable)} />
-          </div>
+          {#if hasResourceIssue("todayTrades", "bondInfos")}
+            <div class="module-data-missing" role="status">可比债成交数据缺失</div>
+          {:else}
+            <div
+              class="data-list"
+              aria-label="1年、2年、3年和5年可比证券公司债列表"
+            >
+              <SecondaryTable
+                headers={["期限", "债券", "发行人", "成交"]}
+                rows={comparableTenorRows(derived.comparable)}
+                emptyText="今日暂无公募债成交"
+              />
+            </div>
+            <div class="summary-strip" aria-label="二级行情汇总">
+              <SummaryStrip items={comparableSummaryItems(derived.comparable)} />
+            </div>
+          {/if}
         </section>
 
         <section
@@ -553,15 +615,19 @@
             <span class="panel-index">07</span>
             <h2 id="inventory-title">东财债券</h2>
           </header>
-          <ChartHost
-            id="inventory-chart"
-            renderer={charts.renderInventory}
-            args={[derived.inventory]}
-            ariaLabel="东财存量债估值期限结构"
-          />
-          <div class="summary-strip" aria-label="东财债券汇总">
-            <SummaryStrip items={inventorySummaryItems(derived.inventory)} />
-          </div>
+          {#if hasResourceIssue("favoriteQuotes", "bondInfos")}
+            <div class="module-data-missing" role="status">东财债券数据缺失</div>
+          {:else}
+            <ChartHost
+              id="inventory-chart"
+              renderer={charts.renderInventory}
+              args={[derived.inventory]}
+              ariaLabel="东财存量债估值期限结构"
+            />
+            <div class="summary-strip" aria-label="东财债券汇总">
+              <SummaryStrip items={inventorySummaryItems(derived.inventory)} />
+            </div>
+          {/if}
         </section>
           </div>
         </div>
@@ -575,6 +641,7 @@
           <TextReport
             data={data}
             {focusText}
+            {missingResources}
             dirty={reportDirty}
             saving={savingFocus}
             onDataChange={handleTextReportDataChange}

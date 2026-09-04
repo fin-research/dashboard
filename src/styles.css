@@ -573,6 +573,33 @@ h1 {
   font-weight: bold;
 }
 
+.module-data-warning {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.module-data-warning span,
+.module-data-missing {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.module-data-warning span {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--line) 22%, #fff);
+}
+
+.module-data-missing {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  text-align: center;
+}
+
 .dashboard-panel {
   position: relative;
   display: flex;

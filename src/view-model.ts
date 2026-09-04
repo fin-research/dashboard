@@ -10,6 +10,7 @@ import type { ReportDerived } from "./report-view";
 import type {
   ComparablePoint,
   InventoryPoint,
+  MarketReportResource,
   MarginSnapshot,
   OmoPoint,
   PrimaryIssueDetail,
@@ -66,7 +67,9 @@ export interface TableRowView {
 export function coreMetricCards(
   data: ReportData,
   derived: ReportDerived,
+  missingResources: readonly MarketReportResource[] = [],
 ): MetricCardView[] {
+  const missing = new Set(missingResources);
   const omo =
     [...derived.omoHistory]
       .reverse()
@@ -81,8 +84,12 @@ export function coreMetricCards(
     .sort((left, right) => right.tenor_years - left.tenor_years);
   const tradeCard: MetricCardView = {
     label: "债券成交",
-    value: tradePoints.length ? `${tradePoints.length} 只` : "—",
-    detail: tradePoints.length ? "当日成交" : "今日暂无",
+    value: missing.has("todayTrades") || missing.has("favoriteQuotes")
+      ? "—"
+      : tradePoints.length ? `${tradePoints.length} 只` : "—",
+    detail: missing.has("todayTrades") || missing.has("favoriteQuotes")
+      ? "数据缺失"
+      : tradePoints.length ? "当日成交" : "今日暂无",
     valueTone: "flat",
     icon: "trade",
   };
@@ -90,36 +97,50 @@ export function coreMetricCards(
   return [
     {
       label: "公开市场操作",
-      value: `${Math.abs(omo).toLocaleString("zh-CN")} 亿`,
-      detail: omo > 0 ? "净投放" : omo < 0 ? "净回笼" : "净投放为零",
+      value: missing.has("omo")
+        ? "—"
+        : `${Math.abs(omo).toLocaleString("zh-CN")} 亿`,
+      detail: missing.has("omo")
+        ? "数据缺失"
+        : omo > 0 ? "净投放" : omo < 0 ? "净回笼" : "净投放为零",
       valueTone: omo > 0 ? "inject" : omo < 0 ? "withdraw" : "flat",
       icon: "bank",
     },
     {
       label: "DR007",
       value: dr007 ? `${number(dr007.value, 4)}%` : "—",
-      detail: dr007 ? signed(dr007.change, "bp") : "数据暂缺",
+      detail: missing.has("fundingDr")
+        ? "数据缺失"
+        : dr007 ? signed(dr007.change, "bp") : "数据暂缺",
       valueTone: tone(dr007?.change),
       icon: "liquidity",
     },
     {
       label: "10Y 国债",
       value: government10 ? `${number(government10.value, 4)}%` : "—",
-      detail: government10 ? signed(government10.change, "bp") : "数据暂缺",
+      detail: missing.has("governmentBonds")
+        ? "数据缺失"
+        : government10 ? signed(government10.change, "bp") : "数据暂缺",
       valueTone: tone(government10?.change),
       icon: "bond",
     },
     {
       label: "上证指数",
       value: shanghai ? number(shanghai.close, 2) : "—",
-      detail: shanghai ? signed(shanghai.change_pct, "%") : "数据暂缺",
+      detail: missing.has("industry")
+        ? "数据缺失"
+        : shanghai ? signed(shanghai.change_pct, "%") : "数据暂缺",
       valueTone: tone(shanghai?.change_pct),
       icon: "equity",
     },
     {
       label: "同业发行",
-      value: `${compactValue(data.primary_summary.current_amount)} 亿`,
-      detail: signed(data.primary_summary.change_amount, " 亿", 0),
+      value: missing.has("primary")
+        ? "—"
+        : `${compactValue(data.primary_summary.current_amount)} 亿`,
+      detail: missing.has("primary")
+        ? "数据缺失"
+        : signed(data.primary_summary.change_amount, " 亿", 0),
       valueTone: tone(data.primary_summary.change_amount),
       icon: "issuance",
     },

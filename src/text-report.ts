@@ -7,6 +7,7 @@ import type {
   FundingRate,
   GovernmentBond,
   InventoryPoint,
+  MarketReportResource,
   MarginSnapshot,
   OmoOperation,
   PrimaryIssueDetail,
@@ -21,30 +22,53 @@ const FUTURES = [
   ["TS9999", "2年期主力合约", false],
 ] as const;
 
-export function buildTextReport(data: ReportData, focusText = ""): string {
+export function buildTextReport(
+  data: ReportData,
+  focusText = "",
+  missingResources: readonly MarketReportResource[] = [],
+): string {
+  const missing = new Set(missingResources);
+  const omoText = missing.has("omo")
+    ? "公开市场操作数据缺失。"
+    : briefOmo(data.omo_operations, data.report_date);
+  const stockText = missing.has("stock")
+    ? "A股收评数据缺失。"
+    : stockMarket(data.stock_paragraphs);
+  const marginText = missing.has("margin")
+    ? "融资融券数据缺失。"
+    : marginTrading(data.margin);
+  const primaryText = missing.has("primary")
+    ? "一级发行数据缺失。"
+    : primaryIssue(data.primary_issues);
+  const secondaryText = missing.has("todayTrades") || missing.has("bondInfos")
+    ? "可比证券公司债券成交数据缺失。"
+    : secondaryMarket(data.secondary_bonds);
+  const inventoryText = missing.has("favoriteQuotes") || missing.has("bondInfos")
+    ? "东财存量债券数据缺失。"
+    : emBonds(data.inventory_bonds);
   return `${data.report_date.replaceAll("-", "")} 境内市场点评
 
 【央行】
-${briefOmo(data.omo_operations, data.report_date)}
+${omoText}
 
 【利率】
-${bondMarket(data)}
+${bondMarket(data, missing)}
 
 【股市】
-${stockMarket(data.stock_paragraphs)}
+${stockText}
 
-${marginTrading(data.margin)}
+${marginText}
 
 【一级发行】
 可比证券公司发行情况:${" "}
-${primaryIssue(data.primary_issues)}
+${primaryText}
 
 【二级行情】
 可比证券公司债券成交：(公募债)
-${secondaryMarket(data.secondary_bonds)}
+${secondaryText}
 
 东财存量债券:${" "}
-${emBonds(data.inventory_bonds)}
+${inventoryText}
 
 【今日聚焦】
 ${focusText}
@@ -59,8 +83,12 @@ export interface TextReportLine {
 export function buildTextReportLines(
   data: ReportData,
   focusText = "",
+  missingResources: readonly MarketReportResource[] = [],
 ): TextReportLine[] {
-  return buildTextReportLinesFromText(data, buildTextReport(data, focusText));
+  return buildTextReportLinesFromText(
+    data,
+    buildTextReport(data, focusText, missingResources),
+  );
 }
 
 export function buildTextReportLinesFromText(
@@ -139,14 +167,46 @@ export function briefOmo(rows: OmoOperation[], reportDate: string): string {
   return text;
 }
 
-function bondMarket(data: ReportData): string {
-  return [capitalBrief(data.funding_rates), bondBrief(data.government_bonds), futuresBrief(data.futures)].join("\n\n");
+function bondMarket(
+  data: ReportData,
+  missing: ReadonlySet<MarketReportResource>,
+): string {
+  const fundingMissing = [
+    missing.has("fundingDr") ? "DR资金利率数据缺失。" : "",
+    missing.has("fundingDibo") ? "同业拆借利率数据缺失。" : "",
+  ].filter(Boolean);
+  const funding = missing.has("fundingDr") || missing.has("fundingDibo")
+    ? [
+        ...fundingMissing,
+        missing.has("fundingDr") ? "" : fundingRateGroup(data.funding_rates, "DR"),
+        missing.has("fundingDibo") ? "" : fundingRateGroup(data.funding_rates, "DIBO"),
+      ].filter(Boolean).join("\n")
+    : capitalBrief(data.funding_rates);
+  const government = missing.has("governmentBonds")
+    ? "利率债成交数据缺失。"
+    : bondBrief(data.government_bonds);
+  const future = missing.has("futures")
+    ? "国债期货数据缺失。"
+    : futuresBrief(data.futures);
+  return [funding, government, future].join("\n\n");
 }
 
 function capitalBrief(rows: FundingRate[]): string {
   const funds = ["DR001", "DR007", "DIBO001", "DIBO007"].map((code) => rows.find((row) => row.code === code) ?? { code, rate: null, change_bp: null });
   const summary = directionSummary(funds.map((row) => row.change_bp ?? 0), "上行", "下行");
   return `今日银行间隔夜和7天期利率${summary}。\n截至17:00，${fundText(funds[0]!)}；${fundText(funds[1]!)}。\n同业拆借${fundText(funds[2]!)}；${fundText(funds[3]!)}。`;
+}
+
+function fundingRateGroup(rows: FundingRate[], source: "DR" | "DIBO"): string {
+  const codes = source === "DR" ? ["DR001", "DR007"] : ["DIBO001", "DIBO007"];
+  const funds = codes.map((code) =>
+    rows.find((row) => row.code === code) ?? { code, rate: null, change_bp: null }
+  );
+  const summary = directionSummary(funds.map((row) => row.change_bp ?? 0), "上行", "下行");
+  const detail = `${fundText(funds[0]!)}；${fundText(funds[1]!)}。`;
+  return source === "DR"
+    ? `今日银行间质押式回购隔夜和7天期利率${summary}。\n截至17:00，${detail}`
+    : `今日同业拆借隔夜和7天期利率${summary}。\n同业拆借${detail}`;
 }
 
 export function fundText(row: FundingRate): string {

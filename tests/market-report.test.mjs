@@ -118,7 +118,7 @@ test("浏览器直读原始 Data REST 并加工，不走聚合或 GraphQL", asyn
     return directDataResponse(String(target));
   };
 
-  const result = await fetchReport(
+  const { report: result } = await fetchReport(
     "2026-08-25",
     false,
     undefined,

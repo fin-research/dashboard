@@ -129,6 +129,22 @@ test("文字版富文本使用块级换行并保留成交行加粗", () => {
   assert.ok(!html.includes("\n"));
 });
 
+test("单个数据源失败时文字版只标记依赖段落并保留其余内容", () => {
+  const report = buildTextReport(
+    data,
+    "手动判断",
+    ["bondInfos", "fundingDr", "margin"],
+  );
+  assert.match(report, /DR资金利率数据缺失。/);
+  assert.match(report, /DIBO001报1\.7000%/);
+  assert.doesNotMatch(report, /DR001报--%/);
+  assert.match(report, /融资融券数据缺失。/);
+  assert.match(report, /可比证券公司债券成交数据缺失。/);
+  assert.match(report, /东财存量债券数据缺失。/);
+  assert.match(report, /7天期逆回购1185亿元/);
+  assert.match(report, /08\/13-丙证券-3年-30亿-1\.70%/);
+});
+
 test("文字版编辑回写结构化数据并联动图表版", () => {
   const edited = buildTextReport(data, "原始判断")
     .replace("DR001报1.4000%，跌2.00bp", "DR001报1.4500%，涨3.00bp")

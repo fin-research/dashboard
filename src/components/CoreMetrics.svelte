@@ -1,14 +1,15 @@
 <script lang="ts">
   import type { ReportDerived } from "../report-view";
-  import type { ReportData } from "../types";
+  import type { MarketReportResource, ReportData } from "../types";
   import { coreMetricCards } from "../view-model";
   import MetricCard from "./MetricCard.svelte";
   import MetricIcon from "./MetricIcon.svelte";
 
   export let data: ReportData;
   export let derived: ReportDerived;
+  export let missingResources: MarketReportResource[] = [];
 
-  $: cards = coreMetricCards(data, derived);
+  $: cards = coreMetricCards(data, derived, missingResources);
 
   const metricToneByIcon = {
     bank: "green",

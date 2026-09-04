@@ -37,7 +37,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 - `src/routes/` 负责页面装配、路由参数和 HTTP 边界，不承载复杂业务计算。
 - `src/App.svelte` 保留市场点评的整体报告装配。
-- `src/api.ts` 按上海日期分流：当天对同源 `/data/*` 原始资源做一次请求编排，用 `fields` 请求最小 DTO 并经 Zod 校验；历史日期优先 GET 完整 R2 定稿，收到 `REPORT_NOT_FINALIZED` 时按所选日期重新请求原始资源；只有手动保存定稿才 PUT `/api/market-report`。
+- `src/api.ts` 按上海日期分流：当天对同源 `/data/*` 原始资源做一次请求编排，用 `fields` 请求最小 DTO 并经 Zod 校验；每个资源独立捕获错误并以显式空结构继续构建报告，同时返回 resource issue 供依赖模块显示“数据缺失”。历史日期优先 GET 完整 R2 定稿，收到 `REPORT_NOT_FINALIZED` 时按所选日期重新请求原始资源；只有手动保存定稿才 PUT `/api/market-report`。
 - `src/market-report-resources.ts` 在浏览器内完成市场点评的筛选、合并与口径换算，产出的唯一 `ReportData` 同时供视觉版和文字版使用。
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，并把可识别的文字版手动编辑反向更新到规范报告数据；不得保存完整文字版或建立第二套数据源。
@@ -63,7 +63,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ### 市场点评
 
-当天浏览器在一次加载中并发请求 OMO、CFETS、国债、期货、两融、行业、股票收评、一级发行、今日成交和收藏报价；每个请求只选择实际使用字段并校验最小 DTO。今日成交与收藏报价的代码合并去重后只批量请求一次债券基础信息，代码集合来自当次响应，不是硬编码清单；基础信息只返回连接、展示和结构化类型筛选所需五个字段。公募公司债使用 `bondType` 与 `bondOfferingType` 判断，不按债券简称字母猜测。`src/market-report-resources.ts` 加工出唯一规范报告，视觉版与文字版共用，不重复请求。历史日期优先一次 GET 完整 R2 定稿；仅当返回 `REPORT_NOT_FINALIZED` 时按所选日期重放可按日期查询的原始资源并在页面提示未定稿，期货最新、今日成交和收藏报价不支持历史回放，不得以当前值冒充历史值。只有手动 PUT 才上传已裁剪的规范数据与今日聚焦并写 R2；完整文字版始终由前端生成，不进入定稿。市场原始数据不经过 Dashboard Worker，也不使用 Data GraphQL 聚合。
+当天浏览器在一次加载中并发请求 OMO、CFETS、国债、期货、两融、行业、股票收评、一级发行、今日成交和收藏报价；每个请求只选择实际使用字段并校验最小 DTO。单个资源失败时使用该资源的空结构完成共享报告，只在依赖模块和文字段落标记数据缺失，不阻断其他已成功模块。今日成交与收藏报价的代码合并去重后只批量请求一次债券基础信息，代码集合来自当次响应，不是硬编码清单；基础信息只返回连接、展示和结构化类型筛选所需字段。公募公司债使用 `bondType` 与 `bondOfferingType` 判断，不按债券简称字母猜测。`src/market-report-resources.ts` 加工出唯一规范报告，视觉版与文字版共用，不重复请求。历史日期优先一次 GET 完整 R2 定稿；仅当返回 `REPORT_NOT_FINALIZED` 时按所选日期重放可按日期查询的原始资源并在页面提示未定稿，期货最新、今日成交和收藏报价不支持历史回放，不得以当前值冒充历史值。只有手动 PUT 才上传已裁剪的规范数据与今日聚焦并写 R2；完整文字版始终由前端生成，不进入定稿。Data GraphQL 镜像相同原始资源，但市场点评仍使用分段 REST，以隔离失败和 Worker CPU。
 
 ### 市场热点
 

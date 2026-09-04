@@ -15,6 +15,7 @@ import type {
   FundingRate,
   GovernmentBond,
   InventoryPoint,
+  MarketReportResource,
   OmoOperation,
   PrimaryIssueDetail,
   ReportData,
@@ -55,9 +56,12 @@ export function applyTextReportEdits(
   data: ReportData,
   focusText: string,
   editedText: string,
+  missingResources: readonly MarketReportResource[] = [],
 ): TextReportEditResult {
   const sections = reportSections(editedText);
-  const originalSections = reportSections(buildTextReport(data, focusText));
+  const originalSections = reportSections(
+    buildTextReport(data, focusText, missingResources),
+  );
   const issues = REQUIRED_SECTIONS
     .filter((name) => !sections.has(name))
     .map((name) => `缺少【${name}】段落`);
@@ -73,7 +77,7 @@ export function applyTextReportEdits(
   const linkedFocus = sectionText(sections, "今日聚焦");
   if (!issues.length) {
     const regeneratedSections = reportSections(
-      buildTextReport(next, linkedFocus),
+      buildTextReport(next, linkedFocus, missingResources),
     );
     for (const name of REQUIRED_SECTIONS) {
       if (name === "今日聚焦") continue;
@@ -281,7 +285,9 @@ function updateStocks(
   if (stockLines.length) data.stock_paragraphs = stockLines.slice(0, 2);
 
   if (marginIndex < 0) {
-    if (!lines.some((line) => line.trim() === "融资融券数据暂缺。")) {
+    if (!lines.some((line) =>
+      ["融资融券数据暂缺。", "融资融券数据缺失。"].includes(line.trim())
+    )) {
       issues.push("【股市】融资融券行格式无法识别");
     }
     return;

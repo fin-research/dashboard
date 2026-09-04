@@ -8,10 +8,11 @@
     normalizeTextReport,
   } from "../text-report";
   import { applyTextReportEdits } from "../text-report-editor";
-  import type { ReportData } from "../types";
+  import type { MarketReportResource, ReportData } from "../types";
 
   export let data: ReportData;
   export let focusText = "";
+  export let missingResources: MarketReportResource[] = [];
   export let dirty = false;
   export let saving = false;
   export let onDataChange: (
@@ -28,7 +29,9 @@
   let currentValue = "";
   let draftDirty = false;
 
-  $: generatedValue = normalizeTextReport(buildTextReport(data, focusText));
+  $: generatedValue = normalizeTextReport(
+    buildTextReport(data, focusText, missingResources),
+  );
   $: if (!draftDirty && generatedValue !== currentValue) {
     currentValue = generatedValue;
     html = buildTextReportHtml(
@@ -43,7 +46,12 @@
 
   function applyDraft(): ReturnType<typeof applyTextReportEdits> | null {
     if (!draftDirty) return { data, focusText, issues: [] };
-    const result = applyTextReportEdits(data, focusText, currentValue);
+    const result = applyTextReportEdits(
+      data,
+      focusText,
+      currentValue,
+      missingResources,
+    );
     if (result.issues.length) {
       globalMessages.warning(result.issues.join("；"), {
         key: "market-report-text-edit",
@@ -53,7 +61,7 @@
     }
     draftDirty = false;
     currentValue = normalizeTextReport(
-      buildTextReport(result.data, result.focusText),
+      buildTextReport(result.data, result.focusText, missingResources),
     );
     html = buildTextReportHtml(
       buildTextReportLinesFromText(result.data, currentValue),
