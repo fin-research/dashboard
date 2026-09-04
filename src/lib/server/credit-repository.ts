@@ -5,13 +5,14 @@ import {
   creditItemTypes,
   type CreditAmountChange,
   type CreditCalendarEvent,
+  type CreditEventDetail,
+  type CreditEventType,
   type CreditInstitutionUpdateResponse,
   type CreditInstitutionView,
   type CreditItemType,
   type CreditReportResponse,
   type CreditSummaryView,
   type CreditWeeklyNewsItem,
-  type CreditWeeklySummaryView,
   type ParsedCreditWorkbook,
 } from "../credit/types.ts";
 import type { CreditInstitutionUpdateInput } from "../credit/update.ts";
@@ -71,6 +72,7 @@ export async function persistCreditWorkbook(
     );
     await insertInstitutions(client, parsed);
     await insertItems(client, parsed);
+    await client.query("SELECT credit.refresh_institution_events()");
     await client.query("COMMIT");
     return {
       reportDate: parsed.reportDate,
@@ -150,6 +152,34 @@ export async function loadCreditReport(
        ORDER BY report_date, institution_name, item_type`,
     [reportDates],
   );
+  const eventResult = await client.query<InstitutionEventRow>(
+    `SELECT
+         to_char(report_date, 'YYYY-MM-DD') AS report_date,
+         to_char(previous_report_date, 'YYYY-MM-DD') AS previous_report_date,
+         source_row,
+         institution_name,
+         institution_type,
+         event_type,
+         previous_status::text AS previous_status,
+         current_status::text AS current_status,
+         previous_total_limit::double precision,
+         current_total_limit::double precision,
+         delta_amount::double precision,
+         to_char(previous_effective_date, 'YYYY-MM-DD') AS previous_effective_date,
+         to_char(current_effective_date, 'YYYY-MM-DD') AS current_effective_date,
+         to_char(previous_expiry_date, 'YYYY-MM-DD') AS previous_expiry_date,
+         to_char(current_expiry_date, 'YYYY-MM-DD') AS current_expiry_date,
+         credit_details
+       FROM credit.institution_event
+       WHERE report_date = $1::date
+          OR (
+            report_date >= ($1::date - INTERVAL '6 months')::date
+            AND report_date <= $1::date
+            AND event_type = ANY($2::text[])
+          )
+       ORDER BY report_date DESC, source_row, institution_name`,
+    [reportDate, ["new", "renewal", "increase"]],
+  );
 
   const itemsByInstitution = groupItems(itemResult.rows);
   const institutionsByDate = new Map<string, CreditInstitutionView[]>();
@@ -169,18 +199,20 @@ export async function loadCreditReport(
   const previousWeeklyInstitutions = previousInstitutions.filter(
     (institution) => institution.includedInWeeklyReport,
   );
-  const weeklyEventCounts = classifyWeeklyEvents(
-    reportDate,
-    previousDate,
-    currentWeeklyInstitutions,
-    previousWeeklyInstitutions,
+  const eventViews = eventResult.rows.map(toInstitutionEventView);
+  const weeklyNews = eventViews.filter((event) => event.reportDate === reportDate);
+  const recentApprovals = eventViews.filter(
+    (event) =>
+      event.eventType === "new" ||
+      event.eventType === "renewal" ||
+      event.eventType === "increase",
   );
-  const weeklyNews = previousDate
-    ? buildWeeklyCreditNews(
-        currentWeeklyInstitutions,
-        previousWeeklyInstitutions,
-      )
-    : [];
+  const weeklyEventCounts = {
+    addedInstitutionCount: weeklyNews.filter((event) => event.eventType === "new").length,
+    expiredInstitutionCount: weeklyNews.filter(
+      (event) => event.eventType === "expiry" || event.eventType === "revocation",
+    ).length,
+  };
 
   return {
     availableDates,
@@ -202,7 +234,10 @@ export async function loadCreditReport(
       : null,
     institutions: currentInstitutions,
     weeklyNews,
-    limitChanges: weeklyNews.map(toLimitChange),
+    recentApprovals,
+    limitChanges: weeklyNews
+      .filter(isApprovalEvent)
+      .map(toLimitChange),
     usageChanges: previousDate
       ? compareCreditSnapshots(
           currentWeeklyInstitutions,
@@ -226,6 +261,9 @@ export async function saveCreditInstitution(
   let report: CreditReportResponse | null = null;
   await client.query("BEGIN");
   try {
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended('credit.excel_import', 0))",
+    );
     const institutionChanges = input.changes.institution ?? {};
     const itemChanges = input.changes.items ?? [];
     const updated = await client.query<{
@@ -362,6 +400,7 @@ export async function saveCreditInstitution(
         throw new CreditDatabaseError(404, "授信分项记录不存在");
       }
     }
+    await client.query("SELECT credit.refresh_institution_events()");
     report = await loadCreditReport(client, input.reportDate);
     await client.query("COMMIT");
   } catch (error) {
@@ -381,6 +420,7 @@ export async function saveCreditInstitution(
     summary: report.summary,
     weeklySummary: report.weeklySummary,
     weeklyNews: report.weeklyNews,
+    recentApprovals: report.recentApprovals,
     limitChanges: report.limitChanges,
     usageChanges: report.usageChanges,
     calendarEvents: report.calendarEvents,
@@ -393,9 +433,9 @@ export function compareCreditSnapshots(
   mode: "limit" | "usage",
 ): CreditAmountChange[] {
   if (mode === "limit") {
-    return buildWeeklyCreditNews(currentInstitutions, previousInstitutions).map(
-      toLimitChange,
-    );
+    return buildWeeklyCreditNews(currentInstitutions, previousInstitutions)
+      .filter(isApprovalEvent)
+      .map(toLimitChange);
   }
 
   const currentByName = new Map(
@@ -459,58 +499,115 @@ export function compareCreditSnapshots(
 export function buildWeeklyCreditNews(
   currentInstitutions: CreditInstitutionView[],
   previousInstitutions: CreditInstitutionView[],
+  reportDate = currentInstitutions[0]?.reportDate ?? "",
+  previousReportDate = previousInstitutions[0]?.reportDate ?? "",
 ): CreditWeeklyNewsItem[] {
+  const currentByName = new Map(
+    currentInstitutions.map((institution) => [institution.institutionName, institution]),
+  );
   const previousByName = new Map(
     previousInstitutions.map((institution) => [institution.institutionName, institution]),
   );
+  const institutionNames = new Set([...currentByName.keys(), ...previousByName.keys()]);
   const news: CreditWeeklyNewsItem[] = [];
 
-  for (const current of currentInstitutions) {
-    const previous = previousByName.get(current.institutionName);
-    if (current.status !== "approved" && previous?.status !== "approved") continue;
-    const eventTypes: CreditWeeklyNewsItem["eventTypes"] = [];
+  for (const institutionName of institutionNames) {
+    const current = currentByName.get(institutionName);
+    const previous = previousByName.get(institutionName);
     const previousAmount = previous ? numberValue(previous.totalLimit) : 0;
-    const currentAmount = numberValue(current.totalLimit);
-
-    if (!previous) {
-      eventTypes.push("new");
-    } else {
-      if (currentAmount > previousAmount + AMOUNT_TOLERANCE) {
-        eventTypes.push("increase");
-      }
-      if (
-        current.expiryDate &&
-        current.expiryDate !== previous.expiryDate
-      ) {
-        eventTypes.push("renewal");
-      }
-    }
-    if (eventTypes.length === 0) continue;
+    const currentAmount = current ? numberValue(current.totalLimit) : 0;
+    const eventType = classifyInstitutionEvent(
+      current,
+      previous,
+      currentAmount,
+      previousAmount,
+      reportDate,
+      previousReportDate,
+    );
+    if (!eventType) continue;
+    const detailSource = current ?? previous;
 
     news.push({
-      institutionName: current.institutionName,
-      institutionType: current.institutionType,
-      eventTypes,
+      reportDate,
+      previousReportDate,
+      institutionName,
+      institutionType: current?.institutionType ?? previous?.institutionType ?? "未分类",
+      eventType,
+      previousStatus: previous?.status ?? null,
+      currentStatus: current?.status ?? null,
       previousAmount,
       currentAmount,
       deltaAmount: currentAmount - previousAmount,
+      previousEffectiveDate: previous?.effectiveDate ?? null,
+      currentEffectiveDate: current?.effectiveDate ?? null,
       previousExpiryDate: previous?.expiryDate ?? null,
-      currentExpiryDate: current.expiryDate,
+      currentExpiryDate: current?.expiryDate ?? null,
+      creditDetails: (detailSource?.items ?? [])
+        .filter((item) => item.limitAmount != null || Boolean(item.details?.trim()))
+        .map((item) => ({
+          type: item.type,
+          limitAmount: item.limitAmount,
+          details: item.details,
+        })),
     });
   }
 
   return news;
 }
 
+function classifyInstitutionEvent(
+  current: CreditInstitutionView | undefined,
+  previous: CreditInstitutionView | undefined,
+  currentAmount: number,
+  previousAmount: number,
+  reportDate: string,
+  previousReportDate: string,
+): CreditEventType | null {
+  if (current && previous && current.status === "revoked" && previous.status !== "revoked") {
+    return "revocation";
+  }
+  const hasApprovedPeriod = current?.status === "approved" || previous?.status === "approved";
+  if (
+    current &&
+    previous &&
+    hasApprovedPeriod &&
+    currentAmount > previousAmount + AMOUNT_TOLERANCE
+  ) {
+    return "increase";
+  }
+  if (
+    current &&
+    previous &&
+    hasApprovedPeriod &&
+    current.expiryDate &&
+    current.expiryDate !== previous.expiryDate
+  ) {
+    return "renewal";
+  }
+  if (current?.status === "approved" && previous?.status !== "approved") {
+    return "new";
+  }
+  if (previous?.status !== "approved") return null;
+  const expiryDate = current?.expiryDate ?? previous.expiryDate;
+  if (!current) {
+    return isDateInComparisonWindow(expiryDate, previousReportDate, reportDate)
+      ? "expiry"
+      : "revocation";
+  }
+  return isDateInComparisonWindow(expiryDate, previousReportDate, reportDate)
+    ? "expiry"
+    : null;
+}
+
 function toLimitChange(news: CreditWeeklyNewsItem): CreditAmountChange {
   const details: string[] = [];
-  if (news.eventTypes.includes("new")) {
+  if (news.eventType === "new") {
     details.push("新增授信主体");
   }
-  if (news.eventTypes.includes("increase")) {
+  if (news.eventType === "increase") {
     details.push(`授信总额 ${amountTransition(news.previousAmount, news.currentAmount)}`);
   }
-  if (news.eventTypes.includes("renewal")) {
+  if (news.eventType === "renewal") {
     details.push(
       `到期日 ${news.previousExpiryDate ?? "未登记"} → ${news.currentExpiryDate ?? "未登记"}`,
     );
@@ -518,12 +615,16 @@ function toLimitChange(news: CreditWeeklyNewsItem): CreditAmountChange {
   return {
     institutionName: news.institutionName,
     institutionType: news.institutionType,
-    kind: news.eventTypes.includes("new") ? "added" : "changed",
+    kind: news.eventType === "new" ? "added" : "changed",
     previousAmount: news.previousAmount,
     currentAmount: news.currentAmount,
     deltaAmount: news.deltaAmount,
     details,
   };
+}
+
+function isApprovalEvent(news: CreditWeeklyNewsItem): boolean {
+  return news.eventType === "new" || news.eventType === "renewal" || news.eventType === "increase";
 }
 
 async function insertInstitutions(
@@ -684,6 +785,48 @@ function groupItems(
   );
 }
 
+function toInstitutionEventView(row: InstitutionEventRow): CreditWeeklyNewsItem {
+  return {
+    reportDate: row.report_date,
+    previousReportDate: row.previous_report_date,
+    institutionName: row.institution_name,
+    institutionType: row.institution_type,
+    eventType: row.event_type,
+    previousStatus: row.previous_status,
+    currentStatus: row.current_status,
+    previousAmount: numberValue(row.previous_total_limit),
+    currentAmount: numberValue(row.current_total_limit),
+    deltaAmount: numberValue(row.delta_amount),
+    previousEffectiveDate: row.previous_effective_date,
+    currentEffectiveDate: row.current_effective_date,
+    previousExpiryDate: row.previous_expiry_date,
+    currentExpiryDate: row.current_expiry_date,
+    creditDetails: parseCreditEventDetails(row.credit_details),
+  };
+}
+
+function parseCreditEventDetails(value: unknown): CreditEventDetail[] {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.flatMap((detail) => {
+    if (!detail || typeof detail !== "object") return [];
+    const record = detail as Record<string, unknown>;
+    if (!creditItemTypes.includes(record.type as CreditItemType)) return [];
+    return [{
+      type: record.type as CreditItemType,
+      limitAmount: nullableNumber(record.limitAmount),
+      details: typeof record.details === "string" ? record.details : null,
+    }];
+  });
+}
+
 function itemKey(reportDate: string, institutionName: string, type: CreditItemType): string {
   return `${reportDate}\u0000${institutionName}\u0000${type}`;
 }
@@ -711,51 +854,6 @@ function toSummary(
       const days = dayDifference(reportDate, institution.expiryDate);
       return days >= 0 && days <= 30;
     }).length,
-  };
-}
-
-function classifyWeeklyEvents(
-  reportDate: string,
-  previousDate: string | null,
-  currentInstitutions: CreditInstitutionView[],
-  previousInstitutions: CreditInstitutionView[],
-): Pick<CreditWeeklySummaryView, "addedInstitutionCount" | "expiredInstitutionCount"> {
-  if (!previousDate) {
-    return { addedInstitutionCount: 0, expiredInstitutionCount: 0 };
-  }
-  const previousByName = new Map(
-    previousInstitutions.map((institution) => [institution.institutionName, institution]),
-  );
-  const currentByName = new Map(
-    currentInstitutions.map((institution) => [institution.institutionName, institution]),
-  );
-  const added = new Set<string>();
-  const expired = new Set<string>();
-
-  for (const current of currentInstitutions) {
-    const previous = previousByName.get(current.institutionName);
-    if (current.status === "approved" && !previous) {
-      added.add(current.institutionName);
-    }
-    if (current.status === "revoked" && previous?.status !== "revoked") {
-      expired.add(current.institutionName);
-    }
-    if (
-      current.expiryDate &&
-      current.expiryDate > previousDate &&
-      current.expiryDate <= reportDate
-    ) {
-      expired.add(current.institutionName);
-    }
-  }
-  for (const previous of previousInstitutions) {
-    if (previous.status === "approved" && !currentByName.has(previous.institutionName)) {
-      expired.add(previous.institutionName);
-    }
-  }
-  return {
-    addedInstitutionCount: added.size,
-    expiredInstitutionCount: expired.size,
   };
 }
 
@@ -813,7 +911,7 @@ function buildCalendarEvents(
         previous?.expiryDate &&
         current.expiryDate > previous.expiryDate
       ) {
-        add(completedChangeEvent(reportDate, current, "renewal", "续签授信"));
+        add(completedChangeEvent(reportDate, current, "renewal", "续作授信"));
       }
       if (
         current.status === "approved" &&
@@ -909,6 +1007,20 @@ function dayDifference(start: string, end: string): number {
   );
 }
 
+function isDateInComparisonWindow(
+  value: string | null | undefined,
+  previousReportDate: string,
+  reportDate: string,
+): boolean {
+  return Boolean(
+    value &&
+    previousReportDate &&
+    reportDate &&
+    value > previousReportDate &&
+    value <= reportDate,
+  );
+}
+
 function nullableNumber(value: unknown): number | null {
   if (value == null || value === "") return null;
   const number = Number(value);
@@ -952,4 +1064,23 @@ interface ItemRow extends QueryResultRow {
   limit_amount: number | null;
   used_amount: number | null;
   details: string | null;
+}
+
+interface InstitutionEventRow extends QueryResultRow {
+  report_date: string;
+  previous_report_date: string;
+  source_row: number;
+  institution_name: string;
+  institution_type: string;
+  event_type: CreditEventType;
+  previous_status: CreditInstitutionView["status"] | null;
+  current_status: CreditInstitutionView["status"] | null;
+  previous_total_limit: number | null;
+  current_total_limit: number | null;
+  delta_amount: number;
+  previous_effective_date: string | null;
+  current_effective_date: string | null;
+  previous_expiry_date: string | null;
+  current_expiry_date: string | null;
+  credit_details: unknown;
 }

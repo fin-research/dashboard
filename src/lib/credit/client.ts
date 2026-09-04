@@ -23,6 +23,7 @@ export async function fetchCreditReport(
     !payload.weeklySummary ||
     !Array.isArray(payload.institutions) ||
     !Array.isArray(payload.weeklyNews) ||
+    !Array.isArray(payload.recentApprovals) ||
     !Array.isArray(payload.availableDates)
   ) {
     throw new Error("授信接口返回的数据结构无效");
@@ -51,7 +52,8 @@ export async function updateCreditInstitution(
     !payload.institution ||
     !payload.summary ||
     !payload.weeklySummary ||
-    !Array.isArray(payload.weeklyNews)
+    !Array.isArray(payload.weeklyNews) ||
+    !Array.isArray(payload.recentApprovals)
   ) {
     throw new Error("授信保存接口返回的数据结构无效");
   }

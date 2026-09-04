@@ -55,8 +55,6 @@
     <span class="research-metric-card__icon" aria-hidden="true">
       <IconComponent {...iconProps} />
     </span>
-  {:else if IconComponent}
-    <span class="research-metric-card__balance" aria-hidden="true"></span>
   {/if}
 
   <div class="research-metric-card__content">
@@ -78,8 +76,6 @@
     <span class="research-metric-card__icon" aria-hidden="true">
       <IconComponent {...iconProps} />
     </span>
-  {:else if IconComponent}
-    <span class="research-metric-card__balance" aria-hidden="true"></span>
   {/if}
 </article>
 
@@ -110,10 +106,6 @@
   .research-metric-card--compact {
     justify-content: flex-start;
     padding-block: 6px;
-  }
-
-  .research-metric-card--compact .research-metric-card__balance {
-    display: none;
   }
 
   .research-metric-card--report {
@@ -265,12 +257,6 @@
     background: var(--metric-soft);
   }
 
-  .research-metric-card__balance {
-    width: 3rem;
-    height: 3rem;
-    flex: 0 0 3rem;
-  }
-
   .research-metric-card__icon :global(svg) {
     width: 3rem;
     height: 3rem;
@@ -299,10 +285,6 @@
 
     .research-metric-card__icon {
       flex-basis: 2.5rem;
-    }
-
-    .research-metric-card__balance {
-      display: none;
     }
 
     .research-metric-card__label,

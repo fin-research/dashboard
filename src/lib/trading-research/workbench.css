@@ -1708,7 +1708,8 @@ body:has(.tr-workbench) {
   margin: 0;
   padding-left: 1.3rem;
   color: var(--tr-text-2);
-  font-size: 0.875rem;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
 .tr-credit-news-list li + li {
@@ -1720,14 +1721,23 @@ body:has(.tr-workbench) {
   gap: 22px;
 }
 
-.tr-credit-change-table {
-  min-width: 1020px;
+.tr-credit-bank-event {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.tr-credit-change-details {
-  min-width: 360px;
-  max-width: 720px;
+.tr-credit-approval-details {
   white-space: normal !important;
+}
+
+.tr-credit-weekly-detail-table th[scope="rowgroup"] {
+  vertical-align: middle;
+}
+
+.tr-credit-weekly-detail-table .is-centered {
+  text-align: center;
 }
 
 .tr-chart-host--curve {

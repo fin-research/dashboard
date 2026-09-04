@@ -12,12 +12,12 @@
   } from "../credit/client.ts";
   import {
     creditItemLabels,
-    type CreditAmountChange,
     type CreditCalendarEvent,
     type CreditInstitutionView,
     type CreditItemType,
     type CreditReportResponse,
     type CreditStatus,
+    type CreditWeeklyNewsItem,
   } from "../credit/types.ts";
   import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
   import type {
@@ -114,6 +114,29 @@
 
   const weeklyNews = $derived.by(() => {
     return report?.weeklyNews.map(formatCreditWeeklyNews) ?? [];
+  });
+
+  const weeklyCreditDetailGroups = $derived.by(() => {
+    const groups = new Map<string, CreditInstitutionView[]>();
+    const institutions = (report?.institutions ?? [])
+      .filter(
+        (institution) =>
+          institution.includedInWeeklyReport && institution.status === "approved",
+      )
+      .sort(
+        (left, right) =>
+          left.institutionType.localeCompare(right.institutionType, "zh-CN") ||
+          left.institutionName.localeCompare(right.institutionName, "zh-CN"),
+      );
+    for (const institution of institutions) {
+      const group = groups.get(institution.institutionType) ?? [];
+      group.push(institution);
+      groups.set(institution.institutionType, group);
+    }
+    return [...groups].map(([institutionType, groupedInstitutions]) => ({
+      institutionType,
+      institutions: groupedInstitutions,
+    }));
   });
 
   const creditUsageRows = $derived.by(() =>
@@ -302,6 +325,7 @@
           summary: result.summary,
           weeklySummary: result.weeklySummary,
           weeklyNews: result.weeklyNews,
+          recentApprovals: result.recentApprovals,
           limitChanges: result.limitChanges,
           usageChanges: result.usageChanges,
           calendarEvents: result.calendarEvents,
@@ -571,14 +595,38 @@
     };
   }
 
-  function formatDelta(value: number): string {
-    return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
+  function creditEventLabel(eventType: CreditWeeklyNewsItem["eventType"]): string {
+    return {
+      new: "新增",
+      renewal: "续作",
+      increase: "扩额",
+      expiry: "到期",
+      revocation: "撤销",
+    }[eventType];
   }
 
-  function changeKindLabel(kind: CreditAmountChange["kind"]): string {
-    if (kind === "added") return "新增";
-    if (kind === "removed") return "移出";
-    return "变更";
+  function creditEventTone(
+    eventType: CreditWeeklyNewsItem["eventType"],
+  ): "info" | "success" | "warning" | "neutral" {
+    if (eventType === "new") return "success";
+    if (eventType === "increase") return "warning";
+    if (eventType === "renewal") return "info";
+    return "neutral";
+  }
+
+  function formatCreditPeriod(event: CreditWeeklyNewsItem): string {
+    const start = event.currentEffectiveDate ?? event.previousEffectiveDate ?? "—";
+    const end = event.currentExpiryDate ?? event.previousExpiryDate ?? "—";
+    return `${start} 至 ${end}`;
+  }
+
+  function formatApprovalDetails(event: CreditWeeklyNewsItem): string {
+    const details = event.creditDetails.map((item) => {
+      const amount = item.limitAmount == null ? "" : `${formatAmount(item.limitAmount)}亿`;
+      const note = item.details?.trim() ? `（${item.details.trim()}）` : "";
+      return `${creditItemLabels[item.type]}${amount ? ` ${amount}` : ""}${note}`;
+    });
+    return details.length ? details.join("；") : "—";
   }
 
   function daysBetween(start: string, end: string): number {
@@ -836,27 +884,60 @@
       </section>
 
       <ModuleCard labelledBy="credit-news-title">
-        <PanelHeading id="credit-news-title" title="本周授信快讯"><Badge>{weeklyNews.length} 项</Badge></PanelHeading>
+        <PanelHeading id="credit-news-title" title="本周授信快讯" />
         {#if !report.previousDate}
           <p class="tr-credit-muted">需要至少两个报表日才能生成本周变化。</p>
         {:else if weeklyNews.length === 0}
-          <p class="tr-credit-muted">本期无新增授信、扩额或续签事项。</p>
+          <p class="tr-credit-muted">本期无新增、续作、扩额、到期或撤销事项。</p>
         {:else}
-          <ol class="tr-credit-news-list">{#each weeklyNews as news}<li>{news}。</li>{/each}</ol>
+          <ol class="tr-credit-news-list">{#each weeklyNews as news}<li>{news}</li>{/each}</ol>
         {/if}
       </ModuleCard>
 
-      <ModuleCard labelledBy="credit-limit-changes-title">
-        <PanelHeading id="credit-limit-changes-title" title="授信额度变动"><Badge tone={report.limitChanges.length ? "warning" : "success"}>{report.limitChanges.length} 家</Badge></PanelHeading>
+      <ModuleCard labelledBy="credit-recent-approvals-title">
+        <PanelHeading id="credit-recent-approvals-title" title="近期新增授信批复（近6个月）" />
         <div class="tr-table-scroll">
-          <table class="tr-data-table tr-credit-change-table">
-            <caption class="sr-only">本周相对上周的授信额度变动</caption>
-            <thead><tr><th>机构</th><th>性质</th><th>类型</th><th class="is-numeric">上期总额</th><th class="is-numeric">本期总额</th><th class="is-numeric">变化</th><th>变化说明</th></tr></thead>
+          <table class="tr-data-table tr-credit-approval-table">
+            <caption class="sr-only">所选报表日前近6个月新增、续作和扩额授信批复</caption>
+            <thead><tr><th>银行名称</th><th>起始到期日</th><th class="is-numeric">授信额度（亿）</th><th>授信明细</th></tr></thead>
             <tbody>
-              {#each report.limitChanges as change (change.institutionName)}
-                <tr><th scope="row">{change.institutionName}</th><td>{change.institutionType}</td><td>{changeKindLabel(change.kind)}</td><td class="is-numeric">{formatAmount(change.previousAmount)}</td><td class="is-numeric">{formatAmount(change.currentAmount)}</td><td class={`is-numeric tr-change ${change.deltaAmount > 0 ? "tr-change--up" : change.deltaAmount < 0 ? "tr-change--down" : ""}`}>{formatDelta(change.deltaAmount)}</td><td class="tr-credit-change-details">{change.details.join("；")}</td></tr>
+              {#each report.recentApprovals as approval (`${approval.reportDate}:${approval.institutionName}`)}
+                <tr>
+                  <th scope="row"><span class="tr-credit-bank-event"><span>{approval.institutionName}</span><Badge tone={creditEventTone(approval.eventType)}>{creditEventLabel(approval.eventType)}</Badge></span></th>
+                  <td>{formatCreditPeriod(approval)}</td>
+                  <td class="is-numeric">{formatAmount(approval.currentAmount)}</td>
+                  <td class="tr-credit-approval-details">{formatApprovalDetails(approval)}</td>
+                </tr>
               {:else}
-                <tr><td class="tr-empty-cell" colspan="7">本期无新增授信、扩额或续签事项</td></tr>
+                <tr><td class="tr-empty-cell" colspan="4">近6个月无新增、续作或扩额授信批复</td></tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </ModuleCard>
+
+      <ModuleCard labelledBy="credit-detail-title">
+        <PanelHeading id="credit-detail-title" title="授信明细" />
+        <div class="tr-table-scroll">
+          <table class="tr-data-table tr-credit-weekly-detail-table">
+            <caption class="sr-only">按银行性质合并展示的授信额度明细</caption>
+            <thead>
+              <tr><th rowspan="2">银行性质</th><th rowspan="2">银行名称</th><th colspan="3" class="is-centered">授信额度</th></tr>
+              <tr><th class="is-numeric">总额度（亿）</th><th class="is-numeric">可用额度（亿）</th><th class="is-numeric">使用率</th></tr>
+            </thead>
+            <tbody>
+              {#each weeklyCreditDetailGroups as group (group.institutionType)}
+                {#each group.institutions as institution, index (institution.institutionName)}
+                  <tr>
+                    {#if index === 0}<th rowspan={group.institutions.length} scope="rowgroup">{group.institutionType}</th>{/if}
+                    <th scope="row">{institution.institutionName}</th>
+                    <td class="is-numeric">{formatAmount(institution.totalLimit)}</td>
+                    <td class="is-numeric">{formatAmount(institution.availableAmount)}</td>
+                    <td class="is-numeric">{institution.utilization == null ? "—" : `${institution.utilization.toFixed(1)}%`}</td>
+                  </tr>
+                {/each}
+              {:else}
+                <tr><td class="tr-empty-cell" colspan="5">暂无已获批的周报授信明细</td></tr>
               {/each}
             </tbody>
           </table>

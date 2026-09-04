@@ -104,17 +104,38 @@ export interface CreditAmountChange {
   details: string[];
 }
 
-export type CreditWeeklyEventType = "new" | "increase" | "renewal";
+export const creditEventTypes = [
+  "new",
+  "renewal",
+  "increase",
+  "expiry",
+  "revocation",
+] as const;
+
+export type CreditEventType = (typeof creditEventTypes)[number];
+
+export interface CreditEventDetail {
+  type: CreditItemType;
+  limitAmount: number | null;
+  details: string | null;
+}
 
 export interface CreditWeeklyNewsItem {
+  reportDate: string;
+  previousReportDate: string;
   institutionName: string;
   institutionType: string;
-  eventTypes: CreditWeeklyEventType[];
+  eventType: CreditEventType;
+  previousStatus: CreditStatus | null;
+  currentStatus: CreditStatus | null;
   previousAmount: number;
   currentAmount: number;
   deltaAmount: number;
+  previousEffectiveDate: string | null;
+  currentEffectiveDate: string | null;
   previousExpiryDate: string | null;
   currentExpiryDate: string | null;
+  creditDetails: CreditEventDetail[];
 }
 
 export interface CreditCalendarEvent {
@@ -137,6 +158,7 @@ export interface CreditReportResponse {
   previousWeeklySummary: CreditWeeklySummaryView | null;
   institutions: CreditInstitutionView[];
   weeklyNews: CreditWeeklyNewsItem[];
+  recentApprovals: CreditWeeklyNewsItem[];
   limitChanges: CreditAmountChange[];
   usageChanges: CreditAmountChange[];
   calendarEvents: CreditCalendarEvent[];
@@ -147,6 +169,7 @@ export interface CreditInstitutionUpdateResponse {
   summary: CreditSummaryView;
   weeklySummary: CreditWeeklySummaryView;
   weeklyNews: CreditWeeklyNewsItem[];
+  recentApprovals: CreditWeeklyNewsItem[];
   limitChanges: CreditAmountChange[];
   usageChanges: CreditAmountChange[];
   calendarEvents: CreditCalendarEvent[];
