@@ -126,6 +126,8 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
   assert.match(routeLoader, /workbenchRoutes/);
   assert.match(styles, /grid-template-columns:\s*minmax\(0, 1\.15fr\) minmax\(0, 0\.85fr\)/);
   assert.doesNotMatch(styles, /1140px/);
+  assert.doesNotMatch(styles, /min-width:\s*520px/);
+  assert.match(styles, /\.secondary-weekly-table-wrap\s*\{[\s\S]*overflow:\s*visible/);
   assert.match(page, /layout-report layout-report--secondary/);
   assert.match(styles, /grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(page, /variant="report"/);
@@ -161,6 +163,10 @@ test("版式报告统一使用 1080px A4 画布且工作台 main 不增加报告
   assert.match(printRules, /\.layout-report\s*\{[\s\S]*width:\s*1080px !important/);
   assert.match(printRules, /zoom:\s*0\.734908136/);
   assert.match(printRules, /> :not\(\.layout-report\):not\(:has\(\.layout-report\)\)/);
+  assert.match(layoutStyles, /\.layout-report table\s*\{[\s\S]*min-width:\s*0 !important;[\s\S]*table-layout:\s*auto/);
+  assert.match(layoutStyles, /\.layout-report table :is\(th, td\)\s*\{[\s\S]*width:\s*auto !important;[\s\S]*white-space:\s*normal !important;[\s\S]*overflow-wrap:\s*anywhere/);
+  assert.match(layoutStyles, /\.layout-report table :is\(th, td\) > \*\s*\{[\s\S]*min-width:\s*0 !important;[\s\S]*max-width:\s*100% !important/);
+  assert.match(layoutStyles, /\.layout-report :is\([^}]+\)\s*\{[\s\S]*max-height:\s*none !important;[\s\S]*overflow:\s*visible !important/);
 
   assert.match(workbench, /<main\s+[\s\S]*id="tr-workbench-main"/);
   assert.doesNotMatch(workbench, /role="main"/);
@@ -172,6 +178,7 @@ test("版式报告统一使用 1080px A4 画布且工作台 main 不增加报告
   assert.match(financing, /<main class="financing-model-page layout-report layout-report--financing">/);
   assert.match(credit, /tr-credit-weekly-report layout-report layout-report--credit/);
   assert.match(design, /授信周报、二级债券池运营周报和融资择时模型报告统一视为版式报告/);
+  assert.match(design, /所有表格使用内容驱动的自适应列宽/);
 });
 
 test("演示交易汇总严格由迁入的十笔交易派生", () => {

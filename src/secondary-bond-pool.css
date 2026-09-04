@@ -181,14 +181,15 @@
 
 .secondary-weekly-table-wrap {
   margin: 0 0 2px;
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .secondary-weekly-table {
   width: 100%;
-  min-width: 520px;
+  min-width: 0;
   margin: 0;
   border-collapse: collapse;
+  table-layout: auto;
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
@@ -197,7 +198,8 @@
   padding: 7px 8px;
   border-bottom: 1px solid #f1f5f9;
   text-align: right;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .secondary-weekly-table thead th {

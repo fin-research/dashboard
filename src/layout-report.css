@@ -5,6 +5,40 @@
   margin-inline: auto;
 }
 
+.layout-report :is(.tr-table-scroll, .forecast-table-wrap, .decision-table-wrap, .secondary-weekly-table-wrap) {
+  width: 100%;
+  max-width: 100%;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.layout-report table {
+  width: 100%;
+  min-width: 0 !important;
+  max-width: 100%;
+  table-layout: auto;
+}
+
+.layout-report table :is(th, td) {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.layout-report table :is(th, td) > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.layout-report table caption {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 @page {
   size: A4 portrait;
   margin: 0;
@@ -55,7 +89,4 @@
     display: none !important;
   }
 
-  body:has(.layout-report) .layout-report :is(.tr-table-scroll, .forecast-table-wrap, .decision-table-wrap, .secondary-weekly-table-wrap) {
-    overflow: visible !important;
-  }
 }
