@@ -74,7 +74,7 @@ test("二级池成交明细表统一使用 1rem 字号", async () => {
 });
 
 test("二级债券池运营周报复用共享组件并提供独立与工作台路由", async () => {
-  const [page, standaloneRoute, workbench, routeLoader, styles] =
+  const [page, standaloneRoute, workbench, routeLoader, styles, charts, design] =
     await Promise.all([
       readFile(
         new URL(
@@ -108,6 +108,8 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
         new URL("../src/secondary-bond-pool.css", import.meta.url),
         "utf8",
       ),
+      readFile(new URL("../src/charts/bond-ledger.ts", import.meta.url), "utf8"),
+      readFile(new URL("../DESIGN.md", import.meta.url), "utf8"),
     ]);
 
   assert.match(page, /LAST_COMPLETE_WEEK = previousBusinessWeekRange\(currentReportDate\(\)\)/);
@@ -124,7 +126,8 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
   assert.match(standaloneRoute, /<SecondaryBondPoolWeeklyPage \/>/);
   assert.match(workbench, /<SecondaryBondPoolWeeklyPage embedded \/>/);
   assert.match(routeLoader, /workbenchRoutes/);
-  assert.match(styles, /grid-template-columns:\s*minmax\(0, 1\.15fr\) minmax\(0, 0\.85fr\)/);
+  assert.match(styles, /\.secondary-weekly-columns\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(styles, /1\.15fr|0\.85fr/);
   assert.doesNotMatch(styles, /1140px/);
   assert.doesNotMatch(styles, /min-width:\s*520px/);
   assert.match(styles, /\.secondary-weekly-table-wrap\s*\{[\s\S]*overflow:\s*visible/);
@@ -132,6 +135,15 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
   assert.match(styles, /grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(page, /variant="report"/);
   assert.match(page, /本周营收/);
+  assert.match(charts, /data:\s*\["业务本金", "全池持仓市值", "时间加权本金"\][\s\S]*?left:\s*"center"/);
+  assert.match(charts, /data:\s*\["全池综合杠杆率", "平层基准（100%）"\][\s\S]*?left:\s*"center"/);
+  assert.match(charts, /formatter:\s*`最新持仓 \$\{\(latest\.marketValue \/ 100_000_000\)\.toFixed\(2\)\} 亿\\n本金/);
+  assert.match(charts, /name:\s*"平层基准（100%）"[\s\S]*?data:\s*points\.map\(\(\) => 100\)/);
+  assert.match(charts, /const SECONDARY_POOL_BLUE_SCALE = \[[\s\S]*?"#1e3a8a"[\s\S]*?"#bfdbfe"[\s\S]*?\] as const/);
+  assert.match(charts, /color:\s*\n\s*SECONDARY_POOL_BLUE_SCALE\[/);
+  assert.match(design, /桌面等宽双栏/);
+  assert.match(design, /图 1 必须显示最新持仓与本金/);
+  assert.match(design, /图 3A 使用由深到浅的蓝色渐变序列/);
 });
 
 test("版式报告统一使用 1080px A4 画布且工作台 main 不增加报告包装层", async () => {

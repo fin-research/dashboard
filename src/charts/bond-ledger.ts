@@ -30,6 +30,17 @@ export const FIN_OPS_CHART_PALETTE = [
   "#12b76a",
 ] as const;
 
+const SECONDARY_POOL_BLUE_SCALE = [
+  "#1e3a8a",
+  "#1d4ed8",
+  "#2563eb",
+  "#2f6fed",
+  "#3b82f6",
+  "#60a5fa",
+  "#93c5fd",
+  "#bfdbfe",
+] as const;
+
 const ledgerAxisLabel = {
   ...axisLabel,
   fontWeight: "normal" as const,
@@ -93,10 +104,23 @@ export function renderWeeklyPoolScaleLeverage(
         fontWeight: "bold",
       },
     },
-    legend: { ...weeklyLegend, top: 24, left: 8 },
+    legend: [
+      {
+        ...weeklyLegend,
+        data: ["业务本金", "全池持仓市值", "时间加权本金"],
+        top: 24,
+        left: "center",
+      },
+      {
+        ...weeklyLegend,
+        data: ["全池综合杠杆率", "平层基准（100%）"],
+        top: "61%",
+        left: "center",
+      },
+    ],
     grid: [
-      { left: 10, right: 12, top: 52, height: "45%", containLabel: true },
-      { left: 10, right: 12, top: "72%", bottom: 2, containLabel: true },
+      { left: 10, right: 12, top: 52, height: "43%", containLabel: true },
+      { left: 10, right: 12, top: "70%", bottom: 2, containLabel: true },
     ],
     tooltip: {
       ...tooltip,
@@ -197,6 +221,30 @@ export function renderWeeklyPoolScaleLeverage(
         data: points.map((point) => point.marketValue / 100_000_000),
         lineStyle: { width: 2.4, color: "#0284c7" },
         itemStyle: { color: "#0284c7" },
+        markPoint: latest
+          ? {
+              symbol: "circle",
+              symbolSize: 7,
+              itemStyle: { color: "#0284c7" },
+              label: {
+                show: true,
+                position: "left",
+                distance: 8,
+                formatter: `最新持仓 ${(latest.marketValue / 100_000_000).toFixed(2)} 亿\n本金 ${(latest.principal / 100_000_000).toFixed(2)} 亿`,
+                color: "#0f3d6c",
+                fontFamily,
+                fontSize: 10,
+                fontWeight: "bold",
+                lineHeight: 15,
+                backgroundColor: "#eff6ff",
+                borderColor: "#bfdbfe",
+                borderWidth: 1,
+                borderRadius: 3,
+                padding: [3, 5],
+              },
+              data: [{ coord: [lastDate, latest.marketValue / 100_000_000] }],
+            }
+          : undefined,
       },
       {
         name: "时间加权本金",
@@ -209,7 +257,7 @@ export function renderWeeklyPoolScaleLeverage(
         itemStyle: { color: colors.muted },
       },
       {
-        name: "综合杠杆率",
+        name: "全池综合杠杆率",
         type: "line",
         xAxisIndex: 1,
         yAxisIndex: 2,
@@ -239,13 +287,17 @@ export function renderWeeklyPoolScaleLeverage(
               data: [{ coord: [lastDate, latest.leverage * 100] }],
             }
           : undefined,
-        markLine: {
-          silent: true,
-          symbol: "none",
-          label: { show: true, formatter: "平层基准 100%" },
-          lineStyle: { color: colors.red, type: "dotted", width: 1.4 },
-          data: [{ yAxis: 100 }],
-        },
+      },
+      {
+        name: "平层基准（100%）",
+        type: "line",
+        xAxisIndex: 1,
+        yAxisIndex: 2,
+        showSymbol: false,
+        silent: true,
+        data: points.map(() => 100),
+        lineStyle: { color: colors.red, type: "dotted", width: 1.4 },
+        itemStyle: { color: colors.red },
       },
     ],
   });
@@ -484,7 +536,10 @@ export function renderWeeklyTradingAllocation(
         data: valid.map((stat, index) => ({
           value: stat.marketValue / 100_000_000,
           itemStyle: {
-            color: FIN_OPS_CHART_PALETTE[index % FIN_OPS_CHART_PALETTE.length],
+            color:
+              SECONDARY_POOL_BLUE_SCALE[
+                Math.min(index, SECONDARY_POOL_BLUE_SCALE.length - 1)
+              ],
             borderRadius: [0, 4, 4, 0],
           },
         })),
