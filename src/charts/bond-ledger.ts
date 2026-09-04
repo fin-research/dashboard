@@ -4,6 +4,8 @@ import type {
   HoldingTypeStat,
   LedgerTrendAccount,
   LedgerTrendPoint,
+  LedgerOperatingTrendPoint,
+  LedgerPerformanceRow,
   MaturityBucketStat,
 } from "../lib/bond-ledger/types";
 import {
@@ -32,6 +34,444 @@ const ledgerAxisLabel = {
   ...axisLabel,
   fontWeight: "normal" as const,
 };
+
+const ledgerLegend = {
+  textStyle: ledgerAxisLabel,
+  itemWidth: 16,
+  itemHeight: 10,
+};
+
+export function renderWeeklyPoolScaleLeverage(
+  host: HTMLElement,
+  points: LedgerPerformanceRow[],
+): void {
+  if (!points.length) {
+    setEmpty(host, "规模与杠杆走势数据暂缺");
+    return;
+  }
+  const dates = points.map((point) => point.date);
+  setChart(host, {
+    animationDuration: 240,
+    aria: {
+      enabled: true,
+      description:
+        "所选区间业务本金、时间加权本金、全池持仓市值与综合杠杆率走势",
+    },
+    color: [...FIN_OPS_CHART_PALETTE],
+    legend: { ...ledgerLegend, top: 0, left: 8 },
+    grid: [
+      { left: 14, right: 18, top: 44, height: "48%", containLabel: true },
+      { left: 14, right: 18, top: "70%", bottom: 4, containLabel: true },
+    ],
+    tooltip: {
+      ...tooltip,
+      trigger: "axis",
+      formatter: (params: unknown) => {
+        const index = (params as Array<{ dataIndex: number }>)[0]?.dataIndex ?? -1;
+        const point = points[index];
+        if (!point) return "";
+        return [
+          `<strong>${escapeHtml(point.date)}</strong>`,
+          `业务本金 ${(point.principal / 100_000_000).toFixed(2)} 亿元`,
+          `时间加权本金 ${(point.timeWeightedPrincipal / 100_000_000).toFixed(2)} 亿元`,
+          `全池持仓市值 ${(point.marketValue / 100_000_000).toFixed(2)} 亿元`,
+          `综合杠杆率 ${(point.leverage * 100).toFixed(2)}%`,
+        ].join("<br>");
+      },
+    },
+    xAxis: [
+      {
+        type: "category",
+        gridIndex: 0,
+        boundaryGap: false,
+        data: dates,
+        axisLine: { lineStyle: { color: colors.line } },
+        axisTick: { show: false },
+        axisLabel: { show: false },
+      },
+      {
+        type: "category",
+        gridIndex: 1,
+        boundaryGap: false,
+        data: dates,
+        axisLine: { lineStyle: { color: colors.line } },
+        axisTick: { show: false },
+        axisLabel: {
+          ...ledgerAxisLabel,
+          hideOverlap: true,
+          formatter: (value: string) => value.slice(5).replace("-", "/"),
+        },
+      },
+    ],
+    yAxis: [
+      {
+        type: "value",
+        gridIndex: 0,
+        name: "规模（亿元）",
+        scale: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: ledgerAxisLabel,
+        nameTextStyle: ledgerAxisLabel,
+        splitLine: { lineStyle: gridLine },
+      },
+      {
+        type: "value",
+        gridIndex: 1,
+        name: "杠杆率",
+        scale: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { ...ledgerAxisLabel, formatter: "{value}%" },
+        nameTextStyle: ledgerAxisLabel,
+        splitLine: { lineStyle: gridLine },
+      },
+    ],
+    series: [
+      {
+        name: "业务本金",
+        type: "line",
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        step: "end",
+        showSymbol: false,
+        data: points.map((point) => point.principal / 100_000_000),
+        lineStyle: { width: 2.2, color: "#0f3d6c" },
+        itemStyle: { color: "#0f3d6c" },
+      },
+      {
+        name: "全池持仓市值",
+        type: "line",
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        showSymbol: false,
+        smooth: 0.12,
+        data: points.map((point) => point.marketValue / 100_000_000),
+        lineStyle: { width: 2.4, color: "#0284c7" },
+        itemStyle: { color: "#0284c7" },
+      },
+      {
+        name: "时间加权本金",
+        type: "line",
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        showSymbol: false,
+        data: points.map((point) => point.timeWeightedPrincipal / 100_000_000),
+        lineStyle: { width: 2, type: "dashed", color: colors.muted },
+        itemStyle: { color: colors.muted },
+      },
+      {
+        name: "综合杠杆率",
+        type: "line",
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+        showSymbol: true,
+        symbolSize: 6,
+        data: points.map((point) => point.leverage * 100),
+        lineStyle: { width: 2.2, color: "#0f3d6c" },
+        itemStyle: { color: "#0f3d6c" },
+        markLine: {
+          silent: true,
+          symbol: "none",
+          label: { show: true, formatter: "平层基准 100%" },
+          lineStyle: { color: colors.red, type: "dotted", width: 1.4 },
+          data: [{ yAxis: 100 }],
+        },
+      },
+    ],
+  });
+}
+
+export function renderWeeklyYieldProfitTrend(
+  host: HTMLElement,
+  points: LedgerOperatingTrendPoint[],
+): void {
+  if (!points.length) {
+    setEmpty(host, "收益率与累计创收数据暂缺");
+    return;
+  }
+  const dates = points.map((point) => point.date);
+  setChart(host, {
+    animationDuration: 240,
+    aria: {
+      enabled: true,
+      description:
+        "所选区间全池含免税及不含免税年化收益率、平层静态、累计毛利与免税增厚走势",
+    },
+    color: [...FIN_OPS_CHART_PALETTE],
+    legend: { ...ledgerLegend, top: 0, left: 8 },
+    grid: [
+      { left: 14, right: 18, top: 44, height: "48%", containLabel: true },
+      { left: 14, right: 18, top: "70%", bottom: 4, containLabel: true },
+    ],
+    tooltip: {
+      ...tooltip,
+      trigger: "axis",
+      formatter: (params: unknown) => {
+        const index = (params as Array<{ dataIndex: number }>)[0]?.dataIndex ?? -1;
+        const point = points[index];
+        if (!point) return "";
+        const percent = (value: number | null) =>
+          value === null ? "—" : `${(value * 100).toFixed(3)}%`;
+        return [
+          `<strong>${escapeHtml(point.date)}</strong>`,
+          `含免税年化收益率 ${percent(point.fullPoolYtdAnnualizedReturn)}`,
+          `不含免税年化收益率 ${percent(point.fullPoolYtdExTaxAnnualizedReturn)}`,
+          `平层静态 ${point.flatStatic === null ? "—" : `${point.flatStatic.toFixed(3)}%`}`,
+          `累计毛利 ${(point.cumulativeProfit / 10_000).toFixed(1)} 万元`,
+          `免税增厚 ${point.cumulativeTaxExemptProfit === null ? "—" : `${(point.cumulativeTaxExemptProfit / 10_000).toFixed(1)} 万元`}`,
+        ].join("<br>");
+      },
+    },
+    xAxis: [
+      {
+        type: "category",
+        gridIndex: 0,
+        boundaryGap: false,
+        data: dates,
+        axisLine: { lineStyle: { color: colors.line } },
+        axisTick: { show: false },
+        axisLabel: { show: false },
+      },
+      {
+        type: "category",
+        gridIndex: 1,
+        boundaryGap: false,
+        data: dates,
+        axisLine: { lineStyle: { color: colors.line } },
+        axisTick: { show: false },
+        axisLabel: {
+          ...ledgerAxisLabel,
+          hideOverlap: true,
+          formatter: (value: string) => value.slice(5).replace("-", "/"),
+        },
+      },
+    ],
+    yAxis: [
+      {
+        type: "value",
+        gridIndex: 0,
+        name: "收益率（%）",
+        scale: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { ...ledgerAxisLabel, formatter: "{value}%" },
+        nameTextStyle: ledgerAxisLabel,
+        splitLine: { lineStyle: gridLine },
+      },
+      {
+        type: "value",
+        gridIndex: 1,
+        name: "累计创收（万元）",
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: ledgerAxisLabel,
+        nameTextStyle: ledgerAxisLabel,
+        splitLine: { lineStyle: gridLine },
+      },
+    ],
+    series: [
+      {
+        name: "含免税年化收益率",
+        type: "line",
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        showSymbol: false,
+        data: points.map((point) =>
+          point.fullPoolYtdAnnualizedReturn === null
+            ? null
+            : point.fullPoolYtdAnnualizedReturn * 100,
+        ),
+        lineStyle: { width: 2.4, color: "#0f3d6c" },
+        itemStyle: { color: "#0f3d6c" },
+      },
+      {
+        name: "不含免税年化收益率",
+        type: "line",
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        showSymbol: false,
+        data: points.map((point) =>
+          point.fullPoolYtdExTaxAnnualizedReturn === null
+            ? null
+            : point.fullPoolYtdExTaxAnnualizedReturn * 100,
+        ),
+        lineStyle: { width: 2, type: "dashed", color: colors.muted },
+        itemStyle: { color: colors.muted },
+      },
+      {
+        name: "平层静态",
+        type: "line",
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        showSymbol: false,
+        data: points.map((point) => point.flatStatic),
+        lineStyle: { width: 2, type: "dotted", color: "#d97706" },
+        itemStyle: { color: "#d97706" },
+      },
+      {
+        name: "累计毛利（含免税）",
+        type: "line",
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+        showSymbol: false,
+        data: points.map((point) => point.cumulativeProfit / 10_000),
+        lineStyle: { width: 2.2, color: "#0f3d6c" },
+        itemStyle: { color: "#0f3d6c" },
+        areaStyle: { color: "rgba(15,61,108,.10)" },
+      },
+      {
+        name: "免税增厚",
+        type: "line",
+        xAxisIndex: 1,
+        yAxisIndex: 1,
+        showSymbol: false,
+        data: points.map((point) =>
+          point.cumulativeTaxExemptProfit === null
+            ? null
+            : point.cumulativeTaxExemptProfit / 10_000,
+        ),
+        lineStyle: { width: 2, type: "dashed", color: "#d97706" },
+        itemStyle: { color: "#d97706" },
+      },
+    ],
+  });
+}
+
+export function renderWeeklyTradingAllocation(
+  host: HTMLElement,
+  stats: HoldingTypeStat[],
+): void {
+  const valid = stats.filter((stat) => stat.marketValue > 0);
+  if (!valid.length) {
+    setEmpty(host, "交易户资产配置数据暂缺");
+    return;
+  }
+  setChart(host, {
+    animationDuration: 220,
+    aria: { enabled: true, description: "按交易户市值统计的资产类别结构" },
+    grid: { left: 8, right: 16, top: 12, bottom: 4, containLabel: true },
+    tooltip: {
+      ...tooltip,
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: (params: unknown) => {
+        const index = (params as Array<{ dataIndex: number }>)[0]?.dataIndex ?? -1;
+        const stat = valid[index];
+        if (!stat) return "";
+        return [
+          `<strong>${escapeHtml(stat.category)}</strong>`,
+          `市值 ${(stat.marketValue / 100_000_000).toFixed(2)} 亿元`,
+          `占比 ${(stat.share * 100).toFixed(1)}%`,
+        ].join("<br>");
+      },
+    },
+    xAxis: {
+      type: "value",
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { ...ledgerAxisLabel, formatter: "{value}亿" },
+      splitLine: { lineStyle: gridLine },
+    },
+    yAxis: {
+      type: "category",
+      inverse: true,
+      data: valid.map((stat) => stat.category),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: ledgerAxisLabel,
+    },
+    series: [
+      {
+        name: "交易户市值",
+        type: "bar",
+        barMaxWidth: 22,
+        data: valid.map((stat, index) => ({
+          value: stat.marketValue / 100_000_000,
+          itemStyle: {
+            color: FIN_OPS_CHART_PALETTE[index % FIN_OPS_CHART_PALETTE.length],
+            borderRadius: [0, 4, 4, 0],
+          },
+        })),
+        label: {
+          show: true,
+          position: "right",
+          color: colors.ink,
+          fontFamily,
+          fontSize: chartTextSize,
+          fontWeight: "bold",
+          formatter: ({ dataIndex }: { dataIndex: number }) =>
+            `${((valid[dataIndex]?.share ?? 0) * 100).toFixed(1)}%`,
+        },
+      },
+    ],
+  });
+}
+
+export function renderWeeklyTradingMaturity(
+  host: HTMLElement,
+  stats: MaturityBucketStat[],
+): void {
+  if (!stats.some((stat) => stat.marketValue > 0)) {
+    setEmpty(host, "交易户期限分布数据暂缺");
+    return;
+  }
+  setChart(host, {
+    animationDuration: 220,
+    aria: { enabled: true, description: "按交易户市值统计的八档剩余期限分布" },
+    grid: { left: 8, right: 8, top: 12, bottom: 4, containLabel: true },
+    tooltip: {
+      ...tooltip,
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: (params: unknown) => {
+        const index = (params as Array<{ dataIndex: number }>)[0]?.dataIndex ?? -1;
+        const stat = stats[index];
+        if (!stat) return "";
+        return [
+          `<strong>${escapeHtml(stat.bucket)}</strong>`,
+          `市值 ${(stat.marketValue / 100_000_000).toFixed(2)} 亿元`,
+          `占比 ${(stat.share * 100).toFixed(1)}%`,
+        ].join("<br>");
+      },
+    },
+    xAxis: {
+      type: "category",
+      data: stats.map((stat) => stat.bucket),
+      axisLine: { lineStyle: { color: colors.line } },
+      axisTick: { show: false },
+      axisLabel: { ...ledgerAxisLabel, interval: 0, rotate: 28 },
+    },
+    yAxis: {
+      type: "value",
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { ...ledgerAxisLabel, formatter: "{value}亿" },
+      splitLine: { lineStyle: gridLine },
+    },
+    series: [
+      {
+        name: "交易户市值",
+        type: "bar",
+        barMaxWidth: 28,
+        data: stats.map((stat) => stat.marketValue / 100_000_000),
+        itemStyle: { color: "#0f3d6c", borderRadius: [4, 4, 0, 0] },
+        label: {
+          show: true,
+          position: "top",
+          color: colors.ink,
+          fontFamily,
+          fontSize: chartTextSize,
+          fontWeight: "bold",
+          formatter: ({ dataIndex, value }: { dataIndex: number; value: number }) =>
+            value > 0
+              ? `${((stats[dataIndex]?.share ?? 0) * 100).toFixed(1)}%`
+              : "",
+        },
+      },
+    ],
+  });
+}
 
 export function renderBondScaleReturnTrend(
   host: HTMLElement,

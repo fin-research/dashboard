@@ -224,15 +224,22 @@ function isBondLedgerReport(value: unknown): value is BondLedgerReport {
   return (
     typeof value.hasData === "boolean" &&
     Array.isArray(value.performanceTrend) &&
+    Array.isArray(value.operatingTrend) &&
     isRecord(value.accountPerformanceTrends) &&
     Array.isArray(value.accountPerformanceTrends.trading) &&
     Array.isArray(value.accountPerformanceTrends.available) &&
     Array.isArray(value.holdingTypes) &&
     Array.isArray(value.maturityBuckets) &&
+    Array.isArray(value.tradingHoldingTypes) &&
+    Array.isArray(value.tradingMaturityBuckets) &&
+    Array.isArray(value.topTradingPositions) &&
     Array.isArray(value.transactions) &&
     isRecord(value.transactionTotals) &&
     isRecord(value.returnRiskMetrics) &&
-    isRecord(value.metricDeltas)
+    isRecord(value.metricDeltas) &&
+    typeof value.detailMarketValue === "number" &&
+    Array.isArray(value.auditChecks) &&
+    typeof value.auditPassed === "boolean"
   );
 }
 

@@ -2,8 +2,11 @@ import type {
   BondLedgerAnalytics,
   BondLedgerReport,
   BondLedgerSource,
+  CoreHolding,
   HoldingTypeStat,
   LedgerAccountDailySummary,
+  LedgerAuditCheck,
+  LedgerOperatingTrendPoint,
   LedgerPerformanceRow,
   LedgerPositionDetail,
   LedgerPositionRow,
@@ -34,6 +37,17 @@ const MATURITY_BUCKETS = [
   { bucket: "3-5年", min: 3, max: 5 },
   { bucket: "5-10年", min: 5, max: 10 },
   { bucket: "10年以上", min: 10, max: Number.POSITIVE_INFINITY },
+] as const;
+
+const WEEKLY_REPORT_MATURITY_BUCKETS = [
+  { bucket: "1月以内", min: 0, max: 1 / 12, maxInclusive: true },
+  { bucket: "1-3月", min: 1 / 12, max: 0.25, minExclusive: true, maxInclusive: true },
+  { bucket: "3-6月", min: 0.25, max: 0.5, minExclusive: true, maxInclusive: true },
+  { bucket: "6-9月", min: 0.5, max: 0.75, minExclusive: true, maxInclusive: true },
+  { bucket: "9-12月", min: 0.75, max: 1, minExclusive: true, maxInclusive: true },
+  { bucket: "1-3年", min: 1, max: 3, minExclusive: true, maxInclusive: true },
+  { bucket: "3-5年", min: 3, max: 5, minExclusive: true, maxInclusive: true },
+  { bucket: "5年以上", min: 5, max: Number.POSITIVE_INFINITY, minExclusive: true },
 ] as const;
 
 export function buildBondLedgerAnalytics(
@@ -68,6 +82,12 @@ export function buildBondLedgerAnalytics(
     selectedLedgers,
   );
   const detailMarketValue = sum(currentPositions.map((row) => row.marketValue));
+  const tradingPositions = currentPositions.filter(
+    (position) => accountType(position.account) === "trading",
+  );
+  const tradingMarketValue = sum(
+    tradingPositions.map((position) => position.marketValue),
+  );
   const transactions = (storedTransactions
     ? storedTransactions.filter(
         (transaction) =>
@@ -106,10 +126,16 @@ export function buildBondLedgerAnalytics(
         effectiveEndDate,
       )
     : emptyReturnRiskMetrics();
+  const accountDailySummaries =
+    storedAccountDailySummaries ?? summarizeAccountPositions(ledgers);
   const accountPerformanceTrends = buildAccountPerformanceTrends(
     latestLedger.performance.filter((row) => row.date <= effectiveEndDate),
     ledgers,
-    storedAccountDailySummaries,
+    accountDailySummaries,
+  );
+  const operatingTrend = buildOperatingTrend(
+    latestLedger.performance.filter((row) => row.date <= effectiveEndDate),
+    accountDailySummaries,
   );
   const comparisonStartDate = effectiveStartDate
     ? addDays(effectiveStartDate, -7)
@@ -154,6 +180,10 @@ export function buildBondLedgerAnalytics(
       : [];
   const transactionCount = uniqueTransactionCount(transactions);
   const previousTransactionCount = uniqueTransactionCount(previousTransactions);
+  const auditChecks = buildAuditChecks(
+    currentPerformance,
+    latestLedger.positions,
+  );
 
   return {
     selectedLedgers,
@@ -162,6 +192,7 @@ export function buildBondLedgerAnalytics(
     performanceTrend: latestLedger.performance.filter(
       (row) => row.date <= effectiveEndDate,
     ),
+    operatingTrend,
     accountPerformanceTrends,
     rangePerformance,
     currentPositions: currentPositions.sort(
@@ -172,6 +203,16 @@ export function buildBondLedgerAnalytics(
       currentPositions,
       detailMarketValue,
     ),
+    tradingHoldingTypes: aggregateHoldingTypes(
+      tradingPositions,
+      tradingMarketValue,
+    ),
+    tradingMaturityBuckets: aggregateMaturityBucketsByDefinition(
+      tradingPositions,
+      tradingMarketValue,
+      WEEKLY_REPORT_MATURITY_BUCKETS,
+    ),
+    topTradingPositions: toCoreHoldings(tradingPositions),
     transactions,
     transactionTotals,
     rangeProfit,
@@ -225,6 +266,8 @@ export function buildBondLedgerAnalytics(
         ? (detailMarketValue - currentPerformance.marketValue) /
           currentPerformance.marketValue
         : null,
+    auditChecks,
+    auditPassed: auditChecks.length === 3 && auditChecks.every((check) => check.pass),
     effectiveStartDate,
     effectiveEndDate,
   };
@@ -237,9 +280,13 @@ export function toBondLedgerReport(
     hasData: analytics.latestLedger !== null,
     currentPerformance: analytics.currentPerformance,
     performanceTrend: analytics.performanceTrend,
+    operatingTrend: analytics.operatingTrend,
     accountPerformanceTrends: analytics.accountPerformanceTrends,
     holdingTypes: analytics.holdingTypes,
     maturityBuckets: analytics.maturityBuckets,
+    tradingHoldingTypes: analytics.tradingHoldingTypes,
+    tradingMaturityBuckets: analytics.tradingMaturityBuckets,
+    topTradingPositions: analytics.topTradingPositions,
     transactions: analytics.transactions,
     transactionTotals: analytics.transactionTotals,
     rangeProfit: analytics.rangeProfit,
@@ -248,6 +295,9 @@ export function toBondLedgerReport(
     returnRiskMetrics: analytics.returnRiskMetrics,
     transactionCount: analytics.transactionCount,
     metricDeltas: analytics.metricDeltas,
+    detailMarketValue: analytics.detailMarketValue,
+    auditChecks: analytics.auditChecks,
+    auditPassed: analytics.auditPassed,
     effectiveStartDate: analytics.effectiveStartDate,
     effectiveEndDate: analytics.effectiveEndDate,
   };
@@ -278,6 +328,22 @@ export function previousBusinessWeekRange(referenceDate: string): {
   return {
     startDate: addDays(currentWeek.startDate, -7),
     endDate: addDays(currentWeek.startDate, -3),
+  };
+}
+
+export function isoWeek(value: string): { year: number; week: number } {
+  const date = parseIsoDate(value);
+  const weekday = date.getUTCDay() || 7;
+  const thursday = new Date(date.valueOf() + (4 - weekday) * DAY_MS);
+  const year = thursday.getUTCFullYear();
+  const firstThursday = new Date(Date.UTC(year, 0, 4));
+  const firstWeekday = firstThursday.getUTCDay() || 7;
+  const firstWeekThursday = new Date(
+    firstThursday.valueOf() + (4 - firstWeekday) * DAY_MS,
+  );
+  return {
+    year,
+    week: Math.round((thursday.valueOf() - firstWeekThursday.valueOf()) / (7 * DAY_MS)) + 1,
   };
 }
 
@@ -432,6 +498,128 @@ export function buildAccountPerformanceTrends(
   return { trading, available };
 }
 
+export function buildOperatingTrend(
+  performance: LedgerPerformanceRow[],
+  summaries: LedgerAccountDailySummary[],
+): LedgerOperatingTrendPoint[] {
+  const summariesByDate = new Map<string, LedgerAccountDailySummary[]>();
+  for (const summary of summaries) {
+    const rows = summariesByDate.get(summary.date) ?? [];
+    rows.push(summary);
+    summariesByDate.set(summary.date, rows);
+  }
+
+  let activeYear = "";
+  let cumulativeTaxExemptProfit = 0;
+  let carriedTaxExemptProfit: number | null = null;
+  let taxExemptCoverageComplete = true;
+  return performance
+    .filter((row) => row.date.slice(5) !== "01-01")
+    .map((row) => {
+      const year = row.date.slice(0, 4);
+      if (year !== activeYear) {
+        activeYear = year;
+        cumulativeTaxExemptProfit = 0;
+        carriedTaxExemptProfit = null;
+        taxExemptCoverageComplete = true;
+      }
+      const dailySummaries = summariesByDate.get(row.date) ?? [];
+      if (!dailySummaries.length) {
+        taxExemptCoverageComplete = false;
+      } else {
+        cumulativeTaxExemptProfit += sum(
+          dailySummaries.map((summary) => summary.taxExemptIncome),
+        );
+      }
+      const tradingMarketValue = sum(
+        dailySummaries
+          .filter((summary) => accountType(summary.account) === "trading")
+          .map((summary) => summary.marketValue),
+      );
+      const availableMarketValue = sum(
+        dailySummaries
+          .filter((summary) => accountType(summary.account) === "available")
+          .map((summary) => summary.marketValue),
+      );
+      const yieldSummaries = dailySummaries.filter(
+        (summary) =>
+          summary.weightedReportYield !== null && summary.reportYieldWeight > 0,
+      );
+      const yieldWeight = sum(
+        yieldSummaries.map((summary) => summary.reportYieldWeight),
+      );
+      const flatStatic =
+        yieldWeight > 0
+          ? sum(
+              yieldSummaries.map(
+                (summary) =>
+                  (summary.weightedReportYield as number) *
+                  summary.reportYieldWeight,
+              ),
+            ) / yieldWeight
+          : null;
+      const annualizationDays = daysBetween(`${year}-01-01`, row.date);
+      const derivedFullPoolReturn = annualizeCumulativeProfit(
+        row.cumulativeProfit,
+        row.timeWeightedPrincipal,
+        annualizationDays,
+      );
+      const reportedReturnIsFullPool = approximatelyEqual(
+        row.ytdAnnualizedReturn,
+        derivedFullPoolReturn,
+      );
+      const reportedExTaxProfit = reportedReturnIsFullPool
+        ? deannualizeCumulativeReturn(
+            row.ytdExTaxAnnualizedReturn,
+            row.timeWeightedPrincipal,
+            annualizationDays,
+          )
+        : null;
+      const dailyTaxExemptIncome = sum(
+        dailySummaries.map((summary) => summary.taxExemptIncome),
+      );
+      if (reportedExTaxProfit !== null) {
+        carriedTaxExemptProfit = row.cumulativeProfit - reportedExTaxProfit;
+      } else if (carriedTaxExemptProfit !== null && dailySummaries.length) {
+        carriedTaxExemptProfit += dailyTaxExemptIncome;
+      }
+      const cumulativeExTaxProfit =
+        reportedExTaxProfit ??
+        (carriedTaxExemptProfit !== null
+          ? row.cumulativeProfit - carriedTaxExemptProfit
+          : null) ??
+        (taxExemptCoverageComplete
+          ? row.cumulativeProfit - cumulativeTaxExemptProfit
+          : null);
+      if (cumulativeExTaxProfit !== null) {
+        carriedTaxExemptProfit = row.cumulativeProfit - cumulativeExTaxProfit;
+      }
+      const fullPoolYtdExTaxAnnualizedReturn =
+        cumulativeExTaxProfit === null
+          ? null
+          : annualizeCumulativeProfit(
+              cumulativeExTaxProfit,
+              row.timeWeightedPrincipal,
+              annualizationDays,
+            );
+
+      return {
+        ...row,
+        tradingMarketValue,
+        availableMarketValue,
+        flatStatic,
+        dv01: sum(dailySummaries.map((summary) => summary.dv01)),
+        cumulativeTaxExemptProfit:
+          cumulativeExTaxProfit === null
+            ? null
+            : row.cumulativeProfit - cumulativeExTaxProfit,
+        cumulativeExTaxProfit,
+        fullPoolYtdAnnualizedReturn: derivedFullPoolReturn,
+        fullPoolYtdExTaxAnnualizedReturn,
+      };
+    });
+}
+
 function calculateRangeProfit(
   performance: LedgerPerformanceRow[],
   startDate: string,
@@ -559,10 +747,32 @@ function aggregateMaturityBuckets(
   positions: LedgerPositionRow[],
   totalMarketValue: number,
 ): MaturityBucketStat[] {
-  return MATURITY_BUCKETS.map(({ bucket, min, max }) => {
+  return aggregateMaturityBucketsByDefinition(
+    positions,
+    totalMarketValue,
+    MATURITY_BUCKETS,
+  );
+}
+
+function aggregateMaturityBucketsByDefinition(
+  positions: LedgerPositionRow[],
+  totalMarketValue: number,
+  definitions: ReadonlyArray<{
+    bucket: string;
+    min: number;
+    max: number;
+    minExclusive?: boolean;
+    maxInclusive?: boolean;
+  }>,
+): MaturityBucketStat[] {
+  return definitions.map(({ bucket, min, max, minExclusive, maxInclusive }) => {
     const members = positions.filter((row) => {
       const remaining = row.remainingYears;
-      return remaining !== null && remaining >= min && remaining < max;
+      return (
+        remaining !== null &&
+        (minExclusive ? remaining > min : remaining >= min) &&
+        (maxInclusive ? remaining <= max : remaining < max)
+      );
     });
     const marketValue = sum(members.map((row) => row.marketValue));
     const yieldMembers = members.filter(
@@ -584,6 +794,77 @@ function aggregateMaturityBuckets(
       positionCount: members.length,
     };
   });
+}
+
+function toCoreHoldings(positions: LedgerPositionDetail[]): CoreHolding[] {
+  return positions
+    .filter((position) => position.marketValue > 0)
+    .sort((left, right) => right.marketValue - left.marketValue)
+    .slice(0, 5)
+    .map((position) => ({
+      name: position.name,
+      category: position.category,
+      remainingYears: position.remainingYears,
+      marketValue: position.marketValue,
+      reportYield: position.reportYield,
+    }));
+}
+
+function buildAuditChecks(
+  performance: LedgerPerformanceRow | null,
+  positions: LedgerPositionRow[],
+): LedgerAuditCheck[] {
+  if (!performance) return [];
+  const detailMarketValue = sum(positions.map((position) => position.marketValue));
+  const calculatedLeverage =
+    performance.principal > 0
+      ? detailMarketValue / performance.principal
+      : Number.NaN;
+  const detailDailyProfit = sum(
+    positions.map((position) => position.dailyProfit),
+  );
+  return [
+    auditCheck(
+      "scale",
+      "交易户与可供户市值合计",
+      detailMarketValue,
+      performance.marketValue,
+      1,
+    ),
+    auditCheck(
+      "leverage",
+      "持仓规模除以业务本金",
+      calculatedLeverage,
+      performance.leverage,
+      0.000001,
+    ),
+    auditCheck(
+      "profit",
+      "交易户与可供户当日损益合计",
+      detailDailyProfit,
+      performance.dailyRevenue,
+      1,
+    ),
+  ];
+}
+
+function auditCheck(
+  key: LedgerAuditCheck["key"],
+  label: string,
+  actual: number,
+  expected: number,
+  tolerance: number,
+): LedgerAuditCheck {
+  const difference = actual - expected;
+  return {
+    key,
+    label,
+    pass: Number.isFinite(difference) && Math.abs(difference) <= tolerance,
+    actual,
+    expected,
+    difference,
+    tolerance,
+  };
 }
 
 function transactionsForLedger(ledger: BondLedgerSource): LedgerTransaction[] {
@@ -632,11 +913,15 @@ function emptyAnalytics(
     latestLedger: null,
     currentPerformance: null,
     performanceTrend: [],
+    operatingTrend: [],
     accountPerformanceTrends: { trading: [], available: [] },
     rangePerformance: [],
     currentPositions: [],
     holdingTypes: [],
     maturityBuckets: [],
+    tradingHoldingTypes: [],
+    tradingMaturityBuckets: [],
+    topTradingPositions: [],
     transactions: [],
     transactionTotals: { 买入: 0, 卖出: 0, 到期: 0 },
     rangeProfit: null,
@@ -657,6 +942,8 @@ function emptyAnalytics(
     },
     detailMarketValue: 0,
     reconciliationGap: null,
+    auditChecks: [],
+    auditPassed: false,
     effectiveStartDate: null,
     effectiveEndDate: null,
   };
@@ -696,9 +983,23 @@ function summarizeAccountPositions(
         account: position.account,
         marketValue: 0,
         dailyProfit: 0,
+        taxExemptIncome: 0,
+        dv01: 0,
+        weightedReportYield: null,
+        reportYieldWeight: 0,
       };
       summary.marketValue += position.marketValue;
       summary.dailyProfit += position.dailyProfit;
+      summary.taxExemptIncome += position.taxExemptIncome;
+      summary.dv01 += position.dv01;
+      if (position.marketValue > 0) {
+        const weightedYieldTotal =
+          (summary.weightedReportYield ?? 0) * summary.reportYieldWeight +
+          (position.reportYield ?? 0) * position.marketValue;
+        summary.reportYieldWeight += position.marketValue;
+        summary.weightedReportYield =
+          weightedYieldTotal / summary.reportYieldWeight;
+      }
       summaries.set(key, summary);
     }
   }
@@ -758,6 +1059,47 @@ function difference(
     previous === undefined
     ? null
     : current - previous;
+}
+
+function annualizeCumulativeProfit(
+  cumulativeProfit: number,
+  timeWeightedPrincipal: number,
+  dayCount: number,
+): number | null {
+  if (timeWeightedPrincipal <= 0 || dayCount <= 0) return null;
+  const value =
+    (cumulativeProfit / timeWeightedPrincipal) * (365 / dayCount);
+  return Number.isFinite(value) ? value : null;
+}
+
+function deannualizeCumulativeReturn(
+  annualizedReturn: number | null,
+  timeWeightedPrincipal: number,
+  dayCount: number,
+): number | null {
+  if (
+    annualizedReturn === null ||
+    timeWeightedPrincipal <= 0 ||
+    dayCount <= 0
+  ) {
+    return null;
+  }
+  const value = annualizedReturn * timeWeightedPrincipal * (dayCount / 365);
+  return Number.isFinite(value) ? value : null;
+}
+
+function approximatelyEqual(
+  left: number | null,
+  right: number | null,
+  tolerance = 1e-9,
+): boolean {
+  return (
+    left !== null &&
+    right !== null &&
+    Number.isFinite(left) &&
+    Number.isFinite(right) &&
+    Math.abs(left - right) <= tolerance
+  );
 }
 
 function addDays(value: string, days: number): string {

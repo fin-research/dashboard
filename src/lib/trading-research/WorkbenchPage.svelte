@@ -3,6 +3,7 @@
 
   import BondLedgerPage from "$lib/pages/BondLedgerPage.svelte";
   import FinancingModelPage from "$lib/pages/FinancingModelPage.svelte";
+  import SecondaryBondPoolWeeklyPage from "$lib/pages/SecondaryBondPoolWeeklyPage.svelte";
   import CreditView from "./CreditView.svelte";
   import OverviewView from "./OverviewView.svelte";
   import ResearchView from "./ResearchView.svelte";
@@ -11,6 +12,7 @@
   import WorkflowView from "./WorkflowView.svelte";
   import {
     normalizeWorkbenchView,
+    workbenchRoutes,
     workbenchViewPath,
     workbenchViews,
     type WorkbenchViewId,
@@ -25,7 +27,7 @@
 
   const activeViewId = $derived(normalizeWorkbenchView(viewId));
   const activeView = $derived(
-    workbenchViews.find((view) => view.id === activeViewId) ?? workbenchViews[0],
+    workbenchRoutes.find((view) => view.id === activeViewId) ?? workbenchRoutes[0],
   );
 
   afterNavigate(() => {
@@ -46,7 +48,7 @@
   }
 
   function isIntegratedView(value: WorkbenchViewId): boolean {
-    return value === "bond" || value === "financing-model";
+    return value === "bond" || value === "secondary-bond-pool" || value === "financing-model";
   }
 </script>
 
@@ -54,7 +56,7 @@
   <title>{activeView?.label} · 交易研究工作台</title>
   <meta
     name="description"
-    content="资金管理部交易管理、授信管理、研究辅助、流程、二级池与融资择时工作台"
+    content="资金管理部交易管理、授信管理、研究辅助、流程、二级池周报与融资择时工作台"
   />
   <meta name="theme-color" content="#f6f8fb" />
 </svelte:head>
@@ -153,6 +155,8 @@
         <WorkflowView />
       {:else if activeViewId === "bond"}
         <BondLedgerPage embedded />
+      {:else if activeViewId === "secondary-bond-pool"}
+        <SecondaryBondPoolWeeklyPage embedded />
       {:else}
         <FinancingModelPage embedded />
       {/if}

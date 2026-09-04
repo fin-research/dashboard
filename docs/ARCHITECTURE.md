@@ -71,7 +71,7 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ### 二级池
 
-浏览器上传 Excel → Worker 写入 `bond-ledger/.pending/<uuid>.xlsx` → 创建 Workflow → Worker 内解析 → Neon 单事务更新 → 覆盖 `bond-ledger/YYYY-MM-DD.xlsx` 并删除临时对象 → 页面按日期区间查询数据库生成周报。
+浏览器上传 Excel → Worker 写入 `bond-ledger/.pending/<uuid>.xlsx` → 创建 Workflow → Worker 内解析 → Neon 单事务更新 → 覆盖 `bond-ledger/YYYY-MM-DD.xlsx` 并删除临时对象 → 页面按日期区间查询数据库生成周报。`/secondary-bond-pool` 与工作台同名子路径使用运营周报组件；原 `/bond` 组件及工作台旧子路径继续存在但不进入导航。
 
 ### 资金日报
 
@@ -87,9 +87,9 @@ quant pipeline → 本地结构化结果 → Neon `financing_model.model_run` �
 
 统一 EDB 链路：Choice EDB + DM `/cfets-histories` → dashboard 首次本地全历史回填 / 每日 00:00 增量 Cron → Neon `public.edb`；浏览器 `/trading-research/research` → `/api/economic-indicators` → Hyperdrive → 最近 18 个月快照，融资工作台负债周报则由服务端经同一 Hyperdrive 读取所需年度序列。前端负责明确的展示换算、利差派生和走势图抽样，不直接调用付费或办公网上游。
 
-交易和流程中心当前仍由冻结数据 → `src/lib/trading-research/demo-data.ts` → 对应只读视图；`/bond` 与 `/financing-model` 的同一页面组件同时装配到工作台子路径。
+交易和流程中心当前仍由冻结数据 → `src/lib/trading-research/demo-data.ts` → 对应只读视图；`/secondary-bond-pool`、`/bond` 与 `/financing-model` 的同一页面组件分别装配到工作台子路径，其中旧 `bond` 只作为隐藏深链保留。
 
-工作台路由使用真实 path：`/trading-research`、`/trading-research/trading`、`/trading-research/credit`、`/trading-research/research`、`/trading-research/workflow`、`/trading-research/bond`、`/trading-research/financing-model`。不使用 `?view=`；原 `/bond`、`/financing-model` 保留。
+工作台路由使用真实 path：`/trading-research`、`/trading-research/trading`、`/trading-research/credit`、`/trading-research/research`、`/trading-research/workflow`、`/trading-research/secondary-bond-pool`、`/trading-research/financing-model`。不使用 `?view=`；原 `/trading-research/bond`、`/bond` 与 `/financing-model` 保留，但旧二级池入口不显示在导航。
 
 后续：交易与流程业务数据库 → 服务端接口 → dashboard 浏览器。浏览器不得直连数据库或研究数据上游。所有授信数据只写 `credit` schema，不交叉写入 `bond` 或 `financing_model`。
 

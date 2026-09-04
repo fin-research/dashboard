@@ -468,7 +468,23 @@ export async function loadBondLedgerReport(
        to_char(report_date, 'YYYY-MM-DD') AS date,
        account,
        sum(market_value)::double precision AS market_value,
-       sum(daily_profit)::double precision AS daily_profit
+       sum(daily_profit)::double precision AS daily_profit,
+       sum(tax_exempt_income)::double precision AS tax_exempt_income,
+       sum(dv01)::double precision AS dv01,
+       CASE
+         WHEN sum(market_value) FILTER (WHERE market_value > 0) > 0
+         THEN (
+           sum(COALESCE(report_yield, 0) * market_value) FILTER (
+             WHERE market_value > 0
+           ) /
+           sum(market_value) FILTER (WHERE market_value > 0)
+         )::double precision
+         ELSE NULL
+       END AS weighted_report_yield,
+       COALESCE(
+         sum(market_value) FILTER (WHERE market_value > 0),
+         0
+       )::double precision AS report_yield_weight
      FROM bond.daily_position
      WHERE report_date BETWEEN $1::date AND $2::date
      GROUP BY report_date, account
@@ -792,6 +808,10 @@ interface AccountTrendRow extends QueryResultRow {
   account: string;
   market_value: number;
   daily_profit: number;
+  tax_exempt_income: number;
+  dv01: number;
+  weighted_report_yield: number | null;
+  report_yield_weight: number;
 }
 
 function importCountResult(row: ImportCountRow): PersistBondLedgerResult {
@@ -876,6 +896,10 @@ function accountTrendFromRow(
     account: row.account,
     marketValue: toFiniteNumber(row.market_value),
     dailyProfit: toFiniteNumber(row.daily_profit),
+    taxExemptIncome: toFiniteNumber(row.tax_exempt_income),
+    dv01: toFiniteNumber(row.dv01),
+    weightedReportYield: toNullableNumber(row.weighted_report_yield),
+    reportYieldWeight: toFiniteNumber(row.report_yield_weight),
   };
 }
 

@@ -6,9 +6,11 @@ import { utils, write } from "xlsx";
 import {
   buildBondLedgerAnalytics,
   buildAccountPerformanceTrends,
+  buildOperatingTrend,
   calculateBusinessAnnualizedReturn,
   calculateBusinessAnnualizedReturnTrend,
   calculateReturnRiskMetrics,
+  isoWeek,
   previousBusinessWeekRange,
   weekRange,
 } from "../src/lib/bond-ledger/analytics.ts";
@@ -88,8 +90,10 @@ test("解析标准台账前两张表并统一日期与数值", () => {
   performance[19] = 1.46;
   performance[20] = 380_000;
   performance[30] = 71_000_000;
-  performance[37] = 0.0245;
-  performance[43] = 0.0229;
+  performance[36] = 0.0245;
+  performance[37] = 0.0241;
+  performance[42] = 0.0229;
+  performance[43] = 0.0225;
   const cachedFuturePerformance = [...performance];
   cachedFuturePerformance[0] = "2026/08/21";
   const position = Array(29).fill(null);
@@ -111,13 +115,21 @@ test("解析标准台账前两张表并统一日期与数值", () => {
   position[27] = 500_000;
 
   const result = parseBondLedgerMatrices(
-    [header, Array(47).fill(null), performance, cachedFuturePerformance],
+    [
+      header,
+      Array(47).fill(null),
+      ["2026/01/01", null, 1, null, null, null, null, null, null, 1],
+      performance,
+      cachedFuturePerformance,
+    ],
     [POSITION_HEADERS, position],
   );
 
   assert.equal(result.date, "2026-08-20");
   assert.deepEqual(result.performance.map((row) => row.date), ["2026-08-20"]);
   assert.equal(result.performance[0].marketValue, 6_400_000_000);
+  assert.equal(result.performance[0].ytdAnnualizedReturn, 0.0245);
+  assert.equal(result.performance[0].ytdExTaxAnnualizedReturn, 0.0229);
   assert.equal(result.positions[0].buyQuantity, 11_000_000);
   assert.equal(result.positions[0].reportYield, 1.43);
   assert.equal(result.positions[0].realizedProfit, -3400.000000000342);
@@ -195,6 +207,7 @@ test("按表名合并交易户和可供户并统一派生成交", async () => {
     utils.aoa_to_sheet([
       performanceHeader,
       Array(47).fill(null),
+      ["2026/01/01", null, 1, null, null, null, null, null, null, 1],
       performance,
     ]),
     "二级池累计收益",
@@ -301,6 +314,47 @@ test("业务收益率按交易日单日收益率算术平均乘 252 年化", () 
     startDate: "2026-08-24",
     endDate: "2026-08-28",
   });
+});
+
+test("运营周报按全池口径派生免税增厚、平层静态与双户结构", () => {
+  const first = performanceRow("2026-01-05", 100, 1_000);
+  first.timeWeightedPrincipal = 1_000;
+  first.ytdAnnualizedReturn = (100 / 1_000) * (365 / 4);
+  first.ytdExTaxAnnualizedReturn = (90 / 1_000) * (365 / 4);
+  const second = performanceRow("2026-01-06", 160, 1_000);
+  second.timeWeightedPrincipal = 1_000;
+  second.ytdAnnualizedReturn = (160 / 1_000) * (365 / 5);
+  second.ytdExTaxAnnualizedReturn = (130 / 1_000) * (365 / 5);
+  const third = performanceRow("2026-01-07", 180, 1_000);
+  third.timeWeightedPrincipal = 1_000;
+  third.dailyRevenue = 20;
+  third.ytdAnnualizedReturn = 0.1;
+  third.ytdExTaxAnnualizedReturn = 0.09;
+  const summaries = [
+    accountSummary("2026-01-05", "交易户", 800, 10, 100, 1.4),
+    accountSummary("2026-01-05", "可供户", 200, 0, 50, 1.8),
+    accountSummary("2026-01-06", "交易户", 800, 15, 100, 1.4),
+    accountSummary("2026-01-06", "可供户", 200, 5, 50, 1.8),
+    accountSummary("2026-01-07", "交易户", 800, 3, 100, 1.4),
+    accountSummary("2026-01-07", "可供户", 200, 1, 50, 1.8),
+  ];
+
+  const trend = buildOperatingTrend([first, second, third], summaries);
+
+  assert.equal(trend[1].tradingMarketValue, 800);
+  assert.equal(trend[1].availableMarketValue, 200);
+  assert.equal(trend[1].dv01, 150);
+  assert.equal(trend[1].flatStatic, 1.48);
+  assert.equal(trend[1].cumulativeTaxExemptProfit, 30);
+  assert.equal(trend[1].cumulativeExTaxProfit, 130);
+  assert.equal(trend[1].fullPoolYtdAnnualizedReturn, second.ytdAnnualizedReturn);
+  assert.equal(
+    trend[1].fullPoolYtdExTaxAnnualizedReturn,
+    second.ytdExTaxAnnualizedReturn,
+  );
+  assert.equal(trend[2].cumulativeExTaxProfit, 146);
+  assert.equal(trend[2].cumulativeTaxExemptProfit, 34);
+  assert.deepEqual(isoWeek("2026-08-28"), { year: 2026, week: 35 });
 });
 
 test("收益与风险指标按所选区间有效日收益率统一派生", () => {
@@ -736,6 +790,26 @@ function performanceRow(date, cumulativeProfit, principal) {
     cumulativeProfit,
     ytdAnnualizedReturn: null,
     ytdExTaxAnnualizedReturn: null,
+  };
+}
+
+function accountSummary(
+  date,
+  account,
+  marketValue,
+  taxExemptIncome,
+  dv01,
+  weightedReportYield,
+) {
+  return {
+    date,
+    account,
+    marketValue,
+    dailyProfit: 0,
+    taxExemptIncome,
+    dv01,
+    weightedReportYield,
+    reportYieldWeight: marketValue,
   };
 }
 

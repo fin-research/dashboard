@@ -25,6 +25,21 @@ export interface LedgerAccountDailySummary {
   account: string;
   marketValue: number;
   dailyProfit: number;
+  taxExemptIncome: number;
+  dv01: number;
+  weightedReportYield: number | null;
+  reportYieldWeight: number;
+}
+
+export interface LedgerOperatingTrendPoint extends LedgerPerformanceRow {
+  tradingMarketValue: number;
+  availableMarketValue: number;
+  flatStatic: number | null;
+  dv01: number;
+  cumulativeTaxExemptProfit: number | null;
+  cumulativeExTaxProfit: number | null;
+  fullPoolYtdAnnualizedReturn: number | null;
+  fullPoolYtdExTaxAnnualizedReturn: number | null;
 }
 
 export interface LedgerPositionRow {
@@ -115,6 +130,24 @@ export interface MaturityBucketStat {
   positionCount: number;
 }
 
+export interface CoreHolding {
+  name: string;
+  category: string;
+  remainingYears: number | null;
+  marketValue: number;
+  reportYield: number | null;
+}
+
+export interface LedgerAuditCheck {
+  key: "scale" | "leverage" | "profit";
+  label: string;
+  pass: boolean;
+  actual: number;
+  expected: number;
+  difference: number;
+  tolerance: number;
+}
+
 export interface ReturnRiskMetrics {
   annualizedVolatility: number | null;
   maxDrawdown: number | null;
@@ -128,6 +161,7 @@ export interface BondLedgerAnalytics {
   latestLedger: BondLedgerSource | null;
   currentPerformance: LedgerPerformanceRow | null;
   performanceTrend: LedgerPerformanceRow[];
+  operatingTrend: LedgerOperatingTrendPoint[];
   accountPerformanceTrends: Record<
     Exclude<LedgerTrendAccount, "all">,
     LedgerTrendPoint[]
@@ -136,6 +170,9 @@ export interface BondLedgerAnalytics {
   currentPositions: LedgerPositionDetail[];
   holdingTypes: HoldingTypeStat[];
   maturityBuckets: MaturityBucketStat[];
+  tradingHoldingTypes: HoldingTypeStat[];
+  tradingMaturityBuckets: MaturityBucketStat[];
+  topTradingPositions: CoreHolding[];
   transactions: LedgerTransaction[];
   transactionTotals: Record<LedgerTransactionSide, number>;
   rangeProfit: number | null;
@@ -156,6 +193,8 @@ export interface BondLedgerAnalytics {
   };
   detailMarketValue: number;
   reconciliationGap: number | null;
+  auditChecks: LedgerAuditCheck[];
+  auditPassed: boolean;
   effectiveStartDate: string | null;
   effectiveEndDate: string | null;
 }
@@ -164,9 +203,13 @@ export interface BondLedgerReport {
   hasData: boolean;
   currentPerformance: LedgerPerformanceRow | null;
   performanceTrend: LedgerPerformanceRow[];
+  operatingTrend: LedgerOperatingTrendPoint[];
   accountPerformanceTrends: BondLedgerAnalytics["accountPerformanceTrends"];
   holdingTypes: HoldingTypeStat[];
   maturityBuckets: MaturityBucketStat[];
+  tradingHoldingTypes: HoldingTypeStat[];
+  tradingMaturityBuckets: MaturityBucketStat[];
+  topTradingPositions: CoreHolding[];
   transactions: LedgerTransaction[];
   transactionTotals: Record<LedgerTransactionSide, number>;
   rangeProfit: number | null;
@@ -175,6 +218,9 @@ export interface BondLedgerReport {
   returnRiskMetrics: ReturnRiskMetrics;
   transactionCount: number;
   metricDeltas: BondLedgerAnalytics["metricDeltas"];
+  detailMarketValue: number;
+  auditChecks: LedgerAuditCheck[];
+  auditPassed: boolean;
   effectiveStartDate: string | null;
   effectiveEndDate: string | null;
 }

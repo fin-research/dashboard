@@ -13,8 +13,8 @@ const PERFORMANCE_COLUMNS = {
   modifiedDuration: 19,
   dailyRevenue: 20,
   cumulativeProfit: 30,
-  ytdAnnualizedReturn: 37,
-  ytdExTaxAnnualizedReturn: 43,
+  ytdAnnualizedReturn: 36,
+  ytdExTaxAnnualizedReturn: 42,
 } as const;
 
 const REQUIRED_POSITION_HEADERS = [
@@ -120,7 +120,7 @@ export function parseBondLedgerMatrices(
   additionalPositionMatrices: Matrix[] = [],
 ): ParsedBondLedger {
   validatePerformanceHeader(performanceMatrix);
-  const performance = parsePerformanceRows(performanceMatrix.slice(2));
+  const performance = parsePerformanceRows(performanceMatrix.slice(3));
   const positions: LedgerPositionRow[] = [];
   let rowNumberOffset = 0;
   const positionMatrices = [positionMatrix, ...additionalPositionMatrices];

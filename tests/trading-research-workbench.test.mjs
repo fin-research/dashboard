@@ -7,6 +7,7 @@ import {
   demoTrades,
   normalizeWorkbenchView,
   workbenchViewPath,
+  workbenchRoutes,
   workbenchViews,
 } from "../src/lib/trading-research/demo-data.ts";
 import {
@@ -23,7 +24,7 @@ import {
   mapLiquidityRateRows,
 } from "../src/lib/trading-research/economic-indicators.ts";
 
-test("交易研究工作台提供七个 path 标签页并保留稳定深链", () => {
+test("交易研究工作台以新二级池周报替换导航入口并保留旧深链", () => {
   assert.deepEqual(
     workbenchViews.map((view) => view.label),
     [
@@ -32,16 +33,24 @@ test("交易研究工作台提供七个 path 标签页并保留稳定深链", ()
       "授信管理",
       "研究辅助",
       "流程中心",
-      "二级池",
+      "二级池周报",
       "融资择时模型",
     ],
   );
   assert.equal(normalizeWorkbenchView("credit"), "credit");
+  assert.equal(normalizeWorkbenchView("bond"), "bond");
+  assert.equal(normalizeWorkbenchView("secondary-bond-pool"), "secondary-bond-pool");
   assert.equal(normalizeWorkbenchView("financing-model"), "financing-model");
   assert.equal(normalizeWorkbenchView("timing"), "overview");
   assert.equal(normalizeWorkbenchView(null), "overview");
   assert.equal(workbenchViewPath("overview"), "/trading-research");
   assert.equal(workbenchViewPath("bond"), "/trading-research/bond");
+  assert.equal(
+    workbenchViewPath("secondary-bond-pool"),
+    "/trading-research/secondary-bond-pool",
+  );
+  assert.ok(workbenchRoutes.some((view) => view.id === "bond"));
+  assert.ok(!workbenchViews.some((view) => view.id === "bond"));
   assert.equal(
     workbenchViewPath("financing-model"),
     "/trading-research/financing-model",
@@ -62,6 +71,60 @@ test("二级池成交明细表统一使用 1rem 字号", async () => {
     styles,
     /\.ledger-panel--risk \.ledger-return-risk-grid\s*\{[\s\S]*?align-content:\s*stretch;[\s\S]*?grid-auto-rows:\s*minmax\(0, 1fr\)/,
   );
+});
+
+test("二级债券池运营周报复用共享组件并提供独立与工作台路由", async () => {
+  const [page, standaloneRoute, workbench, routeLoader, styles] =
+    await Promise.all([
+      readFile(
+        new URL(
+          "../src/lib/pages/SecondaryBondPoolWeeklyPage.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/routes/secondary-bond-pool/+page.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/lib/trading-research/WorkbenchPage.svelte",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../src/routes/trading-research/[view]/+page.ts",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/secondary-bond-pool.css", import.meta.url),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(page, /previousBusinessWeekRange\(currentReportDate\(\)\)/);
+  assert.match(page, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
+  assert.match(page, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
+  assert.match(page, /ChartHost from "\.\.\/\.\.\/components\/ChartHost\.svelte"/);
+  assert.match(page, /title="规模演变与杠杆走势"/);
+  assert.match(page, /title="收益率与累计创收归因"/);
+  assert.match(page, /title="资产配置与期限分布"/);
+  assert.match(page, /title="核心重仓券速览"/);
+  assert.match(page, /title="后续跟踪重点"/);
+  assert.match(page, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
+  assert.match(standaloneRoute, /<SecondaryBondPoolWeeklyPage \/>/);
+  assert.match(workbench, /<SecondaryBondPoolWeeklyPage embedded \/>/);
+  assert.match(routeLoader, /workbenchRoutes/);
+  assert.match(styles, /grid-template-columns:\s*minmax\(0, 1\.15fr\) minmax\(0, 0\.85fr\)/);
+  assert.match(styles, /grid-template-columns:\s*repeat\(auto-fit, minmax\(min\(220px, 100%\), 1fr\)\)/);
 });
 
 test("演示交易汇总严格由迁入的十笔交易派生", () => {
@@ -215,7 +278,7 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
   assert.match(page, /<FinancingModelPage embedded \/>/);
   assert.doesNotMatch(page, /数据截至|activeDate|demoMeta/);
   assert.doesNotMatch(page, /\?view=|tr-context-strip|演示数据|静态演示|未来统一/);
-  assert.match(route, /workbenchViews\.find/);
+  assert.match(route, /workbenchRoutes\.find/);
   assert.match(styles, /\.tr-table-scroll\s*\{[\s\S]*?overflow-x:\s*auto/);
   assert.match(styles, /grid-template-areas:\s*\n\s*"topbar topbar"\s*\n\s*"drawer workspace"/);
   assert.match(styles, /\.tr-workspace\s*\{[\s\S]*?overflow-y:\s*auto/);

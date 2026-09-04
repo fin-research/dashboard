@@ -4,6 +4,7 @@ export type WorkbenchViewId =
   | "credit"
   | "research"
   | "workflow"
+  | "secondary-bond-pool"
   | "bond"
   | "financing-model";
 
@@ -18,7 +19,7 @@ export type WorkbenchIconName =
   | "sidebar"
   | "warning";
 
-export const workbenchViews: Array<{
+export const workbenchRoutes: Array<{
   id: WorkbenchViewId;
   label: string;
   title: string;
@@ -61,6 +62,13 @@ export const workbenchViews: Array<{
     icon: "workflow",
   },
   {
+    id: "secondary-bond-pool",
+    label: "二级池周报",
+    title: "二级池周报",
+    context: "规模杠杆、收益创收与资产期限结构",
+    icon: "secondary-bond-pool",
+  },
+  {
     id: "bond",
     label: "二级池",
     title: "二级池",
@@ -76,10 +84,14 @@ export const workbenchViews: Array<{
   },
 ];
 
+export const workbenchViews = workbenchRoutes.filter(
+  (view) => view.id !== "bond",
+);
+
 export function normalizeWorkbenchView(
   value: string | null | undefined,
 ): WorkbenchViewId {
-  return workbenchViews.some((view) => view.id === value)
+  return workbenchRoutes.some((view) => view.id === value)
     ? (value as WorkbenchViewId)
     : "overview";
 }
