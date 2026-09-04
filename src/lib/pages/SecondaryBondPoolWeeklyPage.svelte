@@ -16,7 +16,6 @@
   } from "../../charts/bond-ledger";
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
-  import MetricIcon from "../../components/MetricIcon.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
   import { exportReportImage } from "../../export";
   import {
@@ -33,8 +32,6 @@
   import {
     formatDecimalPercent,
     formatWan,
-    formatYears,
-    formatYield,
     formatYi,
   } from "$lib/bond-ledger/format";
   import type { BondLedgerReport } from "$lib/bond-ledger/types";
@@ -43,10 +40,13 @@
   import { portal } from "$lib/portal";
   import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
   import { currentReportDate } from "../../report-date";
-  import type { MetricIconName } from "../../view-model";
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
-  const DEFAULT_RANGE = previousBusinessWeekRange(currentReportDate());
+  const LAST_COMPLETE_WEEK = previousBusinessWeekRange(currentReportDate());
+  const DEFAULT_RANGE = {
+    startDate: `${LAST_COMPLETE_WEEK.endDate.slice(0, 4)}-01-01`,
+    endDate: LAST_COMPLETE_WEEK.endDate,
+  };
 
   let analytics: BondLedgerReport = emptyBondLedgerReport();
   let startDate = DEFAULT_RANGE.startDate;
@@ -74,16 +74,18 @@
   $: rangeOperating = analytics.operatingTrend.filter(
     (point) => point.date >= startDate && point.date <= endDate,
   );
+  $: actualStartDate = rangePerformance.at(0)?.date ?? startDate;
+  $: actualEndDate = rangePerformance.at(-1)?.date ?? current?.date ?? endDate;
+  $: currentWeekStart = current ? startOfBusinessWeek(current.date) : null;
+  $: weeklyRevenue = rangePerformance
+    .filter((point) => currentWeekStart !== null && point.date >= currentWeekStart)
+    .reduce((total, point) => total + point.dailyRevenue, 0);
   $: tradingMarketValue = currentOperating?.tradingMarketValue ?? 0;
   $: availableMarketValue = currentOperating?.availableMarketValue ?? 0;
   $: calculatedLeverage =
     current && current.principal > 0
       ? analytics.detailMarketValue / current.principal
       : null;
-  $: rangeRevenue = rangePerformance.reduce(
-    (total, point) => total + point.dailyRevenue,
-    0,
-  );
   $: oneYearShare = analytics.tradingMaturityBuckets
     .slice(0, 5)
     .reduce((total, bucket) => total + bucket.share, 0);
@@ -96,24 +98,21 @@
   $: metricCards = [
     {
       label: "业务本金",
-      value: formatYi(current?.principal ?? null),
-      detail: `时间加权 ${formatYi(current?.timeWeightedPrincipal ?? null)}`,
+      value: formatReportYi(current?.principal ?? null),
+      detail: `时间加权 ${formatReportYi(current?.timeWeightedPrincipal ?? null)}`,
       tone: "blue" as const,
-      icon: "bank" as MetricIconName,
     },
     {
       label: "全池持仓总市值",
-      value: formatYi(analytics.detailMarketValue || null),
-      detail: `交易户 ${formatYi(tradingMarketValue)} / 可供户 ${formatYi(availableMarketValue)}`,
+      value: formatReportYi(analytics.detailMarketValue || null),
+      detail: `交易户 ${formatReportYi(tradingMarketValue)} / 可供户 ${formatReportYi(availableMarketValue)}`,
       tone: "cyan" as const,
-      icon: "bond" as MetricIconName,
     },
     {
       label: "全池综合杠杆率",
       value: formatDecimalPercent(calculatedLeverage),
       detail: `对比平层基准 ${formatSignedPercentagePoint(calculatedLeverage === null ? null : calculatedLeverage - 1)}`,
-      tone: "purple" as const,
-      icon: "leverage" as MetricIconName,
+      tone: "blue" as const,
     },
     {
       label: "年化收益率（含免税）",
@@ -122,15 +121,13 @@
         3,
       ),
       detail: `不含免税 ${formatDecimalPercent(currentOperating?.fullPoolYtdExTaxAnnualizedReturn ?? null, 3)} / 平层静态 ${formatStaticYield(currentOperating?.flatStatic ?? null)}`,
-      tone: "teal" as const,
-      icon: "profit" as MetricIconName,
+      tone: "cyan" as const,
     },
     {
       label: "累计毛利（含免税）",
       value: formatWan(current?.cumulativeProfit ?? null),
       detail: `免税增厚 ${formatWan(currentOperating?.cumulativeTaxExemptProfit ?? null)}`,
-      tone: "orange" as const,
-      icon: "equity" as MetricIconName,
+      tone: "blue" as const,
     },
   ];
 
@@ -236,6 +233,30 @@
       : `${value.toFixed(3)}%`;
   }
 
+  function formatReportYi(value: number | null): string {
+    if (value === null || !Number.isFinite(value)) return "—";
+    return `${(value / 100_000_000).toFixed(2)} 亿`;
+  }
+
+  function formatReportYield(value: number | null): string {
+    return value === null || !Number.isFinite(value)
+      ? "—"
+      : `${value.toFixed(3)}%`;
+  }
+
+  function formatPercentOne(value: number | null): string {
+    return value === null || !Number.isFinite(value)
+      ? "—"
+      : `${(value * 100).toFixed(1)}%`;
+  }
+
+  function startOfBusinessWeek(value: string): string {
+    const date = new Date(`${value}T12:00:00Z`);
+    const weekday = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - weekday);
+    return date.toISOString().slice(0, 10);
+  }
+
   function formatChineseDate(value: string): string {
     const [year, month, day] = value.split("-");
     return year && month && day ? `${year}年${month}月${day}日` : value;
@@ -261,8 +282,9 @@
   <article bind:this={reportSurface} class="secondary-weekly-report">
     <header class="secondary-weekly-masthead">
       <div>
-        <a class="secondary-weekly-portal" href="/" aria-label="返回市场研究门户">东方财富证券 · 资金管理部</a>
-        <h1>二级债券池运营周报</h1>
+        <a class="secondary-weekly-title-link" href="/" aria-label="返回市场研究门户">
+          <h1>二级债券池运营周报</h1>
+        </a>
         <p>
           报告基准日：{formatChineseDate(current?.date ?? endDate)}（{reportWeek.year}年第{reportWeek.week}周）
         </p>
@@ -365,88 +387,92 @@
               value={card.value}
               detail={card.detail}
               tone={card.tone}
-              iconComponent={MetricIcon}
-              iconProps={{ icon: card.icon }}
-              iconPosition="start"
+              variant="report"
             />
           {/each}
         </section>
 
         <div class="secondary-weekly-columns">
           <div class="secondary-weekly-column secondary-weekly-column--primary">
-            <ModuleCard class="secondary-weekly-panel" labelledBy="weekly-scale-title">
-              <PanelHeading id="weekly-scale-title" title="规模演变与杠杆走势" controlsInline>
-                <span class="secondary-weekly-panel-meta">{startDate}—{endDate}</span>
+            <ModuleCard variant="report" class="secondary-weekly-panel" labelledBy="weekly-scale-title">
+              <PanelHeading id="weekly-scale-title" title="规模演变与杠杆走势" controlsInline variant="report">
+                <span class="secondary-weekly-panel-meta">{actualStartDate}—{actualEndDate}</span>
               </PanelHeading>
-              <ChartHost
-                renderer={renderWeeklyPoolScaleLeverage}
-                args={[rangePerformance]}
-                ariaLabel="所选区间业务本金、持仓市值、时间加权本金与杠杆走势"
-                className="secondary-weekly-chart secondary-weekly-chart--trend"
-              />
+              <div class="secondary-weekly-chart-frame">
+                <ChartHost
+                  renderer={renderWeeklyPoolScaleLeverage}
+                  args={[rangePerformance]}
+                  ariaLabel="所选区间业务本金、持仓市值、时间加权本金与杠杆走势"
+                  className="secondary-weekly-chart secondary-weekly-chart--trend"
+                />
+              </div>
               <div class="secondary-weekly-analysis">
-                <p><strong>规模概览：</strong>最新业务本金 {formatYi(current?.principal ?? null)}，全池持仓市值 {formatYi(analytics.detailMarketValue)}，综合杠杆率 {formatDecimalPercent(calculatedLeverage)}。</p>
-                <p><strong>双户结构：</strong>交易户占全池市值 {formatDecimalPercent(analytics.detailMarketValue > 0 ? tradingMarketValue / analytics.detailMarketValue : null)}，可供户占 {formatDecimalPercent(analytics.detailMarketValue > 0 ? availableMarketValue / analytics.detailMarketValue : null)}；两户共同纳入 DV01 与损益核对。</p>
+                <p>• <strong>规模概览</strong>：最新业务本金 <strong>{formatYi(current?.principal ?? null)}</strong>，全池持仓市值 <strong>{formatYi(analytics.detailMarketValue)}</strong>，综合杠杆率 <strong>{formatDecimalPercent(calculatedLeverage)}</strong>。报告数字由最新有效交易日时序台账与两户持仓明细交叉核验。</p>
+                <p>• <strong>双户结构</strong>：交易户占全池市值 {formatPercentOne(analytics.detailMarketValue > 0 ? tradingMarketValue / analytics.detailMarketValue : null)}、可供户占 {formatPercentOne(analytics.detailMarketValue > 0 ? availableMarketValue / analytics.detailMarketValue : null)}；可供户纳入全池 DV01 与损益对账。</p>
               </div>
             </ModuleCard>
 
-            <ModuleCard class="secondary-weekly-panel" labelledBy="weekly-yield-title">
-              <PanelHeading id="weekly-yield-title" title="收益率与累计创收归因" controlsInline>
-                <span class="secondary-weekly-panel-meta">区间营收 {formatWan(rangeRevenue)}</span>
+            <ModuleCard variant="report" class="secondary-weekly-panel" labelledBy="weekly-yield-title">
+              <PanelHeading id="weekly-yield-title" title="收益率与累计创收归因" controlsInline variant="report">
+                <span class="secondary-weekly-panel-meta">本周营收 {formatWan(weeklyRevenue)}</span>
               </PanelHeading>
-              <ChartHost
-                renderer={renderWeeklyYieldProfitTrend}
-                args={[rangeOperating]}
-                ariaLabel="所选区间年化收益率、平层静态、累计毛利与免税增厚走势"
-                className="secondary-weekly-chart secondary-weekly-chart--trend"
-              />
+              <div class="secondary-weekly-chart-frame">
+                <ChartHost
+                  renderer={renderWeeklyYieldProfitTrend}
+                  args={[rangeOperating]}
+                  ariaLabel="所选区间年化收益率、平层静态、累计毛利与免税增厚走势"
+                  className="secondary-weekly-chart secondary-weekly-chart--trend"
+                />
+              </div>
               <div class="secondary-weekly-analysis">
-                <p><strong>收益率：</strong>含免税年化收益率 {formatDecimalPercent(currentOperating?.fullPoolYtdAnnualizedReturn ?? null, 3)}，不含免税 {formatDecimalPercent(currentOperating?.fullPoolYtdExTaxAnnualizedReturn ?? null, 3)}，平层静态 {formatStaticYield(currentOperating?.flatStatic ?? null)}。</p>
-                <p><strong>利润拆分：</strong>累计毛利（含免税）{formatWan(current?.cumulativeProfit ?? null)}，其中免税增厚 {formatWan(currentOperating?.cumulativeTaxExemptProfit ?? null)}；区间营收按所选日期内有效交易日汇总。</p>
+                <p>• <strong>收益率</strong>：含免税年化收益率为 <strong>{formatDecimalPercent(currentOperating?.fullPoolYtdAnnualizedReturn ?? null, 3)}</strong>，不含免税为 <strong>{formatDecimalPercent(currentOperating?.fullPoolYtdExTaxAnnualizedReturn ?? null, 3)}</strong>，平层静态为 <strong>{formatStaticYield(currentOperating?.flatStatic ?? null)}</strong>。</p>
+                <p>• <strong>利润拆分</strong>：累计毛利（含免税）为 <strong>{formatWan(current?.cumulativeProfit ?? null)}</strong>，其中免税增厚贡献 <strong>{formatWan(currentOperating?.cumulativeTaxExemptProfit ?? null)}</strong>。本周区间按报告基准日所在自然周的有效交易日过滤。</p>
               </div>
             </ModuleCard>
           </div>
 
           <div class="secondary-weekly-column secondary-weekly-column--secondary">
-            <ModuleCard class="secondary-weekly-panel" labelledBy="weekly-allocation-title">
-              <PanelHeading id="weekly-allocation-title" title="资产配置与期限分布" controlsInline>
-                <span class="secondary-weekly-panel-meta">交易户 {formatYi(tradingMarketValue)}</span>
+            <ModuleCard variant="report" class="secondary-weekly-panel" labelledBy="weekly-allocation-title">
+              <PanelHeading id="weekly-allocation-title" title="资产配置与期限分布" controlsInline variant="report">
+                <span class="secondary-weekly-panel-meta">交易户 {formatReportYi(tradingMarketValue)}</span>
               </PanelHeading>
-              <div class="secondary-weekly-allocation-grid">
-                <ChartHost
-                  renderer={renderWeeklyTradingAllocation}
-                  args={[analytics.tradingHoldingTypes]}
-                  ariaLabel="交易户资产类别结构"
-                  className="secondary-weekly-chart secondary-weekly-chart--allocation"
-                />
-                <ChartHost
-                  renderer={renderWeeklyTradingMaturity}
-                  args={[analytics.tradingMaturityBuckets]}
-                  ariaLabel="交易户剩余期限分布"
-                  className="secondary-weekly-chart secondary-weekly-chart--allocation"
-                />
+              <div class="secondary-weekly-chart-frame secondary-weekly-chart-frame--allocation">
+                <div class="secondary-weekly-allocation-grid">
+                  <ChartHost
+                    renderer={renderWeeklyTradingAllocation}
+                    args={[analytics.tradingHoldingTypes]}
+                    ariaLabel="交易户资产类别结构"
+                    className="secondary-weekly-chart secondary-weekly-chart--allocation"
+                  />
+                  <ChartHost
+                    renderer={renderWeeklyTradingMaturity}
+                    args={[analytics.tradingMaturityBuckets]}
+                    ariaLabel="交易户剩余期限分布"
+                    className="secondary-weekly-chart secondary-weekly-chart--allocation"
+                  />
+                </div>
               </div>
               <div class="secondary-weekly-analysis">
-                <p><strong>资产类别：</strong>按交易户市值计算，主要类别为 {categorySummary || "—"}。</p>
-                <p><strong>期限结构：</strong>交易户中 1 年以内资产占比 {formatDecimalPercent(oneYearShare)}；最新修正久期 {formatYears(current?.modifiedDuration ?? null)}，合并 DV01 {formatWan(currentOperating?.dv01 ?? null)} / BP。</p>
+                <p>• <strong>资产类别</strong>：按交易户市值计算，主要类别为 {categorySummary || "—"}。</p>
+                <p>• <strong>期限结构</strong>：交易户中 1 年以内资产占比约 <strong>{formatPercentOne(oneYearShare)}</strong>；最新修正久期 <strong>{current?.modifiedDuration === null || current?.modifiedDuration === undefined ? "—" : `${current.modifiedDuration.toFixed(4)} 年`}</strong>，合并 DV01 <strong>{formatWan(currentOperating?.dv01 ?? null, 2)}/BP</strong>。</p>
               </div>
             </ModuleCard>
 
-            <ModuleCard class="secondary-weekly-panel" labelledBy="weekly-holdings-title">
-              <PanelHeading id="weekly-holdings-title" title="核心重仓券速览" controlsInline>
+            <ModuleCard variant="report" class="secondary-weekly-panel" labelledBy="weekly-holdings-title">
+              <PanelHeading id="weekly-holdings-title" title="核心重仓券速览" controlsInline variant="report">
                 <span class="secondary-weekly-panel-meta">Top 5</span>
               </PanelHeading>
               <div class="secondary-weekly-table-wrap">
                 <table class="secondary-weekly-table">
-                  <thead><tr><th>券名</th><th>类别</th><th>期限</th><th>市值</th><th>收益率</th></tr></thead>
+                  <thead><tr><th>券名</th><th>类别</th><th>期限</th><th>市值(亿)</th><th>收益率</th></tr></thead>
                   <tbody>
                     {#each analytics.topTradingPositions as position (position.name)}
                       <tr>
                         <th scope="row">{position.name}</th>
                         <td>{position.category}</td>
                         <td>{position.remainingYears === null ? "—" : `${position.remainingYears.toFixed(2)}Y`}</td>
-                        <td>{formatYi(position.marketValue)}</td>
-                        <td>{formatYield(position.reportYield)}</td>
+                        <td>{(position.marketValue / 100_000_000).toFixed(2)}</td>
+                        <td>{formatReportYield(position.reportYield)}</td>
                       </tr>
                     {:else}
                       <tr><td colspan="5">暂无有效交易户持仓</td></tr>
@@ -456,8 +482,8 @@
               </div>
             </ModuleCard>
 
-            <ModuleCard class="secondary-weekly-panel secondary-weekly-focus" labelledBy="weekly-focus-title">
-              <PanelHeading id="weekly-focus-title" title="后续跟踪重点" />
+            <ModuleCard variant="report" class="secondary-weekly-panel secondary-weekly-focus" labelledBy="weekly-focus-title">
+              <PanelHeading id="weekly-focus-title" title="后续跟踪重点" variant="report" />
               <ol>
                 <li><strong>规模与杠杆：</strong>跟踪业务本金、持仓规模和回购资金变化，确认杠杆是否处于业务允许区间。</li>
                 <li><strong>利率风险：</strong>同步观察修正久期、全池 DV01、收益率曲线和资金利率变化。</li>
@@ -470,6 +496,6 @@
       </main>
     {/if}
 
-    <footer class="secondary-weekly-footer">资金管理部 · 二级债券池内部报告</footer>
+    <footer class="secondary-weekly-footer">资金管理部 · 二级债券池内部报告 | 数据基于输入台账，发送前请复核审计摘要</footer>
   </article>
 </div>

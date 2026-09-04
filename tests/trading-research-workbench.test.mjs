@@ -110,7 +110,8 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
       ),
     ]);
 
-  assert.match(page, /previousBusinessWeekRange\(currentReportDate\(\)\)/);
+  assert.match(page, /LAST_COMPLETE_WEEK = previousBusinessWeekRange\(currentReportDate\(\)\)/);
+  assert.match(page, /startDate: `\$\{LAST_COMPLETE_WEEK\.endDate\.slice\(0, 4\)\}-01-01`/);
   assert.match(page, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
   assert.match(page, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
   assert.match(page, /ChartHost from "\.\.\/\.\.\/components\/ChartHost\.svelte"/);
@@ -124,7 +125,10 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
   assert.match(workbench, /<SecondaryBondPoolWeeklyPage embedded \/>/);
   assert.match(routeLoader, /workbenchRoutes/);
   assert.match(styles, /grid-template-columns:\s*minmax\(0, 1\.15fr\) minmax\(0, 0\.85fr\)/);
-  assert.match(styles, /grid-template-columns:\s*repeat\(auto-fit, minmax\(min\(220px, 100%\), 1fr\)\)/);
+  assert.match(styles, /width:\s*min\(100%, 1140px\)/);
+  assert.match(styles, /grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(page, /variant="report"/);
+  assert.match(page, /本周营收/);
 });
 
 test("演示交易汇总严格由迁入的十笔交易派生", () => {

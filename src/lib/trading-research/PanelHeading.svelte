@@ -7,6 +7,7 @@
     wrap = false,
     controlsInline = false,
     accent = "",
+    variant = "default",
     children,
   }: {
     id: string;
@@ -14,6 +15,7 @@
     wrap?: boolean;
     controlsInline?: boolean;
     accent?: string;
+    variant?: "default" | "report";
     children?: Snippet;
   } = $props();
 </script>
@@ -21,6 +23,7 @@
 <div
   class:tr-panel-heading--wrap={wrap}
   class:tr-panel-heading--controls-inline={controlsInline}
+  class:tr-panel-heading--report={variant === "report"}
   class="tr-panel-heading"
   style={accent ? `--panel-heading-accent: ${accent}` : ""}
 >
@@ -85,6 +88,30 @@
 
   .tr-panel-heading--controls-inline .tr-panel-heading__controls {
     justify-content: flex-end;
+  }
+
+  .tr-panel-heading--report {
+    min-height: 34px;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    border-left: 4px solid var(--panel-heading-accent);
+    border-radius: 0 4px 4px 0;
+    background: #f1f5f9;
+  }
+
+  .tr-panel-heading--report .tr-panel-heading__mark {
+    display: none;
+  }
+
+  .tr-panel-heading--report h2 {
+    color: #0f3d6c;
+    font-size: 0.9375rem;
+    font-weight: bolder;
+  }
+
+  .tr-panel-heading--report .tr-panel-heading__controls {
+    color: #64748b;
+    font-size: 0.75rem;
   }
 
   @media (max-width: 720px) {

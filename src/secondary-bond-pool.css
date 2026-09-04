@@ -1,31 +1,24 @@
 .secondary-weekly-shell {
   min-height: 100vh;
   min-height: 100dvh;
-  padding: clamp(14px, 1.8vw, 28px);
-  color: var(--text-1);
-  background: var(--bg-page);
+  color: #0f172a;
+  background: #ffffff;
 }
 
 .secondary-weekly-shell--embedded {
   min-height: 0;
-  padding: 0;
 }
 
 .secondary-weekly-report {
-  width: min(100%, 2100px);
+  width: min(100%, 1140px);
   min-width: 0;
   margin: 0 auto;
-  padding: clamp(14px, 1.8vw, 28px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--bg-card);
-  box-shadow: var(--shadow-card);
+  padding: 32px 36px;
+  background: #ffffff;
 }
 
 .secondary-weekly-shell--embedded .secondary-weekly-report {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+  padding-top: 18px;
 }
 
 .secondary-weekly-masthead {
@@ -34,37 +27,31 @@
   align-items: center;
   justify-content: space-between;
   gap: 22px;
-  padding: 18px 22px;
-  border-radius: var(--radius-control);
+  margin-bottom: 20px;
+  padding: 18px 24px;
+  border-radius: 6px;
   color: #ffffff;
   background: #0f3d6c;
 }
 
-.secondary-weekly-portal {
-  display: inline-block;
-  margin-bottom: 5px;
-  color: #bfdbfe;
-  font-size: 0.875rem;
-  font-weight: normal;
+.secondary-weekly-title-link {
+  color: inherit;
   text-decoration: none;
 }
 
-.secondary-weekly-portal:hover {
-  color: #ffffff;
-}
-
 .secondary-weekly-masthead h1 {
-  margin: 0;
+  margin: 0 0 3px;
   color: #ffffff;
   font-size: 1.5rem;
   font-weight: bolder;
-  line-height: 1.3;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
 }
 
 .secondary-weekly-masthead p {
-  margin: 5px 0 0;
+  margin: 0;
   color: #bfdbfe;
-  font-size: 1rem;
+  font-size: 0.875rem;
 }
 
 .weekly-report-actions,
@@ -83,10 +70,11 @@
   gap: 7px;
   padding: 0 12px;
   border: 1px solid #bfdbfe;
-  border-radius: var(--radius-control);
+  border-radius: 6px;
   color: #0f3d6c;
   background: #ffffff;
   font: inherit;
+  font-size: 0.875rem;
   font-weight: bold;
   cursor: pointer;
 }
@@ -101,16 +89,12 @@
 }
 
 .secondary-weekly-export svg {
-  width: 19px;
+  width: 18px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
-}
-
-.secondary-weekly-shell--embedded .secondary-weekly-portal {
-  display: none;
 }
 
 .secondary-weekly-shell--embedded .secondary-weekly-masthead {
@@ -120,38 +104,51 @@
 .secondary-weekly-main {
   display: grid;
   gap: 22px;
-  padding-top: 22px;
 }
 
 .secondary-weekly-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
 .secondary-weekly-columns {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  gap: 22px;
+  gap: 24px;
 }
 
 .secondary-weekly-column {
   display: grid;
   min-width: 0;
   align-content: start;
-  gap: 18px;
+  gap: 16px;
 }
 
 .secondary-weekly-column--primary {
-  padding-right: 22px;
-  border-right: 1px solid var(--border);
+  padding-right: 24px;
+  border-right: 1px solid #e2e8f0;
 }
 
 .secondary-weekly-panel-meta {
-  color: var(--text-3);
-  font-size: 0.875rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: normal;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.secondary-weekly-chart-frame {
+  min-width: 0;
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.secondary-weekly-chart-frame--allocation {
+  padding: 4px;
 }
 
 .secondary-weekly-chart {
@@ -160,26 +157,27 @@
 }
 
 .secondary-weekly-chart--trend {
-  height: clamp(430px, 42vw, 610px);
+  height: 372px;
 }
 
 .secondary-weekly-allocation-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .secondary-weekly-chart--allocation {
-  height: 360px;
+  height: 205px;
 }
 
 .secondary-weekly-analysis {
   display: grid;
-  gap: 4px;
-  margin-top: 12px;
-  color: var(--text-2);
-  font-size: 1rem;
+  gap: 2px;
+  margin: 0 0 2px;
+  color: #334155;
+  font-size: 0.8125rem;
   line-height: 1.65;
+  text-align: justify;
 }
 
 .secondary-weekly-analysis p {
@@ -193,25 +191,29 @@
 }
 
 .secondary-weekly-table-wrap {
+  margin: 0 0 2px;
   overflow-x: auto;
 }
 
 .secondary-weekly-table {
   width: 100%;
-  min-width: 620px;
+  min-width: 520px;
+  margin: 0;
   border-collapse: collapse;
-  font-size: 1rem;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 
 .secondary-weekly-table :is(th, td) {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
+  padding: 7px 8px;
+  border-bottom: 1px solid #f1f5f9;
   text-align: right;
   white-space: nowrap;
 }
 
 .secondary-weekly-table thead th {
+  border-top: 1px solid #cbd5e1;
+  border-bottom-color: #cbd5e1;
   color: #0f3d6c;
   background: #f1f5f9;
   font-weight: bold;
@@ -222,18 +224,21 @@
 }
 
 .secondary-weekly-table tbody th {
-  color: var(--text-1);
+  color: #0f172a;
   font-weight: normal;
 }
 
 .secondary-weekly-focus ol {
   display: grid;
-  gap: 7px;
+  gap: 0;
   margin: 0;
-  padding-left: 1.5rem;
-  color: var(--text-2);
-  font-size: 1rem;
-  line-height: 1.6;
+  padding: 10px 14px 10px 36px;
+  border-left: 4px solid #0f3d6c;
+  border-radius: 0 4px 4px 0;
+  color: #334155;
+  background: #f8fafc;
+  font-size: 0.8125rem;
+  line-height: 1.65;
 }
 
 .secondary-weekly-state {
@@ -259,10 +264,10 @@
 
 .secondary-weekly-footer {
   margin-top: 24px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  color: var(--text-3);
-  font-size: 0.875rem;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 0.75rem;
   text-align: center;
 }
 
@@ -276,28 +281,31 @@
 }
 
 @media (max-width: 1180px) {
+  .secondary-weekly-report {
+    padding-inline: 28px;
+  }
+}
+
+@media (max-width: 980px) {
+  .secondary-weekly-metrics {
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  }
+
   .secondary-weekly-columns {
     grid-template-columns: 1fr;
   }
 
   .secondary-weekly-column--primary {
     padding-right: 0;
-    padding-bottom: 18px;
+    padding-bottom: 16px;
     border-right: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #e2e8f0;
   }
 }
 
-@media (max-width: 820px) {
-  .secondary-weekly-shell {
-    padding: 0;
-  }
-
+@media (max-width: 720px) {
   .secondary-weekly-report {
     padding: 12px;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
   }
 
   .secondary-weekly-masthead {
@@ -323,21 +331,18 @@
   }
 
   .secondary-weekly-chart--trend {
-    height: 500px;
+    height: 430px;
+  }
+
+  .secondary-weekly-chart--allocation {
+    height: 270px;
   }
 }
 
 @media print {
-  .secondary-weekly-shell {
-    padding: 0;
-    background: #ffffff;
-  }
-
   .secondary-weekly-report {
-    max-width: none;
+    width: 100%;
     padding: 0;
-    border: 0;
-    box-shadow: none;
   }
 
   .weekly-report-actions {

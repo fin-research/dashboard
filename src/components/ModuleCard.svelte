@@ -5,16 +5,19 @@
     labelledBy,
     class: className = "",
     style = "",
+    variant = "default",
     children,
   }: {
     labelledBy?: string;
     class?: string;
     style?: string;
+    variant?: "default" | "report";
     children: Snippet;
   } = $props();
 </script>
 
 <section
+  class:module-card--report={variant === "report"}
   class={`module-card tr-panel ${className}`.trim()}
   aria-labelledby={labelledBy}
   {style}
@@ -36,9 +39,21 @@
     );
   }
 
+  .module-card--report {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
   @media (max-width: 720px) {
     .module-card {
       padding: 15px;
+    }
+
+    .module-card--report {
+      padding: 0;
     }
   }
 </style>

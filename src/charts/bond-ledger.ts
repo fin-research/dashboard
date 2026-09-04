@@ -41,6 +41,27 @@ const ledgerLegend = {
   itemHeight: 10,
 };
 
+const weeklyAxisLabel = {
+  ...ledgerAxisLabel,
+  fontSize: 11,
+};
+
+const weeklyLegend = {
+  textStyle: weeklyAxisLabel,
+  itemWidth: 14,
+  itemHeight: 8,
+};
+
+function monthlyAxisLabel(
+  dates: string[],
+  index: number,
+  value: string,
+): string {
+  return index === 0 || value.slice(0, 7) !== dates[index - 1]?.slice(0, 7)
+    ? value.slice(0, 7)
+    : "";
+}
+
 export function renderWeeklyPoolScaleLeverage(
   host: HTMLElement,
   points: LedgerPerformanceRow[],
@@ -50,6 +71,9 @@ export function renderWeeklyPoolScaleLeverage(
     return;
   }
   const dates = points.map((point) => point.date);
+  const firstDate = dates[0] ?? "";
+  const lastDate = dates.at(-1) ?? "";
+  const latest = points.at(-1);
   setChart(host, {
     animationDuration: 240,
     aria: {
@@ -58,10 +82,21 @@ export function renderWeeklyPoolScaleLeverage(
         "所选区间业务本金、时间加权本金、全池持仓市值与综合杠杆率走势",
     },
     color: [...FIN_OPS_CHART_PALETTE],
-    legend: { ...ledgerLegend, top: 0, left: 8 },
+    title: {
+      text: `图1：二级资金池规模演变与杠杆率走势（${firstDate}—${lastDate}）`,
+      top: 0,
+      left: "center",
+      textStyle: {
+        color: "#0f3d6c",
+        fontFamily,
+        fontSize: 12,
+        fontWeight: "bold",
+      },
+    },
+    legend: { ...weeklyLegend, top: 24, left: 8 },
     grid: [
-      { left: 14, right: 18, top: 44, height: "48%", containLabel: true },
-      { left: 14, right: 18, top: "70%", bottom: 4, containLabel: true },
+      { left: 10, right: 12, top: 52, height: "45%", containLabel: true },
+      { left: 10, right: 12, top: "72%", bottom: 2, containLabel: true },
     ],
     tooltip: {
       ...tooltip,
@@ -97,9 +132,11 @@ export function renderWeeklyPoolScaleLeverage(
         axisLine: { lineStyle: { color: colors.line } },
         axisTick: { show: false },
         axisLabel: {
-          ...ledgerAxisLabel,
-          hideOverlap: true,
-          formatter: (value: string) => value.slice(5).replace("-", "/"),
+          ...weeklyAxisLabel,
+          interval: (index: number, value: string) =>
+            monthlyAxisLabel(dates, index, value) !== "",
+          formatter: (value: string, index: number) =>
+            monthlyAxisLabel(dates, index, value),
         },
       },
     ],
@@ -111,19 +148,30 @@ export function renderWeeklyPoolScaleLeverage(
         scale: true,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: ledgerAxisLabel,
-        nameTextStyle: ledgerAxisLabel,
+        axisLabel: weeklyAxisLabel,
+        nameTextStyle: weeklyAxisLabel,
         splitLine: { lineStyle: gridLine },
       },
       {
         type: "value",
-        gridIndex: 1,
-        name: "杠杆率",
+        gridIndex: 0,
+        name: "时间加权本金（亿元）",
         scale: true,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { ...ledgerAxisLabel, formatter: "{value}%" },
-        nameTextStyle: ledgerAxisLabel,
+        axisLabel: weeklyAxisLabel,
+        nameTextStyle: weeklyAxisLabel,
+        splitLine: { show: false },
+      },
+      {
+        type: "value",
+        gridIndex: 1,
+        name: "杠杆率（%）",
+        scale: true,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { ...weeklyAxisLabel, formatter: "{value}%" },
+        nameTextStyle: weeklyAxisLabel,
         splitLine: { lineStyle: gridLine },
       },
     ],
@@ -154,7 +202,7 @@ export function renderWeeklyPoolScaleLeverage(
         name: "时间加权本金",
         type: "line",
         xAxisIndex: 0,
-        yAxisIndex: 0,
+        yAxisIndex: 1,
         showSymbol: false,
         data: points.map((point) => point.timeWeightedPrincipal / 100_000_000),
         lineStyle: { width: 2, type: "dashed", color: colors.muted },
@@ -164,12 +212,33 @@ export function renderWeeklyPoolScaleLeverage(
         name: "综合杠杆率",
         type: "line",
         xAxisIndex: 1,
-        yAxisIndex: 1,
-        showSymbol: true,
-        symbolSize: 6,
+        yAxisIndex: 2,
+        showSymbol: false,
         data: points.map((point) => point.leverage * 100),
         lineStyle: { width: 2.2, color: "#0f3d6c" },
         itemStyle: { color: "#0f3d6c" },
+        markPoint: latest
+          ? {
+              symbol: "circle",
+              symbolSize: 7,
+              itemStyle: { color: "#dc2626" },
+              label: {
+                show: true,
+                position: "left",
+                formatter: `最新 ${(latest.leverage * 100).toFixed(2)}%`,
+                color: "#0f3d6c",
+                fontFamily,
+                fontSize: 10,
+                fontWeight: "bold",
+                backgroundColor: "#ffffff",
+                borderColor: "#cbd5e1",
+                borderWidth: 1,
+                borderRadius: 3,
+                padding: [2, 4],
+              },
+              data: [{ coord: [lastDate, latest.leverage * 100] }],
+            }
+          : undefined,
         markLine: {
           silent: true,
           symbol: "none",
@@ -191,6 +260,8 @@ export function renderWeeklyYieldProfitTrend(
     return;
   }
   const dates = points.map((point) => point.date);
+  const firstDate = dates[0] ?? "";
+  const lastDate = dates.at(-1) ?? "";
   setChart(host, {
     animationDuration: 240,
     aria: {
@@ -199,10 +270,21 @@ export function renderWeeklyYieldProfitTrend(
         "所选区间全池含免税及不含免税年化收益率、平层静态、累计毛利与免税增厚走势",
     },
     color: [...FIN_OPS_CHART_PALETTE],
-    legend: { ...ledgerLegend, top: 0, left: 8 },
+    title: {
+      text: `图2：二级资金池收益率与累计创收走势（${firstDate}—${lastDate}）`,
+      top: 0,
+      left: "center",
+      textStyle: {
+        color: "#0f3d6c",
+        fontFamily,
+        fontSize: 12,
+        fontWeight: "bold",
+      },
+    },
+    legend: { ...weeklyLegend, top: 24, left: 8 },
     grid: [
-      { left: 14, right: 18, top: 44, height: "48%", containLabel: true },
-      { left: 14, right: 18, top: "70%", bottom: 4, containLabel: true },
+      { left: 10, right: 12, top: 62, height: "42%", containLabel: true },
+      { left: 10, right: 12, top: "72%", bottom: 2, containLabel: true },
     ],
     tooltip: {
       ...tooltip,
@@ -241,9 +323,11 @@ export function renderWeeklyYieldProfitTrend(
         axisLine: { lineStyle: { color: colors.line } },
         axisTick: { show: false },
         axisLabel: {
-          ...ledgerAxisLabel,
-          hideOverlap: true,
-          formatter: (value: string) => value.slice(5).replace("-", "/"),
+          ...weeklyAxisLabel,
+          interval: (index: number, value: string) =>
+            monthlyAxisLabel(dates, index, value) !== "",
+          formatter: (value: string, index: number) =>
+            monthlyAxisLabel(dates, index, value),
         },
       },
     ],
@@ -255,8 +339,8 @@ export function renderWeeklyYieldProfitTrend(
         scale: true,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { ...ledgerAxisLabel, formatter: "{value}%" },
-        nameTextStyle: ledgerAxisLabel,
+        axisLabel: { ...weeklyAxisLabel, formatter: "{value}%" },
+        nameTextStyle: weeklyAxisLabel,
         splitLine: { lineStyle: gridLine },
       },
       {
@@ -265,8 +349,8 @@ export function renderWeeklyYieldProfitTrend(
         name: "累计创收（万元）",
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: ledgerAxisLabel,
-        nameTextStyle: ledgerAxisLabel,
+        axisLabel: weeklyAxisLabel,
+        nameTextStyle: weeklyAxisLabel,
         splitLine: { lineStyle: gridLine },
       },
     ],
@@ -350,7 +434,18 @@ export function renderWeeklyTradingAllocation(
   setChart(host, {
     animationDuration: 220,
     aria: { enabled: true, description: "按交易户市值统计的资产类别结构" },
-    grid: { left: 8, right: 16, top: 12, bottom: 4, containLabel: true },
+    title: {
+      text: `图3A：交易户资产类别结构（${(valid.reduce((sum, stat) => sum + stat.marketValue, 0) / 100_000_000).toFixed(2)}亿元）`,
+      top: 0,
+      left: "center",
+      textStyle: {
+        color: "#0f3d6c",
+        fontFamily,
+        fontSize: 10,
+        fontWeight: "bold",
+      },
+    },
+    grid: { left: 4, right: 12, top: 30, bottom: 2, containLabel: true },
     tooltip: {
       ...tooltip,
       trigger: "axis",
@@ -370,7 +465,7 @@ export function renderWeeklyTradingAllocation(
       type: "value",
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { ...ledgerAxisLabel, formatter: "{value}亿" },
+      axisLabel: { ...weeklyAxisLabel, fontSize: 9, formatter: "{value}亿" },
       splitLine: { lineStyle: gridLine },
     },
     yAxis: {
@@ -379,7 +474,7 @@ export function renderWeeklyTradingAllocation(
       data: valid.map((stat) => stat.category),
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: ledgerAxisLabel,
+      axisLabel: { ...weeklyAxisLabel, fontSize: 9 },
     },
     series: [
       {
@@ -398,7 +493,7 @@ export function renderWeeklyTradingAllocation(
           position: "right",
           color: colors.ink,
           fontFamily,
-          fontSize: chartTextSize,
+          fontSize: 9,
           fontWeight: "bold",
           formatter: ({ dataIndex }: { dataIndex: number }) =>
             `${((valid[dataIndex]?.share ?? 0) * 100).toFixed(1)}%`,
@@ -419,7 +514,18 @@ export function renderWeeklyTradingMaturity(
   setChart(host, {
     animationDuration: 220,
     aria: { enabled: true, description: "按交易户市值统计的八档剩余期限分布" },
-    grid: { left: 8, right: 8, top: 12, bottom: 4, containLabel: true },
+    title: {
+      text: "图3B：交易户期限分布",
+      top: 0,
+      left: "center",
+      textStyle: {
+        color: "#0f3d6c",
+        fontFamily,
+        fontSize: 10,
+        fontWeight: "bold",
+      },
+    },
+    grid: { left: 4, right: 4, top: 30, bottom: 2, containLabel: true },
     tooltip: {
       ...tooltip,
       trigger: "axis",
@@ -440,13 +546,13 @@ export function renderWeeklyTradingMaturity(
       data: stats.map((stat) => stat.bucket),
       axisLine: { lineStyle: { color: colors.line } },
       axisTick: { show: false },
-      axisLabel: { ...ledgerAxisLabel, interval: 0, rotate: 28 },
+      axisLabel: { ...weeklyAxisLabel, fontSize: 9, interval: 0, rotate: 28 },
     },
     yAxis: {
       type: "value",
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { ...ledgerAxisLabel, formatter: "{value}亿" },
+      axisLabel: { ...weeklyAxisLabel, fontSize: 9, formatter: "{value}亿" },
       splitLine: { lineStyle: gridLine },
     },
     series: [
@@ -461,7 +567,7 @@ export function renderWeeklyTradingMaturity(
           position: "top",
           color: colors.ink,
           fontFamily,
-          fontSize: chartTextSize,
+          fontSize: 9,
           fontWeight: "bold",
           formatter: ({ dataIndex, value }: { dataIndex: number; value: number }) =>
             value > 0

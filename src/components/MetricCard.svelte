@@ -27,6 +27,7 @@
     iconProps = {},
     iconPosition = "start",
     compact = false,
+    variant = "default",
   }: {
     label: string;
     value: string;
@@ -40,11 +41,13 @@
     iconProps?: Record<string, unknown>;
     iconPosition?: "start" | "end";
     compact?: boolean;
+    variant?: "default" | "report";
   } = $props();
 </script>
 
 <article
   class:research-metric-card--compact={compact}
+  class:research-metric-card--report={variant === "report"}
   class:research-metric-card--icon-end={Boolean(IconComponent) && iconPosition === "end"}
   class={`research-metric-card research-metric-card--${tone}`}
 >
@@ -111,6 +114,45 @@
 
   .research-metric-card--compact .research-metric-card__balance {
     display: none;
+  }
+
+  .research-metric-card--report {
+    --metric-report-background: #f8fafc;
+    min-height: 78px;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 10px 12px;
+    border-color: #cbd5e1;
+    border-top: 4px solid var(--metric-accent);
+    border-radius: 5px;
+    background: var(--metric-report-background);
+    box-shadow: none;
+  }
+
+  .research-metric-card--report.research-metric-card--cyan {
+    --metric-accent: #0284c7;
+    --metric-report-background: #eff6ff;
+  }
+
+  .research-metric-card--report .research-metric-card__content {
+    justify-content: flex-start;
+  }
+
+  .research-metric-card--report .research-metric-card__label {
+    font-size: 0.6875rem;
+  }
+
+  .research-metric-card--report .research-metric-card__value strong {
+    color: #0f3d6c;
+    font-size: 1.125rem;
+    line-height: 1.45;
+  }
+
+  .research-metric-card--report .research-metric-card__detail {
+    color: #64748b;
+    font-size: 0.65625rem;
+    line-height: 1.35;
   }
 
   .research-metric-card--blue,
