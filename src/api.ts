@@ -112,13 +112,25 @@ export async function fetchReport(
   signal?: AbortSignal,
   currentDate = currentReportDate(),
 ): Promise<MarketReportSnapshot> {
+  let historicalFallback = false;
   if (reportDate < currentDate) {
     const query = new URLSearchParams({ date: reportDate });
-    return getJson(
-      `/api/market-report?${query}`,
-      marketReportSnapshotSchema,
-      signal,
-    );
+    try {
+      return await getJson(
+        `/api/market-report?${query}`,
+        marketReportSnapshotSchema,
+        signal,
+      );
+    } catch (error) {
+      if (
+        !(error instanceof DataApiRequestError)
+        || error.status !== 404
+        || error.code !== "REPORT_NOT_FINALIZED"
+      ) {
+        throw error;
+      }
+      historicalFallback = true;
+    }
   }
 
   const omoQuery = new URLSearchParams({
@@ -171,16 +183,20 @@ export async function fetchReport(
       ),
     };
   });
-  const todayTradesPromise = getJson(
-    "/data/today-trades?limit=300&fields=bondUniCode,remainingTenor,cbYte,tradeYield,tradeYieldSubCb",
-    todayTradesSchema,
-    signal,
-  );
-  const favoriteQuotesPromise = getJson(
-    "/data/favorite-quotes?limit=100&fields=bondUniCode,bondShortName,remainingTenor,remainingTenorDay,cbYield,bidYield,bidEntryPrice,ofrYield,ofrEntryPrice,tradeEntryPrice,tradeYieldSubCb",
-    favoriteQuotesSchema,
-    signal,
-  );
+  const todayTradesPromise = historicalFallback
+    ? Promise.resolve([])
+    : getJson(
+        "/data/today-trades?limit=300&fields=bondUniCode,remainingTenor,cbYte,tradeYield,tradeYieldSubCb",
+        todayTradesSchema,
+        signal,
+      );
+  const favoriteQuotesPromise = historicalFallback
+    ? Promise.resolve([])
+    : getJson(
+        "/data/favorite-quotes?limit=100&fields=bondUniCode,bondShortName,remainingTenor,remainingTenorDay,cbYield,bidYield,bidEntryPrice,ofrYield,ofrEntryPrice,tradeEntryPrice,tradeYieldSubCb",
+        favoriteQuotesSchema,
+        signal,
+      );
   const bondInfosPromise = Promise.all([
     todayTradesPromise,
     favoriteQuotesPromise,
@@ -224,11 +240,13 @@ export async function fetchReport(
       governmentBondsSchema,
       signal,
     ),
-    getJson(
-      "/data/futures-latest?fields=contractCode,lastPrice,upDownValuePct",
-      futuresQuotesSchema,
-      signal,
-    ),
+    historicalFallback
+      ? Promise.resolve([])
+      : getJson(
+          "/data/futures-latest?fields=contractCode,lastPrice,upDownValuePct",
+          futuresQuotesSchema,
+          signal,
+        ),
     stockPromise,
     getJson(
       `/data/margin?date=${reportDate}&fields=DIM_DATE,TOTAL_RZRQYE,TOTAL_RZYE,TOTAL_RQYE`,

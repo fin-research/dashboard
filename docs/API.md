@@ -32,16 +32,16 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 
 研究辅助浏览器只调用 Dashboard `GET /api/economic-indicators` 读取 Neon。Choice `GET /data/choice/edb` 与 DM `GET /data/cfets-histories` 只供首次本地全历史回填和每日定时增量任务使用，页面加载不消耗上游查询额度。
 
-浏览器在当天直接读取 Data REST 市场数据；历史日期通过 Dashboard REST 读取完整人工定稿。今日聚焦、研究辅助、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
+浏览器在当天直接读取 Data REST 市场数据；历史日期先通过 Dashboard REST 读取完整人工定稿，无定稿时再按所选日期读取可回溯的 Data REST 市场数据并在页面 warning；不支持日期参数的期货最新、今日成交和收藏报价不会进入历史重生成结果。今日聚焦、研究辅助、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不建立第二套 GraphQL 服务。
 
 ## Dashboard Worker `/api/*`
 
 ### 市场点评
 
-- `GET /api/market-report?date=YYYY-MM-DD`：读取并校验该日期完整 R2 定稿；历史日期页面只调用这一接口，不再重新请求当日原始市场资源。无定稿返回 404 `REPORT_NOT_FINALIZED`。
-- `PUT /api/market-report?date=YYYY-MM-DD`：仅在用户手动保存时，同源接收浏览器已加工并经 Schema 裁剪的规范报告与今日聚焦，覆盖当天对象；原始上游响应不得写入 R2，序列化快照上限为 512 KiB。
+- `GET /api/market-report?date=YYYY-MM-DD`：读取并校验该日期完整 R2 定稿。无定稿返回 404 `REPORT_NOT_FINALIZED`，浏览器据此回退到 Data REST 原始资源重新生成。
+- `PUT /api/market-report?date=YYYY-MM-DD`：仅在用户手动保存时，同源接收浏览器已加工并经 Schema 裁剪的规范报告与今日聚焦，覆盖当天对象；完整文字版不得写入 R2，原始上游响应不得写入 R2，序列化快照上限为 512 KiB。
 
-当天普通加载不调用 GET，也不读取 R2；只有选择早于上海当天的历史日期才读取完整定稿。
+当天普通加载不调用 GET，也不读取 R2；选择早于上海当天的历史日期时优先读取完整定稿，仅 `REPORT_NOT_FINALIZED` 触发原始资源回退。
 保存成功后的定稿时间由 PUT 响应更新当前页面状态。
 
 ### 市场热点

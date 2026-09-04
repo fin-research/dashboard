@@ -60,22 +60,53 @@ export function buildTextReportLines(
   data: ReportData,
   focusText = "",
 ): TextReportLine[] {
-  const tradedInventoryLines = new Set(
+  return buildTextReportLinesFromText(data, buildTextReport(data, focusText));
+}
+
+export function buildTextReportLinesFromText(
+  data: ReportData,
+  textReport: string,
+): TextReportLine[] {
+  const tradedInventoryNames = new Set(
     data.inventory_bonds
       .filter((row) => row.trade_yield !== null)
-      .map(emBondLine),
+      .map((row) => row.bond_name)
+      .filter(Boolean),
   );
   let inInventorySection = false;
-  return buildTextReport(data, focusText)
+  return normalizeTextReport(textReport)
     .split("\n")
     .map((text) => {
       if (text.startsWith("东财存量债券:")) inInventorySection = true;
       else if (text.startsWith("【")) inInventorySection = false;
       return {
         text,
-        bold: inInventorySection && tradedInventoryLines.has(text),
+        bold:
+          inInventorySection
+          && [...tradedInventoryNames].some((bondName) =>
+            text.includes(bondName)
+          ),
       };
     });
+}
+
+export function buildTextReportHtml(lines: TextReportLine[]): string {
+  return lines
+    .map((line) => {
+      if (!line.text) return "<div><br></div>";
+      const text = escapeHtml(line.text);
+      return `<div>${line.bold ? `<strong>${text}</strong>` : text}</div>`;
+    })
+    .join("");
+}
+
+export function normalizeTextReport(value: string): string {
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function briefOmo(rows: OmoOperation[], reportDate: string): string {
@@ -118,7 +149,7 @@ function capitalBrief(rows: FundingRate[]): string {
   return `今日银行间隔夜和7天期利率${summary}。\n截至17:00，${fundText(funds[0]!)}；${fundText(funds[1]!)}。\n同业拆借${fundText(funds[2]!)}；${fundText(funds[3]!)}。`;
 }
 
-function fundText(row: FundingRate): string {
+export function fundText(row: FundingRate): string {
   return `${row.code}报${formatNumber(row.rate, 4)}%，${formatChange(row.change_bp, "涨", "跌", "与前日持平", "bp")}`;
 }
 
@@ -139,7 +170,7 @@ function bondBrief(rows: GovernmentBond[]): string {
   return parts.join("\n");
 }
 
-function bondText(label: string, row: GovernmentBond): string {
+export function bondText(label: string, row: GovernmentBond): string {
   return `${label}${row.code || "--"}收益率${formatChange(row.change_bp, "上行", "下行", "持平", "bp")}报${formatNumber(row.yield_rate, 4)}%`;
 }
 
@@ -177,15 +208,25 @@ function futuresBrief(rows: ReportData["futures"]): string {
   if (!selected.length) return "国债期货成交数据暂缺。";
   const values = selected.map(({ row }) => row.change_pct ?? 0);
   const summary = directionSummary(values, "上涨", "下跌");
-  const lines = selected.map(({ row, label, includePrice }) => `${label}${formatChange(row.change_pct, "涨", "跌", "持平", "%")}${includePrice ? `报${formatNumber(row.last_price, 4)}` : ""}`);
+  const lines = selected.map(({ row, label, includePrice }) =>
+    futureContractText(row, label, includePrice)
+  );
   return `国债期货${summary}，${lines.join("，")}。`;
+}
+
+export function futureContractText(
+  row: ReportData["futures"][number],
+  label: string,
+  includePrice: boolean,
+): string {
+  return `${label}${formatChange(row.change_pct, "涨", "跌", "持平", "%")}${includePrice ? `报${formatNumber(row.last_price, 4)}` : ""}`;
 }
 
 function stockMarket(paragraphs: string[]): string {
   return paragraphs.length ? paragraphs.slice(0, 2).join("").trim() : "未找到今日收盘行情";
 }
 
-function marginTrading(snapshot: MarginSnapshot): string {
+export function marginTrading(snapshot: MarginSnapshot): string {
   if (!snapshot.data_date || snapshot.total === null) return "融资融券数据暂缺。";
   const change = (value: number | null) => value === null ? "数据暂缺" : `${value >= 0 ? "增加" : "减少"}${fixed(Math.abs(value), 2)}亿元`;
   const date = new Date(`${snapshot.data_date}T00:00:00`);
@@ -218,9 +259,9 @@ function secondaryMarket(rows: SecondaryBond[]): string {
     const nearest = remaining.reduce((best, row) => Math.abs(row.tenor_years - target) < Math.abs(best.tenor_years - target) ? row : best);
     selected.push(nearest.bond_id);
   }
-  const lines = selected.map((code) => candidates.find((item) => item.bond_id === code)!).map((item) => {
-    return `${item.tenor_label.replaceAll("D", "天").replaceAll("Y", "年")}-${item.issuer}(${item.bond_name})-估值${compact(item.valuation!)}%-成交${compact(item.trade_yield)}%`;
-  });
+  const lines = selected
+    .map((code) => candidates.find((item) => item.bond_id === code)!)
+    .map(secondaryBondLine);
   if (lines.length === 1) lines.push("今日暂无。");
   return lines.join("\n");
 }
@@ -232,7 +273,11 @@ function emBonds(rows: InventoryPoint[]): string {
   return lines.join("\n");
 }
 
-function emBondLine(item: InventoryPoint): string {
+export function secondaryBondLine(item: SecondaryBond): string {
+  return `${item.tenor_label.replaceAll("D", "天").replaceAll("Y", "年")}-${item.issuer}(${item.bond_name})-估值${compact(item.valuation!)}%-成交${compact(item.trade_yield)}%`;
+}
+
+export function emBondLine(item: InventoryPoint): string {
   let line = `${item.tenor_label.replaceAll("D", "天").replaceAll("Y", "年")}-${item.bond_name || "--"}-估值${compact(item.valuation)}%`;
   const trade = emTradeText(item);
   if (trade) line += `-${trade}`;
@@ -316,3 +361,12 @@ function divideHalfEven(numerator: bigint, denominator: bigint): bigint {
   return quotient;
 }
 function sign(value: number): number { return value > 0 ? 1 : value < 0 ? -1 : 0; }
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}

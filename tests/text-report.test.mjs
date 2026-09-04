@@ -3,8 +3,11 @@ import test from "node:test";
 
 import {
   buildTextReport,
+  buildTextReportHtml,
   buildTextReportLines,
+  buildTextReportLinesFromText,
 } from "../src/text-report.ts";
+import { applyTextReportEdits } from "../src/text-report-editor.ts";
 
 const data = {
   report_date: "2026-08-13",
@@ -113,4 +116,92 @@ test("报告日未开展逆回购时显示完整文案", () => {
 
 test("文字版展示当前手动修改后的今日聚焦", () => {
   assert.ok(buildTextReport(data, "手动修改后的判断").endsWith("【今日聚焦】\n手动修改后的判断\n"));
+});
+
+test("文字版富文本使用块级换行并保留成交行加粗", () => {
+  const text = buildTextReport(data, "手动修改后的判断");
+  const html = buildTextReportHtml(buildTextReportLinesFromText(data, text));
+  assert.match(html, /^<div>20260813 境内市场点评<\/div><div><br><\/div>/);
+  assert.match(
+    html,
+    /<div><strong>180天-25东财G1-估值1\.55%-成交1\.56%\(\+1\.25bp\)<\/strong><\/div>/,
+  );
+  assert.ok(!html.includes("\n"));
+});
+
+test("文字版编辑回写结构化数据并联动图表版", () => {
+  const edited = buildTextReport(data, "原始判断")
+    .replace("DR001报1.4000%，跌2.00bp", "DR001报1.4500%，涨3.00bp")
+    .replace(
+      "A股主要指数集体收涨。全市场成交保持活跃。",
+      "A股主要指数震荡收涨。",
+    )
+    .replace("08/13-丙证券-3年-30亿-1.70%", "08/13-丙证券-3年-35亿-1.75%")
+    .replace(
+      "180天-25东财G1-估值1.55%-成交1.56%(+1.25bp)",
+      "180天-25东财G1-估值1.57%-成交1.58%(+1.00bp)",
+    )
+    .replace("【今日聚焦】\n原始判断", "【今日聚焦】\n更新后的判断");
+  const result = applyTextReportEdits(data, "原始判断", edited);
+
+  assert.deepEqual(result.issues, []);
+  assert.equal(result.focusText, "更新后的判断");
+  assert.equal(result.data.funding_rates[0].rate, 1.45);
+  assert.equal(result.data.funding_rates[0].change_bp, 3);
+  assert.deepEqual(result.data.stock_paragraphs, ['A股主要指数震荡收涨。']);
+  assert.equal(result.data.primary_issues[2].amount, 35);
+  assert.deepEqual(result.data.primary_issues[2].coupons, [1.75]);
+  assert.equal(result.data.primary_summary.current_amount, 155);
+  assert.equal(result.data.inventory_bonds[0].valuation, 1.57);
+  assert.equal(result.data.inventory_bonds[0].trade_yield, 1.58);
+  assert.equal(result.data.inventory_bonds[0].trade_spread_bp, 1);
+  assert.match(buildTextReport(result.data, result.focusText), /今日银行间隔夜和7天期利率全面上行/);
+});
+
+test("文字版缺少固定段落时不修改结构化数据", () => {
+  const edited = buildTextReport(data, "原始判断").replace("【利率】", "利率");
+  const result = applyTextReportEdits(data, "原始判断", edited);
+  assert.match(result.issues.join("；"), /缺少【利率】段落/);
+  assert.deepEqual(result.data, data);
+});
+
+test("文字版央行金额与利率修改回写公开市场操作数据", () => {
+  const edited = buildTextReport(data, "原始判断").replace(
+    "7天期逆回购1185亿元，操作利率为1.40%",
+    "7天期逆回购1285亿元，操作利率为1.45%",
+  );
+  const result = applyTextReportEdits(data, "原始判断", edited);
+  const operation = result.data.omo_operations.find(
+    (row) => row.operation_date === data.report_date && row.amount_yi === 1285,
+  );
+
+  assert.deepEqual(result.issues, []);
+  assert.equal(operation?.duration, "7D");
+  assert.equal(operation?.operation_name, "逆回购");
+  assert.equal(operation?.interest_rate, 1.45);
+  assert.match(buildTextReport(result.data, result.focusText), /净投放400亿元/);
+});
+
+test("文字版派生结论不能脱离明细数据单独改写", () => {
+  const edited = buildTextReport(data, "原始判断").replace(
+    "今日银行间隔夜和7天期利率多数上行。",
+    "今日银行间隔夜和7天期利率全面下行。",
+  );
+  const result = applyTextReportEdits(data, "原始判断", edited);
+
+  assert.match(result.issues.join("；"), /【利率】未识别到可回写的数据修改/);
+  assert.deepEqual(result.data, data);
+});
+
+test("同一段的数据修改与不可回写文案修改不会被部分保存", () => {
+  const edited = buildTextReport(data, "原始判断")
+    .replace("DR001报1.4000%，跌2.00bp", "DR001报1.4500%，涨3.00bp")
+    .replace(
+      "今日银行间隔夜和7天期利率多数上行。",
+      "资金面较昨日明显转松。",
+    );
+  const result = applyTextReportEdits(data, "原始判断", edited);
+
+  assert.match(result.issues.join("；"), /【利率】包含无法回写为数据的修改/);
+  assert.deepEqual(result.data, data);
 });

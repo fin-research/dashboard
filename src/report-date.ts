@@ -12,3 +12,11 @@ export function currentReportDate(now = new Date()): string {
   );
   return `${values.year}-${values.month}-${values.day}`;
 }
+
+export function shouldWarnUnfinalizedReport(
+  reportDate: string,
+  finalizedAt: string | null,
+  currentDate = currentReportDate(),
+): boolean {
+  return !finalizedAt && reportDate < currentDate;
+}

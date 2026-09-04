@@ -148,6 +148,7 @@ test("人工定稿才写入裁剪后的 R2 快照", async () => {
 
   const raw = JSON.parse(bucket.objects.get("market-briefing/2026-08-25.json"));
   assert.equal(raw.focus_text, "定稿判断");
+  assert.equal("text_report" in raw, false);
   assert.equal("todayTrades" in raw, false);
   assert.equal("favoriteQuotes" in raw, false);
   assert.equal("bondInfos" in raw, false);

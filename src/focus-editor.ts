@@ -70,6 +70,26 @@ export function loadStoredFocusText(reportDate: string): string {
   }
 }
 
+export function saveStoredFocusText(
+  reportDate: string,
+  value: string,
+): void {
+  if (!reportDate) return;
+  try {
+    const normalized = normalizeFocusText(value);
+    if (normalized) {
+      window.localStorage.setItem(
+        `${FOCUS_STORAGE_PREFIX}${reportDate}`,
+        plainTextToFocusHtml(normalized),
+      );
+    } else {
+      window.localStorage.removeItem(`${FOCUS_STORAGE_PREFIX}${reportDate}`);
+    }
+  } catch {
+    // In-memory report data remains authoritative when storage is unavailable.
+  }
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")

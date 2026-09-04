@@ -20,10 +20,14 @@
   import FocusEditor from "./components/FocusEditor.svelte";
   import TextReport from "./components/TextReport.svelte";
   import { exportReportImage } from "./export";
+  import { saveStoredFocusText } from "./focus-editor";
   import { chineseDateParts } from "./formatters";
   import { globalMessages } from "./lib/global-messages";
   import { deriveReport, type ReportDerived } from "./report-view";
-  import { currentReportDate } from "./report-date";
+  import {
+    currentReportDate,
+    shouldWarnUnfinalizedReport,
+  } from "./report-date";
   import {
     pathnameForReportView,
     reportViewFromPathname,
@@ -76,8 +80,12 @@
   let savedFocusText = "";
   let focusFinalizedAt: string | null = null;
   let savingFocus = false;
+  let savedDataJson = "";
 
   $: derived = data ? deriveReport(data) : EMPTY_DERIVED;
+  $: reportDirty = Boolean(data) && (
+    JSON.stringify(data) !== savedDataJson || focusText !== savedFocusText
+  );
   $: dateParts = data
     ? chineseDateParts(data.report_date)
     : { date: "—", weekday: "—" };
@@ -122,8 +130,15 @@
       focusText = report.focus_text;
       savedFocusText = report.focus_text;
       focusFinalizedAt = report.finalized_at;
+      savedDataJson = JSON.stringify(report);
       charts = chartModule;
       loading = false;
+      if (shouldWarnUnfinalizedReport(requestedDate, report.finalized_at)) {
+        globalMessages.warning(
+          `${requestedDate} 无市场点评定稿，已从可回溯数据源重新生成`,
+          { key: "market-report-unfinalized" },
+        );
+      }
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {
         showError(error);
@@ -156,13 +171,23 @@
   }
 
   async function saveFocus(): Promise<void> {
-    if (!data || savingFocus) return;
+    if (!data) return;
+    await persistReport(data, focusText);
+  }
+
+  async function persistReport(
+    report: ReportData,
+    nextFocusText: string,
+  ): Promise<void> {
+    if (savingFocus) return;
     savingFocus = true;
     try {
-      const snapshot = await saveMarketReport(data, focusText);
+      const snapshot = await saveMarketReport(report, nextFocusText);
       data = snapshot;
+      focusText = snapshot.focus_text;
       savedFocusText = snapshot.focus_text;
       focusFinalizedAt = snapshot.finalized_at;
+      savedDataJson = JSON.stringify(snapshot);
       globalMessages.success(`${snapshot.report_date} 市场点评定稿已保存`, {
         key: "market-report-save",
       });
@@ -182,6 +207,27 @@
     } catch {
       // The native input click remains available where showPicker is unsupported.
     }
+  }
+
+  function handleFocusTextChange(value: string): void {
+    focusText = value;
+  }
+
+  function handleTextReportDataChange(
+    report: ReportData,
+    nextFocusText: string,
+  ): void {
+    data = report;
+    focusText = nextFocusText;
+    saveStoredFocusText(report.report_date, nextFocusText);
+  }
+
+  async function saveTextReport(
+    report: ReportData,
+    nextFocusText: string,
+  ): Promise<void> {
+    handleTextReportDataChange(report, nextFocusText);
+    await persistReport(report, nextFocusText);
   }
 
   async function exportImage(): Promise<void> {
@@ -383,9 +429,9 @@
           <FocusEditor
             reportDate={data.report_date}
             {generatedBriefing}
-            initialText={savedFocusText}
+            initialText={focusText}
             finalizedAt={focusFinalizedAt}
-            onTextChange={(value) => (focusText = value)}
+            onTextChange={handleFocusTextChange}
             onBriefingApplied={handleBriefingApplied}
           />
         </section>
@@ -526,7 +572,14 @@
           role="tabpanel"
           aria-labelledby="text-report-tab"
         >
-          <TextReport data={data} {focusText} />
+          <TextReport
+            data={data}
+            {focusText}
+            dirty={reportDirty}
+            saving={savingFocus}
+            onDataChange={handleTextReportDataChange}
+            onSave={saveTextReport}
+          />
         </div>
       {/if}
     {/if}

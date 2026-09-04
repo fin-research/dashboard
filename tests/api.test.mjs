@@ -101,7 +101,12 @@ function directResponse(target) {
     return Response.json(marginRows());
   }
   if (url.pathname === "/data/primary-issues") {
-    assert.equal(url.searchParams.get("startDate"), "2026-08-22");
+    assert.equal(
+      url.searchParams.get("startDate"),
+      url.searchParams.get("date") === "2026-08-31"
+        ? "2026-08-25"
+        : "2026-08-22",
+    );
     return Response.json([]);
   }
   if (url.pathname === "/data/today-trades") {
@@ -241,25 +246,59 @@ test("历史日期只读取完整 R2 定稿，不再请求 Data 原始资源", a
   assert.equal(report.finalized_at, "2026-08-31T16:00:00+08:00");
 });
 
-test("历史日期没有定稿时显示明确错误，不回退到实时 Data", async (context) => {
+test("历史日期没有定稿时回退原始 Data 重新生成", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url) === "/api/market-report?date=2026-08-31") {
+      return Response.json({
+        detail: "2026-08-31 尚无市场点评定稿",
+        error: {
+          code: "REPORT_NOT_FINALIZED",
+          source: "Dashboard R2",
+          stage: "snapshot_read",
+        },
+      }, { status: 404 });
+    }
+    return directResponse(url);
+  };
+
+  const report = await fetchReport(
+    "2026-08-31",
+    false,
+    undefined,
+    "2026-09-01",
+  );
+  assert.equal(calls[0], "/api/market-report?date=2026-08-31");
+  assert.equal(calls.filter((url) => url.startsWith("/data/")).length, 8);
+  assert.ok(calls.every((url) => !url.startsWith("/data/futures-latest")));
+  assert.ok(calls.every((url) => !url.startsWith("/data/today-trades")));
+  assert.ok(calls.every((url) => !url.startsWith("/data/favorite-quotes")));
+  assert.equal(report.report_date, "2026-08-31");
+  assert.equal(report.finalized_at, null);
+});
+
+test("历史定稿的其他读取错误不触发原始 Data 回退", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   const calls = [];
   globalThis.fetch = async (url) => {
     calls.push(String(url));
     return Response.json({
-      detail: "2026-08-31 尚无市场点评定稿",
+      detail: "历史定稿数据损坏",
       error: {
-        code: "REPORT_NOT_FINALIZED",
+        code: "FINALIZED_SNAPSHOT_INVALID",
         source: "Dashboard R2",
-        stage: "snapshot_read",
+        stage: "snapshot_validation",
       },
-    }, { status: 404 });
+    }, { status: 503 });
   };
 
   await assert.rejects(
     fetchReport("2026-08-31", false, undefined, "2026-09-01"),
-    /REPORT_NOT_FINALIZED.*Dashboard R2.*snapshot_read/,
+    /FINALIZED_SNAPSHOT_INVALID.*Dashboard R2.*snapshot_validation/,
   );
   assert.deepEqual(calls, ["/api/market-report?date=2026-08-31"]);
 });
@@ -346,6 +385,7 @@ test("保存定稿只提交规范报告与今日聚焦", async (context) => {
   assert.equal(call.url, "/api/market-report?date=2026-08-25");
   assert.equal(call.init.method, "PUT");
   assert.equal(body.focusText, "定稿判断");
+  assert.equal("textReport" in body, false);
   assert.equal("focus_text" in body.report, false);
   assert.equal(saved.finalized_at, "2026-08-25T16:00:00+08:00");
 });
