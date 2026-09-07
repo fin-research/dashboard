@@ -44,7 +44,8 @@ export type CreditSession = {
   turns: CreditTurn[]; running: boolean; progress: string; error: string | null; startedAt: number;
   pendingQuestion?: string;
 };
-export const stepSchema = z.object({ step: z.discriminatedUnion("action", [
+// Responses structured outputs support nested anyOf; Zod's discriminated union emits oneOf.
+export const stepSchema = z.object({ step: z.union([
   z.object({ action: z.literal("search"), query: z.string().min(1).max(500) }),
   z.object({ action: z.literal("read"), sourceIds: z.array(z.string()).min(1).max(12) }),
   z.object({ action: z.literal("calculate"), calculation: calculationSchema }),

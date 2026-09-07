@@ -5,7 +5,7 @@ import { z } from "zod";
 import { arithmetic, calculateCredit, finalizeCreditAnswer, lexicalSearch, verifyQuote, canonicalSearchEvidence, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
 import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
 import { generateAiGatewayObject } from "../src/lib/server/ai-gateway.ts";
-import { customerAnswerText } from "../src/lib/credit-assistant/types.ts";
+import { customerAnswerText, stepSchema } from "../src/lib/credit-assistant/types.ts";
 
 const doc = { id: "a".repeat(24), title: "2025年审计报告.pdf", relativePath: "2025年审计报告.pdf", sha256: "a".repeat(64), bytes: 123,
   authority: "audited", originalKey: `originals/${"a".repeat(24)}.pdf`, modifiedAt: "2026-01-01", blockCount: 2, ocrCount: 0 };
@@ -146,4 +146,12 @@ test("a multi-row search chunk prioritizes the requested account over a longer n
     { ...blocks[1], id: "neighbor-row", searchKey: key, text: "2025年 分配股利利润或偿付利息支付的现金。筹资活动现金流出小计。支付其他与筹资活动有关的现金。" }];
   const result = canonicalSearchEvidence({ ...corpus, blocks: rows }, "2025年取得借款收到的现金", [{ key, text: rows.map(b => b.text).join("\n") }]);
   assert.equal(result[0].id, "borrowing-row");
+});
+
+test("credit tool decisions use the Responses-supported anyOf schema", () => {
+  const json = z.toJSONSchema(stepSchema);
+  assert.equal(json.properties.step.anyOf.length, 4);
+  assert.equal(JSON.stringify(json).includes('"oneOf"'), false);
+  assert.deepEqual(stepSchema.parse({ step: { action: "search", query: "借款" } }), { step: { action: "search", query: "借款" } });
+  assert.equal(stepSchema.safeParse({ step: { action: "calculate", query: "借款" } }).success, false);
 });
