@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}" dir="{{ dir | default: 'auto' }}">
+  <head>
+    {%- auth0:head -%}
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {% if application.id == '16vMxoYpr5AdPRiW1PkwIiHuRWszii6m' %}
+    <style>
+      body { background: #f6f8fb; color: #172033; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .eastmoney-brand { padding: 24px 24px 0; font-size: 1rem; font-weight: bold; line-height: 1.5; text-align: center; }
+      .eastmoney-brand a { color: #172033; text-decoration: none; display: inline-flex; min-height: 44px; align-items: center; gap: 12px; }
+      .eastmoney-brand a::before { content: ""; width: 4px; height: 24px; border-radius: 6px; background: #2f6fd6; }
+      .eastmoney-brand a:focus-visible { outline: 2px solid #2f6fd6; outline-offset: 4px; border-radius: 6px; }
+      .ulp-field input { min-height: 44px; }
+    </style>
+    {% endif %}
+  </head>
+  <body class="_widget-auto-layout">
+    {% if application.id == '16vMxoYpr5AdPRiW1PkwIiHuRWszii6m' %}
+      <header class="eastmoney-brand"><a href="https://eastmoney.hasbai.xyz/">东方财富证券 · 资金管理部</a></header>
+    {% endif %}
+    {%- auth0:widget -%}
+  </body>
+</html>

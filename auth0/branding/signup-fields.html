@@ -1,0 +1,17 @@
+<div class="ulp-field">
+  <label for="eastmoney-name">姓名</label>
+  <input type="text" id="eastmoney-name" name="ulp-name" autocomplete="name" required maxlength="50" aria-describedby="eastmoney-name-error" />
+  <div id="eastmoney-name-error" class="ulp-error-info" data-ulp-validation-function="eastmoneyValidName" data-ulp-validation-event-listeners="blur,change,input">请填写姓名，最多 50 个字符。</div>
+</div>
+<div class="ulp-field">
+  <label for="eastmoney-department">部门</label>
+  <input type="text" id="eastmoney-department" name="ulp-department" autocomplete="organization-title" required maxlength="100" aria-describedby="eastmoney-department-error" />
+  <div id="eastmoney-department-error" class="ulp-error-info" data-ulp-validation-function="eastmoneyValidDepartment" data-ulp-validation-event-listeners="blur,change,input">请填写部门，最多 100 个字符。</div>
+</div>
+<script>
+  function eastmoneyValidProfileText(value, limit) {
+    return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= limit && !/[\u0000-\u001f\u007f<>]/.test(value);
+  }
+  function eastmoneyValidName(element) { return eastmoneyValidProfileText(element.value, 50); }
+  function eastmoneyValidDepartment(element) { return eastmoneyValidProfileText(element.value, 100); }
+</script>

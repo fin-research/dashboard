@@ -16,7 +16,7 @@
 - `src/lib/bond-ledger/`：Excel 解析、校验、格式化与分析。
 - `worker/`：自定义 Worker 入口和二级池导入 Workflow。
 - `migrations/`：D1 migration；`postgres-migrations/`：Neon `bond` schema migration；`financing-model-migrations/`：Neon `financing_model` schema migration。
-- `auth0/actions/`：已纳入版本管理的 Auth0 登录 Action；先发布其公开提示页，再使用专用脚本发布 Action。
+- `auth0/`：Auth0 中文主题、注册字段和登录 Actions；配置与启用顺序见 `auth0/README.md`。公开提示页先上线，注册字段须先有已验证自定义域名。
 - `scripts/`：类型生成、D1 同步、Neon migration 与台账回填。
 - `tests/`：Node 单元与契约测试。
 

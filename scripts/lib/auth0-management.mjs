@@ -12,7 +12,10 @@ export function management(method, path, body) {
   try { data = result.stdout?.trim() ? JSON.parse(result.stdout) : null; }
   catch { throw new Error(`Auth0 ${method} ${path.split('?')[0]} returned invalid JSON`); }
   if (result.status !== 0 || data?.statusCode >= 400 || (!data && method === 'get')) {
-    throw new Error(`Auth0 ${method} ${path.split('?')[0]} failed; check management authorization`);
+    const status = data?.statusCode ?? Number(result.stderr?.match(/\b([45]\d\d): API request failed/)?.[1] || 0);
+    const error = new Error(`Auth0 ${method} ${path.split('?')[0]} failed${status ? ` (${status})` : ''}; check management authorization`);
+    error.status = status;
+    throw error;
   }
   return data;
 }
