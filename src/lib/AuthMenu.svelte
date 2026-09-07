@@ -1,37 +1,11 @@
-<script lang="ts">
-  import { onMount } from 'svelte';
-  import { page } from '$app/state';
-  let enabled = $state(false);
-  let email = $state<string | null>(null);
-  onMount(() => {
-    const controller = new AbortController();
-    void fetch('/auth/session', { cache: 'no-store', signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) return;
-        const session = await response.json();
-        enabled = session.enabled === true;
-        email = typeof session.user?.email === 'string' ? session.user.email : null;
-      }).catch(() => {});
-    return () => controller.abort();
-  });
-</script>
-
-{#if enabled}
-  <nav class="auth-menu" aria-label="统一账号">
-    {#if email}
-      <form method="post" action="/auth/logout">
-        <button type="submit" title={email} aria-label={`退出登录：${email}`}>退出登录</button>
-      </form>
-    {:else}
-      <a data-sveltekit-reload href={`/auth/login?returnTo=${encodeURIComponent(page.url.pathname + page.url.search)}`}>登录 / 注册</a>
-    {/if}
-  </nav>
-{/if}
+<a class="profile-entry" href="/profile" aria-label="个人信息" title="个人信息">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></svg>
+</a>
 
 <style>
-  .auth-menu { display: inline-flex; align-items: center; flex: 0 0 auto; }
-  form { margin: 0; }
-  a, button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid var(--border, #d8e0ec); border-radius: .5rem; background: var(--surface, #fff); color: var(--brand, #2f6fd6); font: inherit; font-size: .875rem; text-decoration: none; cursor: pointer; }
-  a:focus-visible, button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-  @media print { .auth-menu { display: none; } }
+  .profile-entry { display: inline-grid; place-items: center; width: 44px; height: 44px; flex: 0 0 auto; border: 1px solid var(--line, #d8e0ec); border-radius: var(--radius-control, 8px); color: var(--brand, #2f6fd6); background: var(--surface, #fff); text-decoration: none; }
+  svg { width: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .profile-entry:hover { background: var(--brand-soft, #eef4ff); }
+  .profile-entry:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
+  @media print { .profile-entry { display: none; } }
 </style>

@@ -1,4 +1,5 @@
 import { get, writable } from "svelte/store";
+import { isLoginRedirecting } from './auth-client.ts';
 
 export type GlobalMessageKind = "success" | "error" | "warning" | "info";
 
@@ -67,6 +68,7 @@ function show(
   message: string,
   options: MessageOptions = {},
 ): string {
+  if (isLoginRedirecting()) return '';
   const normalizedMessage = message.trim();
   if (!normalizedMessage) return "";
 

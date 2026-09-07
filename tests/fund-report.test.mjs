@@ -180,14 +180,14 @@ test("资金日报上传校验已有请求长度并兼容代理省略 Content-Le
   assert.equal(result.fileName, "2026-08-24.html");
 });
 
-test("管理页加载全局设计令牌并始终展示上传主操作", async () => {
+test("上传模态框保留文件选择与上传主操作", async () => {
   const { readFile } = await import("node:fs/promises");
   const page = await readFile(
-    new URL("../src/routes/management/+page.svelte", import.meta.url),
+    new URL("../src/lib/FundReportUploadDialog.svelte", import.meta.url),
     "utf8",
   );
-  assert.match(page, /import "\.\.\/\.\.\/styles\.css";/);
-  assert.match(page, /class="management-file-input"[\s\S]*?type="file"/);
+  assert.match(page, /<dialog[\s\S]*?aria-labelledby="fund-report-upload-title"/);
+  assert.match(page, /class="upload-file-input"[\s\S]*?type="file"/);
   assert.match(
     page,
     /<footer class="upload-actions">[\s\S]*?<button class="upload-button" type="submit"/,

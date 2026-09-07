@@ -41,6 +41,16 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 
 ## Dashboard Worker `/api/*`
 
+### 个人信息与登录
+
+- `GET /auth/session`：返回当前 Access 会话；匿名用户的 `user` 为 `null`，供页面跳转和上传前检查。所有身份响应禁止缓存。
+- `GET /profile`：需登录，展示个人资料、邮箱、密码重置入口、只读角色权限和原有浏览器个性化设置。
+- `GET /api/profile`：仅返回当前账号的姓名、邮箱、邮箱验证状态、已分配角色与权限；不返回管理令牌、身份提供方凭证或内部 metadata。
+- `POST /api/profile`：JSON 请求体上限 4 KiB，严格只接受 `action=name` 与 `name`（1–50 字），或 `action=email`、`email`（18.cn 邮箱）与 `confirmed=true`，或 `action=password`。不得指定用户 ID、角色、权限或自定义字段。
+- 姓名更新回传服务端确认的姓名；邮箱更新清除验证状态、请求验证邮件并回传 `logout=true`，前端完成统一退出；密码操作只向当前账号请求 Auth0 密码重置邮件。
+- 同源浏览器请求收到 HTTP 401 时统一整页跳转 `/auth/login`，保留当前安全页面路径、查询和锚点；403 保持权限错误。SvelteKit 页面数据请求返回框架的登录重定向协议，直接页面请求返回 303。登录接口及 Cloudflare 路径不能作为回跳目标。
+- Auth0 上游管理凭证失效映射为 503，不冒充当前用户未登录。
+
 ### 市场点评
 
 - `GET /api/market-report?date=YYYY-MM-DD`：读取并校验该日期完整 R2 定稿。无定稿返回 404 `REPORT_NOT_FINALIZED`，浏览器据此回退到 Data REST 原始资源重新生成。
@@ -79,7 +89,8 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 - `POST /api/fund-report`：上传单个 UTF-8 HTML，文件名末尾必须为 `YYYYMMDD.html` 或 `YYYY-MM-DD.html`；成功为 201。
 - 请求体为原始 HTML 文件，`X-Fund-Report-Filename` 传 URL 编码的原文件名，`X-Fund-Report-Size` 传文件字节数。
 - Worker 将文件保存为 R2 `fund-reports/YYYY-MM-DD.html`；同日报告再次上传会覆盖并在响应中返回 `replaced: true`。
-- `GET /fund-report`：以 `Cache-Control: no-store` 返回按日期倒序排列的历史资金日报列表。
+- `GET /management`：兼容旧入口，303 跳转 `/fund-report?upload=1`；目标页先检查登录，再打开上传模态框。
+- `GET /fund-report`：提供上传按钮，登录后打开模态框，成功后定向刷新历史列表；以 `Cache-Control: no-store` 返回按日期倒序排列的历史资金日报列表。
 - `GET /fund-report/YYYY-MM-DD.html`：从 R2 返回 HTML；无该日报为 404。
 
 ### 二级池台账

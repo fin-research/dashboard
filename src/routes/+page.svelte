@@ -1,36 +1,12 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import AuthMenu from '$lib/AuthMenu.svelte';
-
   import { currentReportDate } from "../report-date";
-  import {
-    readPreferences,
-    savePreferences,
-    type MarketColorConvention,
-  } from "$lib/preferences";
-
-  let settingsDialog: HTMLDialogElement;
-  let marketColorConvention: MarketColorConvention = "red-up-green-down";
   const todayFundReportUrl = `/fund-report/${currentReportDate()}.html`;
-
-  onMount(() => {
-    marketColorConvention = readPreferences().marketColorConvention;
-  });
-
-  function openSettings(): void {
-    marketColorConvention = readPreferences().marketColorConvention;
-    settingsDialog.showModal();
-  }
-
-  function persistSettings(): void {
-    savePreferences({ marketColorConvention });
-    settingsDialog.close();
-  }
 </script>
 
 <svelte:head>
   <title>市场研究 · 资金管理部</title>
-  <meta name="description" content="资金日报、市场研究工作台与管理入口" />
+  <meta name="description" content="资金日报与市场研究工作台" />
   <meta name="theme-color" content="#fffbf4" />
 </svelte:head>
 
@@ -41,13 +17,6 @@
       <span>资金管理部</span>
     </a>
     <AuthMenu />
-    <button class="settings-entry" type="button" onclick={openSettings}>
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19 13.5v-3l-2-.7a7.6 7.6 0 0 0-.7-1.7l.9-1.9-2.1-2.1-1.9.9a7.6 7.6 0 0 0-1.7-.7L10.5 2h-3l-.7 2.3a7.6 7.6 0 0 0-1.7.7l-1.9-.9-2.1 2.1.9 1.9a7.6 7.6 0 0 0-.7 1.7L-1 10.5v3l2.3.7a7.6 7.6 0 0 0 .7 1.7l-.9 1.9 2.1 2.1 1.9-.9a7.6 7.6 0 0 0 1.7.7l.7 2.3h3l.7-2.3a7.6 7.6 0 0 0 1.7-.7l1.9.9 2.1-2.1-.9-1.9a7.6 7.6 0 0 0 .7-1.7z" transform="translate(3) scale(.75)" />
-      </svg>
-      <span>个性化</span>
-    </button>
   </header>
 
   <main>
@@ -223,60 +192,9 @@
         </span>
       </a>
 
-      <a class="tool-card tool-card--management" href="/management">
-        <span class="tool-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8M8 16h5" />
-            <circle cx="17" cy="16" r="2" />
-          </svg>
-        </span>
-        <span class="card-visual card-visual--management" aria-hidden="true">
-          <svg viewBox="0 0 180 100">
-            <path d="M22 18h136v68H22zM22 37h136M62 37v49" />
-            <path d="M33 52h18M33 65h18M33 78h18M76 51h62M76 66h44" />
-            <circle cx="141" cy="70" r="13" />
-            <path d="M141 63v14M134 70h14" />
-          </svg>
-        </span>
-        <span class="tool-copy">
-          <h2>管理</h2>
-        </span>
-        <span class="tool-action">
-          打开管理
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 12h14m-5-5 5 5-5 5" />
-          </svg>
-        </span>
-      </a>
     </nav>
   </main>
 </div>
-
-<dialog bind:this={settingsDialog} class="settings-dialog" aria-labelledby="settings-title">
-  <form method="dialog" onsubmit={(event) => event.preventDefault()}>
-    <header>
-      <h2 id="settings-title">个性化配置</h2>
-      <button type="button" aria-label="关闭个性化配置" onclick={() => settingsDialog.close()}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-      </button>
-    </header>
-    <fieldset>
-      <legend>行情颜色逻辑</legend>
-      <label>
-        <input type="radio" bind:group={marketColorConvention} value="red-up-green-down" />
-        <span><strong>红涨绿跌</strong><small>默认</small></span>
-      </label>
-      <label>
-        <input type="radio" bind:group={marketColorConvention} value="green-up-red-down" />
-        <span><strong>绿涨红跌</strong></span>
-      </label>
-    </fieldset>
-    <footer>
-      <button type="button" class="settings-cancel" onclick={() => settingsDialog.close()}>取消</button>
-      <button type="button" class="settings-save" onclick={persistSettings}>保存</button>
-    </footer>
-  </form>
-</dialog>
 
 <style>
   :global(*) {
@@ -333,30 +251,6 @@
     font-weight: 750;
     letter-spacing: 0.05em;
     text-decoration: none;
-  }
-
-  .settings-entry {
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-    gap: 8px;
-    padding: 0 13px;
-    border: 1px solid rgba(21, 36, 59, 0.16);
-    border-radius: 10px;
-    color: var(--ink);
-    background: #fff;
-    cursor: pointer;
-    font: inherit;
-    font-weight: 700;
-  }
-
-  .settings-entry svg {
-    width: 20px;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.8;
   }
 
   .brand-mark {
@@ -469,10 +363,6 @@
     box-shadow: 0 24px 54px rgba(47, 111, 214, 0.14);
   }
 
-  .tool-card--management {
-    background: var(--lilac);
-    box-shadow: 0 24px 54px rgba(105, 65, 198, 0.14);
-  }
 
   .tool-card:hover {
     box-shadow: 0 30px 64px rgba(21, 36, 59, 0.18);
@@ -643,138 +533,4 @@
     }
   }
 
-  :global(.settings-dialog) {
-    width: min(520px, calc(100% - 32px));
-    max-height: calc(100dvh - 32px);
-    padding: 0;
-    overflow: hidden;
-    border: 1px solid rgba(21, 36, 59, 0.14);
-    border-radius: 18px;
-    color: #15243b;
-    background: #fff;
-    box-shadow: 0 28px 72px rgba(21, 36, 59, 0.24);
-  }
-
-  :global(.settings-dialog::backdrop) {
-    background: rgba(15, 23, 42, 0.38);
-    backdrop-filter: blur(3px);
-  }
-
-  :global(.settings-dialog form) {
-    display: grid;
-    gap: 22px;
-    padding: 24px;
-  }
-
-  :global(.settings-dialog header),
-  :global(.settings-dialog footer) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  :global(.settings-dialog h2) {
-    margin: 0;
-    font-size: 1.25rem;
-  }
-
-  :global(.settings-dialog header button) {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    place-items: center;
-    border: 0;
-    border-radius: 10px;
-    background: #f4f6f9;
-    cursor: pointer;
-  }
-
-  :global(.settings-dialog header svg) {
-    width: 20px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-  }
-
-  :global(.settings-dialog fieldset) {
-    display: grid;
-    gap: 10px;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-
-  :global(.settings-dialog legend) {
-    margin-bottom: 10px;
-    font-weight: 750;
-  }
-
-  :global(.settings-dialog fieldset label) {
-    display: flex;
-    min-height: 56px;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    border: 1px solid #d8e2f0;
-    border-radius: 10px;
-    cursor: pointer;
-  }
-
-  :global(.settings-dialog fieldset label:has(input:checked)) {
-    border-color: #2f6fd6;
-    background: #eef4ff;
-  }
-
-  :global(.settings-dialog input) {
-    width: 20px;
-    height: 20px;
-    accent-color: #2f6fd6;
-  }
-
-  :global(.settings-dialog fieldset span) {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  :global(.settings-dialog small) {
-    padding: 2px 6px;
-    border-radius: 5px;
-    color: #175cd3;
-    background: #eff4ff;
-    font-size: 0.75rem;
-    font-weight: 750;
-  }
-
-  :global(.settings-dialog footer) {
-    justify-content: flex-end;
-    gap: 10px;
-  }
-
-  :global(.settings-dialog footer button) {
-    min-width: 88px;
-    min-height: 44px;
-    border-radius: 9px;
-    cursor: pointer;
-    font: inherit;
-    font-weight: 750;
-  }
-
-  :global(.settings-cancel) {
-    border: 1px solid #d0d5dd;
-    background: #fff;
-  }
-
-  :global(.settings-save) {
-    border: 1px solid #2f6fd6;
-    color: #fff;
-    background: #2f6fd6;
-  }
-
-  :global(.settings-entry:focus-visible),
-  :global(.settings-dialog button:focus-visible),
-  :global(.settings-dialog input:focus-visible) {
-    outline: 3px solid rgba(47, 111, 214, 0.28);
-    outline-offset: 2px;
-  }
 </style>

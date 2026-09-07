@@ -5,7 +5,8 @@ import {
 import { currentReportDate } from "../../report-date";
 import type { PageServerLoad } from "./$types";
 
-export const load: PageServerLoad = async ({ platform, setHeaders }) => {
+export const load: PageServerLoad = async ({ platform, setHeaders, depends }) => {
+  depends("app:fund-reports");
   setHeaders({ "Cache-Control": "no-store" });
 
   try {

@@ -3,7 +3,7 @@
 declare global {
   namespace App {
     interface Locals {
-      user: { id: string; email: string } | null;
+      user: { id: string; email: string; auth0Id: string | null } | null;
     }
     interface Platform {
       env: Env;

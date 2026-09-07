@@ -26,10 +26,13 @@
 - Auth0 的 `eastmoney-email` 连接只允许邮箱注册，Pre Registration Action 限制为 `18.cn`；新账号验证邮箱后登录，迁移的既有账号保留原验证状态。
 - Cloudflare Access 使用团队 `protossr.cloudflareaccess.com` 和独立 eastmoney 应用。Worker 校验 RS256 签名、issuer、audience、有效期与人员邮箱，不信任单独的邮箱头，也不接受服务身份执行用户操作。
 - `/auth/login` 是统一登录／注册入口，返回地址只接受安全的本站路径。退出清理站点 Cookie，再退出 Auth0 和 Access。
-- `src/hooks.server.ts` 统一保护所有非 GET/HEAD/OPTIONS 操作及 `/trading-research*`、`/credit-assistant`、`/api/credit*` 和 `/api/economic-indicators`。其他页面和只读接口保持公开。Dashboard 对有效登录账号不检查角色或业务权限。
+- `src/hooks.server.ts` 统一保护所有非 GET/HEAD/OPTIONS 操作及 `/profile*`、`/api/profile*`、`/trading-research*`、`/credit-assistant`、`/api/credit*` 和 `/api/economic-indicators`。其他页面和只读接口保持公开。Dashboard 对有效登录账号不检查角色或业务权限。
 - `worker/entry.ts` 对绕过 SvelteKit 的授信问答 HTTP 入口执行相同验证；WebSocket 和 GET 也受保护。
 - 写入同时验证 Origin，文件上传继续保留类型、大小、日期、内容校验，数据库写入继续使用参数化查询和事务。登录不能替代业务输入校验。
 - 公开报告资源通道只允许报告使用的资源、字段、日期范围和有界条数，不能转发任意 URL、路径、GraphQL 或 Choice 指标。通过私有 DATA binding 读取后流式返回，客户端继续执行原有 Zod 契约校验。
+- 个人资料只使用签名已验证 JWT 中的 `eastmoney_user_id`（兼容 `custom` / `oidc_fields`），绝不通过邮箱查找并关联 Auth0 用户。每次读写再次核对 Auth0 当前账号、连接、停用状态和邮箱；旧邮箱对应的 Access 会话不得继续修改资料。
+- `/api/profile` 严格白名单输入，用户不能传入目标 ID、角色、权限、`app_metadata` 或密码。邮箱变更必须明确确认，仅限 18.cn，设置 `email_verified=false` 与 `verify_email=true` 后退出登录；密码只使用 Auth0 邮件重置流程。管理 API 的 Secret 仅驻留服务端，外部请求禁止跟随重定向，响应与请求均限制读取大小。
+- 前端路由守卫与上传前登录检查属于交互保护；服务端 Access 与 Origin 校验仍是授权边界。浏览器同源 HTTP 401 统一跳转登录，禁止把 403 或上游管理凭证失效误判为当前用户登录失效。
 - 登录相关响应和含身份的页面使用 private/no-store；JWT、Cookie、客户端 Secret 不进入页面数据或日志。
 - `ACCESS_MODE=legacy` 仅用于有明确顺序的迁移与回退；正常配置为 `enforce`，未知模式或保护配置缺失必须失败关闭。
 

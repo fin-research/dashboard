@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("首页提供政策跟踪等七个业务入口并自适应换行", async () => {
+test("首页提供六个业务入口并把账号设置集中到个人信息", async () => {
   const [page, globalStyles] = await Promise.all([
     readFile(new URL("../src/routes/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
@@ -32,16 +32,11 @@ test("首页提供政策跟踪等七个业务入口并自适应换行", async ()
     page,
     /<a class="tool-card tool-card--policies" href="\/policy-tracking">[\s\S]*?<h2>政策跟踪<\/h2>/,
   );
-  assert.match(
-    page,
-    /<a class="tool-card tool-card--management" href="\/management">[\s\S]*?<h2>管理<\/h2>/,
-  );
-  assert.equal((page.match(/class="tool-card /g) ?? []).length, 7);
+  assert.match(page, /<AuthMenu \/>/);
+  assert.doesNotMatch(page, /href="\/management"|settings-dialog|openSettings/);
+  assert.equal((page.match(/class="tool-card /g) ?? []).length, 6);
   assert.ok(
     page.indexOf('href="/fund-report"') < page.indexOf('href="/market-briefing"'),
-  );
-  assert.ok(
-    page.indexOf('href="/management"') > page.indexOf('href="/financing/"'),
   );
   assert.doesNotMatch(page, /href="\/(bond|financing-model)"/);
   assert.match(

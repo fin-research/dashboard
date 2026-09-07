@@ -1,9 +1,32 @@
 <script lang="ts">
   import "../../styles.css";
 
+  import { onMount } from 'svelte';
+  import { invalidate } from '$app/navigation';
+  import { page } from '$app/state';
+  import AuthMenu from '$lib/AuthMenu.svelte';
+  import FundReportUploadDialog from '$lib/FundReportUploadDialog.svelte';
+  import { requireClientLogin, isLoginRedirecting } from '$lib/auth-client';
+  import { globalMessages } from '$lib/global-messages';
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
+
+  let uploadDialog: FundReportUploadDialog;
+  let checkingLogin = $state(false);
+  async function openUpload() {
+    if (checkingLogin) return;
+    checkingLogin = true;
+    try {
+      if (await requireClientLogin('/fund-report?upload=1')) uploadDialog.open();
+    } catch (error) {
+      if (!isLoginRedirecting()) globalMessages.error(error instanceof Error ? error.message : '登录状态读取失败');
+    } finally { checkingLogin = false; }
+  }
+  function refreshReports() {
+    void invalidate('app:fund-reports').catch(() => globalMessages.error('日报已保存，列表刷新失败，请重新加载'));
+  }
+  onMount(() => { if (page.url.searchParams.get('upload') === '1') void openUpload(); });
 
   function formatReportDate(date: string): string {
     const [year, month, day] = date.split("-");
@@ -46,6 +69,13 @@
         <span class="title-dot" aria-hidden="true">•</span>
         <span class="title-subject">历史资金日报</span>
       </h1>
+    </div>
+    <div class="header-actions">
+      <button class="upload-entry" type="button" disabled={checkingLogin} onclick={openUpload}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6" /></svg>
+        {checkingLogin ? '正在检查登录' : '上传资金日报'}
+      </button>
+      <AuthMenu />
     </div>
   </header>
 
@@ -102,7 +132,16 @@
   </main>
 </div>
 
+<FundReportUploadDialog bind:this={uploadDialog} onuploaded={refreshReports} />
+
 <style>
+  .header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  .upload-entry { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--brand); border-radius: var(--radius-control); color: white; background: var(--brand); font: inherit; font-weight: bold; cursor: pointer; }
+  .upload-entry svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .upload-entry:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  .upload-entry:disabled { opacity: .65; cursor: wait; }
+  @media (max-width: 720px) { .fund-report-header { flex-wrap: wrap; gap: 12px; } }
+
   .fund-report-page {
     width: min(100%, 2100px);
     min-height: 100dvh;

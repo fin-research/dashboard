@@ -10,7 +10,7 @@ pnpm dev
 - 开发服务器绑定 `127.0.0.1:8765`。
 - `.env.dev` 必须提供 `DATA_PROXY_TARGET`；Vite 代理 `/data/*` 与本地二级池接口。
 - 从 `.env.local.example` 创建未跟踪的 `.env.local`，并把 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` 设置为带 TLS 参数的线上 Neon 直连连接串。`pnpm dev` 会在 Vite 启动前加载该文件，使本地 Worker 直连线上 Neon；本地开发不经过 Hyperdrive 缓存。
-- `pnpm dev` 通过 SvelteKit 平台代理使用本地 R2 模拟，避免页面请求连接或写入生产 bucket；本地资金日报初始为空，可通过本地管理页上传。
+- `pnpm dev` 通过 SvelteKit 平台代理使用本地 R2 模拟，避免页面请求连接或写入生产 bucket；本地资金日报初始为空，可通过历史资金日报页的上传模态框上传。
 - `pnpm dev` 仍使用本地 D1，不自动同步远端 D1 数据。
 - 只有明确需要热点证据时运行 `pnpm db:sync:remote`。本地模型请求仍会产生外部调用。
 
@@ -47,6 +47,9 @@ git diff --check
 
 - `pnpm worker:dev` 用于构建后本地 Worker 检查。
 - `pnpm worker:deploy` 会部署 `eastmoney-dashboard`，只在用户明确要求发布时执行。
+- 个人信息服务复用现有 Auth0 管理应用：`AUTH0_MANAGEMENT_CLIENT_ID` 为非敏感配置，`AUTH0_MANAGEMENT_CLIENT_SECRET` 必须作为 Dashboard 的 Worker Secret 单独配置（融资 Worker 的同名 Secret 不会自动共享）。需要 `read:users`、`update:users`、`read:roles` 权限；只读取当前账号的角色与权限，不授予前端管理令牌。
+- 本地账号服务可从 `.dev.vars.example` 创建未跟踪的 `.dev.vars`。变更真实邮箱、姓名及发送密码重置邮件均属于实际账号操作；默认测试使用模拟服务，不修改真实账号。
+- 账号与路由专项验收：`node --test tests/auth-client.test.mjs tests/profile.test.mjs tests/access.test.mjs tests/fund-report.test.mjs`；构建后运行 `node scripts/verify-profile-routes.mjs` 验证真实 SvelteKit 路由与内存上传，全部上游为模拟实现。
 - 发布前核对 `wrangler.jsonc` 中绑定、migration 顺序和生产数据服务路径，但不要把 Secret 写入配置。
 
 ## 文档维护

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import "../../styles.css";
+  import { isLoginRedirecting } from "$lib/auth-client";
 
   import {
     fundReportDateFromFileName,
@@ -19,7 +19,9 @@
   let selectedFile: File | null = null;
   let selectedDate = "";
   let uploading = false;
-  let lastUpload: UploadResult | null = null;
+  export let onuploaded: (result: UploadResult) => void = () => {};
+  let dialog: HTMLDialogElement;
+  export function open(): void { dialog.showModal(); }
 
   function chooseFile(): void {
     fileInput.click();
@@ -30,7 +32,6 @@
     const file = input.files?.[0] ?? null;
     selectedFile = null;
     selectedDate = "";
-    lastUpload = null;
     if (!file) return;
 
     const reportDate = fundReportDateFromFileName(file.name);
@@ -78,21 +79,24 @@
       });
       const payload = (await response.json()) as UploadResult & {
         error?: string;
+        detail?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.error || "资金日报上传失败");
+        throw new Error(payload.detail || payload.error || "资金日报上传失败");
       }
       if (operationMessage) globalMessages.dismiss(operationMessage);
-      lastUpload = payload;
       selectedFile = null;
       selectedDate = "";
       fileInput.value = "";
+      dialog.close();
+      onuploaded(payload);
       globalMessages.success(
         `${payload.fileName} 已${payload.replaced ? "更新" : "上传"}`,
         { key: "fund-report-upload", title: "资金日报已保存", duration: 8000 },
       );
     } catch (error) {
       if (operationMessage) globalMessages.dismiss(operationMessage);
+      if (isLoginRedirecting()) return;
       globalMessages.error(
         error instanceof Error ? error.message : String(error),
         { key: "fund-report-upload", title: "资金日报上传失败", duration: 8000 },
@@ -109,37 +113,11 @@
   }
 </script>
 
-<svelte:head>
-  <title>管理 · 资金管理部</title>
-  <meta name="description" content="资金日报上传管理" />
-  <meta name="theme-color" content="#f6f8fb" />
-</svelte:head>
-
-<div class="management-page">
-  <header class="management-header">
-    <div class="management-title-block">
-      <a class="management-back" href="/" aria-label="返回市场研究门户">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4-6 6 6 6" /></svg>
-      </a>
-      <h1>
-        <span>资金管理部</span>
-        <span class="title-dot" aria-hidden="true">•</span>
-        <span class="title-subject">管理</span>
-      </h1>
-    </div>
+<dialog bind:this={dialog} aria-labelledby="fund-report-upload-title" oncancel={(event) => { if (uploading) event.preventDefault(); }}>
+  <header class="dialog-heading">
+    <h2 id="fund-report-upload-title">上传资金日报</h2>
+    <button class="close-button" type="button" aria-label="关闭上传窗口" disabled={uploading} onclick={() => dialog.close()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
   </header>
-
-  <main>
-    <section class="management-panel" aria-labelledby="fund-report-upload-title">
-      <header class="panel-heading">
-        <div>
-          <span class="panel-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6" /></svg>
-          </span>
-          <h2 id="fund-report-upload-title">上传资金日报</h2>
-        </div>
-      </header>
-
       <form
         class="upload-form"
         aria-busy={uploading}
@@ -158,7 +136,7 @@
 
         <input
           bind:this={fileInput}
-          class="management-file-input"
+          class="upload-file-input"
           type="file"
           accept=".html,text/html"
           aria-label="选择资金日报 HTML 文件"
@@ -208,165 +186,26 @@
 
         <footer class="upload-actions">
           <span>{selectedFile ? `即将发布 ${fundReportFileName(selectedDate)}` : "选择文件后即可上传发布"}</span>
+          <button class="cancel-button" type="button" disabled={uploading} onclick={() => dialog.close()}>取消</button>
           <button class="upload-button" type="submit" disabled={!selectedFile || uploading}>
             {#if uploading}<span class="button-spinner" aria-hidden="true"></span>{/if}
             <span>{uploading ? "正在上传" : "上传并发布"}</span>
           </button>
         </footer>
 
-        {#if lastUpload}
-          <div class="upload-success" role="status">
-            <span aria-hidden="true">
-              <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" /><path d="m6.5 10 2.2 2.2 4.8-4.8" /></svg>
-            </span>
-            <strong>{lastUpload.fileName} 已{lastUpload.replaced ? "更新" : "发布"}</strong>
-            <a href={lastUpload.url} target="_blank" rel="noreferrer">打开日报</a>
-          </div>
-        {/if}
+
       </form>
-    </section>
-  </main>
-</div>
+</dialog>
 
 <style>
-  .management-page {
-    width: min(100%, 2100px);
-    min-height: 100dvh;
-    margin-inline: auto;
-    padding: 12px 16px 40px;
-    color: var(--text-1);
-    background: var(--bg-page);
-  }
-
-  .management-header {
-    display: flex;
-    min-height: 64px;
-    align-items: center;
-    padding: 4px 2px 12px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .management-title-block {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .management-title-block h1 {
-    display: flex;
-    min-width: 0;
-    align-items: baseline;
-    gap: 9px;
-    margin: 0;
-    color: var(--text-2);
-    font-size: 1.5rem;
-    font-weight: bolder;
-    letter-spacing: -0.025em;
-  }
-
-  .title-dot {
-    color: color-mix(in srgb, var(--brand) 72%, var(--muted));
-  }
-
-  .title-subject {
-    color: var(--brand-deep);
-  }
-
-  .management-back {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    flex: 0 0 auto;
-    place-items: center;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-control);
-    color: var(--brand-deep);
-    background: var(--surface);
-    box-shadow: var(--shadow-card);
-    text-decoration: none;
-    transition:
-      border-color 160ms ease,
-      background 160ms ease;
-  }
-
-  .management-back:hover {
-    border-color: var(--brand);
-    background: var(--brand-soft);
-  }
-
-  .management-back svg,
-  .panel-icon svg,
-  .upload-note svg,
-  .file-picker svg,
-  .upload-success svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.9;
-  }
-
-  .management-back svg {
-    width: 20px;
-  }
-
-  main {
-    width: min(100%, 1040px);
-    margin-inline: auto;
-    padding-top: clamp(28px, 5vw, 56px);
-  }
-
-  .management-panel {
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-card);
-    background: var(--surface);
-    box-shadow: var(--shadow-card);
-  }
-
-  .panel-heading,
-  .panel-heading > div,
-  .upload-actions,
-  .upload-success {
-    display: flex;
-    align-items: center;
-  }
-
-  .panel-heading {
-    min-height: 76px;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .panel-heading > div {
-    min-width: 0;
-    gap: 12px;
-  }
-
-  .panel-heading h2 {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: bold;
-  }
-
-  .panel-icon {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    flex: 0 0 auto;
-    place-items: center;
-    border-radius: var(--radius-control);
-    color: var(--brand-deep);
-    background: var(--brand-soft);
-  }
-
-  .panel-icon svg {
-    width: 24px;
-  }
-
+  dialog { width: min(720px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-card); color: var(--text-1); background: var(--surface); box-shadow: var(--shadow-card); }
+  dialog::backdrop { background: rgb(15 23 42 / 40%); }
+  .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  .dialog-heading h2 { margin: 0; font-size: 1.25rem; }
+  .close-button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); cursor: pointer; }
+  .close-button svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
+  .cancel-button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--text-2); background: var(--surface); font: inherit; cursor: pointer; }
+  .upload-note svg, .file-picker-icon svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .upload-form {
     display: grid;
     gap: 20px;
@@ -403,7 +242,7 @@
     font-weight: bold;
   }
 
-  .management-file-input {
+  .upload-file-input {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -528,6 +367,8 @@
   }
 
   .upload-actions {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
     padding-top: 20px;
@@ -581,48 +422,7 @@
     animation: spin 700ms linear infinite;
   }
 
-  .upload-success {
-    gap: 10px;
-    padding: 12px 14px;
-    border: 1px solid color-mix(in srgb, var(--green) 30%, var(--line));
-    border-radius: var(--radius-inner);
-    color: color-mix(in srgb, var(--green) 76%, #173b31);
-    background: color-mix(in srgb, var(--green) 8%, var(--surface));
-  }
-
-  .upload-success > span {
-    display: grid;
-    width: 28px;
-    height: 28px;
-    flex: 0 0 auto;
-    place-items: center;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--green) 12%, var(--surface));
-  }
-
-  .upload-success svg {
-    width: 20px;
-  }
-
-  .upload-success strong {
-    color: var(--text-2);
-    font-weight: bold;
-  }
-
-  .upload-success a {
-    margin-left: auto;
-    color: var(--brand-deep);
-    font-weight: bold;
-    text-decoration: none;
-  }
-
-  .management-back:focus-visible,
-  .file-picker:focus-visible,
-  .upload-button:focus-visible,
-  .upload-success a:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--brand) 36%, transparent);
-    outline-offset: 2px;
-  }
+  button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 
   @keyframes spin {
     to {
@@ -631,72 +431,11 @@
   }
 
   @media (max-width: 720px) {
-    .management-page {
-      padding: 10px 12px 28px;
-    }
-
-    .management-title-block h1 {
-      gap: 6px;
-      font-size: 1.25rem;
-    }
-
-    main {
-      padding-top: 20px;
-    }
-
-    .panel-heading,
-    .upload-form {
-      padding-inline: 16px;
-    }
-
-    .file-picker {
-      grid-template-columns: 48px minmax(0, 1fr);
-      min-height: 112px;
-      padding: 16px;
-    }
-
-    .file-picker-icon {
-      width: 48px;
-      height: 48px;
-    }
-
-    .file-picker-action {
-      display: none;
-    }
-
-    .selected-file dl {
-      grid-template-columns: 1fr;
-    }
-
-    .upload-actions {
-      align-items: stretch;
-      flex-direction: column;
-    }
-
-    .upload-button {
-      width: 100%;
-    }
-
-    .upload-success {
-      align-items: flex-start;
-      flex-wrap: wrap;
-    }
-
-    .upload-success a {
-      width: 100%;
-      margin-left: 38px;
-    }
+    .file-picker { grid-template-columns: 48px minmax(0, 1fr); padding: 16px; }
+    .file-picker-action { display: none; }
+    .selected-file dl { grid-template-columns: 1fr; }
+    .upload-actions { flex-wrap: wrap; }
+    .upload-actions > span { width: 100%; }
   }
-
-  @media (prefers-reduced-motion: reduce) {
-    .management-back,
-    .file-picker,
-    .upload-button {
-      transition: none;
-    }
-
-    .button-spinner {
-      animation-duration: 1.4s;
-    }
-  }
+  @media (prefers-reduced-motion: reduce) { .button-spinner { animation: none; } }
 </style>
