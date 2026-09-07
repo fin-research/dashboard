@@ -21,7 +21,7 @@ function terms(query: string): string[] {
   return [...new Set(words.flatMap(w => /^[\u4e00-\u9fff]+$/.test(w) && w.length > 2
     ? [w, ...Array.from({ length: w.length - 1 }, (_, i) => w.slice(i, i + 2))] : [w]))];
 }
-export function lexicalSearch(corpus: CreditCorpus, query: string, limit = 16): CreditBlock[] {
+function rankCreditBlocks(corpus: CreditCorpus, query: string): Array<{ block: CreditBlock; score: number }> {
   const tokens = terms(query);
   const documents = new Map(corpus.documents.map(d => [d.id, d]));
   return corpus.blocks.filter(b => b.extraction !== "unreadable").map(block => {
@@ -34,7 +34,10 @@ export function lexicalSearch(corpus: CreditCorpus, query: string, limit = 16): 
     if (doc.authority === "audited" || doc.authority === "disclosure") score *= 1.15;
     if (doc.authority === "draft") score *= .7;
     return { block, score };
-  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, limit).map(x => x.block);
+  }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+}
+export function lexicalSearch(corpus: CreditCorpus, query: string, limit = 16): CreditBlock[] {
+  return rankCreditBlocks(corpus, query).slice(0, limit).map(x => x.block);
 }
 export type CreditSearchHit = { key: string; text: string };
 export function canonicalSearchEvidence(corpus: CreditCorpus, query: string, hits: Array<CreditSearchHit | string>): CreditBlock[] {
@@ -46,8 +49,16 @@ export function canonicalSearchEvidence(corpus: CreditCorpus, query: string, hit
     if (!blocks.length) continue;
     // AI Search chooses the chunk boundaries. Its text only locates canonical evidence;
     // never cite an index payload directly or take the first pages of a matched document.
-    const ranked = lexicalSearch({ ...corpus, blocks }, hit.text.slice(0, 6000) || query, 2);
-    for (const block of ranked) found.set(block.id, block);
+    const candidates = { ...corpus, blocks };
+    const questionScores = new Map(rankCreditBlocks(candidates, query).map(x => [x.block.id, x.score]));
+    const passageRanks = rankCreditBlocks(candidates, hit.text.slice(0, 6000) || query);
+    const maxQuestion = Math.max(1, ...questionScores.values());
+    const maxPassage = Math.max(1, passageRanks[0]?.score ?? 0);
+    // Normalize each signal so a long neighboring row cannot swamp the requested account.
+    const ranked = passageRanks
+      .map(x => ({ ...x, score: x.score / maxPassage + 2 * (questionScores.get(x.block.id) ?? 0) / maxQuestion }))
+      .sort((a, b) => b.score - a.score).slice(0, 2);
+    for (const { block } of ranked) found.set(block.id, block);
   }
   return [...found.values()].slice(0, 8);
 }

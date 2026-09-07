@@ -139,3 +139,11 @@ test("original file keys preserve names while rejecting traversal and non-materi
   assert.ok(isCreditOriginalKey("originals/业务/【请证投部&计财部确认】情况.docx"));
   for (const key of ["originals/../secret.pdf", "originals//报告.pdf", "originals/报告.pdf\n", "originals/报告\\a.pdf", "catalog/corpus.json", "originals/file.exe"]) assert.equal(isCreditOriginalKey(key), false);
 });
+
+test("a multi-row search chunk prioritizes the requested account over a longer neighboring row", () => {
+  const key = "search/财务报表.xlsx.md";
+  const rows = [{ ...blocks[0], id: "borrowing-row", searchKey: key, text: "2025年 取得借款收到的现金 5000000000" },
+    { ...blocks[1], id: "neighbor-row", searchKey: key, text: "2025年 分配股利利润或偿付利息支付的现金。筹资活动现金流出小计。支付其他与筹资活动有关的现金。" }];
+  const result = canonicalSearchEvidence({ ...corpus, blocks: rows }, "2025年取得借款收到的现金", [{ key, text: rows.map(b => b.text).join("\n") }]);
+  assert.equal(result[0].id, "borrowing-row");
+});
