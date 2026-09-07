@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const MAX_AI_GATEWAY_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_CREDIT_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAX_AI_GATEWAY_TIMEOUT_MS = 300_000;
 
 export const AI_GATEWAY_MODEL = "gpt-5.6-luna" as const;
@@ -320,7 +321,8 @@ async function runProvider<OUTPUT>(
   const gatewayLogId = response.headers.get("cf-aig-log-id") ?? "";
   let responseText: string;
   try {
-    responseText = await readTextBounded(response, MAX_AI_GATEWAY_RESPONSE_BYTES);
+    responseText = await readTextBounded(response, options.taskType === "credit_answer"
+      ? MAX_CREDIT_GATEWAY_RESPONSE_BYTES : MAX_AI_GATEWAY_RESPONSE_BYTES);
   } catch (error) {
     throw new AiGatewayResponseError({
       provider,

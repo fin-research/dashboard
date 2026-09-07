@@ -161,6 +161,19 @@ test("structured final answers exclude assistant commentary messages", async () 
   assert.deepEqual(value, { ok: true });
 });
 
+test("credit max-effort responses allow a bounded larger envelope while validating the final object", async () => {
+  const { value } = await withoutAiLogs(() => generateAiGatewayObject(credentials,
+    [{ role: "user", content: "Verify the source" }], z.object({ ok: z.boolean() }), "probe", { ...options, taskType: "credit_answer" },
+    async () => Response.json({ status: "completed", output: [
+      { type: "reasoning", encrypted_content: "x".repeat(3 * 1024 * 1024) },
+      { type: "message", phase: "final_answer", content: [{ type: "output_text", text: '{"ok":true}' }] },
+    ] })));
+  assert.deepEqual(value, { ok: true });
+  await assert.rejects(generateAiGatewayObject(credentials, [{ role: "user", content: "test" }],
+    z.object({ ok: z.boolean() }), "probe", { ...options, taskType: "credit_answer" },
+    async () => new Response("x".repeat(8 * 1024 * 1024 + 1))), /exceeds 8388608 bytes/);
+});
+
 test("market briefing enables Responses web search with max reasoning effort", async () => {
   const calls = [];
   const fetcher = async (url, init) => {
