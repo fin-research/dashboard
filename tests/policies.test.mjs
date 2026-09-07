@@ -83,7 +83,7 @@ test("政策时间轴一次装配政策资讯、自动研报关系与一对一�
 
 test("政策页面展示重要性并使用隔离的时间轴类名", async () => {
   const [page, migration, relationMigration, importanceMigration] = await Promise.all([
-    readFile(new URL("../src/routes/policy-tracking/+page.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/pages/PolicyTrackingPage.svelte", import.meta.url), "utf8"),
     readFile(new URL("../migrations/1004_create_policy_tracking.sql", import.meta.url), "utf8"),
     readFile(new URL("../migrations/1005_remove_policy_article_explanations.sql", import.meta.url), "utf8"),
     readFile(new URL("../migrations/1014_add_policy_importance.sql", import.meta.url), "utf8"),
@@ -129,7 +129,7 @@ test("无关联研报时仍可装配政策点评生成上下文", async () => {
 
 test("政策资讯、研报与点评使用独立深链并从政策页面进入", async () => {
   const [policyPage, newsPage, articlePage, commentaryPage] = await Promise.all([
-    readFile(new URL("../src/routes/policy-tracking/+page.svelte", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/pages/PolicyTrackingPage.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/news/[id]/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/articles/[id]/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/commentaries/[id]/+page.svelte", import.meta.url), "utf8"),

@@ -1,6 +1,6 @@
 # 授信问答
 
-入口：`/trading-research/credit-assistant`；`/credit-assistant` 重定向到工作台入口。面向内部同事生成供客户使用的答复和资料来源，不自动向客户发送消息。
+入口：`/credit-workbench/assistant`，归属首页一级授信工作台；`/credit-assistant` 和 `/trading-research/credit-assistant` 重定向到新入口。面向内部同事生成供客户使用的答复和资料来源，不自动向客户发送消息。
 
 界面为单一聊天流，不展示问答/材料双模块、材料目录或预设提问案例。用户在底部输入框提问或索取文件，答复内的附件卡片直接下载原件（`?download=1`）；来源链接仍可打开 PDF 原页。Enter 发送、Shift + Enter 换行，中文输入法确认不会触发发送。正在生成时可起草下一条消息，已有对话、附件及来源会带入后续追问；进行中和失败的问题也保存在会话中，刷新后仍可查看或重试。
 
@@ -98,7 +98,7 @@ node scripts/upload-credit-corpus.mjs --apply --prune-previous=.credit-local/pre
 
 所有写操作执行同源校验，请求体限长；会话 ID 仅从随机 Cookie 获取；下载仅接受目录中的文档 ID，不能传任意对象路径。返回 `private, no-store` 和 `nosniff`。不暴露通用 `/agents/*` 路由，不接受客户端 state 更新或任意 RPC 方法。
 
-身份由中央 Access 校验统一保护；随机会话 Cookie 只隔离客户会话，不是身份鉴权。机构保密协议控制位于登录校验之内。保护范围同时覆盖 `/trading-research/credit-assistant`、`/credit-assistant`、`/api/credit-assistant/*` 以及任何 Worker 预览/直连域名，不能只保护页面。
+身份由中央 Access 校验统一保护；随机会话 Cookie 只隔离客户会话，不是身份鉴权。机构保密协议控制位于登录校验之内。保护范围同时覆盖 `/credit-workbench/*`、`/trading-research/credit-assistant`、`/credit-assistant`、`/api/credit-assistant/*` 以及任何 Worker 预览/直连域名，不能只保护页面。
 
 ## 验收与发布
 

@@ -2,7 +2,7 @@
 
 ## 当前交付边界
 
-工作台当前包含七个导航标签页：总览、交易管理、授信管理、研究辅助、流程中心、二级池周报和融资择时模型。授信管理已经接入 Neon `credit` schema：业务人员每周在本地解析 Excel 并按报告日期写入数据库，浏览器通过同源 `/api/credit` 和 Hyperdrive 读取。研究辅助的首次全历史回填由受控本地命令完成；此后 dashboard Worker 每日增量读取 Choice EDB 与 DM 资金利率历史并写入 Neon `public.edb`，浏览器只通过同源 `/api/economic-indicators` 读取；交易和流程中心仍使用仓库内冻结数据；二级池周报与融资择时复用独立路由的生产页面组件和既有数据链路。
+交易研究工作台包含八个导航标签页：总览、交易管理、市场热点、政策跟踪、研究辅助、流程中心、二级池周报和融资择时模型。授信工作台独立为首页一级入口，提供授信一览表、授信日历、授信周报、授信问答。授信报表已经接入 Neon `credit` schema：业务人员每周在本地解析 Excel 并按报告日期写入数据库，浏览器通过同源 `/api/credit` 和 Hyperdrive 读取。研究辅助的首次全历史回填由受控本地命令完成；此后 dashboard Worker 每日增量读取 Choice EDB 与 DM 资金利率历史并写入 Neon `public.edb`，浏览器只通过同源 `/api/economic-indicators` 读取；交易和流程中心仍使用仓库内冻结数据；二级池周报与融资择时复用独立路由的生产页面组件和既有数据链路。
 
 上述数据边界属于工程实现说明，不在工作台 UI 展示“演示数据”“静态演示”“未来统一由数据库与同源 `/data` API 提供”等提示。业务页面只展示模块、数据基准日和业务状态，避免以实现说明占用研究界面。
 
@@ -21,12 +21,17 @@
 
 - `/trading-research`：总览。
 - `/trading-research/trading`：交易管理。
-- `/trading-research/credit`：授信管理。
+- `/trading-research/market-hotspots`：市场热点。
+- `/trading-research/policy-tracking`：政策跟踪。
 - `/trading-research/research`：研究辅助。
 - `/trading-research/workflow`：流程中心。
 - `/trading-research/secondary-bond-pool`：二级池周报。
 - `/trading-research/bond`：旧二级池报告隐藏深链，不显示在导航。
 - `/trading-research/financing-model`：融资择时模型。
+
+授信工作台使用 `/credit-workbench`、`/credit-workbench/calendar`、`/credit-workbench/weekly` 和 `/credit-workbench/assistant`。可选路径参数使一览表、日历、周报复用同一报表实例；问答独立卸载，保留服务端客户会话与保密控制。两个工作台共用 `src/lib/workbench/WorkbenchShell.svelte`，不复制框架。
+
+旧 `/trading-research/credit`、`/trading-research/credit-assistant` 和 `/credit-assistant` 转到授信工作台；`/market-hotspots`、`/policy-tracking` 转到交易研究工作台对应子页，并保留查询参数和政策锚点。研究详情的返回链接使用新的政策跟踪路径。
 
 原 `/bond`、`/trading-research/bond` 与 `/financing-model` 深链保留；新运营周报使用 `/secondary-bond-pool`，并与工作台子路径复用同一 Svelte 页面组件，不建立第二套请求实现。旧二级池入口不显示在 UI 导航。嵌入工作台时，日期与导出操作合并到工作台页头右侧。
 

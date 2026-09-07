@@ -20,6 +20,11 @@
   {:else if name === "credit"}
     <path d="M12 3 5 6v5c0 4.8 2.7 8.4 7 10 4.3-1.6 7-5.2 7-10V6l-7-3Z" />
     <path d="m9 12 2 2 4-4" />
+  {:else if name === "market-hotspots"}
+    <circle cx="6" cy="12" r="2.5" /><circle cx="17" cy="6" r="2.5" /><circle cx="18" cy="17" r="2.5" />
+    <path d="m8.3 10.8 6.4-3.6M8.4 13.1l7.2 2.8" />
+  {:else if name === "policy-tracking"}
+    <path d="M6 3v18M6 5h12l-3 4 3 4H6" />
   {:else if name === "research"}
     <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" />
   {:else if name === "workflow"}

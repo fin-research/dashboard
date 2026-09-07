@@ -4,7 +4,7 @@
 
 债券市场研究全栈应用，提供市场点评、市场热点和二级池周报。技术栈为 SvelteKit、Svelte 5、TypeScript、Tailwind CSS 4、daisyUI、ECharts、Cloudflare Workers/D1/R2/Workflows/Hyperdrive、Neon PostgreSQL 与 AI Gateway。
 
-运行入口：门户 `/`，资金日报 `/fund-report`，个人信息 `/profile`（旧 `/management` 转到资金日报上传），市场点评 `/market-briefing`，文字版 `/market-briefing/text`，市场热点 `/market-hotspots`，政策跟踪 `/policy-tracking`，新闻资讯 `/news/[id]`，研报详情 `/articles/[id]`，研究点评 `/commentaries/[id]`，融资择时模型 `/financing-model`，二级债券池运营周报 `/secondary-bond-pool`；旧二级池 `/bond` 作为隐藏深链保留。
+运行入口：门户 `/`，资金日报 `/fund-report`，个人信息 `/profile`（旧 `/management` 转到资金日报上传），市场点评 `/market-briefing`，文字版 `/market-briefing/text`，交易研究工作台 `/trading-research`（含市场热点 `/trading-research/market-hotspots`、政策跟踪 `/trading-research/policy-tracking`），授信工作台 `/credit-workbench`（一览表、日历、周报、问答），新闻资讯 `/news/[id]`，研报详情 `/articles/[id]`，研究点评 `/commentaries/[id]`，融资择时模型 `/financing-model`，二级债券池运营周报 `/secondary-bond-pool`；旧二级池 `/bond` 作为隐藏深链保留。
 
 ## Repository Structure
 

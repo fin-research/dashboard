@@ -48,6 +48,7 @@
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
     "daisyui": "5.7.4",
+    "happy-dom": "^20.14.0",
     "svelte-check": "^4.7.4",
     "tailwindcss": "4.3.3",
     "typescript": "^5.9.0",

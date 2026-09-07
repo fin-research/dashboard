@@ -1,8 +1,8 @@
 export type WorkbenchViewId =
   | "overview"
   | "trading"
-  | "credit"
-  | "credit-assistant"
+  | "market-hotspots"
+  | "policy-tracking"
   | "research"
   | "workflow"
   | "secondary-bond-pool"
@@ -11,6 +11,7 @@ export type WorkbenchViewId =
 
 export type WorkbenchIconName =
   | WorkbenchViewId
+  | "credit"
   | "calendar"
   | "check"
   | "database"
@@ -48,18 +49,18 @@ export const workbenchRoutes: Array<{
     icon: "trading",
   },
   {
-    id: "credit",
-    label: "授信管理",
-    title: "授信管理",
-    context: "授信周报发布范围与额度风险快照",
-    icon: "credit",
+    id: "market-hotspots",
+    label: "市场热点",
+    title: "市场热点",
+    context: "研报热点与关联证据",
+    icon: "market-hotspots",
   },
   {
-    id: "credit-assistant",
-    label: "授信问答",
-    title: "授信问答",
-    context: "授信材料查询与客户答复",
-    icon: "search",
+    id: "policy-tracking",
+    label: "政策跟踪",
+    title: "政策跟踪",
+    context: "政策资讯与研究点评",
+    icon: "policy-tracking",
   },
   {
     id: "research",

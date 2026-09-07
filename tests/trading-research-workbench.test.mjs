@@ -30,15 +30,17 @@ test("交易研究工作台以新二级池周报替换导航入口并保留旧�
     [
       "总览",
       "交易管理",
-      "授信管理",
-    "授信问答",
+      "市场热点",
+      "政策跟踪",
       "研究辅助",
       "流程中心",
       "二级池周报",
       "融资择时模型",
     ],
   );
-  assert.equal(normalizeWorkbenchView("credit"), "credit");
+  assert.equal(normalizeWorkbenchView("market-hotspots"), "market-hotspots");
+  assert.equal(normalizeWorkbenchView("policy-tracking"), "policy-tracking");
+  assert.equal(normalizeWorkbenchView("credit"), "overview");
   assert.equal(normalizeWorkbenchView("bond"), "bond");
   assert.equal(normalizeWorkbenchView("secondary-bond-pool"), "secondary-bond-pool");
   assert.equal(normalizeWorkbenchView("financing-model"), "financing-model");
@@ -181,9 +183,11 @@ test("版式报告统一使用 1080px A4 画布且工作台 main 不增加报告
   assert.match(layoutStyles, /\.layout-report table :is\(th, td\) > \*\s*\{[\s\S]*min-width:\s*0 !important;[\s\S]*max-width:\s*100% !important/);
   assert.match(layoutStyles, /\.layout-report :is\([^}]+\)\s*\{[\s\S]*max-height:\s*none !important;[\s\S]*overflow:\s*visible !important/);
 
-  assert.match(workbench, /<main\s+[\s\S]*id="tr-workbench-main"/);
-  assert.doesNotMatch(workbench, /role="main"/);
-  assert.match(workbench, /class:layout-report=\{isLayoutReport\(activeViewId\)\}/);
+  const sharedShell = await readFile(new URL("../src/lib/workbench/WorkbenchShell.svelte", import.meta.url), "utf8");
+  assert.match(sharedShell, /<main\s+[\s\S]*id="tr-workbench-main"/);
+  assert.doesNotMatch(sharedShell, /role="main"/);
+  assert.match(workbench, /layoutReport=\{isLayoutReport\(activeViewId\)\}/);
+  assert.match(sharedShell, /class:layout-report=\{layoutReport\}/);
   assert.doesNotMatch(secondary, /secondary-weekly-shell/);
   assert.doesNotMatch(secondary, /<article[^>]+secondary-weekly-report/);
   assert.match(secondary, /<main[\s\S]*layout-report layout-report--secondary/);
@@ -334,13 +338,16 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
     ),
   ]);
 
-  assert.match(page, /class="tr-drawer"/);
-  assert.match(page, /aria-controls="tr-workbench-drawer"/);
-  assert.match(page, /class="tr-sidebar-toggle"[\s\S]*?<WorkbenchIcon name="sidebar"/);
-  assert.match(page, /class="tr-portal-link" href="\/"[\s\S]*?东方财富证券 · 资金管理部/);
-  assert.match(page, /class="tr-breadcrumb"[\s\S]*?交易研究工作台[\s\S]*?activeView\?\.label/);
-  assert.doesNotMatch(page, /tr-brand|tr-back-link|tr-drawer__collapse/);
-  assert.match(page, /href=\{workbenchViewPath\(view\.id\)\}/);
+  const shell = await readFile(new URL("../src/lib/workbench/WorkbenchShell.svelte", import.meta.url), "utf8");
+  assert.match(shell, /class="tr-drawer"/);
+  assert.match(shell, /aria-controls="tr-workbench-drawer"/);
+  assert.match(shell, /class="tr-sidebar-toggle"[\s\S]*?<WorkbenchIcon name="sidebar"/);
+  assert.match(shell, /class="tr-portal-link" href="\/"[\s\S]*?东方财富证券 · 资金管理部/);
+  assert.match(shell, /class="tr-breadcrumb"[\s\S]*?homeHref[\s\S]*?activeView\?\.label/);
+  assert.match(page, /title="交易研究工作台"/);
+  assert.doesNotMatch(shell, /tr-brand|tr-back-link|tr-drawer__collapse/);
+  assert.match(page, /href: workbenchViewPath\(view\.id\)/);
+  assert.match(shell, /href=\{view\.href\}/);
   assert.match(page, /<BondLedgerPage embedded \/>/);
   assert.match(page, /<FinancingModelPage embedded \/>/);
   assert.doesNotMatch(page, /数据截至|activeDate|demoMeta/);
@@ -513,7 +520,8 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(panelHeading, /font-size:\s*1\.125rem/);
   assert.match(styles, /\.tr-panel-heading--wrap \.tr-table-controls\s*\{[\s\S]*?flex-wrap:\s*nowrap/);
   assert.doesNotMatch(styles, /^\.tr-panel\s*\{/m);
-  assert.match(workbenchPage, /id="tr-topbar-actions"/);
+  assert.match(workbenchPage, /<WorkbenchShell/);
+  assert.match(await readFile(new URL("../src/lib/workbench/WorkbenchShell.svelte", import.meta.url), "utf8"), /id="tr-topbar-actions"/);
   assert.doesNotMatch(workbenchPage, /观测日期|见各指标卡/);
   assert.match(bond, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
   assert.match(financing, /use:portal=\{portalTarget\}/);

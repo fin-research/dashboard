@@ -55,7 +55,7 @@
   <meta name="description" content="政策跟踪关联研报详情" />
 </svelte:head>
 
-<DetailPageShell eyebrow="RESEARCH REPORT" title="研报详情" backHref="/policy-tracking" backLabel="返回政策跟踪">
+<DetailPageShell eyebrow="RESEARCH REPORT" title="研报详情" backHref="/trading-research/policy-tracking" backLabel="返回政策跟踪">
   {#if loading}
     <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取研报</strong></section>
   {:else if errorMessage}
@@ -88,7 +88,7 @@
               {#each report.policies as policy}
                 <li>
                   <div><span>{policyCategoryLabels[policy.category]}</span><time datetime={policy.policyDate}>{policy.policyDate}</time></div>
-                  <a href={`/policy-tracking#policy-${encodeURIComponent(policy.id)}`}>{policy.title}</a>
+                  <a href={`/trading-research/policy-tracking#policy-${encodeURIComponent(policy.id)}`}>{policy.title}</a>
                   <p>{policy.summary}</p>
                 </li>
               {/each}

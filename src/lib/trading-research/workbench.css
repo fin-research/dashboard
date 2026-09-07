@@ -443,6 +443,11 @@ body:has(.tr-workbench) {
   padding: 0;
 }
 
+#tr-workbench-main.tr-canvas-page {
+  height: 100%;
+  padding: 0;
+}
+
 .tr-view-stack {
   display: grid;
   gap: 22px;

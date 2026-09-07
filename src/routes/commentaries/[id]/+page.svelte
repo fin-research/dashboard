@@ -54,7 +54,7 @@
   <meta name="description" content="政策跟踪标准化研究点评" />
 </svelte:head>
 
-<DetailPageShell eyebrow="RESEARCH COMMENTARY" title="研究点评" backHref="/policy-tracking" backLabel="返回政策跟踪">
+<DetailPageShell eyebrow="RESEARCH COMMENTARY" title="研究点评" backHref="/trading-research/policy-tracking" backLabel="返回政策跟踪">
   {#if loading}
     <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取研究点评</strong></section>
   {:else if errorMessage}
@@ -80,7 +80,7 @@
           <div class="policy-meta"><span>{policyCategoryLabels[detail.policy.category]}</span><time datetime={detail.policy.policyDate}>{detail.policy.policyDate}</time></div>
           <h2 id="source-policy-title">{detail.policy.title}</h2>
           <p>{detail.policy.summary}</p>
-          <a href={`/policy-tracking#policy-${encodeURIComponent(detail.policy.id)}`}>查看对应政策</a>
+          <a href={`/trading-research/policy-tracking#policy-${encodeURIComponent(detail.policy.id)}`}>查看对应政策</a>
         </ModuleCard>
       </aside>
     </div>

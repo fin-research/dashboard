@@ -86,64 +86,6 @@
         </span>
       </a>
 
-      <a class="tool-card tool-card--hotspots" href="/market-hotspots">
-        <span class="tool-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <circle cx="6" cy="12" r="2.5" />
-            <circle cx="17" cy="6" r="2.5" />
-            <circle cx="18" cy="17" r="2.5" />
-            <path d="m8.3 10.8 6.4-3.6M8.4 13.1l7.2 2.8" />
-          </svg>
-        </span>
-        <span class="card-visual card-visual--hotspots" aria-hidden="true">
-          <svg viewBox="0 0 180 100">
-            <path d="m26 66 41-38 39 30 47-39M67 28l-8 57m47-27 42 23" />
-            <circle cx="26" cy="66" r="7" />
-            <circle cx="67" cy="28" r="10" />
-            <circle cx="59" cy="85" r="5" />
-            <circle cx="106" cy="58" r="12" />
-            <circle cx="153" cy="19" r="6" />
-            <circle cx="148" cy="81" r="8" />
-          </svg>
-        </span>
-        <span class="tool-copy">
-          <h2>市场热点</h2>
-        </span>
-        <span class="tool-action">
-          打开市场热点
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 12h14m-5-5 5 5-5 5" />
-          </svg>
-        </span>
-      </a>
-
-      <a class="tool-card tool-card--policies" href="/policy-tracking">
-        <span class="tool-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M6 3v18M6 6h11l-2.5 3L17 12H6" />
-            <circle cx="6" cy="6" r="2" />
-            <circle cx="6" cy="12" r="2" />
-            <circle cx="6" cy="18" r="2" />
-          </svg>
-        </span>
-        <span class="card-visual card-visual--policies" aria-hidden="true">
-          <svg viewBox="0 0 180 100">
-            <path d="M34 10v80M34 22h104l-18 16 18 16H34M34 68h75l-14 12 14 12H34" />
-            <circle cx="34" cy="22" r="6" />
-            <circle cx="34" cy="68" r="6" />
-          </svg>
-        </span>
-        <span class="tool-copy">
-          <h2>政策跟踪</h2>
-        </span>
-        <span class="tool-action">
-          打开政策跟踪
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 12h14m-5-5 5 5-5 5" />
-          </svg>
-        </span>
-      </a>
-
       <a class="tool-card tool-card--trading-research" href="/trading-research">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -163,6 +105,35 @@
         </span>
         <span class="tool-action">
           打开交易研究工作台
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-5-5 5 5-5 5" />
+          </svg>
+        </span>
+      </a>
+
+      <a class="tool-card tool-card--credit-workbench" href="/credit-workbench">
+        <span class="tool-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 3 5 6v5c0 4.8 2.7 8.4 7 10 4.3-1.6 7-5.2 7-10V6l-7-3Z" />
+            <path d="m9 12 2 2 4-4" />
+          </svg>
+        </span>
+        <span class="card-visual card-visual--credit-workbench" aria-hidden="true">
+          <svg viewBox="0 0 180 100">
+            <path d="m26 66 41-38 39 30 47-39M67 28l-8 57m47-27 42 23" />
+            <circle cx="26" cy="66" r="7" />
+            <circle cx="67" cy="28" r="10" />
+            <circle cx="59" cy="85" r="5" />
+            <circle cx="106" cy="58" r="12" />
+            <circle cx="153" cy="19" r="6" />
+            <circle cx="148" cy="81" r="8" />
+          </svg>
+        </span>
+        <span class="tool-copy">
+          <h2>授信工作台</h2>
+        </span>
+        <span class="tool-action">
+          打开授信工作台
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 12h14m-5-5 5 5-5 5" />
           </svg>
@@ -343,14 +314,9 @@
     box-shadow: 0 24px 54px rgba(22, 163, 148, 0.16);
   }
 
-  .tool-card--hotspots {
+  .tool-card--credit-workbench {
     background: var(--blue);
     box-shadow: 0 24px 54px rgba(31, 119, 183, 0.16);
-  }
-
-  .tool-card--policies {
-    background: var(--sage);
-    box-shadow: 0 24px 54px rgba(31, 122, 75, 0.14);
   }
 
   .tool-card--workspace {

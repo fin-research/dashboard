@@ -228,13 +228,13 @@
   });
 </script>
 
-<div class="chat-toolbar" use:portal={"#tr-topbar-actions"}>
-  <button class="chat-button chat-button--new" type="button" disabled={busy || loading} onclick={() => void newSession()}>
-    <WorkbenchIcon name="plus" /><span>{creating ? "正在新建…" : "新对话"}</span>
-  </button>
-</div>
-
 <div class="credit-chat" bind:this={chat}>
+  <!-- Keep the component's root in place; only move its nested toolbar. -->
+  <div class="chat-toolbar" use:portal={"#tr-topbar-actions"}>
+    <button class="chat-button chat-button--new" type="button" disabled={busy || loading} onclick={() => void newSession()}>
+      <WorkbenchIcon name="plus" /><span>{creating ? "正在新建…" : "新对话"}</span>
+    </button>
+  </div>
   <div class="chat-messages" role="log" aria-label="对话记录" aria-live="polite" aria-relevant="additions text">
     {#if loading}
       <div class="chat-empty" role="status"><span class="loading-dot"></span><p>正在载入对话…</p></div>
@@ -327,7 +327,7 @@
             </ul>
             {#if searching}<p role="status">正在搜索机构…</p>
             {:else if searchError}<p role="alert">{searchError}</p>
-            {:else if !customers.length}<p role="status">未找到机构，请调整名称或先在授信管理中维护机构。</p>{/if}
+            {:else if !customers.length}<p role="status">未找到机构，请调整名称或先在授信一览表中维护机构。</p>{/if}
           </div>
         {/if}
       </div>

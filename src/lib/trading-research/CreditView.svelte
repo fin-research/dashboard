@@ -53,7 +53,8 @@
 
   const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
 
-  let activeTab = $state<CreditTab>("overview");
+  let { tab = "overview" }: { tab?: CreditTab } = $props();
+  const activeTab = $derived(tab);
   let report = $state<CreditReportResponse | null>(null);
   let loading = $state(true);
   let errorMessage = $state("");
@@ -643,11 +644,6 @@
     aria-label="授信报表控制"
     use:portal={"#tr-topbar-actions"}
   >
-    <div class="tr-credit-tabs" role="tablist" aria-label="授信报表">
-      <button class:active={activeTab === "overview"} type="button" role="tab" aria-selected={activeTab === "overview"} onclick={() => (activeTab = "overview")}>授信一览表</button>
-      <button class:active={activeTab === "calendar"} type="button" role="tab" aria-selected={activeTab === "calendar"} onclick={() => (activeTab = "calendar")}>授信日历</button>
-      <button class:active={activeTab === "weekly"} type="button" role="tab" aria-selected={activeTab === "weekly"} onclick={() => (activeTab = "weekly")}>授信周报</button>
-    </div>
     {#if report}
       <div class="tr-credit-toolbar__actions">
         <label>

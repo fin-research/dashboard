@@ -31,7 +31,7 @@ test('unrelated external 401s do not log users out of dashboard', async () => {
 });
 
 test('private page guard covers child routes and agrees with the server', () => {
-  for (const path of ['/profile', '/profile/__data.json', '/trading-research', '/trading-research/credit', '/credit-assistant', '/trading%2dresearch/credit']) {
+  for (const path of ['/profile', '/profile/__data.json', '/trading-research', '/trading-research/credit', '/credit-workbench', '/credit-workbench/calendar', '/credit-workbench/weekly', '/credit-workbench/assistant', '/credit%2dworkbench/__data.json', '/credit-assistant', '/trading%2dresearch/credit']) {
     assert.equal(pageRequiresLogin(path), true, path);
     assert.equal(dashboardRequiresLogin(new Request(`https://eastmoney.hasbai.xyz${path}`)), true, path);
   }
