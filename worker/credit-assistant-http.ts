@@ -1,5 +1,9 @@
 import { getAgentByName } from "agents";
 import { loadCreditCorpus, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
+import { findCreditCustomers } from "../src/lib/server/credit-repository.ts";
+import { withPostgres } from "../src/lib/server/postgres.ts";
+import { canDownloadCreditDocument, creditCorpusForCustomer, isPublicCreditDocument, CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
+import type { CreditSession } from "../src/lib/credit-assistant/types.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const PRIVATE_HEADERS = { "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
@@ -10,9 +14,16 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env)
     return Response.json({ error: "请求来源不匹配" }, { status: 403, headers: PRIVATE_HEADERS });
   }
   try {
-    if (url.pathname === "/api/credit-assistant/session" || url.pathname === "/api/credit-assistant/session/new") {
+    if (url.pathname === "/api/credit-assistant/institutions") {
+      if (request.method !== "GET") return new Response(null, { status: 405, headers: PRIVATE_HEADERS });
+      const query = (url.searchParams.get("q") ?? "").trim();
+      if (query.length > 200) return Response.json({ error: "客户名称不能超过200字" }, { status: 400, headers: PRIVATE_HEADERS });
+      const institutions = query ? await withPostgres(env.HYPERDRIVE.connectionString, "credit-customer-search", client => findCreditCustomers(client, query)) : [];
+      return Response.json({ institutions }, { headers: PRIVATE_HEADERS });
+    }
+    if (["/api/credit-assistant/session", "/api/credit-assistant/session/new", "/api/credit-assistant/session/institution"].includes(url.pathname)) {
       const newSession = url.pathname.endsWith("/new");
-      if (newSession && request.method !== "POST") return new Response(null, { status: 405 });
+      if ((newSession || url.pathname.endsWith("/institution")) && request.method !== "POST") return new Response(null, { status: 405 });
       if (!["GET", "POST", "DELETE"].includes(request.method)) return new Response(null, { status: 405 });
       const cookie = request.headers.get("cookie")?.match(/(?:^|;\s*)credit-session=([^;]+)/)?.[1];
       const session = !newSession && cookie && UUID.test(cookie) ? cookie : crypto.randomUUID();
@@ -42,13 +53,27 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env)
     }
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405 });
     const corpus = await loadCreditCorpus(env.CREDIT);
+    async function currentSession(): Promise<CreditSession | null> {
+      const cookie = request.headers.get("cookie")?.match(/(?:^|;\s*)credit-session=([^;]+)/)?.[1];
+      if (!cookie || !UUID.test(cookie)) return null;
+      const agent = await getAgentByName(env.CREDIT_AGENT, cookie);
+      const result = await agent.fetch(new Request(url.origin + "/api/credit-assistant/session"));
+      if (!result.ok) throw new Error("Credit session unavailable");
+      return result.json<CreditSession>();
+    }
     if (url.pathname === "/api/credit-assistant/materials") {
-      return Response.json({ builtAt: corpus.builtAt, documents: corpus.documents.map(d => ({ id: d.id, title: d.title,
+      const session = await currentSession();
+      const allowed = creditCorpusForCustomer(corpus, session?.customer ?? null);
+      return Response.json({ builtAt: corpus.builtAt, documents: allowed.documents.map(d => ({ id: d.id, title: d.title,
+        confidentiality: isPublicCreditDocument(d) ? "public" : "confidential",
         authority: d.authority, blockCount: d.blockCount, ocrCount: d.ocrCount, url: `/api/credit-assistant/files/${d.id}` })) }, { headers: PRIVATE_HEADERS });
     }
     const id = url.pathname.match(/^\/api\/credit-assistant\/files\/([a-f0-9]{24})$/)?.[1];
     const doc = id ? corpus.documents.find(d => d.id === id) : undefined;
     if (!doc) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
+    if (!isPublicCreditDocument(doc) && !canDownloadCreditDocument(doc, await currentSession(), url.searchParams.get("turnId"))) {
+      return Response.json({ error: CREDIT_NDA_REQUIRED }, { status: 403, headers: PRIVATE_HEADERS });
+    }
     // Resolve only catalog-owned immutable keys; arbitrary R2 paths cannot be requested.
     if (!isCreditOriginalKey(doc.originalKey)) throw new Error("Invalid catalog key");
     const file = await env.CREDIT.get(doc.originalKey, { range: request.headers });
@@ -59,7 +84,7 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env)
     headers.set("content-disposition", `${isPdf && url.searchParams.get("download") !== "1" ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(doc.title)}`);
     headers.set("accept-ranges", "bytes");
     headers.set("etag", file.httpEtag);
-    const range = file.range;
+    const range = request.headers.has("range") ? file.range : undefined;
     if (range && "offset" in range && range.offset !== undefined && range.length !== undefined) {
       headers.set("content-range", `bytes ${range.offset}-${range.offset + range.length - 1}/${file.size}`);
       headers.set("content-length", String(range.length));

@@ -4,6 +4,17 @@
 
 界面为单一聊天流，不展示问答/材料双模块、材料目录或预设提问案例。用户在底部输入框提问或索取文件，答复内的附件卡片直接下载原件（`?download=1`）；来源链接仍可打开 PDF 原页。Enter 发送、Shift + Enter 换行，中文输入法确认不会触发发送。正在生成时可起草下一条消息，已有对话、附件及来源会带入后续追问；进行中和失败的问题也保存在会话中，刷新后仍可查看或重试。
 
+输入框上方的“客户名称”必须通过授信库搜索并点击候选机构（也支持方向键、Enter）完成选择，展示已签署、未签署或未标记的保密协议状态。查询仅使用 `credit.institution` 最新报表日快照，不回退到某机构过往的已签署记录。选择、提交、生成完成、读取会话、复制答复和下载时由服务端重新查询；查询带 `CURRENT_TIMESTAMP` 禁止 Hyperdrive 缓存。客户端状态或对话中自述已签署均不能授权。切换客户自动新建会话；服务端拒绝对既有会话更换客户，旧版未绑定客户的会话不能继续使用。
+
+## 保密规则
+
+- 仅原件路径与目录一致且位于顶层 `定期报告/` 的文件可公开；其他目录及未识别旧路径全部需要保密协议，审计/披露标签不代表可公开。`unknown` 和 `not_signed` 均不得访问保密材料。
+- `定期报告与审计` 改名为 `定期报告`；`风险控制指标监管报表专项审计报告2025.pdf` 移至 `风控与监管指标/2025年/`；`风控与监管指标/历年汇总/监管指标.xlsx` 移至 `定期报告/财务与监管指标.xlsx`。其他风控统计文件仍保密。
+- 未签署机构的模型上下文仅含公开目录、公开原文和当前仍可提供的同机构历史答复；AI Search 的受限结果只用于服务端判断材料是否存在，不进入生成或复核上下文。明确索取受限原件时无需模型即可拒绝；工具读取、附件、引文或计算输入引用受限 ID 时直接拒绝。公开证据不能完整回答且存在受限检索结果时返回统一拒绝答复。
+- 拒绝答复固定为“该机构尚未签署保密协议，请提交授信流程签署保密协议之后方可提供该数据。”，不携带数据、引文、计算、附件或原始模型的补充说明。
+- 每份答复记录客户和模型接触的文档范围，覆盖正文、附件、未引注说明及历史上下文。返回前再次读取目录与协议状态，撤销协议、文件退出目录或调整为保密后阻止提供旧答复；保密历史问题也不带入后续生成。已签署机构生成时接触过保密目录的答复会保守地按保密历史处理。
+- 原件链接携带 `turnId`，保密文件仅在当前已签署客户会话的该轮答复确实提供过附件或来源时允许读取。直接拼 ID、旧会话链接、HEAD 和 Range 均遵守同一规则，校验通过前不读取原件字节。公开材料仍须通过全站登录校验。
+
 ## 方案
 
 在 Dashboard 的自定义 Worker 内使用 Cloudflare Agents SDK，避免另建站点、复制模型适配器或增加跨 Worker 公网调用。每个浏览器的随机 HttpOnly Cookie 对应一个 SQLite Durable Object 会话。通过 `schedule()` 持久化到 Durable Object alarm 后执行问答，浏览器轮询状态；刷新页面仍可读取完成的答复，服务重启后任务可继续执行。启动时将尚未完成的旧队列任务迁移为幂等定时任务，先写入定时任务再移除队列记录，避免发布中断后会话一直处于处理中。新建会话分配新的随机标识，保留旧会话存储。
@@ -22,7 +33,7 @@
                                          └─ 独立证据复核 → 客户答复、来源、附件、待确认项
 ```
 
-R2 保留原始文件名和整理后的分类目录，例如 `originals/定期报告与审计/2025年度/公司审计报告.pdf` 与 `search/定期报告与审计/2025年度/公司审计报告.pdf.md`。文档 ID 仅用于应用内引用，不作为对象文件名。R2 是原始证据与当前版本目录。AI Search 只调用 `search()`，不调用其生成回答接口；该实例显示的默认生成模型不影响授信答复模型。关键词和向量检索帮助找同义表达，全文精确检索用于科目、文件和数值定位，也在索引未完成或暂不可用时提供回退。检索结果的对象 key 必须匹配当前目录的 `searchFiles`。AI Search 返回分片文本后，在该文档的当前原文中定位对应页、段落或行，再回读证据；不直接引用索引文本，也不把整份文档命中的前几页当作答案。旧格式 `searchKey` 仅用于迁移兼容。
+R2 保留原始文件名和整理后的分类目录，例如 `originals/定期报告/2025年度/公司审计报告.pdf` 与 `search/定期报告/2025年度/公司审计报告.pdf.md`。文档 ID 仅用于应用内引用，不作为对象文件名。R2 是原始证据与当前版本目录。AI Search 只调用 `search()`，不调用其生成回答接口；该实例显示的默认生成模型不影响授信答复模型。关键词和向量检索帮助找同义表达，全文精确检索用于科目、文件和数值定位，也在索引未完成或暂不可用时提供回退。检索结果的对象 key 必须匹配当前目录的 `searchFiles`。AI Search 返回分片文本后，在该文档的当前原文中定位对应页、段落或行，再回读证据；不直接引用索引文本，也不把整份文档命中的前几页当作答案。旧格式 `searchKey` 仅用于迁移兼容。
 
 每次语义检索等待最多 15 秒，超时即用当前全文证据继续并显示提示。模型上游返回 HTTP 429 时，会话结束本次任务并提示服务繁忙或额度受限；不自动改用其他 Provider，也不反复重试处于冷却状态的凭证。
 
@@ -40,7 +51,7 @@ R2 保留原始文件名和整理后的分类目录，例如 `originals/定期�
 
 ## 材料准备与更新
 
-先用 `scripts/organize-credit-materials.py` 按报告类别、年度和反馈机构整理本地文件。该脚本在移动前写出逐文件映射和 SHA-256 清单，拒绝目标重名，移动后复核字节；保留原文件名，重复运行不再改动已整理路径。转换脚本本身只读原件。
+先用 `scripts/organize-credit-materials.py` 按报告类别、年度和反馈机构整理本地文件。该脚本在移动前写出逐文件映射和 SHA-256 清单，拒绝目标重名，移动后复核字节；除明确指定的监管指标汇总表重命名外保留原文件名；已整理目录也会执行公开目录迁移，重复运行不再改动目标路径。转换脚本本身只读原件。
 
 依赖：`uv`、MarkItDown（Word）、OpenPyXL/XLRD（财务表格）、Poppler 的 `pdftotext`/`pdftoppm`；旧 DOC 转换需要 LibreOffice。Python 的读取依赖记录在脚本 PEP 723 元数据内。macOS 推荐 Vision OCR，以页面坐标恢复表格行；可选 Tesseract 需要中文及英文语言包。
 
@@ -76,26 +87,28 @@ node scripts/upload-credit-corpus.mjs --apply --prune-previous=.credit-local/pre
 
 | 接口 | 用途 |
 | --- | --- |
-| `GET /api/credit-assistant/materials` | 当前文件目录 |
+| `GET /api/credit-assistant/materials` | 当前客户可提供的文件目录；未选择机构时仅公开材料 |
+| `GET /api/credit-assistant/institutions?q=名称` | 最新授信快照中最多20个名称匹配候选及保密协议状态 |
+| `POST /api/credit-assistant/session/institution` | 选择并绑定 `{ "institutionName": "..." }` |
 | `GET /api/credit-assistant/files/:id` | 由目录解析的原件；PDF 支持页码深链和 Range |
 | `GET /api/credit-assistant/session` | 当前浏览器会话、任务进度和答复 |
-| `POST /api/credit-assistant/session` | 提交 `{ "question": "..." }`，异步返回 202 |
+| `POST /api/credit-assistant/session` | 提交 `{ "question": "...", "institutionName": "..." }`，异步返回 202 |
 | `POST /api/credit-assistant/session/new` | 新建独立会话 |
 | `DELETE /api/credit-assistant/session` | 删除当前会话记录；进行中返回 409，UI 不提供此操作 |
 
 所有写操作执行同源校验，请求体限长；会话 ID 仅从随机 Cookie 获取；下载仅接受目录中的文档 ID，不能传任意对象路径。返回 `private, no-store` 和 `nosniff`。不暴露通用 `/agents/*` 路由，不接受客户端 state 更新或任意 RPC 方法。
 
-按用户决定，本期不加访问口令，也未配置 Access。随机会话 Cookie 只隔离会话，不是身份鉴权；材料目录和原件接口目前没有访问控制。后续统一接入 Access 时，必须同时覆盖 `/trading-research/credit-assistant`、`/credit-assistant`、`/api/credit-assistant/*` 以及任何 Worker 预览/直连域名，不能只保护页面。
+身份由中央 Access 校验统一保护；随机会话 Cookie 只隔离客户会话，不是身份鉴权。机构保密协议控制位于登录校验之内。保护范围同时覆盖 `/trading-research/credit-assistant`、`/credit-assistant`、`/api/credit-assistant/*` 以及任何 Worker 预览/直连域名，不能只保护页面。
 
 ## 验收与发布
 
 转换测试：`uv run tests/test_credit_materials.py`（UTF-8 边界、整表数值/公式缓存、目录归类）。代码检查：`pnpm typecheck`、`pnpm worker:typecheck`、`pnpm test`、`pnpm build`、`wrangler deploy --dry-run`、`git diff --check`。新增测试覆盖精确计算、伪造数值/引用、文件路径、OCR/待确认提示、复核拒绝及指定 Provider；全站导航契约同步更新。
 
-本地真实模型验收需要在未跟踪的 `.dev.vars` 中提供 `CF_AIG_TOKEN`；Git 发布完成后也可用线上 HTTP 模式复用现有生产 Secret，每例创建独立会话。Wrangler OAuth 登录不能代替 Gateway Token。不得声称模拟工具调用或单元测试已经通过真实模型验收。
+本地真实模型验收需要在未跟踪的 `.dev.vars` 中提供 `CF_AIG_TOKEN`；Git 发布完成后，具备 Access 登录身份的 HTTP 环境可复用现有生产 Secret，每例创建独立会话；当前 CLI 不复用浏览器身份，未携带有效 Access 凭据时会被登录校验拒绝。Wrangler OAuth 登录不能代替 Gateway Token。不得声称模拟工具调用或单元测试已经通过真实模型验收。
 
 ```sh
-node --env-file=.dev.vars scripts/evaluate-credit-assistant.mjs
-node scripts/evaluate-credit-assistant.mjs --base-url=https://eastmoney.hasbai.xyz
+node --env-file=.env.local --env-file=.dev.vars scripts/evaluate-credit-assistant.mjs --institution=机构名称
+node scripts/evaluate-credit-assistant.mjs --base-url=https://eastmoney.hasbai.xyz --institution=机构名称
 # 或逐例执行 --case=material / capital / borrowing / calculation
 ```
 

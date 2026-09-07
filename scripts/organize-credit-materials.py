@@ -1,4 +1,4 @@
-"""Organize the authorized credit source folder without changing names or bytes."""
+"""Organize credit materials, including the authorized public-directory migration."""
 
 import argparse
 import datetime as dt
@@ -9,7 +9,7 @@ from pathlib import Path
 
 SUPPORTED = {".pdf", ".doc", ".docx", ".xls", ".xlsx"}
 CATEGORIES = {
-    "定期报告与审计",
+    "定期报告",
     "财务报表",
     "信用评级",
     "风控与监管指标",
@@ -24,6 +24,16 @@ def destination(relative):
     name = relative.name
     year = re.search(r"20\d{2}", name)
     year = year[0] if year else ""
+    # Run these migrations before the already-organized fast path. A regulatory
+    # special audit is confidential even though its name contains 审计报告.
+    if "风险控制指标监管报表专项审计报告" in name:
+        return Path("风控与监管指标") / (year + "年" if year else "其他") / name
+    if relative == Path("风控与监管指标/历年汇总/监管指标.xlsx") or relative == Path(
+        "监管指标.xlsx"
+    ):
+        return Path("定期报告/财务与监管指标.xlsx")
+    if parts[0] == "定期报告与审计":
+        return Path("定期报告", *parts[1:])
     if parts[0] in CATEGORIES and (parts[0] != "财务报表" or len(parts) > 2):
         return relative
     if parts[0] == "授信资料反馈" or name.startswith("授信答复"):
@@ -50,7 +60,7 @@ def destination(relative):
         return Path("信用评级") / (year + "年" if year else "其他") / name
     if "审计报告" in name or re.search("公司债券.*报告|财务报表及附注", name):
         return (
-            Path("定期报告与审计")
+            Path("定期报告")
             / (year + ("半年度" if "半年度" in name else "年度") if year else "其他")
             / name
         )

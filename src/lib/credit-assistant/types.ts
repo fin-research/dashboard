@@ -17,6 +17,15 @@ export const corpusSchema = z.object({
 export type CreditDocument = z.infer<typeof documentSchema>;
 export type CreditBlock = z.infer<typeof blockSchema>;
 export type CreditCorpus = z.infer<typeof corpusSchema>;
+export const creditCustomerSchema = z.object({
+  name: z.string().min(1).max(200),
+  confidentialityStatus: z.enum(["signed", "not_signed", "unknown"]),
+  reportDate: z.string(),
+});
+export type CreditCustomer = z.infer<typeof creditCustomerSchema>;
+export const creditCustomerSelectionSchema = z.object({ institutionName: z.string().trim().min(1).max(200) }).strict();
+export const creditQuestionSchema = creditCustomerSelectionSchema.extend({ question: z.string().trim().min(1).max(3000) });
+export const confidentialityLabels = { signed: "已签署保密协议", not_signed: "未签署保密协议", unknown: "保密协议未标记" };
 export const citationSchema = z.object({ sourceId: z.string(), quote: z.string().min(2).max(1000) });
 export const calculationSchema = z.object({
   label: z.string().max(200), expression: z.string().max(300), resultUnit: z.string().max(40),
@@ -38,11 +47,14 @@ export type CreditAnswer = CreditAnswerDraft & {
   sources: Array<Omit<CreditSource, "text" | "searchKey">>; calculations: CreditCalculation[];
   files: Array<{ id: string; title: string; url: string }>;
   corpusVersion: string; createdAt: string; warnings: string[];
+  notice?: string;
+  disclosure?: { policyVersion: 1; institutionName: string; documentIds: string[]; blocked: boolean };
 };
 export type CreditTurn = { id: string; question: string; answer: CreditAnswer; createdAt: string };
 export type CreditSession = {
   turns: CreditTurn[]; running: boolean; progress: string; error: string | null; startedAt: number;
   pendingQuestion?: string;
+  customer?: CreditCustomer | null;
 };
 // Responses structured outputs support nested anyOf; Zod's discriminated union emits oneOf.
 export const stepSchema = z.object({ step: z.union([
@@ -55,6 +67,7 @@ export const stepSchema = z.object({ step: z.union([
 export function customerAnswerText(answer: CreditAnswer): string {
   const ids = [...new Set(answer.paragraphs.flatMap(p => p.citations.map(c => c.sourceId)))];
   const paragraphs = answer.paragraphs.map(p => `${p.text}${p.citations.map(c => `[${ids.indexOf(c.sourceId) + 1}]`).join("")}`);
+  if (answer.notice) paragraphs.unshift(answer.notice);
   if (answer.gaps.length) paragraphs.push(`尚需补充确认：\n${answer.gaps.map(x => `- ${x}`).join("\n")}`);
   if (answer.warnings.length) paragraphs.push(`资料说明：\n${answer.warnings.map(x => `- ${x}`).join("\n")}`);
   const refs = ids.map((id, i) => {

@@ -3,7 +3,7 @@
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
   import { portal } from "../portal";
   import { globalMessages } from "../global-messages";
-  import { customerAnswerText, type CreditAnswer, type CreditSession } from "./types";
+  import { customerAnswerText, creditCustomerSchema, confidentialityLabels, type CreditAnswer, type CreditCustomer, type CreditSession } from "./types";
 
   let session = $state<CreditSession>({ turns: [], running: false, progress: "", error: null, startedAt: 0 });
   let question = $state("");
@@ -12,6 +12,16 @@
   let loadError = $state("");
   let sending = $state(false);
   let creating = $state(false);
+  let customerName = $state("");
+  let customers = $state<CreditCustomer[]>([]);
+  let searching = $state(false);
+  let searchError = $state("");
+  let showCustomers = $state(false);
+  let activeCustomer = $state(-1);
+  let selecting = $state(false);
+  let customerInput: HTMLInputElement;
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let searchRevision = 0;
   let chat: HTMLDivElement;
   let textarea: HTMLTextAreaElement;
   let form: HTMLFormElement;
@@ -19,7 +29,8 @@
   let mounted = false;
   let revision = 0;
   const pendingQuestion = $derived(session.pendingQuestion || optimisticQuestion);
-  const busy = $derived(sending || session.running || creating);
+  const busy = $derived(sending || session.running || creating || selecting);
+  const selectedCustomer = $derived(session.customer?.name === customerName.trim() ? session.customer : null);
   const authorityNames: Record<string, string> = { audited: "审计报告", disclosure: "正式披露", internal: "业务材料", historical_reply: "历史答复", draft: "待部门确认" };
 
   async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -50,6 +61,7 @@
       const next = await api<CreditSession>("session");
       if (!mounted || current !== revision) return;
       session = next;
+      if (loading) customerName = next.customer?.name ?? "";
       loadError = "";
       if (!session.running && !session.error) optimisticQuestion = "";
       if (followLatest) void scrollLatest();
@@ -57,6 +69,66 @@
       if (mounted && current === revision) loadError = error instanceof Error ? error.message : "读取对话失败";
     } finally {
       if (mounted && current === revision) { loading = false; schedulePoll(); }
+    }
+  }
+  function searchCustomers(event: Event) {
+    customerName = (event.currentTarget as HTMLInputElement).value;
+    clearTimeout(searchTimer);
+    const current = ++searchRevision;
+    const query = customerName.trim();
+    customers = [];
+    activeCustomer = -1;
+    searchError = "";
+    showCustomers = !!query;
+    searching = !!query;
+    if (!query) return;
+    searchTimer = setTimeout(async () => {
+      try {
+        const result = await api<{ institutions: CreditCustomer[] }>(`institutions?q=${encodeURIComponent(query)}`);
+        if (!mounted || current !== searchRevision) return;
+        customers = result.institutions.map(value => creditCustomerSchema.parse(value));
+      } catch (error) {
+        if (mounted && current === searchRevision) searchError = error instanceof Error ? error.message : "机构搜索失败";
+      } finally { if (mounted && current === searchRevision) searching = false; }
+    }, 300);
+  }
+  async function selectCustomer(customer: CreditCustomer) {
+    if (busy) return;
+    selecting = true;
+    showCustomers = false;
+    clearTimeout(searchTimer);
+    searchRevision++;
+    revision++;
+    clearTimeout(timer);
+    try {
+      if ((session.customer && session.customer.name !== customer.name) || (!session.customer && (session.turns.length || session.error))) {
+        session = await api<CreditSession>("session/new", { method: "POST" });
+        optimisticQuestion = "";
+        question = "";
+      }
+      const next = await api<CreditSession>("session/institution", { method: "POST", body: JSON.stringify({ institutionName: customer.name }) });
+      if (!mounted) return;
+      session = next;
+      customerName = next.customer?.name ?? "";
+      customers = [];
+      searchError = "";
+      loadError = "";
+      textarea?.focus({ preventScroll: true });
+    } catch (error) {
+      if (mounted) { customerName = ""; globalMessages.error(error instanceof Error ? error.message : "选择机构失败"); }
+    } finally { selecting = false; searching = false; }
+  }
+  function customerKeydown(event: KeyboardEvent) {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === "Escape") { showCustomers = false; return; }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      showCustomers = true;
+      activeCustomer = Math.max(0, Math.min(customers.length - 1, activeCustomer + (event.key === "ArrowDown" ? 1 : -1)));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const customer = customers[activeCustomer];
+      if (showCustomers && customer) void selectCustomer(customer);
     }
   }
   function resizeInput() {
@@ -67,6 +139,7 @@
   async function sendQuestion(value: string) {
     const text = value.trim();
     if (!text || busy || loading || loadError) return;
+    if (!selectedCustomer) { globalMessages.error("请先输入客户名称并从列表中选择机构。"); customerInput?.focus(); return; }
     revision++;
     clearTimeout(timer);
     sending = true;
@@ -76,7 +149,7 @@
     session = { ...session, error: null, pendingQuestion: "" };
     void scrollLatest();
     try {
-      const next = await api<CreditSession>("session", { method: "POST", body: JSON.stringify({ question: text }) });
+      const next = await api<CreditSession>("session", { method: "POST", body: JSON.stringify({ question: text, institutionName: selectedCustomer.name }) });
       if (!mounted) return;
       session = next;
       schedulePoll();
@@ -112,17 +185,30 @@
       session = next;
       optimisticQuestion = "";
       question = "";
+      customerName = "";
+      customers = [];
+      showCustomers = false;
+      clearTimeout(searchTimer);
+      searchRevision++;
       loadError = "";
       await tick();
       resizeInput();
-      textarea?.focus({ preventScroll: true });
+      customerInput?.focus({ preventScroll: true });
       void scrollLatest();
     } catch (error) { globalMessages.error(error instanceof Error ? error.message : "新建对话失败"); }
     finally { creating = false; }
   }
-  async function copy(answer: CreditAnswer) {
-    try { await navigator.clipboard.writeText(customerAnswerText(answer)); globalMessages.success("已复制答复和资料来源"); }
-    catch { globalMessages.error("复制失败，请选择答复文字手动复制"); }
+  async function copy(turnId: string) {
+    const current = revision;
+    try {
+      const latest = await api<CreditSession>("session");
+      if (!mounted || current !== revision) return;
+      session = latest;
+      const answer = latest.turns.find(t => t.id === turnId)?.answer;
+      if (!answer) throw new Error("当前会话中没有该答复，请重新提问。");
+      await navigator.clipboard.writeText(customerAnswerText(answer));
+      globalMessages.success(answer.disclosure?.blocked ? "已复制保密协议签署提示" : "已复制答复和资料来源");
+    } catch (error) { globalMessages.error(error instanceof Error ? error.message : "复制失败，请重试"); }
   }
   function citations(answer: CreditAnswer): string[] { return [...new Set(answer.paragraphs.flatMap(p => p.citations.map(c => c.sourceId)))]; }
   async function showCitation(event: MouseEvent, turnId: string, sourceId: string) {
@@ -138,7 +224,7 @@
   onMount(() => {
     mounted = true;
     void refresh();
-    return () => { mounted = false; revision++; clearTimeout(timer); };
+    return () => { mounted = false; revision++; searchRevision++; clearTimeout(timer); clearTimeout(searchTimer); };
   });
 </script>
 
@@ -162,8 +248,9 @@
       <article class="chat-turn" aria-label="一轮对话">
         <div class="message message--user"><span class="sr-only">你：</span><p>{turn.question}</p></div>
         <div class="message message--assistant">
-          <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手</span></div>
+          <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手{turn.answer.disclosure?.institutionName ? ` · ${turn.answer.disclosure.institutionName}` : ""}</span></div>
           <div class="answer-content">
+            {#if turn.answer.notice}<p class="answer-paragraph">{turn.answer.notice}</p>{/if}
             {#each turn.answer.paragraphs as paragraph}
               <p class="answer-paragraph">{paragraph.text}{#each paragraph.citations as cite}<a class="citation" href={`#source-${turn.id}-${cite.sourceId}`} aria-label={`查看资料来源${citations(turn.answer).indexOf(cite.sourceId) + 1}`} onclick={event => void showCitation(event, turn.id, cite.sourceId)}>[{citations(turn.answer).indexOf(cite.sourceId) + 1}]</a>{/each}</p>
             {/each}
@@ -171,7 +258,7 @@
               {#if !turn.answer.paragraphs.length}<p class="answer-paragraph">所需材料已附上，可以直接下载。</p>{/if}
               <ul class="file-attachments" aria-label="答复附件">
                 {#each turn.answer.files as file}
-                  <li><a class="file-attachment" href={`${file.url}?download=1`} download={file.title} aria-label={`下载 ${file.title}`}>
+                  <li><a class="file-attachment" href={`${file.url}${file.url.includes("?") ? "&" : "?"}download=1`} download={file.title} aria-label={`下载 ${file.title}`}>
                     <span class="file-icon"><WorkbenchIcon name="file" /></span>
                     <span class="file-info"><strong>{file.title}</strong><span>{fileType(file.title)} · 下载文件</span></span>
                     <span class="file-download"><WorkbenchIcon name="download" /></span>
@@ -199,7 +286,7 @@
                 {/each}
               </details>
             {/if}
-            <button class="chat-button chat-button--copy" type="button" onclick={() => void copy(turn.answer)} aria-label="复制答复和资料来源"><WorkbenchIcon name="copy" /><span>复制答复</span></button>
+            <button class="chat-button chat-button--copy" type="button" onclick={() => void copy(turn.id)} aria-label="复制答复和资料来源"><WorkbenchIcon name="copy" /><span>复制答复</span></button>
           </div>
         </div>
       </article>
@@ -219,12 +306,39 @@
     {/if}
   </div>
   <div class="composer-dock">
+    <div class="customer-picker">
+      <label for="credit-customer">客户名称</label>
+      <div class="customer-search">
+        <input id="credit-customer" bind:this={customerInput} bind:value={customerName} oninput={searchCustomers} onkeydown={customerKeydown}
+          onfocus={() => { if (customers.length) showCustomers = true; }} onblur={() => { showCustomers = false; }}
+          type="text" role="combobox" aria-autocomplete="list" aria-expanded={showCustomers} aria-controls="credit-customers"
+          aria-activedescendant={showCustomers && activeCustomer >= 0 && customers[activeCustomer] ? `credit-customer-${activeCustomer}` : undefined}
+          autocomplete="off" maxlength="200" placeholder="搜索并选择请求材料的机构" disabled={busy || loading} />
+        {#if showCustomers}
+          <div class="customer-options">
+            <ul id="credit-customers" role="listbox" aria-label="匹配机构">
+              {#each customers as customer, index (customer.name)}
+                <li role="option" aria-selected={index === activeCustomer} id={`credit-customer-${index}`}>
+                  <button type="button" tabindex="-1" onpointerdown={event => event.preventDefault()} onclick={() => void selectCustomer(customer)}>
+                    <span>{customer.name}</span><span>{confidentialityLabels[customer.confidentialityStatus]}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+            {#if searching}<p role="status">正在搜索机构…</p>
+            {:else if searchError}<p role="alert">{searchError}</p>
+            {:else if !customers.length}<p role="status">未找到机构，请调整名称或先在授信管理中维护机构。</p>{/if}
+          </div>
+        {/if}
+      </div>
+      <span class="customer-status" aria-live="polite">{selecting ? "正在核对机构…" : selectedCustomer ? confidentialityLabels[selectedCustomer.confidentialityStatus] : "请选择机构"}</span>
+    </div>
     <form class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
       <textarea id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} maxlength="3000" rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={loading || creating} aria-describedby="credit-composer-hint"></textarea>
       <div class="composer-actions">
         <span id="credit-composer-hint">Enter 发送<span class="keyboard-hint"> · Shift + Enter 换行</span></span>
-        <button class="chat-button chat-button--send" type="submit" disabled={!question.trim() || busy || loading || !!loadError} aria-label={busy ? "正在处理消息" : "发送消息"} title={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
+        <button class="chat-button chat-button--send" type="submit" disabled={!selectedCustomer || !question.trim() || busy || loading || !!loadError} aria-label={busy ? "正在处理消息" : "发送消息"} title={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
       </div>
     </form>
   </div>
@@ -276,6 +390,17 @@
   .answer-error p, .chat-load-error p { margin: 0 0 12px; color: var(--text-2); }
   .chat-load-error { margin-bottom: 24px; }
   .composer-dock { position: sticky; z-index: 2; bottom: 0; width: 100%; padding: 16px 24px max(20px, env(safe-area-inset-bottom)); background: var(--bg-page); }
+  .customer-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; max-width: 832px; margin: 0 auto 12px; font-size: .875rem; }
+  .customer-picker label { font-weight: bold; color: var(--text-1); }
+  .customer-search { position: relative; flex: 1; min-width: min(100%, 220px); }
+  .customer-search input { width: 100%; min-height: 44px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: 10px 12px; background: var(--surface); color: var(--text-1); font: inherit; }
+  .customer-search input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .customer-options { position: absolute; bottom: calc(100% + 8px); width: 100%; max-height: min(320px, 40dvh); overflow-y: auto; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); box-shadow: var(--shadow-card); }
+  .customer-options ul { margin: 0; padding: 4px; list-style: none; }
+  .customer-options button { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 10px; border: 0; border-radius: var(--radius-control); background: transparent; text-align: left; color: var(--text-1); font: inherit; cursor: pointer; }
+  .customer-options button:hover, .customer-options [aria-selected="true"] button { background: var(--brand-soft); }
+  .customer-options button span:last-child, .customer-status { color: var(--text-3); }
+  .customer-options p { margin: 0; padding: 12px; color: var(--text-2); }
   .chat-composer { max-width: 832px; margin-inline: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 160ms ease; }
   .chat-composer:focus-within { border-color: var(--brand); }
   textarea { display: block; width: 100%; min-height: 56px; max-height: 180px; padding: 0; border: 0; resize: none; background: transparent; color: var(--text-1); font: inherit; line-height: 1.75; outline: none; }

@@ -7,8 +7,8 @@ import { answerCreditQuestion, recoverQueuedCreditAnswers } from "../src/lib/ser
 import { generateAiGatewayObject } from "../src/lib/server/ai-gateway.ts";
 import { customerAnswerText, stepSchema } from "../src/lib/credit-assistant/types.ts";
 
-const doc = { id: "a".repeat(24), title: "2025年审计报告.pdf", relativePath: "2025年审计报告.pdf", sha256: "a".repeat(64), bytes: 123,
-  authority: "audited", originalKey: `originals/${"a".repeat(24)}.pdf`, modifiedAt: "2026-01-01", blockCount: 2, ocrCount: 0 };
+const doc = { id: "a".repeat(24), title: "2025年审计报告.pdf", relativePath: "定期报告/2025年审计报告.pdf", sha256: "a".repeat(64), bytes: 123,
+  authority: "audited", originalKey: "originals/定期报告/2025年审计报告.pdf", modifiedAt: "2026-01-01", blockCount: 2, ocrCount: 0 };
 const blocks = [{ id: "a-1", documentId: doc.id, locator: "PDF第3页", text: "2025年合并报表，单位元。吸收投资收到的现金 3,090,000,000.00，2024年为0。", extraction: "text", searchKey: "search/a-1.md" },
   { id: "a-2", documentId: doc.id, locator: "PDF第4页", text: "股东甲现金增资30.90亿元，其中6.00亿元计入实收资本，24.90亿元计入资本公积。", extraction: "text", searchKey: "search/a-2.md" }];
 const corpus = { version: "credit-extract-v1", builtAt: "2026-09-07", documents: [doc], blocks };
@@ -16,6 +16,7 @@ const opened = new Map(blocks.map(b => [b.id, b]));
 const calculation = { label: "元换算亿元", expression: "a/100000000", resultUnit: "亿元", decimals: 2,
   inputs: [{ name: "a", value: "3090000000", unit: "元", sourceId: "a-1", quote: "吸收投资收到的现金 3,090,000,000.00" }] };
 const draft = { status: "complete", paragraphs: [{ text: "2025年吸收投资收到现金30.90亿元。", citations: [{ sourceId: "calc-1", quote: "30.90" }] }], gaps: [], attachments: [doc.id] };
+const customer = { name: "测试银行", confidentialityStatus: "signed", reportDate: "2026-09-07" };
 const credentials = { accountId: "test", gatewayId: "default", token: "test-token" };
 
 test("calculation retains exact decimal result and source inputs", () => {
@@ -59,7 +60,7 @@ test("agent calculates, validates and independently reviews before delivering", 
     if (name === "credit_review") return schema.parse({ approved: true, issues: [] });
     return schema.parse({ step: calls === 1 ? { action: "calculate", calculation } : { action: "answer", answer: draft } });
   };
-  const answer = await answerCreditQuestion({ question: "2025吸收投资现金换算亿元", corpus, history: [], credentials, generate,
+  const answer = await answerCreditQuestion({ customer, question: "2025吸收投资现金换算亿元", corpus, history: [], credentials, generate,
     semanticSearch: async () => ["search/unknown.md"] });
   assert.equal(calls, 3); assert.equal(answer.calculations[0].result, "30.90");
 });
@@ -72,7 +73,7 @@ test("review rejection requires correction; unverified invented claims never rea
       status: "complete", paragraphs: [{ text: "借款来自银行乙。", citations: [{ sourceId: "a-1", quote: "吸收投资收到的现金" }] }], gaps: [], attachments: [],
     } : { status: "insufficient", paragraphs: [], gaps: ["现有资料未披露具体借款银行。"], attachments: [] } } });
   };
-  const answer = await answerCreditQuestion({ question: "2025借款哪里借入", corpus, history: [], credentials, generate });
+  const answer = await answerCreditQuestion({ customer, question: "2025借款哪里借入", corpus, history: [], credentials, generate });
   assert.equal(answer.status, "insufficient"); assert.equal(answer.paragraphs.length, 0); assert.equal(modelSteps, 2);
 });
 test("credit model is pinned to codex with max effort and no provider fallback", async () => {
@@ -88,7 +89,7 @@ test("credit model is pinned to codex with max effort and no provider fallback",
 test("slow semantic search does not block canonical lexical evidence", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   let initialSources;
-  const answerPromise = answerCreditQuestion({ question: "2025吸收投资现金", corpus, history: [], credentials,
+  const answerPromise = answerCreditQuestion({ customer, question: "2025吸收投资现金", corpus, history: [], credentials,
     semanticSearch: () => new Promise(() => {}),
     generate: async (_credentials, messages, schema) => {
       initialSources = JSON.parse(messages[2].content).sources;
@@ -103,9 +104,9 @@ test("slow semantic search does not block canonical lexical evidence", async t =
 });
 
 test("follow-up questions retain prior attachments, evidence and calculations", async () => {
-  const previous = finalizeCreditAnswer(draft, corpus, opened, [calculateCredit(calculation, opened, "calc-1")]);
+  const previous = { ...finalizeCreditAnswer(draft, corpus, opened, [calculateCredit(calculation, opened, "calc-1")]), disclosure: { policyVersion: 1, institutionName: customer.name, documentIds: [doc.id], blocked: false } };
   const history = [{ id: "previous", question: "请提供2025年审计报告及吸收投资现金数据", answer: previous, createdAt: previous.createdAt }];
-  const answer = await answerCreditQuestion({ question: "把刚才那份报告再发给我", corpus, history, credentials,
+  const answer = await answerCreditQuestion({ customer, question: "把刚才那份报告再发给我", corpus, history, credentials,
     generate: async (_credentials, messages, schema) => {
       const context = JSON.parse(messages[1].content);
       const prior = context.history[0];
@@ -170,7 +171,7 @@ test("interrupted legacy work is removed only after a durable recovery is schedu
 test("credit work stops within its overall execution budget", async t => {
   t.mock.timers.enable({ apis: ["Date"] });
   let calls = 0;
-  const result = await answerCreditQuestion({ question: "查找现金流数据", corpus, history: [], credentials,
+  const result = await answerCreditQuestion({ customer, question: "查找现金流数据", corpus, history: [], credentials,
     generate: async (_credentials, _messages, schema) => {
       calls++;
       t.mock.timers.tick(12 * 60_000);

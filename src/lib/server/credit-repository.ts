@@ -17,8 +17,34 @@ import {
 } from "../credit/types.ts";
 import type { CreditInstitutionUpdateInput } from "../credit/update.ts";
 import type { DatabaseClient } from "./postgres.ts";
+import { creditCustomerSchema, type CreditCustomer } from "../credit-assistant/types.ts";
 
 const AMOUNT_TOLERANCE = 0.0001;
+
+/** Only the latest complete ledger snapshot can authorize disclosure. The database-time
+ * checkedAt value prevents Hyperdrive query caching for permission rechecks. */
+export async function findCreditCustomers(client: DatabaseClient, query: string, exact = false): Promise<CreditCustomer[]> {
+  const name = query.trim();
+  if (!name || name.length > 200) return [];
+  await client.query("BEGIN READ ONLY");
+  try {
+    const result = await client.query<{ name: string; confidentialityStatus: string; reportDate: string }>(
+      `SELECT institution_name AS name, confidentiality_status::text AS "confidentialityStatus",
+              to_char(report_date, 'YYYY-MM-DD') AS "reportDate", CURRENT_TIMESTAMP::text AS "checkedAt"
+       FROM credit.institution
+       WHERE report_date = (SELECT max(report_date) FROM credit.institution)
+         AND ($2::boolean AND institution_name = $1
+              OR NOT $2::boolean AND strpos(lower(institution_name), lower($1)) > 0)
+       ORDER BY (institution_name = $1) DESC, institution_name
+       LIMIT 20`, [name, exact]);
+    const customers = result.rows.map(row => creditCustomerSchema.parse(row));
+    await client.query("COMMIT");
+    return customers;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  }
+}
 
 export interface PersistCreditImportInput {
   parsed: ParsedCreditWorkbook;
