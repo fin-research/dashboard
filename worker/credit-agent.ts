@@ -1,6 +1,6 @@
 import { Agent } from "agents";
 import { z } from "zod";
-import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
+import { answerCreditQuestion, recoverQueuedCreditAnswers } from "../src/lib/server/credit-assistant.ts";
 import { loadCreditCorpus } from "../src/lib/server/credit-evidence.ts";
 import { AiGatewayResponseError } from "../src/lib/server/ai-gateway.ts";
 import type { CreditSession } from "../src/lib/credit-assistant/types.ts";
@@ -9,6 +9,14 @@ const questionSchema = z.object({ question: z.string().trim().min(1).max(3000) }
 
 export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   initialState: CreditSession = { turns: [], running: false, progress: "", error: null, startedAt: 0, pendingQuestion: "" };
+
+  async onStart(): Promise<void> {
+    const question = this.state.pendingQuestion;
+    if (!this.state.running || !question) return;
+    await recoverQueuedCreditAnswers(this.getQueues("question", question),
+      payload => this.schedule(1, "answerQuestion", payload, { idempotent: true }),
+      id => this.dequeue(id));
+  }
 
   async onRequest(request: Request): Promise<Response> {
     if (request.method === "GET") return Response.json(this.state);
@@ -27,7 +35,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
     const id = crypto.randomUUID();
     this.setState({ ...this.state, running: true, progress: "已收到问题，正在读取材料", error: null, startedAt: Date.now(), pendingQuestion: parsed.data.question });
     try {
-      await this.queue("answerQuestion", { question: parsed.data.question, id });
+      await this.schedule(1, "answerQuestion", { question: parsed.data.question, id }, { idempotent: true });
     } catch {
       this.setState({ ...this.state, running: false, progress: "", error: "问答任务创建失败，请重试" });
       return Response.json({ error: this.state.error }, { status: 503 });

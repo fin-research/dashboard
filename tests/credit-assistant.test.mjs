@@ -3,7 +3,7 @@ import test from "node:test";
 import { Decimal } from "decimal.js";
 import { z } from "zod";
 import { arithmetic, calculateCredit, finalizeCreditAnswer, lexicalSearch, verifyQuote, canonicalSearchEvidence, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
-import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
+import { answerCreditQuestion, recoverQueuedCreditAnswers } from "../src/lib/server/credit-assistant.ts";
 import { generateAiGatewayObject } from "../src/lib/server/ai-gateway.ts";
 import { customerAnswerText, stepSchema } from "../src/lib/credit-assistant/types.ts";
 
@@ -154,4 +154,28 @@ test("credit tool decisions use the Responses-supported anyOf schema", () => {
   assert.equal(JSON.stringify(json).includes('"oneOf"'), false);
   assert.deepEqual(stepSchema.parse({ step: { action: "search", query: "借款" } }), { step: { action: "search", query: "借款" } });
   assert.equal(stepSchema.safeParse({ step: { action: "calculate", query: "借款" } }).success, false);
+});
+
+test("interrupted legacy work is removed only after a durable recovery is scheduled", async () => {
+  const payload = { id: "12345678-1234-4123-8123-123456789abc", question: "请提供报告" };
+  const job = { id: "queue-1", callback: "answerQuestion", payload };
+  const events = [];
+  await recoverQueuedCreditAnswers([job, { ...job, id: "unrelated", callback: "other" }, { ...job, payload: {} }],
+    async value => events.push({ scheduled: value }), id => events.push({ removed: id }));
+  assert.deepEqual(events, [{ scheduled: payload }, { removed: "queue-1" }]);
+  await assert.rejects(recoverQueuedCreditAnswers([job], async () => { throw new Error("alarm unavailable"); },
+    () => assert.fail("must retain the old queue row")), /alarm unavailable/);
+});
+
+test("credit work stops within its overall execution budget", async t => {
+  t.mock.timers.enable({ apis: ["Date"] });
+  let calls = 0;
+  const result = await answerCreditQuestion({ question: "查找现金流数据", corpus, history: [], credentials,
+    generate: async (_credentials, _messages, schema) => {
+      calls++;
+      t.mock.timers.tick(12 * 60_000);
+      return schema.parse({ step: { action: "read", sourceIds: ["a-1"] } });
+    } });
+  assert.equal(calls, 1);
+  assert.equal(result.status, "insufficient");
 });
