@@ -172,6 +172,7 @@ export function buildAiSearchToolCall(
           retrieval: {
             max_num_results: AI_SEARCH_MAX_RESULTS,
             filters: {
+              type: { $eq: "研报" },
               published_at: {
                 $gte: period.startMs,
                 $lte: period.endMs,

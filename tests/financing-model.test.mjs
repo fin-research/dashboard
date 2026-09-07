@@ -686,6 +686,7 @@ test("AI Search 固定检索最近七个上海自然日且最多返回50条", ()
   assert.equal(period.startMs, Date.parse("2026-08-18T00:00:00+08:00"));
   assert.equal(period.endMs, Date.parse("2026-08-24T23:59:59.999+08:00"));
   assert.equal(retrieval.max_num_results, 50);
+  assert.deepEqual(retrieval.filters.type, { $eq: "研报" });
   assert.deepEqual(retrieval.filters.published_at, {
     $gte: period.startMs,
     $lte: period.endMs,
