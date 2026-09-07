@@ -56,7 +56,7 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env)
     const isPdf = doc.originalKey.endsWith(".pdf");
     const headers = new Headers(PRIVATE_HEADERS);
     headers.set("content-type", isPdf ? "application/pdf" : "application/octet-stream");
-    headers.set("content-disposition", `${isPdf ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(doc.title)}`);
+    headers.set("content-disposition", `${isPdf && url.searchParams.get("download") !== "1" ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(doc.title)}`);
     headers.set("accept-ranges", "bytes");
     headers.set("etag", file.httpEtag);
     const range = file.range;

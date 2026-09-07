@@ -437,6 +437,12 @@ body:has(.tr-workbench) {
   padding: clamp(12px, 1.4vw, 22px);
 }
 
+#tr-workbench-main.tr-chat-page {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
 .tr-view-stack {
   display: grid;
   gap: 22px;

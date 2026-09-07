@@ -41,6 +41,7 @@ export type CreditAnswer = CreditAnswerDraft & {
 export type CreditTurn = { id: string; question: string; answer: CreditAnswer; createdAt: string };
 export type CreditSession = {
   turns: CreditTurn[]; running: boolean; progress: string; error: string | null; startedAt: number;
+  pendingQuestion?: string;
 };
 export const stepSchema = z.object({ step: z.discriminatedUnion("action", [
   z.object({ action: z.literal("search"), query: z.string().min(1).max(500) }),

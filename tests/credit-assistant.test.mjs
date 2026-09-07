@@ -101,3 +101,21 @@ test("slow semantic search does not block canonical lexical evidence", async t =
   assert.match(answer.warnings.join(""), /全文精确检索/);
   assert.equal(answer.files[0].id, doc.id);
 });
+
+test("follow-up questions retain prior attachments, evidence and calculations", async () => {
+  const previous = finalizeCreditAnswer(draft, corpus, opened, [calculateCredit(calculation, opened, "calc-1")]);
+  const history = [{ id: "previous", question: "请提供2025年审计报告及吸收投资现金数据", answer: previous, createdAt: previous.createdAt }];
+  const answer = await answerCreditQuestion({ question: "把刚才那份报告再发给我", corpus, history, credentials,
+    generate: async (_credentials, messages, schema) => {
+      const context = JSON.parse(messages[1].content);
+      const prior = context.history[0];
+      assert.equal(prior.question, history[0].question);
+      assert.equal(prior.files[0].title, doc.title);
+      assert.equal(prior.sources[0].id, "a-1");
+      assert.equal(prior.calculations[0].result, "30.90");
+      return schema.parse({ step: { action: "answer", answer: { status: "complete", paragraphs: [], gaps: [], attachments: [prior.files[0].id] } } });
+    },
+  });
+  assert.equal(answer.files[0].url, `/api/credit-assistant/files/${doc.id}`);
+  assert.equal(history.length, 1);
+});

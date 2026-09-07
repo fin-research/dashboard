@@ -18,6 +18,12 @@ export type WorkbenchIconName =
   | "menu"
   | "search"
   | "sidebar"
+  | "chat"
+  | "plus"
+  | "arrow-up"
+  | "file"
+  | "download"
+  | "copy"
   | "warning";
 
 export const workbenchRoutes: Array<{

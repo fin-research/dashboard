@@ -2,6 +2,8 @@
 
 入口：`/trading-research/credit-assistant`；`/credit-assistant` 重定向到工作台入口。面向内部同事生成供客户使用的答复和资料来源，不自动向客户发送消息。
 
+界面为单一聊天流，不展示问答/材料双模块、材料目录或预设提问案例。用户在底部输入框提问或索取文件，答复内的附件卡片直接下载原件（`?download=1`）；来源链接仍可打开 PDF 原页。Enter 发送、Shift + Enter 换行，中文输入法确认不会触发发送。正在生成时可起草下一条消息，已有对话、附件及来源会带入后续追问；进行中和失败的问题也保存在会话中，刷新后仍可查看或重试。
+
 ## 方案
 
 在 Dashboard 的自定义 Worker 内使用 Cloudflare Agents SDK，避免另建站点、复制模型适配器或增加跨 Worker 公网调用。每个浏览器的随机 HttpOnly Cookie 对应一个 SQLite Durable Object 会话。Agents 队列执行问答，浏览器轮询状态；刷新页面仍可读取完成的答复。新建会话分配新的随机标识，保留旧会话存储。

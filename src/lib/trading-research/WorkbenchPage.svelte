@@ -144,6 +144,7 @@
   <section class="tr-workspace">
     <main
       id="tr-workbench-main"
+      class:tr-chat-page={activeViewId === "credit-assistant"}
       class:tr-integrated-page={isIntegratedView(activeViewId)}
       class:layout-report={isLayoutReport(activeViewId)}
       class:layout-report--secondary={activeViewId === "secondary-bond-pool"}

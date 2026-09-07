@@ -47,6 +47,20 @@
   {:else if name === "sidebar"}
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <path d="M9 4v16" />
+  {:else if name === "chat"}
+    <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-3 3V11.5A7.5 7.5 0 0 1 9.5 4h3a7.5 7.5 0 0 1 7.5 7.5Z" />
+    <path d="M7 10h8M7 14h5" />
+  {:else if name === "plus"}
+    <path d="M12 5v14M5 12h14" />
+  {:else if name === "arrow-up"}
+    <path d="M12 19V5m-6 6 6-6 6 6" />
+  {:else if name === "file"}
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6M8 13h8M8 17h5" />
+  {:else if name === "download"}
+    <path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" />
+  {:else if name === "copy"}
+    <rect x="8" y="8" width="12" height="13" rx="2" />
+    <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
   {:else if name === "warning"}
     <path d="M12 3 2.8 20h18.4L12 3Z" />
     <path d="M12 9v5m0 3h.01" />

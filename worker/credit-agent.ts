@@ -8,7 +8,7 @@ import type { CreditSession } from "../src/lib/credit-assistant/types.ts";
 const questionSchema = z.object({ question: z.string().trim().min(1).max(3000) });
 
 export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
-  initialState: CreditSession = { turns: [], running: false, progress: "", error: null, startedAt: 0 };
+  initialState: CreditSession = { turns: [], running: false, progress: "", error: null, startedAt: 0, pendingQuestion: "" };
 
   async onRequest(request: Request): Promise<Response> {
     if (request.method === "GET") return Response.json(this.state);
@@ -25,7 +25,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
     const parsed = questionSchema.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "请输入1至3000字的授信问题" }, { status: 400 });
     const id = crypto.randomUUID();
-    this.setState({ ...this.state, running: true, progress: "已收到问题，正在读取材料", error: null, startedAt: Date.now() });
+    this.setState({ ...this.state, running: true, progress: "已收到问题，正在读取材料", error: null, startedAt: Date.now(), pendingQuestion: parsed.data.question });
     try {
       await this.queue("answerQuestion", { question: parsed.data.question, id });
     } catch {
@@ -51,7 +51,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         },
       });
       this.setState({ ...this.state, turns: [...this.state.turns, { id: payload.id, question: payload.question, answer, createdAt: answer.createdAt }],
-        running: false, progress: "", error: null });
+        running: false, progress: "", error: null, pendingQuestion: "" });
     } catch (error) {
       console.error(JSON.stringify({ event: "credit_answer_failed", error_type: error instanceof Error ? error.name : "unknown",
         ...(error instanceof AiGatewayResponseError ? { provider: error.provider, status: error.status, gateway_log_id: error.gatewayLogId,

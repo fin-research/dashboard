@@ -1,28 +1,30 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import ModuleCard from "../../components/ModuleCard.svelte";
-  import PanelHeading from "../trading-research/PanelHeading.svelte";
+  import { onMount, tick } from "svelte";
+  import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
+  import { portal } from "../portal";
   import { globalMessages } from "../global-messages";
   import { customerAnswerText, type CreditAnswer, type CreditSession } from "./types";
 
-  type Material = { id: string; title: string; authority: string; url: string; ocrCount: number };
   let session = $state<CreditSession>({ turns: [], running: false, progress: "", error: null, startedAt: 0 });
   let question = $state("");
-  let pendingQuestion = $state("");
-  let materials = $state<Material[]>([]);
-  let materialFilter = $state("");
+  let optimisticQuestion = $state("");
   let loading = $state(true);
   let loadError = $state("");
   let sending = $state(false);
+  let creating = $state(false);
+  let chat: HTMLDivElement;
+  let textarea: HTMLTextAreaElement;
+  let form: HTMLFormElement;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let mounted = false;
-  const filteredMaterials = $derived(materials.filter(m => m.title.includes(materialFilter.trim())));
-  const statusNames = { complete: "答复", partial: "答复与待确认事项", insufficient: "尚需补充材料" };
+  let revision = 0;
+  const pendingQuestion = $derived(session.pendingQuestion || optimisticQuestion);
+  const busy = $derived(sending || session.running || creating);
   const authorityNames: Record<string, string> = { audited: "审计报告", disclosure: "正式披露", internal: "业务材料", historical_reply: "历史答复", draft: "待部门确认" };
-  const examples = ["请提供2025年度审计报告。", "2025年合并现金流量表中吸收投资收到的现金是多少？主要由谁出资？", "2025年取得借款收到的现金50亿元，主要用途和借款来源是什么？"];
 
   async function api<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`/api/credit-assistant/${path}`, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
+    const response = await fetch(`/api/credit-assistant/${path}`, { ...init, signal: AbortSignal.timeout(30_000),
+      headers: { "content-type": "application/json", ...init?.headers } });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? "请求未完成，请重试");
     return data as T;
@@ -31,134 +33,272 @@
     clearTimeout(timer);
     if (mounted && session.running) timer = setTimeout(() => void refresh(), 2500);
   }
-  async function refresh() {
-    try {
-      session = await api<CreditSession>("session");
-      loadError = "";
-      if (!session.running) pendingQuestion = "";
-    } catch (error) {
-      loadError = error instanceof Error ? error.message : "读取问答记录失败";
-    } finally { loading = false; schedulePoll(); }
+  function nearLatest() {
+    const workspace = chat?.closest<HTMLElement>(".tr-workspace");
+    return !workspace || workspace.scrollHeight - workspace.scrollTop - workspace.clientHeight < 220;
   }
-  async function send(event: SubmitEvent) {
-    event.preventDefault();
-    if (!question.trim() || sending || session.running) return;
-    sending = true;
+  async function scrollLatest() {
+    await tick();
+    if (!mounted) return;
+    const workspace = chat?.closest<HTMLElement>(".tr-workspace");
+    workspace?.scrollTo({ top: workspace.scrollHeight, behavior: "instant" });
+  }
+  async function refresh() {
+    const current = revision;
+    const followLatest = loading || nearLatest();
     try {
-      session = await api<CreditSession>("session", { method: "POST", body: JSON.stringify({ question: question.trim() }) });
-      pendingQuestion = question.trim(); question = ""; schedulePoll();
-    } catch (error) { globalMessages.error(error instanceof Error ? error.message : "发送失败"); }
-    finally { sending = false; }
+      const next = await api<CreditSession>("session");
+      if (!mounted || current !== revision) return;
+      session = next;
+      loadError = "";
+      if (!session.running && !session.error) optimisticQuestion = "";
+      if (followLatest) void scrollLatest();
+    } catch (error) {
+      if (mounted && current === revision) loadError = error instanceof Error ? error.message : "读取对话失败";
+    } finally {
+      if (mounted && current === revision) { loading = false; schedulePoll(); }
+    }
+  }
+  function resizeInput() {
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+  }
+  async function sendQuestion(value: string) {
+    const text = value.trim();
+    if (!text || busy || loading || loadError) return;
+    revision++;
+    clearTimeout(timer);
+    sending = true;
+    optimisticQuestion = text;
+    const draft = question;
+    question = "";
+    session = { ...session, error: null, pendingQuestion: "" };
+    void scrollLatest();
+    try {
+      const next = await api<CreditSession>("session", { method: "POST", body: JSON.stringify({ question: text }) });
+      if (!mounted) return;
+      session = next;
+      schedulePoll();
+    } catch (error) {
+      if (!mounted) return;
+      question ||= draft || text;
+      optimisticQuestion = "";
+      globalMessages.error(error instanceof Error ? error.message : "发送失败");
+    } finally {
+      sending = false;
+      await tick();
+      if (mounted) { resizeInput(); textarea?.focus({ preventScroll: true }); }
+    }
+  }
+  function send(event: SubmitEvent) {
+    event.preventDefault();
+    void sendQuestion(question);
+  }
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
   }
   async function newSession() {
-    try { session = await api<CreditSession>("session/new", { method: "POST" }); pendingQuestion = ""; question = ""; }
-    catch (error) { globalMessages.error(error instanceof Error ? error.message : "新建会话失败"); }
+    if (busy || loading) return;
+    revision++;
+    clearTimeout(timer);
+    creating = true;
+    try {
+      const next = await api<CreditSession>("session/new", { method: "POST" });
+      if (!mounted) return;
+      session = next;
+      optimisticQuestion = "";
+      question = "";
+      loadError = "";
+      await tick();
+      resizeInput();
+      textarea?.focus({ preventScroll: true });
+      void scrollLatest();
+    } catch (error) { globalMessages.error(error instanceof Error ? error.message : "新建对话失败"); }
+    finally { creating = false; }
   }
   async function copy(answer: CreditAnswer) {
     try { await navigator.clipboard.writeText(customerAnswerText(answer)); globalMessages.success("已复制答复和资料来源"); }
     catch { globalMessages.error("复制失败，请选择答复文字手动复制"); }
   }
   function citations(answer: CreditAnswer): string[] { return [...new Set(answer.paragraphs.flatMap(p => p.citations.map(c => c.sourceId)))]; }
+  async function showCitation(event: MouseEvent, turnId: string, sourceId: string) {
+    event.preventDefault();
+    const details = document.getElementById(`references-${turnId}`);
+    if (details instanceof HTMLDetailsElement) details.open = true;
+    await tick();
+    const target = document.getElementById(`source-${turnId}-${sourceId}`);
+    target?.scrollIntoView({ block: "start", behavior: "instant" });
+    target?.focus({ preventScroll: true });
+  }
+  function fileType(title: string) { return title.match(/\.([a-z0-9]+)$/i)?.[1]?.toUpperCase() || "文件"; }
   onMount(() => {
     mounted = true;
     void refresh();
-    void api<{ documents: Material[] }>("materials").then(data => materials = data.documents).catch(() => {});
-    return () => { mounted = false; clearTimeout(timer); };
+    return () => { mounted = false; revision++; clearTimeout(timer); };
   });
 </script>
 
-<div class="credit-assistant">
-  <div class="conversation">
-    <ModuleCard>
-      <div class="conversation-header">
-        <PanelHeading id="credit-qa-heading" title="授信问答" />
-        <button class="btn btn-sm" type="button" disabled={session.running || sending} onclick={() => void newSession()}>新建会话</button>
-      </div>
-      {#if loading}
-        <p role="status">正在读取问答记录…</p>
-      {:else if loadError}
-        <p role="alert">{loadError} <button type="button" class="btn btn-sm" onclick={() => void refresh()}>重试</button></p>
-      {:else if !session.turns.length && !session.running}
-        <div class="examples">
-          {#each examples as example}<button type="button" onclick={() => question = example}>{example}</button>{/each}
-        </div>
-      {/if}
-      <div class="turns">
-        {#each session.turns as turn (turn.id)}
-          <article class="turn">
-            <p class="question">{turn.question}</p>
-            <div class="answer-heading"><h3>{statusNames[turn.answer.status]}</h3><button class="btn btn-sm" type="button" onclick={() => void copy(turn.answer)}>复制答复及来源</button></div>
+<div class="chat-toolbar" use:portal={"#tr-topbar-actions"}>
+  <button class="chat-button chat-button--new" type="button" disabled={busy || loading} onclick={() => void newSession()}>
+    <WorkbenchIcon name="plus" /><span>{creating ? "正在新建…" : "新对话"}</span>
+  </button>
+</div>
+
+<div class="credit-chat" bind:this={chat}>
+  <div class="chat-messages" role="log" aria-label="对话记录" aria-live="polite" aria-relevant="additions text">
+    {#if loading}
+      <div class="chat-empty" role="status"><span class="loading-dot"></span><p>正在载入对话…</p></div>
+    {:else if !session.turns.length && !pendingQuestion && !session.running && !session.error && !loadError}
+      <div class="chat-empty"><span class="chat-welcome-icon"><WorkbenchIcon name="chat" /></span><h2>有什么需要核实？</h2></div>
+    {/if}
+    {#if loadError}
+      <div class="chat-load-error" role="alert"><p>{loadError}</p><button class="chat-button" type="button" onclick={() => void refresh()}>重新连接</button></div>
+    {/if}
+    {#each session.turns as turn (turn.id)}
+      <article class="chat-turn" aria-label="一轮对话">
+        <div class="message message--user"><span class="sr-only">你：</span><p>{turn.question}</p></div>
+        <div class="message message--assistant">
+          <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手</span></div>
+          <div class="answer-content">
             {#each turn.answer.paragraphs as paragraph}
-              <p class="answer-paragraph">{paragraph.text}{#each paragraph.citations as cite}<a class="citation" href={`#source-${turn.id}-${cite.sourceId}`} aria-label={`资料来源${citations(turn.answer).indexOf(cite.sourceId) + 1}`}>[{citations(turn.answer).indexOf(cite.sourceId) + 1}]</a>{/each}</p>
+              <p class="answer-paragraph">{paragraph.text}{#each paragraph.citations as cite}<a class="citation" href={`#source-${turn.id}-${cite.sourceId}`} aria-label={`查看资料来源${citations(turn.answer).indexOf(cite.sourceId) + 1}`} onclick={event => void showCitation(event, turn.id, cite.sourceId)}>[{citations(turn.answer).indexOf(cite.sourceId) + 1}]</a>{/each}</p>
             {/each}
-            {#if turn.answer.gaps.length}<div class="gaps"><h4>尚需补充确认</h4><ul>{#each turn.answer.gaps as gap}<li>{gap}</li>{/each}</ul></div>{/if}
-            {#if turn.answer.warnings.length}<div class="warnings">{#each turn.answer.warnings as warning}<p>{warning}</p>{/each}</div>{/if}
-            {#if turn.answer.files.length}<ul class="attachments">{#each turn.answer.files as file}<li><a href={file.url} target="_blank" rel="noreferrer">{file.title}</a></li>{/each}</ul>{/if}
+            {#if turn.answer.files.length}
+              {#if !turn.answer.paragraphs.length}<p class="answer-paragraph">所需材料已附上，可以直接下载。</p>{/if}
+              <ul class="file-attachments" aria-label="答复附件">
+                {#each turn.answer.files as file}
+                  <li><a class="file-attachment" href={`${file.url}?download=1`} download={file.title} aria-label={`下载 ${file.title}`}>
+                    <span class="file-icon"><WorkbenchIcon name="file" /></span>
+                    <span class="file-info"><strong>{file.title}</strong><span>{fileType(file.title)} · 下载文件</span></span>
+                    <span class="file-download"><WorkbenchIcon name="download" /></span>
+                  </a></li>
+                {/each}
+              </ul>
+            {/if}
+            {#if turn.answer.gaps.length}<div class="answer-gaps"><h3>尚需确认</h3><ul>{#each turn.answer.gaps as gap}<li>{gap}</li>{/each}</ul></div>{/if}
+            {#if turn.answer.warnings.length}<div class="answer-warnings">{#each turn.answer.warnings as warning}<p>{warning}</p>{/each}</div>{/if}
             {#if turn.answer.sources.length || turn.answer.calculations.length}
-              <details class="sources">
+              <details class="answer-sources" id={`references-${turn.id}`}>
                 <summary>资料来源与计算过程</summary>
                 {#each turn.answer.sources as source}
-                  <div class="source" id={`source-${turn.id}-${source.id}`}>
+                  <div class="source" id={`source-${turn.id}-${source.id}`} tabindex="-1">
                     <a href={source.url} target="_blank" rel="noreferrer">{source.title} · {source.locator}</a>
                     <span class="source-kind">{authorityNames[source.authority]}{source.extraction === "ocr" ? " · 扫描识别" : ""}</span>
                     {#each turn.answer.paragraphs.flatMap(p => p.citations).filter(c => c.sourceId === source.id) as cite}<blockquote>{cite.quote}</blockquote>{/each}
                   </div>
                 {/each}
                 {#each turn.answer.calculations as calc}
-                  <div class="source calculation" id={`source-${turn.id}-${calc.id}`}>
-                    <h4>{calc.label}</h4><p>{calc.expression} = {calc.result} {calc.resultUnit}</p>
+                  <div class="source" id={`source-${turn.id}-${calc.id}`} tabindex="-1">
+                    <h3>{calc.label}</h3><p>{calc.expression} = {calc.result} {calc.resultUnit}</p>
                     <ul>{#each calc.inputs as input}<li>{input.name} = {input.value} {input.unit}<blockquote>{input.quote}</blockquote><a href={turn.answer.sources.find(s => s.id === input.sourceId)?.url} target="_blank" rel="noreferrer">{turn.answer.sources.find(s => s.id === input.sourceId)?.title} · {turn.answer.sources.find(s => s.id === input.sourceId)?.locator}</a></li>{/each}</ul>
                   </div>
                 {/each}
               </details>
             {/if}
-          </article>
-        {/each}
-        {#if session.running}<div class="pending" role="status">{#if pendingQuestion}<p class="question">{pendingQuestion}</p>{/if}<p>{session.progress || "正在核对材料…"}</p></div>{/if}
-        {#if session.error}<p role="alert">{session.error}</p>{/if}
-      </div>
-      <form class="composer" onsubmit={send}>
-        <label for="credit-question">授信问题</label>
-        <textarea id="credit-question" class="textarea textarea-bordered" bind:value={question} maxlength="3000" rows="4" placeholder="请说明主体、期间和需要核实的问题，例如：2025年合并口径吸收投资收到的现金来源。" disabled={sending || session.running}></textarea>
-        <button class="btn btn-primary" type="submit" disabled={!question.trim() || sending || session.running}>{session.running ? "正在核对材料" : sending ? "正在发送" : "生成答复"}</button>
-      </form>
-    </ModuleCard>
+            <button class="chat-button chat-button--copy" type="button" onclick={() => void copy(turn.answer)} aria-label="复制答复和资料来源"><WorkbenchIcon name="copy" /><span>复制答复</span></button>
+          </div>
+        </div>
+      </article>
+    {/each}
+    {#if pendingQuestion || session.running || sending || session.error}
+      <article class="chat-turn" aria-label="当前对话">
+        {#if pendingQuestion}<div class="message message--user"><span class="sr-only">你：</span><p>{pendingQuestion}</p></div>{/if}
+        <div class="message message--assistant">
+          <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手</span></div>
+          {#if session.running || sending}
+            <p class="chat-progress" role="status"><span class="loading-dot"></span>{sending ? "正在发送…" : session.progress || "正在核对材料…"}</p>
+          {:else if session.error}
+            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<button class="chat-button" type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</button>{/if}</div>
+          {/if}
+        </div>
+      </article>
+    {/if}
   </div>
-  <aside class="materials">
-    <ModuleCard>
-      <PanelHeading id="credit-materials-heading" title="授信材料" />
-      <label for="credit-material-filter">查找材料</label>
-      <input id="credit-material-filter" class="input input-bordered" bind:value={materialFilter} placeholder="文件名、年份或材料类型" />
-      {#if !materials.length}<p>材料目录尚未载入。</p>{/if}
-      <ul class="material-list">{#each filteredMaterials as material}<li><a href={material.url} target="_blank" rel="noreferrer">{material.title}</a><span class="source-kind">{authorityNames[material.authority]}</span></li>{/each}</ul>
-    </ModuleCard>
-  </aside>
+  <div class="composer-dock">
+    <form class="chat-composer" onsubmit={send} bind:this={form}>
+      <label class="sr-only" for="credit-question">输入消息</label>
+      <textarea id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} maxlength="3000" rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={loading || creating} aria-describedby="credit-composer-hint"></textarea>
+      <div class="composer-actions">
+        <span id="credit-composer-hint">Enter 发送<span class="keyboard-hint"> · Shift + Enter 换行</span></span>
+        <button class="chat-button chat-button--send" type="submit" disabled={!question.trim() || busy || loading || !!loadError} aria-label={busy ? "正在处理消息" : "发送消息"} title={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <style>
-  .credit-assistant { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 330px); gap: 20px; align-items: start; }
-  .conversation, .materials { min-width: 0; }
-  .conversation-header, .answer-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .examples { display: grid; gap: 12px; margin: 20px 0; }
-  .examples button { min-height: 44px; text-align: left; padding: 12px; border: 1px solid var(--border, #d8e2f0); border-radius: var(--radius-control, 6px); background: var(--surface, white); cursor: pointer; }
-  .turn { padding: 20px 0; border-bottom: 1px solid var(--border, #d8e2f0); }
-  .question { padding: 14px; background: var(--page-bg, #f6f8fb); border-radius: var(--radius-control, 6px); white-space: pre-wrap; overflow-wrap: anywhere; }
-  .answer-paragraph { line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
-  h3 { font-size: 1.125rem; font-weight: bold; } h4 { font-size: 1rem; font-weight: bold; margin: 12px 0; }
-  a { color: var(--brand, #2f6fd6); text-decoration: underline; overflow-wrap: anywhere; }
-  .citation { margin-left: 4px; font-size: .875rem; }
-  .composer { display: grid; gap: 12px; padding-top: 24px; }
-  .composer textarea { width: 100%; min-height: 110px; resize: vertical; font-size: 1rem; }
-  .composer button { justify-self: end; min-height: 44px; }
-  label { display: block; font-size: .875rem; margin-bottom: 8px; }
-  .materials input { width: 100%; min-height: 44px; }
-  .material-list { list-style: none; padding: 0; margin-bottom: 0; max-height: 68vh; overflow-y: auto; }
-  .material-list li { padding: 14px 0; border-bottom: 1px solid var(--border, #d8e2f0); font-size: .875rem; line-height: 1.65; }
-  .source-kind { display: block; color: var(--text-2, #667085); font-size: .875rem; margin-top: 6px; }
-  .sources { margin-top: 20px; } summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
-  .source { padding: 12px 0; border-top: 1px solid var(--border, #d8e2f0); scroll-margin-top: 20px; }
-  blockquote { white-space: pre-wrap; overflow-wrap: anywhere; border-left: 3px solid var(--border, #d8e2f0); margin: 12px 0; padding: 4px 12px; font-size: .875rem; line-height: 1.7; }
-  .warnings, .gaps { line-height: 1.75; } .warnings { color: var(--text-2, #667085); font-size: .875rem; }
-  .attachments { padding-left: 20px; line-height: 1.8; } .pending { padding-top: 18px; }
-  @media (max-width: 960px) { .credit-assistant { grid-template-columns: minmax(0, 1fr); } .material-list { max-height: none; } }
+  .credit-chat { display: flex; flex: 1; flex-direction: column; min-width: 0; width: 100%; }
+  .chat-toolbar { display: flex; align-items: center; }
+  .chat-messages { flex: 1; width: min(100%, 880px); margin-inline: auto; padding: 36px 24px 20px; }
+  .chat-empty { display: flex; min-height: min(40dvh, 320px); flex-direction: column; align-items: center; justify-content: center; gap: 20px; color: var(--text-3); text-align: center; }
+  .chat-empty h2 { margin: 0; color: var(--text-1); font-size: 1.5rem; font-weight: bold; }
+  .chat-welcome-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: var(--radius-card); background: var(--brand-soft); color: var(--brand); }
+  .chat-welcome-icon :global(svg) { width: 28px; height: 28px; }
+  .chat-turn { display: grid; gap: 28px; margin-bottom: 36px; }
+  .message { min-width: 0; line-height: 1.85; overflow-wrap: anywhere; }
+  .message--user { justify-self: end; max-width: min(85%, 680px); padding: 12px 18px; border-radius: var(--radius-card); background: var(--brand-soft); color: var(--text-1); }
+  .message--user p { margin: 0; white-space: pre-wrap; }
+  .message--assistant { display: grid; gap: 12px; }
+  .assistant-identity { display: flex; align-items: center; gap: 10px; color: var(--text-1); font-size: .875rem; font-weight: bold; }
+  .assistant-identity :global(svg) { color: var(--brand); width: 22px; height: 22px; }
+  .answer-content { min-width: 0; }
+  .answer-paragraph { margin: 0 0 16px; white-space: pre-wrap; }
+  .answer-paragraph:last-child { margin-bottom: 0; }
+  .answer-content a { color: var(--brand); overflow-wrap: anywhere; }
+  .citation { margin-left: 4px; padding-block: 6px; font-size: .875rem; text-decoration: none; }
+  .citation:hover { text-decoration: underline; }
+  .file-attachments { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; list-style: none; margin: 16px 0; padding: 0; }
+  .file-attachment { display: flex; align-items: center; gap: 12px; min-height: 88px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); text-decoration: none; transition: border-color 160ms ease, background 160ms ease; }
+  .file-attachment:hover { border-color: var(--brand); background: var(--brand-soft); }
+  .file-icon { flex-shrink: 0; display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-control); background: var(--bg-page); }
+  .file-icon :global(svg) { width: 24px; height: 24px; }
+  .file-info { display: grid; gap: 4px; min-width: 0; flex: 1; }
+  .file-info strong { color: var(--text-1); font-size: .875rem; font-weight: bold; line-height: 1.6; }
+  .file-info > span { color: var(--text-3); font-size: .875rem; }
+  .file-download { display: grid; place-items: center; flex-shrink: 0; }
+  .file-download :global(svg) { width: 20px; height: 20px; }
+  h3 { margin: 12px 0 8px; font-size: 1rem; font-weight: bold; }
+  .answer-gaps ul, .source ul { margin: 0 0 12px; padding-left: 24px; }
+  .answer-warnings { color: var(--text-3); font-size: .875rem; }
+  .answer-warnings p { margin: 8px 0; }
+  .answer-sources { margin: 12px 0 4px; color: var(--text-2); font-size: .875rem; }
+  summary { width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--text-3); }
+  summary:hover { color: var(--brand); }
+  .source { padding: 16px 0; border-top: 1px solid var(--border); scroll-margin-top: 24px; }
+  .source-kind { display: block; color: var(--text-3); margin-top: 4px; }
+  blockquote { margin: 10px 0; padding: 4px 12px; border-left: 2px solid var(--border-strong); white-space: pre-wrap; }
+  .chat-progress { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--text-3); font-size: .875rem; }
+  .loading-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--brand); }
+  .answer-error p, .chat-load-error p { margin: 0 0 12px; color: var(--text-2); }
+  .chat-load-error { margin-bottom: 24px; }
+  .composer-dock { position: sticky; z-index: 2; bottom: 0; width: 100%; padding: 16px 24px max(20px, env(safe-area-inset-bottom)); background: var(--bg-page); }
+  .chat-composer { max-width: 832px; margin-inline: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 160ms ease; }
+  .chat-composer:focus-within { border-color: var(--brand); }
+  textarea { display: block; width: 100%; min-height: 56px; max-height: 180px; padding: 0; border: 0; resize: none; background: transparent; color: var(--text-1); font: inherit; line-height: 1.75; outline: none; }
+  textarea::placeholder { color: var(--text-3); }
+  textarea:disabled { cursor: wait; }
+  .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; }
+  .composer-actions > span { color: var(--text-3); font-size: .875rem; }
+  .chat-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text-2); font-size: .875rem; font-weight: bold; cursor: pointer; transition: background 160ms ease, border-color 160ms ease, color 160ms ease; }
+  .chat-button :global(svg) { width: 18px; height: 18px; }
+  .chat-button:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+  .chat-button:disabled { opacity: .5; cursor: not-allowed; }
+  .chat-button--copy { padding-inline: 10px; margin-left: -10px; border-color: transparent; background: transparent; color: var(--text-3); font-weight: normal; }
+  .chat-button--send { flex-shrink: 0; width: 44px; padding: 0; border-color: var(--brand); background: var(--brand); color: var(--surface); }
+  .chat-button--send :global(svg) { width: 22px; height: 22px; }
+  .chat-button--send:hover:not(:disabled) { border-color: var(--brand-deep); background: var(--brand-deep); color: var(--surface); }
+  .chat-button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  @media (max-width: 600px) {
+    .chat-messages { padding: 24px 16px 12px; }
+    .composer-dock { padding: 12px 16px max(16px, env(safe-area-inset-bottom)); }
+    .chat-composer { padding: 12px; }
+    .message--user { max-width: 92%; }
+    .chat-turn { gap: 22px; }
+    .keyboard-hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .chat-button, .file-attachment, .chat-composer { transition: none; } }
 </style>
