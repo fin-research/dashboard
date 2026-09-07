@@ -7,7 +7,7 @@
   "vars": {
     "AUTH0_DOMAIN": "hasbai.eu.auth0.com",
     "AUTH0_CLIENT_ID": "16vMxoYpr5AdPRiW1PkwIiHuRWszii6m",
-    "AUTH0_MANAGEMENT_CLIENT_ID": "LA46CcB3FQ4Uac4JyEzPSObcV4PV8CFU",
+    "AUTH0_MANAGEMENT_CLIENT_ID": "MriIYaKO6xE8QfOAMdiQMxmKeSq53eHo",
     "ACCESS_MODE": "enforce",
     "ACCESS_TEAM_DOMAIN": "protossr.cloudflareaccess.com",
     "ACCESS_AUD": "3eceddd7e32af3ce30d8209174e4ad8238fd9a27b700f1337fcff689a13fa973",

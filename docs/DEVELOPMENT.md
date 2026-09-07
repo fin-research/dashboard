@@ -47,7 +47,9 @@ git diff --check
 
 - `pnpm worker:dev` 用于构建后本地 Worker 检查。
 - `pnpm worker:deploy` 会部署 `eastmoney-dashboard`，只在用户明确要求发布时执行。
-- 个人信息服务复用现有 Auth0 管理应用：`AUTH0_MANAGEMENT_CLIENT_ID` 为非敏感配置，`AUTH0_MANAGEMENT_CLIENT_SECRET` 必须作为 Dashboard 的 Worker Secret 单独配置（融资 Worker 的同名 Secret 不会自动共享）。需要 `read:users`、`update:users`、`read:roles` 权限；只读取当前账号的角色与权限，不授予前端管理令牌。
+- 个人信息服务使用独立的 `eastmoney dashboard profile` Auth0 管理应用：`AUTH0_MANAGEMENT_CLIENT_ID` 为非敏感配置，`AUTH0_MANAGEMENT_CLIENT_SECRET` 必须作为 Dashboard 的 Worker Secret 单独配置（不得轮换融资 Worker 使用的管理应用密钥）。需要 `read:users`、`update:users`、`read:roles` 权限；只读取当前账号的角色与权限，不授予前端管理令牌。
+- 管理凭证配置：`node --use-env-proxy scripts/provision-auth0-profile.mjs` 只读计划；用户授权后加 `--apply` 创建或复用 Dashboard 专用 M2M 应用（不轮换已存在密钥），验证 client credentials 后通过标准输入写入 Worker Secret，并更新本地非敏感 Client ID。脚本不输出或落盘密钥与 Token；之后运行 `pnpm worker:typegen`。
+- 注册验证提示：Action 源码为 `auth0/actions/eastmoney-login.cjs`，公开页面为 `/auth/verify-email`。必须先发布 Dashboard 并确认提示页 200，再执行 `node --use-env-proxy scripts/publish-auth0-login.mjs --apply`；脚本保留已有 Action Secret、依赖和绑定，拒绝覆盖其他未发布草稿。发布后回读生效版本与 post-login 绑定。
 - 本地账号服务可从 `.dev.vars.example` 创建未跟踪的 `.dev.vars`。变更真实邮箱、姓名及发送密码重置邮件均属于实际账号操作；默认测试使用模拟服务，不修改真实账号。
 - 账号与路由专项验收：`node --test tests/auth-client.test.mjs tests/profile.test.mjs tests/access.test.mjs tests/fund-report.test.mjs`；构建后运行 `node scripts/verify-profile-routes.mjs` 验证真实 SvelteKit 路由与内存上传，全部上游为模拟实现。
 - 发布前核对 `wrangler.jsonc` 中绑定、migration 顺序和生产数据服务路径，但不要把 Secret 写入配置。

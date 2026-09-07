@@ -43,6 +43,7 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 
 ### 个人信息与登录
 
+- `GET /auth/verify-email`：公开的注册邮箱验证提示页，返回 200、`no-store, private` 和 `Referrer-Policy: no-referrer`。提示用户检查邮件，完成验证后从 `/auth/login?returnTo=%2Fprofile` 开始新登录；查询中的邮箱、错误文本和 Auth0 事务状态均不反射到页面。
 - `GET /auth/session`：返回当前 Access 会话；匿名用户的 `user` 为 `null`，供页面跳转和上传前检查。所有身份响应禁止缓存。
 - `GET /profile`：需登录，展示个人资料、邮箱、密码重置入口、只读角色权限和原有浏览器个性化设置。
 - `GET /api/profile`：仅返回当前账号的姓名、邮箱、邮箱验证状态、已分配角色与权限；不返回管理令牌、身份提供方凭证或内部 metadata。

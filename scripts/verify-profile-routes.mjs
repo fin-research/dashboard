@@ -52,6 +52,15 @@ try {
     assert.deepEqual(await data.json(), { type: 'redirect', location: `/auth/login?returnTo=${encodeURIComponent(path)}` });
     checks++;
   }
+  const notice = await respond('/auth/verify-email?state=opaque-test-state&email=must-not-render%4018.cn');
+  assert.equal(notice.status, 200);
+  assert.match(notice.headers.get('cache-control'), /no-store/);
+  assert.equal(notice.headers.get('referrer-policy'), 'no-referrer');
+  const noticeHtml = await notice.text();
+  assert.match(noticeHtml, /请检查验证邮件/);
+  assert.match(noticeHtml, /我已验证，继续登录/);
+  assert.doesNotMatch(noticeHtml, /opaque-test-state|must-not-render|access_denied|role="alert"/);
+  checks++;
   const denied = await respond('/api/fund-report', { method: 'POST', headers: { Accept: '*/*' } });
   assert.equal(denied.status, 401);
   assert.equal((await denied.json()).code, 'LOGIN_REQUIRED');
