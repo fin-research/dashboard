@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import AuthMenu from '$lib/AuthMenu.svelte';
 
   import { currentReportDate } from "../report-date";
   import {
@@ -39,6 +40,7 @@
       <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
       <span>资金管理部</span>
     </a>
+    <AuthMenu />
     <button class="settings-entry" type="button" onclick={openSettings}>
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="3" />

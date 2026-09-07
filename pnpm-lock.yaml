@@ -29,6 +29,9 @@ importers:
       html-to-image:
         specifier: ^1.11.13
         version: 1.11.13
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
       pg:
         specifier: ^8.23.0
         version: 8.23.0

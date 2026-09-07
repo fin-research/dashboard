@@ -23,10 +23,11 @@
 
 - 修改前先搜索现有页面、组件、图表、派生函数和测试；优先复用，不建立平行实现。
 - UI 变更必须读取 `DESIGN.md`；保持既有桌面布局和移动端模块顺序，不自行引入新设计体系。
-- 浏览器只请求同源 `/data/*`；本地由 Vite 代理，线上 Dashboard Worker 不接管 `/data/*`。
-- 市场点评由浏览器直接请求 Data Worker 的单一上游映射 REST 资源，在 `src/market-report-resources.ts` 加工为视觉版与文字版共享的完整契约；Data GraphQL 仅是同资源薄镜像，不作为整份报告主链路。不得请求 `/data/market-report/*`，不得经过 Dashboard Worker 聚合，也不得新增 GraphQL 市场报告业务字段。
+- 公网 `/data/*` 由 Data Worker 管理并要求登录。公开市场点评经同源 `/api/market-resources/*` 的限定资源通道读取，Dashboard 通过 `DATA` / `InternalData` 私有 Service Binding 访问上游。
+- 市场点评仍按单一上游映射 REST 资源读取，在 `src/market-report-resources.ts` 加工为视觉版与文字版共享的完整契约；公开资源通道只验证资源、字段和查询范围，不聚合整份报告。Data GraphQL 仅是同资源薄镜像，不作为整份报告主链路；不得新增 GraphQL 市场报告业务字段。
 - Data REST 列表按顶层 JSON array 消费，每次请求必须用 `fields` 只选择实际使用字段，并以 `src/data-contracts.ts` 的 Zod Schema 校验响应。债券基础信息代码只能从当次成交与收藏报价动态派生，不得硬编码债券清单；公募公司债筛选使用结构化 `bondType` 与 `bondOfferingType`，不得按名称字母猜测。
 - Dashboard Worker 服务端访问 Data Worker 必须优先使用 `DATA` Service Binding；不得从同一 Cloudflare zone 通过全局公网 `fetch` 回环。新闻详情扇出必须保持有界并发。
+- 身份由 Auth0 与 Cloudflare Access 统一管理。所有写入、AI 和交易研究工作台入口均须通过中央 Access 校验；Dashboard 只检查有效登录，不检查融资角色。独立 Worker HTTP 入口同样需要保护。
 - 一级发行视觉与文字输出必须共用 `src/primary-issues.ts`；文字报告不得读取 Python 归档文本。
 - 热点首次访问只读最近成功快照；只有用户手动生成才调用模型并追加 `hotspot_snapshot`。旧快照的证据范围以快照自身为准。
 - 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。

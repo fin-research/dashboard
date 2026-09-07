@@ -11,11 +11,11 @@
 
 ## 客户端与服务端边界
 
-- 授信问答是单独的材料库，按用户要求将指定授信材料原件及解析文本上传独立 R2 `credit`，并支持按文档 ID 下载；这不改变下文“授信台账 Excel 仅本地导入 Neon”的既有流程。其 `/api/credit-assistant/*` 本期按用户决定不加口令，未来统一由 Access 覆盖页面、全部 API 和直连域名。随机 Cookie 仅隔离会话，不是鉴权。
+- 授信问答是单独的材料库，按用户要求将指定授信材料原件及解析文本上传独立 R2 `credit`，并支持按文档 ID 下载；这不改变下文“授信台账 Excel 仅本地导入 Neon”的既有流程。其页面、`/api/credit-assistant/*` 和独立 Worker HTTP 入口统一验证 Access 身份，直连域名也不能绕过。会话隔离 Cookie 不承担身份认证。
 
 - 浏览器不得取得 Provider 密钥、数据库连接字符串、D1/R2 binding、完整二级池 Excel 数据缓存或授信源 Excel。本地授信导入不得上传文件到 Worker、R2 或浏览器接口。
 - `$lib/server` 模块不得被客户端代码导入。
-- Dashboard Worker 到同一 zone 的 Data Worker 使用 `DATA` Service Binding；服务端代码不得以公开 hostname 做 Worker-to-Worker 回环请求。浏览器仍只访问同源 `/data/*`。
+- Dashboard Worker 到同一 zone 的 Data Worker 使用 `DATA` Service Binding；服务端代码不得以公开 hostname 做 Worker-to-Worker 回环请求。公开市场点评的浏览器请求使用 `/api/market-resources/*` 限定通道，其余 Data 请求须携带有效 Access 会话。
 - 生成式 AI 输出必须经 Zod Schema 或明确的文本协议校验后进入业务层。
 - 融资择时卖方观点先调用固定 AI Search MCP 公共端点，仅把限长、去重后的证据交给 AI Gateway；机构、标题、日期和源 key 由检索元数据回填，不接受模型自由生成。
 - R2 对象 key 和下载文件必须先由数据库记录解析，不能接受任意用户路径直读存储桶。
@@ -23,12 +23,15 @@
 
 ## 请求保护
 
-- 二级池上传和删除执行同源校验；保持 `src/lib/server/bond-ledger.ts` 的校验边界。
-- 市场点评定稿保存和热点页面当前不是独立账号系统；写入只做同源校验。同源不等于鉴权，若页面开放给不可信用户，必须先补独立身份与授权模型。
-- 融资择时整体结论和卖方生成按已授权内部写操作处理，执行同源校验并保留追加历史；当前同样不是独立账号鉴权。
-- 文件上传必须维持类型、大小、日期和内容校验；失败时不得留下被标记为成功的数据库记录。
-- 资金日报上传执行同源校验，但当前与其他内部写接口一样没有独立账号鉴权；不要把管理页入口本身视为权限控制。
-- `/api/credit` 的 PATCH 按内部已授权写操作处理：执行同源校验、Zod 输入校验、参数化增量更新和单事务提交。当前与其他内部写接口一样不等于独立账号鉴权；若站点开放给不可信用户，必须先补身份与岗位授权。
+- Auth0 的 `eastmoney-email` 连接只允许邮箱注册，Pre Registration Action 限制为 `18.cn`；新账号验证邮箱后登录，迁移的既有账号保留原验证状态。
+- Cloudflare Access 使用团队 `protossr.cloudflareaccess.com` 和独立 eastmoney 应用。Worker 校验 RS256 签名、issuer、audience、有效期与人员邮箱，不信任单独的邮箱头，也不接受服务身份执行用户操作。
+- `/auth/login` 是统一登录／注册入口，返回地址只接受安全的本站路径。退出清理站点 Cookie，再退出 Auth0 和 Access。
+- `src/hooks.server.ts` 统一保护所有非 GET/HEAD/OPTIONS 操作及 `/trading-research*`、`/credit-assistant`、`/api/credit*` 和 `/api/economic-indicators`。其他页面和只读接口保持公开。Dashboard 对有效登录账号不检查角色或业务权限。
+- `worker/entry.ts` 对绕过 SvelteKit 的授信问答 HTTP 入口执行相同验证；WebSocket 和 GET 也受保护。
+- 写入同时验证 Origin，文件上传继续保留类型、大小、日期、内容校验，数据库写入继续使用参数化查询和事务。登录不能替代业务输入校验。
+- 公开报告资源通道只允许报告使用的资源、字段、日期范围和有界条数，不能转发任意 URL、路径、GraphQL 或 Choice 指标。通过私有 DATA binding 读取后流式返回，客户端继续执行原有 Zod 契约校验。
+- 登录相关响应和含身份的页面使用 private/no-store；JWT、Cookie、客户端 Secret 不进入页面数据或日志。
+- `ACCESS_MODE=legacy` 仅用于有明确顺序的迁移与回退；正常配置为 `enforce`，未知模式或保护配置缺失必须失败关闭。
 
 ## 数据与日志
 

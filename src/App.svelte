@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AuthMenu from '$lib/AuthMenu.svelte';
   import { onDestroy, onMount } from "svelte";
 
   import "./app.css";
@@ -308,6 +309,7 @@
       </div>
       <div class="masthead-controls" aria-label="报告控制">
         <div class="titlebar-actions">
+          <AuthMenu />
           <div class="view-toggle" role="group" aria-label="报告展示方式">
             <button
               id="visual-report-tab"

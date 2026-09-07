@@ -69,7 +69,7 @@ async function getJson<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetch(url.startsWith("/data/") ? url.replace("/data/", "/api/market-resources/") : url, {
       method,
       signal,
       headers: {

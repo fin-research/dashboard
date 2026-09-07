@@ -5,6 +5,11 @@
   "compatibility_date": "2026-08-20",
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
+    "AUTH0_DOMAIN": "hasbai.eu.auth0.com",
+    "AUTH0_CLIENT_ID": "16vMxoYpr5AdPRiW1PkwIiHuRWszii6m",
+    "ACCESS_MODE": "enforce",
+    "ACCESS_TEAM_DOMAIN": "protossr.cloudflareaccess.com",
+    "ACCESS_AUD": "3eceddd7e32af3ce30d8209174e4ad8238fd9a27b700f1337fcff689a13fa973",
     "CLOUDFLARE_ACCOUNT_ID": "5cecc63c78acf8f5473f8745f4244448",
     "AI_GATEWAY_ID": "default",
     "DATA_API_BASE_URL": "https://eastmoney.hasbai.xyz/data"
@@ -32,6 +37,7 @@
     {
       "binding": "DATA",
       "service": "eastmoney-data",
+      "entrypoint": "InternalData",
       "remote": true
     }
   ],

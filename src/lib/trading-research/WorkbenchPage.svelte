@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AuthMenu from '$lib/AuthMenu.svelte';
   import { afterNavigate } from "$app/navigation";
 
   import BondLedgerPage from "$lib/pages/BondLedgerPage.svelte";
@@ -112,6 +113,7 @@
       </div>
     </div>
     <div class="tr-topbar__meta">
+      <AuthMenu />
       <div id="tr-topbar-actions" class="tr-topbar__actions"></div>
     </div>
   </header>
