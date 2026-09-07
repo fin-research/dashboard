@@ -22,6 +22,8 @@
 
 R2 是原始证据与版本目录。AI Search 只调用 `search()`，不调用其生成回答接口；该实例显示的默认生成模型不影响授信答复模型。关键词和向量检索帮助找同义表达，全文精确检索用于科目、文件和数值定位，也在索引未完成或暂不可用时提供回退。检索结果必须匹配当前目录的 `searchKey`，并回读当前原文；旧版本和不在本资料库的命中不能进入证据。
 
+每次语义检索等待最多 15 秒，超时即用当前全文证据继续并显示提示。模型上游返回 HTTP 429 时，会话结束本次任务并提示服务繁忙或额度受限；不自动改用其他 Provider，也不反复重试处于冷却状态的凭证。
+
 本功能根据用户明确指定使用 `credit_answer` 任务类型，固定 `custom-codex/responses`、`gpt-5.6-luna`、`reasoning.effort=max`，不切换 Provider。其余业务继续使用现有 opencode → codex 默认策略。所有生成请求和复核请求复用 `src/lib/server/ai-gateway.ts`，使用既有 `CF_AIG_TOKEN` Secret 和 Gateway BYOK。
 
 ## 证据规则
@@ -77,14 +79,17 @@ node scripts/upload-credit-corpus.mjs --apply
 
 代码检查：`pnpm typecheck`、`pnpm worker:typecheck`、`pnpm test`、`pnpm build`、`wrangler deploy --dry-run`、`git diff --check`。新增测试覆盖精确计算、伪造数值/引用、文件路径、OCR/待确认提示、复核拒绝及指定 Provider；全站导航契约同步更新。
 
-真实模型验收需要在未跟踪的 `.dev.vars` 中提供 `CF_AIG_TOKEN`，或在明确授权部署后使用现有生产 Secret。Wrangler OAuth 登录不能代替 Gateway Token。不得声称模拟工具调用或单元测试已经通过真实模型验收。
+本地真实模型验收需要在未跟踪的 `.dev.vars` 中提供 `CF_AIG_TOKEN`；Git 发布完成后也可用线上 HTTP 模式复用现有生产 Secret，每例创建独立会话。Wrangler OAuth 登录不能代替 Gateway Token。不得声称模拟工具调用或单元测试已经通过真实模型验收。
 
 ```sh
 node --env-file=.dev.vars scripts/evaluate-credit-assistant.mjs
+node scripts/evaluate-credit-assistant.mjs --base-url=https://eastmoney.hasbai.xyz
 # 或逐例执行 --case=material / capital / borrowing / calculation
 ```
 
 评估脚本将真实回答、来源和耗时写入 `.credit-local/evaluations/`，只输出步骤和摘要日志，仍需逐份核对回答。开发时请使用 `pnpm worker:dev` 启动自定义 Worker；`pnpm dev` 的 SvelteKit 开发服务器不承载 Worker 入口中的 Agents API。本地环境需先按 `docs/DEVELOPMENT.md` 配置 Hyperdrive；远程资料读取依赖 R2/AI Search remote bindings。
+
+2026-09-07 首次实测：55 份原件、3,281 个证据块已发布至 R2，原件及目录 SHA-256 核对通过；其中 58 页使用 OCR。线上材料目录、文件下载及会话可用。四类真实问答均已发起，但 codex 上游返回 HTTP 429：该模型全部凭证处于冷却状态；因此真实生成质量尚未通过验收。恢复上游后须重新运行以上用例并逐份核验，不把该记录当成验收通过。
 
 典型问题至少覆盖：索取审计报告、不同报告期的指标和比例计算、2025 年 30.90 亿元增资来源、50 亿元取得借款现金流的来源与用途、材料未披露的问题、错误金额前提、连续追问。
 

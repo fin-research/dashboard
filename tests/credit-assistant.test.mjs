@@ -84,3 +84,20 @@ test("credit model is pinned to codex with max effort and no provider fallback",
   assert.equal(calls.length, 1); assert.match(calls[0].url, /custom-codex\/responses$/);
   assert.equal(calls[0].body.model, "gpt-5.6-luna"); assert.equal(calls[0].body.reasoning.effort, "max");
 });
+
+test("slow semantic search does not block canonical lexical evidence", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let initialSources;
+  const answerPromise = answerCreditQuestion({ question: "2025吸收投资现金", corpus, history: [], credentials,
+    semanticSearch: () => new Promise(() => {}),
+    generate: async (_credentials, messages, schema) => {
+      initialSources = JSON.parse(messages[2].content).sources;
+      return schema.parse({ step: { action: "answer", answer: { status: "complete", paragraphs: [], gaps: [], attachments: [doc.id] } } });
+    },
+  });
+  t.mock.timers.tick(15_000);
+  const answer = await answerPromise;
+  assert.ok(initialSources.some(s => s.id === "a-1"));
+  assert.match(answer.warnings.join(""), /全文精确检索/);
+  assert.equal(answer.files[0].id, doc.id);
+});

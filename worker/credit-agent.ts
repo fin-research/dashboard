@@ -57,7 +57,10 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         ...(error instanceof AiGatewayResponseError ? { provider: error.provider, status: error.status, gateway_log_id: error.gatewayLogId,
           detail: (this.env.CF_AIG_TOKEN ? error.message.replaceAll(this.env.CF_AIG_TOKEN, "[secret]") : error.message).slice(0, 500) } : {}),
       }));
-      this.setState({ ...this.state, running: false, progress: "", error: "本次答复未完成，请重试。若持续失败，请检查材料索引和 AI Gateway 配置。" });
+      const message = error instanceof AiGatewayResponseError && error.status === 429
+        ? "指定模型服务暂时繁忙或额度受限，请稍后重试。管理员可检查 codex 上游的额度与凭证状态。"
+        : "本次答复未完成，请重试。若持续失败，请检查材料索引和 AI Gateway 配置。";
+      this.setState({ ...this.state, running: false, progress: "", error: message });
     }
   }
 }

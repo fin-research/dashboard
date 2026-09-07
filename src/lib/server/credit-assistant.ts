@@ -19,6 +19,17 @@ export type CreditSearch = (query: string) => Promise<string[]>;
 export type CreditGenerate = typeof generateAiGatewayObject;
 const reviewSchema = z.object({ approved: z.boolean(), issues: z.array(z.string().max(1000)).max(12) });
 
+async function boundedSearch(search: CreditSearch, query: string): Promise<string[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([search(query), new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("检索等待超时")), 15_000);
+    })]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function answerCreditQuestion(options: {
   question: string; corpus: CreditCorpus; history: CreditTurn[]; credentials: AiGatewayCredentials;
   semanticSearch?: CreditSearch; progress?: (message: string) => void; generate?: CreditGenerate;
@@ -42,7 +53,7 @@ export async function answerCreditQuestion(options: {
     let semantic: CreditBlock[] = [];
     if (options.semanticSearch) {
       try {
-        const keys = new Set(await options.semanticSearch(query));
+        const keys = new Set(await boundedSearch(options.semanticSearch, query));
         semantic = corpus.blocks.filter(b => keys.has(b.searchKey) && b.extraction !== "unreadable");
       } catch {
         warnings.add("语义检索暂不可用，本次使用材料全文精确检索。");
