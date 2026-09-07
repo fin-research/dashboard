@@ -151,6 +151,16 @@ test("reasoning effort is fixed by task type", () => {
   });
 });
 
+test("structured final answers exclude assistant commentary messages", async () => {
+  const { value } = await withoutAiLogs(() => generateAiGatewayObject(credentials,
+    [{ role: "user", content: "Find the report" }], z.object({ ok: z.boolean() }), "probe", options,
+    async () => Response.json({ status: "completed", output: [
+      { type: "message", phase: "commentary", content: [{ type: "output_text", text: "I will check the files." }] },
+      { type: "message", phase: "final_answer", content: [{ type: "output_text", text: '{"ok":true}' }] },
+    ] })));
+  assert.deepEqual(value, { ok: true });
+});
+
 test("market briefing enables Responses web search with max reasoning effort", async () => {
   const calls = [];
   const fetcher = async (url, init) => {

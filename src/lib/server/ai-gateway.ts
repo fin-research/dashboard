@@ -372,7 +372,8 @@ async function runProvider<OUTPUT>(
   try {
     output = JSON.parse(outputText);
   } catch {
-    throw outputError(provider, response.status, gatewayLogId, "output_text is not JSON");
+    const diagnostics = options.taskType === "credit_answer" ? ` (phases=${JSON.stringify(envelope.data.output.filter(isObject).filter(x => x.type === "message").map(x => x.phase ?? "unspecified"))}, first_char=${JSON.stringify(outputText.trim()[0])}, chars=${outputText.length})` : "";
+    throw outputError(provider, response.status, gatewayLogId, "output_text is not JSON" + diagnostics);
   }
   const validated = schema.safeParse(output);
   if (!validated.success) {
@@ -427,8 +428,12 @@ function splitInstructions(messages: AiGatewayMessage[]): {
 
 function extractOutputText(output: unknown[]): string {
   const texts: string[] = [];
-  for (const item of output) {
-    if (!isObject(item) || item.type !== "message" || !Array.isArray(item.content)) {
+  const messages = output.filter(isObject).filter(item => item.type === "message");
+  const finals = messages.filter(item => item.phase === "final_answer");
+  // A coding model can emit commentary before its structured final answer.
+  // Preserve legacy unphased outputs, but never concatenate a preamble into JSON.
+  for (const item of finals.length ? finals : messages.filter(item => item.phase !== "commentary")) {
+    if (!Array.isArray(item.content)) {
       continue;
     }
     for (const content of item.content) {
