@@ -6,6 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "AUTH0_DOMAIN": "hasbai.eu.auth0.com",
+    "AUTH0_LOGIN_DOMAIN": "auth.hasbai.xyz",
     "AUTH0_CLIENT_ID": "16vMxoYpr5AdPRiW1PkwIiHuRWszii6m",
     "AUTH0_MANAGEMENT_CLIENT_ID": "MriIYaKO6xE8QfOAMdiQMxmKeSq53eHo",
     "ACCESS_MODE": "enforce",

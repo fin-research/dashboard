@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { AUTH0_DOMAIN } from './lib/auth0-management.mjs';
+import { AUTH0_DOMAIN, management } from './lib/auth0-management.mjs';
 
 // Read-only HTTP smoke: no credentials, signup submissions, cookies or transaction
 // URLs are written to disk/output. This does not replace browser visual testing.
@@ -31,9 +31,18 @@ for (const screen of ['login', 'signup']) {
   assert.ok(html.includes(screen === 'login' ? '登录资金管理平台' : '注册账号'));
   assert.ok(/#2f6fd6/i.test(html), "Expected brand blue");
   assert.ok(/#f6f8fb/i.test(html), "Expected project background");
-  if (domain !== AUTH0_DOMAIN && screen === 'signup') {
-    assert.ok(/name="ulp-name"/.test(html), "Missing name field"); assert.ok(/name="ulp-department"/.test(html), "Missing department field");
-  }
   console.log(JSON.stringify({ screen, origin: url.origin, path: url.pathname, status: 200,
-    locale: 'zh-CN', brandColor: true, background: true, customFields: screen === 'signup' && html.includes('name="ulp-name"') }));
+    locale: 'zh-CN', brandColor: true, background: true }));
+}
+if (domain !== AUTH0_DOMAIN) {
+  const form = management('get', 'forms').find((item) => item.name === 'eastmoney signup profile');
+  assert.ok(form, 'Missing signup profile Form');
+  const current = management('get', `forms/${form.id}`);
+  const fields = current.nodes.flatMap((node) => node.config?.components ?? []).filter((item) => item.category === 'FIELD');
+  assert.deepEqual(fields.map((field) => [field.id, field.required, field.config.max_length]), [['name', true, 50], ['department', true, 100]]);
+  assert.equal(current.languages.primary, 'zh-CN');
+  assert.equal(current.ending.resume_flow, true);
+  const binding = management('get', 'actions/triggers/post-login/bindings').bindings.find((item) => item.action.name === 'eastmoney signup profile');
+  assert.ok(binding, 'Missing profile Action binding');
+  console.log(JSON.stringify({ profileFormConfigured: true, formId: form.id, fields: ['name', 'department'], required: true }));
 }

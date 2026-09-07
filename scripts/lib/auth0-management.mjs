@@ -5,7 +5,7 @@ export const LOGIN_ACTION_ID = '0b72438c-33ff-4321-b6c7-74b7d021e6a3';
 
 // Capture output in memory: Auth0 responses can contain client secrets.
 export function management(method, path, body) {
-  const result = spawnSync('auth0', ['api', method, path, '--tenant', AUTH0_DOMAIN, '--no-input'], {
+  const result = spawnSync('auth0', ['api', method, path, '--tenant', AUTH0_DOMAIN, '--no-input', ...(method === 'delete' ? ['--force'] : [])], {
     input: body === undefined ? undefined : JSON.stringify(body), encoding: 'utf8', maxBuffer: 4 * 1024 * 1024,
   });
   let data;

@@ -43,6 +43,17 @@ const respond = (path, { authenticated = false, method = 'GET', headers = {}, bo
 );
 let checks = 0;
 try {
+  for (const method of ['GET', 'POST']) {
+    const response = await respond('/auth/logout?returnTo=https://other.test', { method });
+    assert.equal(response.status, 303);
+    const destination = new URL(response.headers.get('location'));
+    assert.equal(destination.origin, `https://${vars.AUTH0_LOGIN_DOMAIN}`);
+    assert.equal(destination.pathname, '/v2/logout');
+    assert.equal(destination.searchParams.get('client_id'), vars.AUTH0_CLIENT_ID);
+    assert.equal(destination.searchParams.get('returnTo'), `https://${vars.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/logout`);
+    assert.match(response.headers.get('set-cookie'), /CF_Authorization=;/);
+    checks++;
+  }
   for (const path of ['/profile', '/trading-research', '/trading-research/credit']) {
     const response = await respond(path);
     assert.equal(response.status, 303);
