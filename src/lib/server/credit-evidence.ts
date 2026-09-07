@@ -36,6 +36,26 @@ export function lexicalSearch(corpus: CreditCorpus, query: string, limit = 16): 
     return { block, score };
   }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, limit).map(x => x.block);
 }
+export type CreditSearchHit = { key: string; text: string };
+export function canonicalSearchEvidence(corpus: CreditCorpus, query: string, hits: Array<CreditSearchHit | string>): CreditBlock[] {
+  const found = new Map<string, CreditBlock>();
+  for (const raw of hits.slice(0, 20)) {
+    const hit = typeof raw === "string" ? { key: raw, text: "" } : raw;
+    const file = corpus.searchFiles?.find(f => f.key === hit.key);
+    const blocks = corpus.blocks.filter(b => (file ? b.documentId === file.documentId : b.searchKey === hit.key) && b.extraction !== "unreadable");
+    if (!blocks.length) continue;
+    // AI Search chooses the chunk boundaries. Its text only locates canonical evidence;
+    // never cite an index payload directly or take the first pages of a matched document.
+    const ranked = lexicalSearch({ ...corpus, blocks }, hit.text.slice(0, 6000) || query, 2);
+    for (const block of ranked) found.set(block.id, block);
+  }
+  return [...found.values()].slice(0, 8);
+}
+export function isCreditOriginalKey(key: string): boolean {
+  return key.startsWith("originals/") && /\.(pdf|docx?|xlsx?)$/i.test(key)
+    && new TextEncoder().encode(key).byteLength <= 1024 && !/[\\\u0000-\u001f\u007f]/.test(key)
+    && key.split("/").every(segment => segment !== "" && segment !== "." && segment !== "..");
+}
 export function sourceFor(corpus: CreditCorpus, block: CreditBlock): CreditSource {
   const doc = corpus.documents.find(d => d.id === block.documentId)!;
   const page = block.locator.match(/^PDF第(\d+)页/)?.[1];

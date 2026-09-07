@@ -1,5 +1,5 @@
 import { getAgentByName } from "agents";
-import { loadCreditCorpus } from "../src/lib/server/credit-evidence.ts";
+import { loadCreditCorpus, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const PRIVATE_HEADERS = { "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
@@ -50,7 +50,7 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env)
     const doc = id ? corpus.documents.find(d => d.id === id) : undefined;
     if (!doc) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
     // Resolve only catalog-owned immutable keys; arbitrary R2 paths cannot be requested.
-    if (!/^originals\/[a-f0-9]{24}\.(pdf|docx?|xlsx?)$/.test(doc.originalKey)) throw new Error("Invalid catalog key");
+    if (!isCreditOriginalKey(doc.originalKey)) throw new Error("Invalid catalog key");
     const file = await env.CREDIT.get(doc.originalKey, { range: request.headers });
     if (!file) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
     const isPdf = doc.originalKey.endsWith(".pdf");

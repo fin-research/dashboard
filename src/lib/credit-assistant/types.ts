@@ -10,8 +10,9 @@ export const blockSchema = z.object({
   extraction: z.enum(["text", "ocr", "unreadable"]), searchKey: z.string(),
 });
 export const corpusSchema = z.object({
-  version: z.literal("credit-extract-v1"), builtAt: z.string(),
+  version: z.enum(["credit-extract-v1", "credit-document-v2"]), builtAt: z.string(),
   documents: z.array(documentSchema).max(500), blocks: z.array(blockSchema).max(30000),
+  searchFiles: z.array(z.object({ key: z.string(), documentId: z.string(), sha256: z.string(), bytes: z.number().int().positive().max(4_000_000), part: z.number().int().positive() })).optional(),
 });
 export type CreditDocument = z.infer<typeof documentSchema>;
 export type CreditBlock = z.infer<typeof blockSchema>;

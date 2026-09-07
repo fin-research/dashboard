@@ -32,7 +32,7 @@ for (const item of cases.filter(c => !selected || selected === c.id)) {
           headers: { "content-type": "application/json" }, body: JSON.stringify({ query, ai_search_options: {
             retrieval: { retrieval_type: "hybrid", max_num_results: 50 }, query_rewrite: { enabled: false }, cache: { enabled: false },
           } }) })).json();
-        return (response.result?.chunks ?? []).map(c => c.item.key);
+        return (response.result?.chunks ?? []).map(c => ({ key: c.item.key, text: c.text }));
       },
     }) };
   } catch (error) {

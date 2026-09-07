@@ -47,7 +47,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
             retrieval: { retrieval_type: "hybrid", max_num_results: 50 },
             query_rewrite: { enabled: false }, cache: { enabled: false },
           } });
-          return result.chunks.map(c => c.item.key);
+          return result.chunks.map(c => ({ key: c.item.key, text: c.text }));
         },
       });
       this.setState({ ...this.state, turns: [...this.state.turns, { id: payload.id, question: payload.question, answer, createdAt: answer.createdAt }],

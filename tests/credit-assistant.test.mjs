@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Decimal } from "decimal.js";
 import { z } from "zod";
-import { arithmetic, calculateCredit, finalizeCreditAnswer, lexicalSearch, verifyQuote } from "../src/lib/server/credit-evidence.ts";
+import { arithmetic, calculateCredit, finalizeCreditAnswer, lexicalSearch, verifyQuote, canonicalSearchEvidence, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
 import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
 import { generateAiGatewayObject } from "../src/lib/server/ai-gateway.ts";
 import { customerAnswerText } from "../src/lib/credit-assistant/types.ts";
@@ -118,4 +118,24 @@ test("follow-up questions retain prior attachments, evidence and calculations", 
   });
   assert.equal(answer.files[0].url, `/api/credit-assistant/files/${doc.id}`);
   assert.equal(history.length, 1);
+});
+
+test("whole-document search matches the returned passage rather than the first page", () => {
+  const key = "search/定期报告/2025年度审计报告.pdf.md";
+  const pages = [{ ...blocks[0], id: "cover", text: "2025年度审计报告封面", searchKey: key },
+    { ...blocks[1], id: "late-note", locator: "PDF第102页", text: "关联方东方财富支付借款利息8,520,547.95元。", searchKey: key }];
+  const whole = { ...corpus, version: "credit-document-v2", blocks: pages,
+    searchFiles: [{ key, documentId: doc.id, bytes: 100, sha256: "b".repeat(64), part: 1 },
+      { key: key + ".part-002.md", documentId: doc.id, bytes: 100, sha256: "c".repeat(64), part: 2 }] };
+  const result = canonicalSearchEvidence(whole, "借款的来源", [{ key, text: "关联方东方财富支付借款利息8,520,547.95元。" }]);
+  assert.equal(result[0].id, "late-note");
+  assert.equal(canonicalSearchEvidence(whole, "借款", [{ key: key + ".part-002.md", text: "关联方借款利息" }])[0].id, "late-note");
+  assert.deepEqual(canonicalSearchEvidence(whole, "借款", [{ key: "search/deleted.md", text: "伪造来源" }]), []);
+  assert.equal(result[0].text, pages[1].text);
+});
+
+test("original file keys preserve names while rejecting traversal and non-material paths", () => {
+  assert.ok(isCreditOriginalKey("originals/定期报告/2025年度/公司报告.pdf"));
+  assert.ok(isCreditOriginalKey("originals/业务/【请证投部&计财部确认】情况.docx"));
+  for (const key of ["originals/../secret.pdf", "originals//报告.pdf", "originals/报告.pdf\n", "originals/报告\\a.pdf", "catalog/corpus.json", "originals/file.exe"]) assert.equal(isCreditOriginalKey(key), false);
 });
