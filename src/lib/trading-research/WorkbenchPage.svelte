@@ -5,6 +5,7 @@
   import FinancingModelPage from "$lib/pages/FinancingModelPage.svelte";
   import SecondaryBondPoolWeeklyPage from "$lib/pages/SecondaryBondPoolWeeklyPage.svelte";
   import CreditView from "./CreditView.svelte";
+  import CreditAssistantView from "../credit-assistant/CreditAssistantView.svelte";
   import OverviewView from "./OverviewView.svelte";
   import ResearchView from "./ResearchView.svelte";
   import TradingView from "./TradingView.svelte";
@@ -158,6 +159,8 @@
         <TradingView />
       {:else if activeViewId === "credit"}
         <CreditView />
+      {:else if activeViewId === "credit-assistant"}
+        <CreditAssistantView />
       {:else if activeViewId === "research"}
         <ResearchView />
       {:else if activeViewId === "workflow"}

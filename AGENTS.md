@@ -65,6 +65,7 @@
 - D1、Neon、R2、migration、导入一致性 → `docs/DATABASE.md`
 - `/data/*` 或 `/api/*` 契约、状态码、参数 → `docs/API.md`
 - Secret、服务端边界、同源校验、日志 → `docs/SECURITY.md`
+- 授信问答、材料解析/OCR、R2 credit、AI Search credit、CreditAgent → `docs/CREDIT_ASSISTANT.md`；此业务按用户指定使用 `credit_answer`，固定 codex / gpt-5.6-luna / max。
 - 本地环境、测试、构建、调试、发布 → `docs/DEVELOPMENT.md`
 
 Do not load all documentation by default. Read only documentation relevant to the current task. If multiple areas are affected, read only the corresponding documents. Do not repeatedly read documents already available in the current context unless necessary.

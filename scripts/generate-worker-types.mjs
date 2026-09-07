@@ -21,6 +21,9 @@ await new Promise((resolve, reject) => {
 const declarationUrl = new URL("../worker-configuration.d.ts", import.meta.url);
 const generated = await readFile(declarationUrl, "utf8");
 const withoutBuildImport = generated.replace(
+  /\n\t\tmainModule: typeof import\("[^"]+"\);/,
+  "",
+).replace(
   /\n\tinterface GlobalProps \{\n\t\tmainModule: typeof import\("[^"]+"\);\n\t\}\n/,
   "\n",
 ).replace(
@@ -30,4 +33,4 @@ const withoutBuildImport = generated.replace(
   /Workflow<Parameters<import\("\.\/worker\/entry"\)\.EconomicIndicatorSyncWorkflow\['run'\]>\[0\]\['payload'\]>/,
   'Workflow<import("./src/lib/server/economic-indicator-sync").EconomicIndicatorSyncParams>',
 );
-await writeFile(declarationUrl, withoutBuildImport);
+await writeFile(declarationUrl, withoutBuildImport.replaceAll('import("./worker/entry").CreditAgent', 'import("agents").Agent<Cloudflare.Env>'));

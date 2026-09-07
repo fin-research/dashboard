@@ -11,6 +11,8 @@
 
 ## 客户端与服务端边界
 
+- 授信问答是单独的材料库，按用户要求将指定授信材料原件及解析文本上传独立 R2 `credit`，并支持按文档 ID 下载；这不改变下文“授信台账 Excel 仅本地导入 Neon”的既有流程。其 `/api/credit-assistant/*` 本期按用户决定不加口令，未来统一由 Access 覆盖页面、全部 API 和直连域名。随机 Cookie 仅隔离会话，不是鉴权。
+
 - 浏览器不得取得 Provider 密钥、数据库连接字符串、D1/R2 binding、完整二级池 Excel 数据缓存或授信源 Excel。本地授信导入不得上传文件到 Worker、R2 或浏览器接口。
 - `$lib/server` 模块不得被客户端代码导入。
 - Dashboard Worker 到同一 zone 的 Data Worker 使用 `DATA` Service Binding；服务端代码不得以公开 hostname 做 Worker-to-Worker 回环请求。浏览器仍只访问同源 `/data/*`。

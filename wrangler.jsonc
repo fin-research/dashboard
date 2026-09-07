@@ -45,6 +45,11 @@
   ],
   "r2_buckets": [
     {
+      "binding": "CREDIT",
+      "bucket_name": "credit",
+      "remote": true
+    },
+    {
       "binding": "EASTMONEY",
       "bucket_name": "eastmoney",
       "remote": true
@@ -73,5 +78,28 @@
     "logs": {
       "head_sampling_rate": 1
     }
-  }
+  },
+  "ai_search": [
+    {
+      "binding": "CREDIT_SEARCH",
+      "instance_name": "credit",
+      "remote": true
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CREDIT_AGENT",
+        "class_name": "CreditAgent"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "credit-agent-v1",
+      "new_sqlite_classes": [
+        "CreditAgent"
+      ]
+    }
+  ]
 }

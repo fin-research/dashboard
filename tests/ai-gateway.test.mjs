@@ -146,6 +146,7 @@ test("reasoning effort is fixed by task type", () => {
     market_briefing: "max",
     analysis: "high",
     policy_commentary: "max",
+    credit_answer: "max",
     summary: "low",
   });
 });

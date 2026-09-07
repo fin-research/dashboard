@@ -47,6 +47,8 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ## 服务端模块
 
+- 授信问答使用同一 Worker 内的 `CreditAgent`（Agents SDK + SQLite Durable Object），从独立 R2 `credit` 原件/解析文本及 AI Search `credit` 找证据，执行有来源的计算后通过统一 Gateway 生成并复核答复。入口、材料更新、数据边界与 Access 预留路径见 `docs/CREDIT_ASSISTANT.md`。
+
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。
 - `src/lib/server/market-briefing.ts` 通过 `DATA` Service Binding 分别从 `/data/stock-summary`、`/data/news` 和新闻详情取材；新闻详情保持最多 5 个并发，在 Dashboard Worker 组装提示词并生成今日聚焦。

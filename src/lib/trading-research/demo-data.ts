@@ -2,6 +2,7 @@ export type WorkbenchViewId =
   | "overview"
   | "trading"
   | "credit"
+  | "credit-assistant"
   | "research"
   | "workflow"
   | "secondary-bond-pool"
@@ -46,6 +47,13 @@ export const workbenchRoutes: Array<{
     title: "授信管理",
     context: "授信周报发布范围与额度风险快照",
     icon: "credit",
+  },
+  {
+    id: "credit-assistant",
+    label: "授信问答",
+    title: "授信问答",
+    context: "授信材料查询与客户答复",
+    icon: "search",
   },
   {
     id: "research",

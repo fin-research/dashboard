@@ -1,4 +1,8 @@
 node_modules/
+.credit-local/
+scripts/__pycache__/
+.dev.vars*
+!.dev.vars.example
 dist/
 .svelte-kit/
 .DS_Store

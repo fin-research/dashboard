@@ -29,7 +29,9 @@
   "dependencies": {
     "@sveltejs/adapter-cloudflare": "^7.2.9",
     "@sveltejs/kit": "^2.70.2",
+    "agents": "^0.22.0",
     "d3-cloud": "^1.2.9",
+    "decimal.js": "^10.6.0",
     "echarts": "^6.0.0",
     "html-to-image": "^1.11.13",
     "pg": "^8.23.0",

@@ -11,6 +11,7 @@ export const AI_GATEWAY_REASONING_EFFORT_BY_TASK = {
   market_briefing: "max",
   analysis: "high",
   policy_commentary: "max",
+  credit_answer: "max",
   summary: "low",
 } as const;
 
@@ -156,7 +157,7 @@ export async function generateAiGatewayObject<OUTPUT>(
 
   const primary = await attemptProvider(
     normalizedCredentials,
-    AI_GATEWAY_PRIMARY_PROVIDER,
+    options.taskType === "credit_answer" ? AI_GATEWAY_FALLBACK_PROVIDER : AI_GATEWAY_PRIMARY_PROVIDER,
     "primary",
     messages,
     schema,
@@ -167,6 +168,8 @@ export async function generateAiGatewayObject<OUTPUT>(
     fetcher,
   );
   if (primary.ok) return primary.value;
+  // Credit answers explicitly use the user's codex provider; never silently change it.
+  if (options.taskType === "credit_answer") throw primary.error;
   if (!primary.error.retryable) throw primary.error;
 
   console.warn(
