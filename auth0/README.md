@@ -6,6 +6,7 @@
 
 - `branding/theme.json` 映射 `DESIGN.md`：品牌蓝 `#2f6fd6`、冷灰 `#f6f8fb`、白色卡片、8px 控件和 10px 卡片圆角。
 - `branding/zh-CN.json` 管理登录、注册和密码重置的中文文案；其余错误及验证文案由 Auth0 内置中文翻译提供。
+- 登录和注册的 `description` 使用单个空格隐藏默认说明；不能改为空字符串，否则 Auth0 会恢复“登录／注册以继续使用”的默认文案。
 - 仅启用 `zh-CN`，确保英文浏览器也显示中文。主题和语言是 Auth0 租户级配置。
 - `node --use-env-proxy scripts/publish-auth0-branding.mjs` 输出计划；加 `--apply` 发布并回读验证。发布前在系统临时目录保存不含密钥的配置备份，输出备份目录。
 

@@ -28,7 +28,11 @@ for (const screen of ['login', 'signup']) {
     html = await response.text(); break;
   }
   assert.ok(/lang="zh-CN"/i.test(html), "Expected Chinese document language");
-  assert.ok(html.includes(screen === 'login' ? '登录资金管理平台' : '注册账号'));
+  assert.ok(html.includes(screen === 'login' ? '工作台' : '注册账号'));
+  const heading = html.match(/<header\b[^>]*>([\s\S]*?)<\/header>/i)?.[1];
+  assert.ok(heading, 'Missing login / signup header');
+  const headingText = heading.replace(/<[^>]*>/g, '').replace(/\s+/g, '').trim();
+  assert.equal(headingText, screen === 'login' ? '工作台' : '注册账号', 'Default description must remain hidden');
   assert.ok(/#2f6fd6/i.test(html), "Expected brand blue");
   assert.ok(/#f6f8fb/i.test(html), "Expected project background");
   console.log(JSON.stringify({ screen, origin: url.origin, path: url.pathname, status: 200,
