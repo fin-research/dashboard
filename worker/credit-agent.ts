@@ -2,6 +2,7 @@ import { Agent } from "agents";
 import { z } from "zod";
 import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
 import { loadCreditCorpus } from "../src/lib/server/credit-evidence.ts";
+import { AiGatewayResponseError } from "../src/lib/server/ai-gateway.ts";
 import type { CreditSession } from "../src/lib/credit-assistant/types.ts";
 
 const questionSchema = z.object({ question: z.string().trim().min(1).max(3000) });
@@ -52,7 +53,10 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
       this.setState({ ...this.state, turns: [...this.state.turns, { id: payload.id, question: payload.question, answer, createdAt: answer.createdAt }],
         running: false, progress: "", error: null });
     } catch (error) {
-      console.error(JSON.stringify({ event: "credit_answer_failed", error_type: error instanceof Error ? error.name : "unknown" }));
+      console.error(JSON.stringify({ event: "credit_answer_failed", error_type: error instanceof Error ? error.name : "unknown",
+        ...(error instanceof AiGatewayResponseError ? { provider: error.provider, status: error.status, gateway_log_id: error.gatewayLogId,
+          detail: (this.env.CF_AIG_TOKEN ? error.message.replaceAll(this.env.CF_AIG_TOKEN, "[secret]") : error.message).slice(0, 500) } : {}),
+      }));
       this.setState({ ...this.state, running: false, progress: "", error: "本次答复未完成，请重试。若持续失败，请检查材料索引和 AI Gateway 配置。" });
     }
   }

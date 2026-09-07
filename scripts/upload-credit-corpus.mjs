@@ -55,6 +55,7 @@ await Promise.all(Array.from({ length: 4 }, async () => {
     if (++originalCount % 10 === 0) console.log(JSON.stringify({ originalsHashVerified: originalCount, total: corpus.documents.length }));
   }
 }));
+console.log(JSON.stringify({ originalsHashVerified: originalCount, total: corpus.documents.length }));
 const catalog = await readFile(path.join(directory, "corpus.json"));
 await (await request("/r2/buckets/credit/objects/catalog/corpus.json", { method: "PUT", body: catalog, headers: { "content-type": "application/json" } })).body?.cancel();
 const published = await request("/r2/buckets/credit/objects/catalog/corpus.json");

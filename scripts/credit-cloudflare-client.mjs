@@ -15,7 +15,7 @@ export async function cloudflareClient() {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const response = await fetch(base + resource, { ...init, headers: { authorization: `Bearer ${token}`,
-          "user-agent": "wrangler/4.125.0", ...init.headers }, signal: AbortSignal.timeout(90000) });
+          "user-agent": "wrangler/4.125.0", ...init.headers }, signal: AbortSignal.timeout(300000) });
         if (response.ok) return response;
         lastStatus = response.status;
         await response.body?.cancel();
