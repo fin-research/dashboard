@@ -1,0 +1,126 @@
+/* Business workspaces share these refinements. Report canvases retain their
+   established shell, typography and controls by omitting tr-shell--workspace. */
+.tr-shell--workspace {
+  --workspace-accent: var(--tr-primary-deep);
+  --workspace-soft: var(--tr-primary-soft);
+}
+
+.tr-shell--workspace[data-workspace-tone="teal"] {
+  --workspace-accent: var(--tr-green);
+  --workspace-soft: var(--tr-green-soft);
+}
+
+.tr-shell--workspace[data-workspace-tone="orange"] {
+  --workspace-accent: var(--tr-orange);
+  --workspace-soft: var(--tr-orange-soft);
+}
+
+.tr-shell--workspace[data-workspace-tone="purple"] {
+  --workspace-accent: var(--tr-purple);
+  --workspace-soft: var(--tr-purple-soft);
+}
+
+.tr-shell.tr-shell--workspace .tr-topbar {
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  background: var(--tr-surface);
+  backdrop-filter: none;
+}
+
+.tr-shell--workspace .tr-topbar__heading { gap: 5px; }
+.tr-shell--workspace .tr-breadcrumb ol { flex-wrap: wrap; gap: 4px 8px; }
+.tr-shell--workspace .tr-breadcrumb a {
+  color: var(--tr-muted);
+  font-size: 1rem;
+  font-weight: normal;
+}
+.tr-shell--workspace .tr-topbar h1 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.tr-shell--workspace .tr-breadcrumb__separator { font-size: 1rem; }
+.tr-shell--workspace h2 {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
+.tr-shell--workspace .tr-drawer { box-shadow: none; }
+.tr-shell--workspace .tr-drawer__nav { padding: 16px 12px; }
+.tr-shell--workspace .tr-drawer__nav a {
+  min-height: 52px;
+  padding-inline: 10px;
+  color: var(--tr-text-2);
+}
+.tr-shell--workspace .tr-nav-icon {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  border-radius: var(--tr-radius-control);
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-soft) 65%, var(--tr-surface));
+}
+.tr-shell--workspace .tr-nav-icon svg { width: 20px; height: 20px; }
+.tr-shell--workspace .tr-nav-label { font-size: 1rem; }
+.tr-shell--workspace .tr-drawer__nav a:hover,
+.tr-shell--workspace .tr-drawer__nav a.active {
+  color: var(--workspace-accent);
+  background: var(--workspace-soft);
+}
+.tr-shell--workspace .tr-drawer__nav a.active {
+  border-color: color-mix(in srgb, var(--workspace-accent) 20%, var(--tr-border));
+}
+.tr-shell--workspace .tr-drawer__nav a.active::before { background: var(--workspace-accent); }
+.tr-shell--workspace.tr-shell--collapsed .tr-drawer__nav a { padding-inline: 0; }
+
+/* Labels remain emphasized; entered values use normal body weight. */
+.tr-shell--workspace :is(.input, .select, .textarea) { font-weight: normal; }
+.tr-shell--workspace :is(a, button, input, select, textarea, summary, main, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-deep);
+  outline-offset: 3px;
+}
+.tr-shell--workspace main:focus-visible { outline-offset: -4px; }
+.tr-shell--workspace #tr-workbench-main:has(.floating-create-button) { padding-bottom: 104px; }
+
+/* Intrinsic card widths also work when the app is shown in a narrow panel. */
+.tr-shell--workspace .tr-metric-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+}
+.tr-shell--workspace .tr-metric-grid--five {
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+}
+
+.tr-shell.tr-shell--workspace .tr-topbar .tr-topbar__meta {
+  display: flex;
+  width: auto;
+  max-width: 100%;
+  margin-left: auto;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.tr-shell.tr-shell--workspace .tr-topbar__actions {
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 1280px) {
+  .tr-shell.tr-shell--workspace .tr-topbar:has(.tr-topbar__actions:not(:empty)) :is(.tr-topbar__meta, .tr-topbar__actions) {
+    width: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .tr-shell.tr-shell--workspace .tr-topbar__title { width: auto; }
+  .tr-shell--workspace .tr-drawer { visibility: hidden; }
+  .tr-shell--workspace.tr-shell--mobile-open .tr-drawer { visibility: visible; }
+  .tr-shell--workspace.tr-shell--collapsed .tr-drawer__nav a { padding-inline: 10px; }
+}
+
+@media (max-width: 720px) {
+  .tr-shell.tr-shell--workspace .tr-topbar { gap: 8px 12px; }
+  .tr-shell--workspace .tr-breadcrumb a { font-size: .875rem; }
+}

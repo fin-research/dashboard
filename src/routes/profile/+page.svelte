@@ -101,7 +101,7 @@
         </form>
       </ModuleCard>
       <ModuleCard labelledBy="profile-email-title">
-        <PanelHeading id="profile-email-title" title="登录邮箱" />
+        <PanelHeading id="profile-email-title" title="登录邮箱" accent="var(--color-accent)" />
         <form class="profile-form" onsubmit={(event) => { event.preventDefault(); void submit('email'); }}>
           <label for="profile-email">邮箱地址 {#if profile}<span class="field-status">{profile.emailVerified ? '已验证' : '待验证'}</span>{/if}</label>
           <input class="input" id="profile-email" name="email" type="email" autocomplete="email" bind:value={email} required maxlength="254" pattern="[^@\s]+@18\.[cC][nN]" disabled={!profile || pending !== null} aria-describedby="email-help" />
@@ -111,14 +111,14 @@
         </form>
       </ModuleCard>
       <ModuleCard labelledBy="profile-password-title">
-        <PanelHeading id="profile-password-title" title="登录密码" />
+        <PanelHeading id="profile-password-title" title="登录密码" accent="var(--color-warning-content)" />
         <div class="profile-form">
           <p class="profile-help">向当前登录邮箱发送密码重置邮件，在邮件中的安全页面设置新密码。</p>
           <div class="profile-actions"><button class="btn btn-outline profile-button" type="button" disabled={!profile || pending !== null} onclick={() => submit('password')}>{pending === 'password' ? '正在请求' : '发送密码重置邮件'}</button></div>
         </div>
       </ModuleCard>
       <ModuleCard labelledBy="profile-preferences-title">
-        <PanelHeading id="profile-preferences-title" title="个性化配置" />
+        <PanelHeading id="profile-preferences-title" title="个性化配置" accent="var(--color-secondary)" />
         <form class="profile-form" onsubmit={(event) => { event.preventDefault(); persistPreferences(); }}>
           <fieldset class="fieldset"><legend class="fieldset-legend">行情颜色逻辑</legend>
             <label class="profile-choice"><input class="radio radio-primary" type="radio" name="marketColorConvention" bind:group={marketColorConvention} value="red-up-green-down" /><span>红涨绿跌（默认）</span></label>

@@ -71,7 +71,7 @@
 
 <div class="tr-view-stack">
   <section aria-labelledby="overview-funding-title">
-    <SectionHeading id="overview-funding-title" title="资金存量指标" />
+    <SectionHeading id="overview-funding-title" title="资金存量指标" accent="var(--tr-orange)" />
     <div class="tr-metric-grid">
       <MetricCard
         label="融入融出合计"
@@ -113,7 +113,7 @@
   </section>
 
   <section aria-labelledby="overview-credit-title">
-    <SectionHeading id="overview-credit-title" title="授信概览" />
+    <SectionHeading id="overview-credit-title" title="授信概览" accent="var(--tr-green)" />
     <div class="tr-metric-grid">
       <MetricCard
         label="授信总额度"
@@ -146,7 +146,7 @@
   </section>
 
   <section aria-labelledby="overview-secondary-title">
-    <SectionHeading id="overview-secondary-title" title="二级资金池概览" />
+    <SectionHeading id="overview-secondary-title" title="二级资金池概览" accent="var(--tr-purple)" />
     <div class="tr-metric-grid">
       <MetricCard
         label="业务本金"
@@ -201,7 +201,7 @@
     </ModuleCard>
 
     <ModuleCard labelledBy="overview-product-title">
-      <PanelHeading id="overview-product-title" title="品种分布">
+      <PanelHeading id="overview-product-title" title="品种分布" accent="var(--tr-orange)">
         <Badge>当日成交金额</Badge>
       </PanelHeading>
       <ChartHost
@@ -213,7 +213,7 @@
     </ModuleCard>
 
     <ModuleCard labelledBy="overview-term-title">
-      <PanelHeading id="overview-term-title" title="期限分布">
+      <PanelHeading id="overview-term-title" title="期限分布" accent="var(--tr-purple)">
         <Badge>当日成交金额</Badge>
       </PanelHeading>
       <ChartHost
@@ -226,7 +226,7 @@
   </div>
 
   <ModuleCard labelledBy="overview-alerts-title">
-    <PanelHeading id="overview-alerts-title" title="预警中心">
+    <PanelHeading id="overview-alerts-title" title="预警中心" accent="var(--tr-orange)">
       <div class="tr-filter-chips" role="group" aria-label="预警筛选">
         <button class="btn" class:btn-active={alertFilter === "all"} type="button" onclick={() => (alertFilter = "all")}>全部 {overviewAlerts.length}</button>
         <button class="btn" class:btn-active={alertFilter === "pending"} type="button" onclick={() => (alertFilter = "pending")}>待处理 {overviewAlerts.length - acknowledgedAlertIds.length}</button>

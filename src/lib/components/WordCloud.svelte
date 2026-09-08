@@ -26,7 +26,7 @@
   let lastSignature = "";
   let frame: number | null = null;
 
-  const colors = ["#f6c96b", "#77bdfb", "#8ad9ca", "#c7b6ff", "#f2a49d"];
+  const colors = ["var(--color-warning-content)", "var(--brand-deep)", "var(--color-success-content)", "var(--color-secondary)", "var(--color-error-content)"];
 
   onMount(() => {
     mounted = true;
@@ -88,8 +88,8 @@
       .words(words)
       .padding(() => clamp(width / 120, 5, 13))
       .rotate(0)
-      .font('ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif')
-      .fontWeight((word) => (word.heat >= 75 ? 720 : 620))
+      .font(getComputedStyle(host).fontFamily)
+      .fontWeight((word) => (word.heat >= 75 ? "bold" : "normal"))
       .fontSize((word) => word.size)
       .spiral("archimedean")
       .random(seededRandom(`${width}:${height}:${lastSignature}`))
@@ -165,7 +165,7 @@
               text-anchor="middle"
               dominant-baseline="central"
               font-size={word.size}
-              font-weight={word.heat >= 75 ? 720 : 620}
+              font-weight={word.heat >= 75 ? "bold" : "normal"}
               fill={wordColor(index, word)}
             >{word.text}</text>
           </g>
@@ -198,30 +198,30 @@
 
   .cloud-word text {
     paint-order: stroke;
-    stroke: rgba(4, 15, 33, 0.28);
+    stroke: transparent;
     stroke-width: 1.5px;
     transition:
-      filter 160ms ease,
       opacity 160ms ease,
       stroke 160ms ease;
   }
 
   .cloud-word:hover text {
-    filter: brightness(1.28) drop-shadow(0 0 10px rgba(119, 189, 251, 0.85));
-    stroke: rgba(246, 201, 107, 0.95);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
     opacity: 1;
   }
 
   .cloud-word.selected text {
-    filter: brightness(1.2) drop-shadow(0 0 8px rgba(110, 214, 189, 0.6));
-    opacity: 0.95;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
   }
 
   .cloud-word:focus-visible text {
-    filter: brightness(1.28) drop-shadow(0 0 10px rgba(119, 189, 251, 0.85));
-    stroke: rgba(246, 201, 107, 0.95);
+    stroke: var(--brand-deep);
     text-decoration: underline;
-    text-decoration-thickness: 1px;
+    text-decoration-thickness: 2px;
     text-underline-offset: 6px;
   }
 
@@ -230,7 +230,7 @@
     inset: 0;
     display: grid;
     place-items: center;
-    color: #91a6c5;
+    color: var(--text-3);
     font-size: 0.875rem;
     letter-spacing: 0.08em;
   }

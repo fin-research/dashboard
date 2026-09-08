@@ -96,7 +96,7 @@ test("政策页面展示重要性并使用隔离的时间轴类名", async () =>
   assert.match(page, /\.policy-timeline \{ display: grid; gap: 2rem;/);
   assert.match(page, /\.policy-timeline-item \{ display: grid; grid-template-columns: 126px minmax\(0, 1fr\); gap: 2rem;/);
   assert.doesNotMatch(page, /class="timeline(?:-item)?"/);
-  assert.match(page, /\.timeline-date \{[^}]*display: flex; align-items: center; justify-content: flex-end;/);
+  assert.match(page, /\.timeline-date \{[^}]*display: flex; align-items: flex-start; justify-content: flex-end;/);
   assert.match(page, /importance-chip--\$\{policy\.importance\}/);
   assert.match(page, /policyImportanceLabels\[policy\.importance\]/);
   assert.match(page, /\.importance-chip--important \{[^}]*color: #b42318;/);

@@ -54,9 +54,9 @@ const save: SubmitFunction = () => {
     <ModuleCard class="role-catalog">
       <PanelHeading id="role-catalog-title" title="角色"><span class="badge badge-ghost">{data.roles.length}</span></PanelHeading>
       <label class="input role-search"><Search size={18} aria-hidden="true" /><input type="search" bind:value={roleQuery} placeholder="查找角色" aria-label="查找角色" /></label>
-      <ul class="menu role-list" aria-labelledby="role-catalog-title">
+      <ul class="role-list" aria-labelledby="role-catalog-title">
         {#each visibleRoles as item}
-          <li><button type="button" class:menu-active={selectedRole === item.id} disabled={saving} onclick={() => selectedRole = item.id} aria-pressed={selectedRole === item.id}>
+          <li><button type="button" class="btn" class:btn-soft={selectedRole === item.id} class:btn-secondary={selectedRole === item.id} class:btn-ghost={selectedRole !== item.id} disabled={saving} onclick={() => selectedRole = item.id} aria-pressed={selectedRole === item.id}>
             <span class="role-label">{item.name}</span><span class="badge badge-ghost">{(drafts[item.id] ?? []).length}</span>
           </button></li>
         {/each}
@@ -98,7 +98,8 @@ const save: SubmitFunction = () => {
                   {#each group.permissions as [code, name, description]}
                     <label class="permission-item" class:permission-item--selected={selected.includes(code)}>
                       <input class="checkbox checkbox-primary checkbox-sm" type="checkbox" checked={selected.includes(code)} onchange={(event) => toggle(code, event.currentTarget.checked)} />
-                      <span><strong>{name}</strong><span>{description}</span><code>{code}</code></span>
+                      <span><strong>{name}</strong><span>{description}</span></span>
+                      <code>{code}</code>
                     </label>
                   {/each}
                 </div>
@@ -119,8 +120,8 @@ const save: SubmitFunction = () => {
   .permission-workspace { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 1.25rem; }
   .permission-workspace :global(.role-catalog) { position: sticky; top: 1rem; }
   .role-search, .permission-search { width: 100%; }
-  .role-list { width: 100%; gap: .375rem; padding: .75rem 0 0; }
-  .role-list button { min-height: 48px; grid-template-columns: 1fr auto; }
+  .role-list { display: grid; width: 100%; gap: .375rem; margin: 0; padding: .75rem 0 0; list-style: none; }
+  .role-list button { display: flex; width: 100%; min-height: 48px; justify-content: space-between; gap: .5rem; padding-inline: .75rem; }
   .role-label { min-width: 0; overflow-wrap: anywhere; }
   .permission-editor-heading, .permission-toolbar, .domain-heading, .domain-heading h2 { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
   .permission-editor-heading :global(.tr-panel-heading) { margin-bottom: 0; }
@@ -138,11 +139,12 @@ const save: SubmitFunction = () => {
   .domain-heading h2 { justify-content: flex-start; margin: 0; font-size: 1rem; font-weight: bold; }
   .domain-heading label { display: flex; min-height: 44px; gap: .5rem; align-items: center; font-size: .875rem; }
   .permission-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: .75rem; }
-  .permission-item { display: flex; align-items: start; gap: .75rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-control); min-width: 0; cursor: pointer; }
+  .permission-item { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .5rem .75rem; padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius-control); min-width: 0; cursor: pointer; }
   .permission-item:hover { border-color: var(--color-primary); }
   .permission-item--selected { background: var(--brand-soft); border-color: color-mix(in srgb, var(--brand) 28%, var(--line)); }
   .permission-item > input { margin-top: .125rem; }
   .permission-item > span { display: grid; gap: .375rem; overflow-wrap: anywhere; }
+  .permission-item > code { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; }
   .permission-item code, .permission-item span span { font-family: inherit; font-size: .875rem; color: var(--muted); line-height: 1.5; }
   .empty-copy { padding: 1rem 0; color: var(--muted); }
   @media (max-width: 1100px) { .permission-workspace { grid-template-columns: 1fr; } .permission-workspace :global(.role-catalog) { position: static; } .role-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); } }

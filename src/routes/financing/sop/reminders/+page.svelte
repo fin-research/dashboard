@@ -171,7 +171,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		<div class="empty-state">
 			<Mail size={24} />
 			<strong>没有匹配的提醒记录</strong>
-			<p>调整筛选条件，或先运行一次提醒任务。</p>
+			<p>可调整筛选条件后查看；提醒发送后，记录会显示在这里。</p>
 		</div>
 	{/if}
 </section>
@@ -186,7 +186,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		min-height: 2.75rem;
 		align-items: center;
 		gap: 0.5rem;
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		font-weight: bold;
 		color: #475467;
 	}
@@ -267,7 +267,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	}
 
 	.filter-bar label > span, .query-field > span {
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		font-weight: bold;
 		color: #475467;
 	}
@@ -277,10 +277,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	.filter-bar button,
 	.filter-bar > a {
 		min-height: 2.75rem;
-		border: 1px solid #d0d5dd;
-		border-radius: 0.5rem;
 		font-size: 1rem;
-		background: #fff;
 	}
 
 	.filter-bar select {
@@ -297,8 +294,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		align-items: center;
 		gap: 0.5rem;
 		padding-inline: 0.75rem;
-		color: #667085;
 	}
+	.query-input :global(svg) { color: var(--muted); }
 
 	.query-field input {
 		width: 100%;

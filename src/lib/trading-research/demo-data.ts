@@ -17,6 +17,7 @@ export type WorkbenchIconName =
   | "database"
   | "funds"
   | "menu"
+  | "user"
   | "search"
   | "sidebar"
   | "chat"

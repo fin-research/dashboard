@@ -46,6 +46,9 @@
     <path d="M4 19V9m5 10V5m5 14v-7m5 7V8M3 21h18" />
   {:else if name === "menu"}
     <path d="M4 7h16M4 12h16M4 17h16" />
+  {:else if name === "user"}
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
   {:else if name === "search"}
     <circle cx="10.5" cy="10.5" r="6.5" />
     <path d="m15.5 15.5 4 4" />

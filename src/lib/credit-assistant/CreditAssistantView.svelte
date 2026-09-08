@@ -335,7 +335,7 @@
     </div>
     <form class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
-      <textarea class="textarea" id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} maxlength="3000" rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={loading || creating} aria-describedby="credit-composer-hint"></textarea>
+      <textarea class="textarea textarea-ghost" id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} maxlength="3000" rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={loading || creating} aria-describedby="credit-composer-hint"></textarea>
       <div class="composer-actions">
         <span id="credit-composer-hint">Enter 发送<span class="keyboard-hint"> · Shift + Enter 换行</span></span>
         <button class="btn chat-button chat-button--send" type="submit" disabled={!selectedCustomer || !question.trim() || busy || loading || !!loadError} aria-label={busy ? "正在处理消息" : "发送消息"} title={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
@@ -400,8 +400,9 @@
   .customer-options button span:last-child, .customer-status { color: var(--text-3); }
   .customer-options p { margin: 0; padding: 12px; color: var(--text-2); }
   .chat-composer { max-width: 832px; margin-inline: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 160ms ease; }
-  .chat-composer:focus-within { border-color: var(--brand); }
-  textarea { display: block; width: 100%; max-height: 180px; padding: 0; resize: none; min-height: 56px; }
+  .chat-composer:focus-within { border-color: var(--brand); outline: 2px solid var(--brand); outline-offset: 2px; }
+  textarea { display: block; width: 100%; max-height: 180px; padding: 0; border: 0; box-shadow: none; resize: none; min-height: 56px; }
+  .chat-composer textarea:focus-visible { outline: none; }
   textarea::placeholder { color: var(--text-3); }
   .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; }
   .composer-actions > span { color: var(--text-3); font-size: .875rem; }

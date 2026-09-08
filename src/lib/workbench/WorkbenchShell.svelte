@@ -6,15 +6,17 @@
   import type { WorkbenchIconName } from "../trading-research/demo-data";
   import "../../layout-report.css";
   import "../trading-research/workbench.css";
+  import "./workspace.css";
 
   let { title, homeHref, views, activeViewId, activeLabel = "", children, chat = false, canvas = false,
     class: className = '', actions, account, status,
-    integrated = false, layoutReport = false, reportKind = null }: {
+    integrated = false, layoutReport = false, reportKind = null, visualVariant = 'workspace', tone = 'blue' }: {
     title: string; homeHref: string;
     class?: string; actions?: Snippet; account?: Snippet; status?: Snippet;
     views: ReadonlyArray<{ id: string; label: string; icon: WorkbenchIconName; href: string }>;
     activeViewId: string; activeLabel?: string; children: Snippet; chat?: boolean; canvas?: boolean;
     integrated?: boolean; layoutReport?: boolean; reportKind?: "secondary" | "financing" | "liability" | null;
+    visualVariant?: 'workspace' | 'report'; tone?: 'blue' | 'teal' | 'orange' | 'purple';
   } = $props();
   let desktopCollapsed = $state(false);
   let mobileDrawerOpen = $state(false);
@@ -61,7 +63,9 @@
 <div
   class:tr-shell--collapsed={desktopCollapsed}
   class:tr-shell--mobile-open={mobileDrawerOpen}
+  class:tr-shell--workspace={!layoutReport && !integrated && visualVariant === 'workspace'}
   class={`tr-workbench tr-shell ${className}`}
+  data-workspace-tone={tone}
   style:--tr-topbar-height={`${topbarHeight}px`}
 >
   <a class="tr-skip-link" href="#tr-workbench-main">跳至工作台内容</a>

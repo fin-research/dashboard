@@ -3,9 +3,9 @@
   import ModuleCard from '../../components/ModuleCard.svelte';
   import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
   const entries = [
-    { href: '/management/people', title: '角色权限', icon: ShieldCheck, tone: 'primary', items: ['业务权限配置', '角色授权范围', '分组检索与批量选择'] },
-    { href: '/profile', title: '个人管理', icon: UserRound, tone: 'secondary', items: ['个人资料与登录邮箱', '密码与账号安全', '行情显示偏好'] },
-    { href: '/fund-report?upload=1', title: '资金日报', icon: FileUp, tone: 'accent', items: ['上传日报文件', '历史日报归档', '查看报告'] }
+    { href: '/management/people', title: '角色权限', icon: ShieldCheck, tone: 'primary', actionClass: 'btn-info', items: ['业务权限配置', '角色授权范围', '分组检索与批量选择'] },
+    { href: '/profile', title: '个人管理', icon: UserRound, tone: 'secondary', actionClass: 'btn-soft btn-secondary', items: ['个人资料与登录邮箱', '密码与账号安全', '行情显示偏好'] },
+    { href: '/fund-report?upload=1', title: '资金日报', icon: FileUp, tone: 'accent', actionClass: 'btn-success', items: ['上传日报文件', '历史日报归档', '查看报告'] }
   ];
 </script>
 
@@ -17,7 +17,7 @@
         <div class={`management-icon management-icon--${entry.tone}`}><entry.icon size={28} aria-hidden="true" /></div>
         <h2>{entry.title}</h2>
         <ul>{#each entry.items as item}<li>{item}</li>{/each}</ul>
-        <a class="btn btn-outline management-entry-action" href={entry.href}>进入{entry.title}<ArrowUpRight size={18} aria-hidden="true" /></a>
+        <a class={`btn ${entry.actionClass} management-entry-action`} href={entry.href}>进入{entry.title}<ArrowUpRight size={18} aria-hidden="true" /></a>
       </ModuleCard>
     {/each}
   </div>

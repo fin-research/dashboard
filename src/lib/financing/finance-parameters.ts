@@ -42,7 +42,12 @@ export function financialReconciliation(row: DataRow) {
 	return { asset_liability_ratio: ratio, adjusted_asset_liability_ratio: adjusted, difference };
 }
 
-export function financialValue(value: unknown, ratio = false) {
-	if (value == null || value === '' || !Number.isFinite(Number(value))) return '暂无数据';
-	return `${(Number(value) * (ratio ? 100 : 1)).toLocaleString('zh-CN', { maximumFractionDigits: ratio ? 2 : 4 })}${ratio ? '%' : ' 亿元'}`;
+export function hasFinancialValue(value: unknown): boolean {
+	return value != null && value !== '' && Number.isFinite(Number(value));
+}
+
+export function financialValue(value: unknown, ratio = false, options: { unit?: boolean } = {}) {
+	if (!hasFinancialValue(value)) return '暂无数据';
+	const unit = options.unit === false ? '' : ratio ? '%' : ' 亿元';
+	return `${(Number(value) * (ratio ? 100 : 1)).toLocaleString('zh-CN', { maximumFractionDigits: ratio ? 2 : 4 })}${unit}`;
 }

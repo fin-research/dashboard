@@ -90,12 +90,14 @@ export function renderWorkbenchBarChart(
       type: "value",
       min: 0,
       max,
+      splitNumber: 3,
       name: unit,
       nameGap: 8,
       nameTextStyle: axisLabel,
       axisLabel: {
         ...axisLabel,
         formatter: (value: number) => `${value}`,
+        hideOverlap: true,
       },
       axisLine: { show: false },
       axisTick: { show: false },
@@ -449,14 +451,14 @@ export function renderLiquidityRateChart(
           textStyle: {
             color: colors.ink,
             fontFamily,
-            fontSize: Math.max(chartTextSize - 1, 12),
+            fontSize: chartTextSize,
           },
         }
       : undefined,
     grid: {
       left: 18,
       right: 20,
-      top: showLegend ? 42 : 16,
+      top: showLegend ? 42 : 28,
       bottom: 24,
       containLabel: true,
     },
@@ -476,11 +478,13 @@ export function renderLiquidityRateChart(
     yAxis: {
       type: "value",
       scale: unit === "%",
+      splitNumber: host.clientHeight < 250 ? 3 : 5,
       name: unit,
       nameTextStyle: axisLabel,
       axisLabel: {
         ...axisLabel,
         formatter: (value: number) => value.toFixed(unit === "bp" ? 0 : 2),
+        hideOverlap: true,
       },
       splitLine: { lineStyle: gridLine },
     },

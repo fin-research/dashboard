@@ -55,7 +55,7 @@
   <meta name="description" content="政策跟踪关联研报详情" />
 </svelte:head>
 
-<DetailPageShell eyebrow="RESEARCH REPORT" title="研报详情" backHref="/trading-research/policy-tracking" backLabel="返回政策跟踪">
+<DetailPageShell eyebrow="RESEARCH REPORT" title="研报详情" backHref="/trading-research/policy-tracking" backLabel="返回政策跟踪" wrapHeadings>
   {#if loading}
     <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取研报</strong></section>
   {:else if errorMessage}

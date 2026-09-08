@@ -95,7 +95,7 @@
 	height: 0.75rem;
 	border: 2px solid #fff;
 	border-radius: 50%;
-	box-shadow: 0 0 0 1px rgb(15 23 42 / 8%), 0 0 0.625rem currentColor;
+	box-shadow: 0 0 0 1px rgb(15 23 42 / 12%);
 }
 
 :where(.financing-scope) .financing-status-light.good { color: #079455; background: #12b76a; }
@@ -125,7 +125,18 @@
 :where(.financing-scope) .financing-panel table {
 	width: 100%;
 	border-collapse: collapse;
-	table-layout: fixed;
+	table-layout: auto;
+}
+
+:where(.financing-scope) .financing-table-scroll {
+	min-width: 0;
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+:where(.financing-scope) .financing-date {
+	display: block;
+	white-space: nowrap;
 }
 
 :where(.financing-scope) .financing-panel th,
@@ -174,12 +185,7 @@
 	background: #eff6ff;
 }
 
-:where(.financing-scope) .project-panel th:first-child { width: 28%; }
-:where(.financing-scope) .project-panel th:nth-child(2) { width: 18%; }
-:where(.financing-scope) .project-panel th:nth-child(n + 3) { width: 18%; }
 :where(.financing-scope) .issuance-panel th:first-child { width: 34%; }
-
-:where(.financing-scope) .limit-card th:first-child { width: 22%; }
 
 :where(.financing-scope) .limit-card td > strong {
 	color: #1e293b;
@@ -200,10 +206,6 @@
 	flex-direction: column;
 }
 
-:where(.financing-scope) .project-panel table {
-	flex: 1 1 auto;
-}
-
 :where(.financing-scope) .parameter-reminder {
 	display: flex;
 	align-items: center;
@@ -218,12 +220,13 @@
 }
 
 :where(.financing-scope) .parameter-reminder a {
+	flex: 0 0 auto;
 	margin-left: auto;
-	font-weight: bold;
-	color: #92400e;
+	white-space: nowrap;
 }
 
 :where(.financing-scope) .calendar-card {
+	grid-column: 1 / -1;
 	overflow: visible;
 }
 
@@ -322,24 +325,9 @@
 :where(.financing-scope) .calendar-events a.violet { border-color: #ddd6fe; border-left-color: #7c3aed; color: #5b21b6; background: #f5f3ff; }
 
 :where(.financing-scope) .calendar-expand {
-	position: absolute;
-	z-index: 6;
-	top: 50%;
-	right: 0.5rem;
-	display: grid;
-	width: 2rem;
-	place-items: center;
-	transform: translateY(-50%);
-	pointer-events: none;
-}
-
-:where(.financing-scope) .calendar-wrap:hover .calendar-expand,
-:where(.financing-scope) .calendar-expand:focus-visible {
-	pointer-events: auto;
-}
-
-:where(.financing-scope) .calendar-expand:hover {
-	transform: translateY(-50%) scale(1.06);
+	flex: 0 0 auto;
+	gap: .375rem;
+	white-space: nowrap;
 }
 
 :where(.financing-scope) .simulator-form {
@@ -388,109 +376,6 @@
 :where(.financing-scope) .simulation-results strong { display: block; margin-bottom: 0.125rem; color: currentColor; }
 :where(.financing-scope) .simulation-results span { font-size: 0.875rem; line-height: 1.5; }
 
-:where(.financing-scope) .reminder-list {
-	display: grid;
-}
-
-:where(.financing-scope) .reminder-item {
-	display: grid;
-	grid-template-columns: auto minmax(0, 1fr) auto;
-	align-items: start;
-	gap: 0.625rem;
-	padding: 0.75rem 1.125rem;
-	border-bottom: 1px solid #eef1f5;
-	transition: background 180ms ease;
-}
-
-:where(.financing-scope) .reminder-item:last-child {
-	border-bottom: 0;
-}
-
-:where(.financing-scope) .reminder-item:hover,
-:where(.financing-scope) .reminder-item:focus-visible {
-	background: #f8faff;
-}
-
-:where(.financing-scope) .reminder-dot {
-	width: 0.625rem;
-	height: 0.625rem;
-	margin-top: 0.4375rem;
-	border: 2px solid #84adff;
-	border-radius: 50%;
-	background: #dbe8ff;
-}
-
-:where(.financing-scope) .reminder-dot.warning {
-	border-color: #fdb022;
-	background: #fef0c7;
-}
-
-:where(.financing-scope) .reminder-dot.danger {
-	border-color: #f97066;
-	background: #fee4e2;
-}
-
-:where(.financing-scope) .reminder-copy {
-	display: grid;
-	min-width: 0;
-	gap: 0.125rem;
-}
-
-:where(.financing-scope) .reminder-copy > strong {
-	overflow: hidden;
-	font-size: 1rem;
-	text-overflow: ellipsis;
-	overflow-wrap: anywhere;
-	color: #1d2939;
-}
-
-:where(.financing-scope) .reminder-copy > span {
-	overflow: hidden;
-	font-size: 1rem;
-	text-overflow: ellipsis;
-	overflow-wrap: anywhere;
-	color: #475467;
-}
-
-:where(.financing-scope) .reminder-copy small {
-	font-size: 0.875rem;
-	color: #667085;
-}
-
-:where(.financing-scope) .reminder-due {
-	margin-top: 0.125rem;
-	padding: 0.1875rem 0.5rem;
-	border-radius: 999rem;
-	font-size: 0.875rem;
-	font-weight: bold;
-	overflow-wrap: anywhere;
-	color: #175cd3;
-	background: #eff4ff;
-}
-
-:where(.financing-scope) .reminder-due.warning {
-	color: #b54708;
-	background: #fff7ed;
-}
-
-:where(.financing-scope) .reminder-due.danger {
-	color: #b42318;
-	background: #fef3f2;
-}
-
-:where(.financing-scope) .reminder-empty {
-	margin: 0;
-	padding: 1.75rem 1rem;
-	text-align: center;
-	color: #667085;
-}
-
-@media (hover: none) {
-	:where(.financing-scope) .calendar-expand {
-		pointer-events: auto;
-	}
-}
-
 @media (max-width: 75rem) {
 	:where(.financing-scope) .dashboard-grid { grid-template-columns: minmax(0, 1.2fr) minmax(20rem, 0.8fr); }
 }
@@ -513,8 +398,7 @@
 	:where(.financing-scope) .financing-panel th,
 	:where(.financing-scope) .financing-panel td { padding: 0.5rem; font-size: 0.875rem; }
 	:where(.financing-scope) .calendar-cell { min-height: 5rem; padding: 0.25rem; }
-	:where(.financing-scope) .reminder-item { padding: 0.625rem 0.875rem; }
-}
+	}
 
 @media (max-width: 35rem) {
 	:where(.financing-scope) .regulatory-grid { grid-template-columns: 1fr; grid-template-rows: repeat(4, auto); }
@@ -528,9 +412,7 @@
 	:where(.financing-scope) .calendar-cell.other { display: grid; min-height: auto; grid-template-columns: 2.5rem minmax(0, 1fr); border-bottom: 1px solid #e7ebf1; background: #fff; }
 	:where(.financing-scope) .day-number { grid-row: 1; }
 	:where(.financing-scope) .calendar-events { grid-column: 2; }
-	:where(.financing-scope) .reminder-item { grid-template-columns: auto minmax(0, 1fr); }
-	:where(.financing-scope) .reminder-due { grid-column: 2; justify-self: start; }
-}
+	}
 
 @media (prefers-reduced-motion: reduce) {
 	:where(.financing-scope) * { transition: none !important; }

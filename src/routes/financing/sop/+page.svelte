@@ -125,11 +125,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 <div class="management-page workflow-page">
 	<section class="workflow-grid">
 		<ModuleCard class="section-card">
-			<PanelHeading id="sop-heading-0" title="负债品种 SOP" controlsInline>{#if canCreateSop}
-					<button class="btn link-button" type="button" onclick={() => sopDialog?.showModal()}>
-						<Plus size={14} /> 新建
-					</button>
-				{/if}</PanelHeading>
+			<PanelHeading id="sop-heading-0" title="负债品种 SOP" controlsInline />
 			<div class="sop-list">
 				{#each settings.sopTemplates as sop}
 					<a class="sop-item" href={withBase(`/sop/${sop.id}`)}>
@@ -156,11 +152,11 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		</ModuleCard>
 
 		<ModuleCard class="section-card">
-			<PanelHeading id="sop-heading-1" title="提醒规则" controlsInline><div class="header-actions">
+			<PanelHeading id="sop-heading-1" title="提醒规则" accent="var(--orange)" controlsInline><div class="header-actions">
 					<a class="btn btn-ghost link-button" href={withBase('/sop/reminders')}>发送历史</a>
 					{#if canCreateReminder}
 						<button class="btn link-button" type="button" onclick={() => reminderDialog?.showModal()}>
-							<Plus size={14} /> 新建
+							<Plus size={14} /> 新增提醒
 						</button>
 					{/if}
 				</div></PanelHeading>
@@ -194,12 +190,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				{:else}
 					<p class="empty-state">尚未配置提醒规则。</p>
 				{/each}
-				{#if canCreateReminder}
-					<button class="btn add-rule" type="button" onclick={() => reminderDialog?.showModal()}>
-						<Plus size={15} />
-						添加提醒规则
-					</button>
-				{/if}
 			</div>
 		</ModuleCard>
 	</section>
@@ -450,11 +440,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		background: #fff7ed;
 	}
 
-	.add-rule {
-		margin: 0.75rem;
-		min-height: 3rem;
-	}
-
 	.rule-fieldset {
 		grid-column: 1 / -1;
 		min-width: 0;
@@ -621,9 +606,5 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 			grid-column: 1 / -1;
 		}
 
-		.add-rule {
-			margin-right: 4.75rem;
-		min-height: 3rem;
-		}
 	}
 </style>

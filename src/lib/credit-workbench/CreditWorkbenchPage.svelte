@@ -8,7 +8,8 @@
 </script>
 
 <WorkbenchShell title="授信工作台" homeHref="/credit-workbench" views={creditWorkbenchViews}
-  activeViewId={viewId} chat={viewId === "assistant"}>
+  activeViewId={viewId} chat={viewId === "assistant"} tone="teal"
+  visualVariant={viewId === "weekly" ? "report" : "workspace"}>
   {#if viewId === "assistant"}
     <CreditAssistantView />
   {:else}

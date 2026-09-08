@@ -17,6 +17,10 @@ test('monthly financial input keeps amount units, canonical month ends and exclu
 	assert.equal(monthEnd('2026-02'), '2026-02-28');
 	assert.equal(financialValue(0), '0 亿元');
 	assert.equal(financialValue(null), '暂无数据');
+	assert.equal(financialValue(0, false, { unit: false }), '0');
+	assert.equal(financialValue(null, false, { unit: false }), '暂无数据');
+	assert.equal(financialValue('4636.3417', false, { unit: false }), '4,636.3417');
+	assert.equal(financialValue('0.7167', true, { unit: false }), '71.67');
 });
 
 test('ratio previews and equity reconciliation use the same month and distinguish missing values from zero', () => {

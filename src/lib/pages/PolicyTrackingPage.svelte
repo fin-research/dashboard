@@ -394,7 +394,8 @@
   h1 { margin: 2px 0 0; font-size: 1.5rem; font-weight: bolder; }
   .filters { flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
   .filters label { gap: 7px; color: #475467; font-size: .875rem; font-weight: bold; }
-  .filters input, .filters select { padding: 0 10px; }
+  .filters label > span { flex: 0 0 auto; white-space: nowrap; }
+  .filters input, .filters select { width: 10rem; padding: 0 10px; }
   button { padding: 0 14px; }
   button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid rgba(47, 111, 214, .25); outline-offset: 2px; }
   .policy-main { width: min(1600px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0 64px; }
@@ -403,14 +404,14 @@
   .spinner { width: 24px; height: 24px; border: 3px solid #dbe8fb; border-top-color: #2f6fd6; border-radius: 50%; animation: spin 800ms linear infinite; }
   .policy-timeline { display: grid; gap: 2rem; margin: 0; padding: 0; list-style: none; }
   .policy-timeline-item { display: grid; grid-template-columns: 126px minmax(0, 1fr); gap: 2rem; }
-  .timeline-date { position: relative; display: flex; align-items: center; justify-content: flex-end; text-align: right; }
-  .timeline-date time { color: #344054; font-size: .875rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .timeline-date { position: relative; display: flex; align-items: flex-start; justify-content: flex-end; padding-top: 26px; text-align: right; }
+  .timeline-date time { position: sticky; top: 16px; color: #344054; font-size: .875rem; font-weight: bold; font-variant-numeric: tabular-nums; }
   .timeline-date::before, .timeline-date::after { position: absolute; right: -1rem; width: 1px; background: #cbd5e1; content: ""; }
-  .timeline-date::before { top: 0; bottom: 50%; }
-  .timeline-date::after { top: 50%; bottom: -2rem; }
+  .timeline-date::before { top: 0; bottom: calc(100% - 36px); }
+  .timeline-date::after { top: 36px; bottom: -2rem; }
   .policy-timeline-item:first-child .timeline-date::before { display: none; }
   .policy-timeline-item:last-child .timeline-date::after { display: none; }
-  .timeline-date span { position: absolute; z-index: 2; top: 50%; right: -1rem; width: 11px; height: 11px; border: 3px solid #f6f8fb; border-radius: 50%; background: #2f6fd6; box-shadow: 0 0 0 1px #2f6fd6; transform: translate(50%, -50%); }
+  .timeline-date span { position: absolute; z-index: 2; top: 36px; right: -1rem; width: 11px; height: 11px; border: 3px solid #f6f8fb; border-radius: 50%; background: #2f6fd6; box-shadow: 0 0 0 1px #2f6fd6; transform: translate(50%, -50%); }
   :global(.policy-card) { padding: 24px; }
   .policy-card-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   .policy-meta { flex-wrap: wrap; gap: 8px; }
@@ -432,7 +433,7 @@
   .section-heading h3 { margin: 0; font-size: 1.125rem; font-weight: bold; }
   .section-heading h3 span { color: #667085; font-size: .875rem; }
   .heading-actions { flex-wrap: wrap; gap: 8px; }
-  .ai-generate-button { display: inline-grid; width: 32px; min-width: 32px; place-items: center; padding: 3px; }
+  .ai-generate-button { display: inline-grid; width: 44px; min-width: 44px; place-items: center; padding: 3px; }
   .ai-generate-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
   .ai-generate-button.is-loading svg { animation: spin 1.2s linear infinite; }
   .detail-link { display: inline-flex; min-height: 44px; align-items: center; padding: 0 12px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; font-size: .875rem; font-weight: bold; text-decoration: none; }
@@ -488,7 +489,8 @@
     .policy-header { position: static; align-items: flex-start; flex-direction: column; min-height: 82px; }
     .filters { width: 100%; justify-content: flex-start; }
     .policy-timeline-item { grid-template-columns: 1fr; gap: 8px; }
-    .timeline-date { justify-content: flex-start; text-align: left; }
+    .timeline-date { justify-content: flex-start; padding-top: 0; text-align: left; }
+    .timeline-date time { position: static; }
     .timeline-date::before, .timeline-date::after, .timeline-date span { display: none; }
     .commentary dl, .form-grid { grid-template-columns: 1fr; }
   }

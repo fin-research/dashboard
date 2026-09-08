@@ -33,7 +33,7 @@ const activeLabel = $derived(path.startsWith('/projects/') ? '项目详情' : pa
 
 {#if data.user}
 <WorkbenchShell title="融资工作台" homeHref="/financing/" {views} {activeViewId} {activeLabel}
-  class="financing-scope" layoutReport={isLiabilityReport} reportKind={isLiabilityReport ? 'liability' : null}>
+  class="financing-scope" tone="orange" layoutReport={isLiabilityReport} reportKind={isLiabilityReport ? 'liability' : null}>
   {#snippet actions()}
     <details class="dropdown dropdown-end financing-reminders" bind:this={remindersMenu}>
       <summary class="btn btn-ghost reminder-trigger" aria-label={`查看提醒，${data.reminders.total} 条待办`}>

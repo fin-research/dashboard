@@ -6,12 +6,14 @@
     title,
     backHref,
     backLabel,
+    wrapHeadings = false,
     children,
   }: {
     eyebrow: string;
     title: string;
     backHref: string;
     backLabel: string;
+    wrapHeadings?: boolean;
     children: Snippet;
   } = $props();
 
@@ -19,7 +21,7 @@
   onMount(() => mainElement.focus({ preventScroll: true }));
 </script>
 
-<div class="detail-page">
+<div class="detail-page" class:detail-page--wrap-headings={wrapHeadings}>
   <header class="detail-header">
     <div class="header-title">
       <a href={backHref} aria-label={backLabel}>
@@ -44,6 +46,7 @@
   .header-title span { display: block; margin-bottom: 2px; color: #2f6fd6; font-size: .75rem; font-weight: bold; letter-spacing: .08em; }
   .header-title h1 { margin: 0; font-size: 1.5rem; font-weight: bolder; }
   .detail-main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0 56px; outline: none; }
+  .detail-page--wrap-headings :global(h2) { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
   @media (max-width: 620px) {
     .detail-header { position: static; min-height: 74px; padding: 12px 14px; }
     .header-title { gap: 10px; }

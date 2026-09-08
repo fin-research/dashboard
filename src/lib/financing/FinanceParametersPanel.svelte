@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 	import { LoaderCircle, Pencil, Plus, RefreshCw, X } from '@lucide/svelte';
 	import type { DataRow } from './data-admin';
-	import { FINANCE_PARAMETER_CONFIG, FINANCIAL_INPUT_FIELDS, FINANCIAL_RATIO_FIELDS, financeParameterPayload, financialReconciliation, financialValue } from './finance-parameters';
+	import { FINANCE_PARAMETER_CONFIG, FINANCIAL_INPUT_FIELDS, FINANCIAL_RATIO_FIELDS, financeParameterPayload, financialReconciliation, financialValue, hasFinancialValue } from './finance-parameters';
 	import { NeonDataApi } from './neon-data-api';
 
 	import { hasPermission } from '$lib/permissions';
@@ -115,10 +115,10 @@
 		{#if selected}
 			<div class="parameter-grid">
 				{#each FINANCIAL_INPUT_FIELDS as field (field.key)}
-					<article class="parameter-card"><h3>{field.label}</h3><p class="parameter-value">{financialValue(selected[field.key])}</p></article>
+					<article class="parameter-card"><h3>{field.label}</h3><p class="parameter-value" class:parameter-value--empty={!hasFinancialValue(selected[field.key])}>{financialValue(selected[field.key], false, { unit: false })}{#if hasFinancialValue(selected[field.key])}<span>亿元</span>{/if}</p></article>
 				{/each}
 				{#each FINANCIAL_RATIO_FIELDS as field (field.key)}
-					<article class="parameter-card computed"><h3>{field.label.replace('（%）', '').replace('，%', '')}<span>计算值</span></h3><p class="parameter-value">{financialValue(selected[field.key], true)}</p></article>
+					<article class="parameter-card computed"><h3>{field.label.replace('（%）', '').replace('，%', '')}<span>计算值</span></h3><p class="parameter-value" class:parameter-value--empty={!hasFinancialValue(selected[field.key])}>{financialValue(selected[field.key], true, { unit: false })}{#if hasFinancialValue(selected[field.key])}<span>%</span>{/if}</p></article>
 				{/each}
 			</div>
 			{#if reconciliation?.difference != null}
@@ -174,7 +174,9 @@
 	.parameter-card { min-width: 0; padding: .875rem; border: 1px solid var(--line); border-radius: .5rem; overflow-wrap: anywhere; }
 	h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin: 0; font-size: 1rem; font-weight: bold; }
 	h3 span { font-size: .75rem; color: var(--muted); font-weight: normal; }
-	.parameter-value { margin: .75rem 0 0; font-size: clamp(1.125rem, 1.6vw, 1.5rem); font-weight: bold; font-variant-numeric: tabular-nums; }
+	.parameter-value { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem; margin: .75rem 0 0; font-size: clamp(1.125rem, 1.6vw, 1.5rem); font-weight: bold; font-variant-numeric: tabular-nums; }
+	.parameter-value > span { color: var(--muted); font-size: .875rem; font-weight: normal; }
+	.parameter-value--empty { color: var(--muted); font-size: 1rem; font-weight: normal; }
 	.computed { background: var(--canvas); }
 	.parameter-notes, .reconciliation { margin: 0; padding: 0 0 1rem; font-size: .875rem; overflow-wrap: anywhere; }
 	.parameter-notes { color: var(--muted); white-space: pre-wrap; }
