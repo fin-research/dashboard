@@ -86,7 +86,7 @@ PostgreSQL 的主键、唯一约束和外键不会自动覆盖继承子表，因
 - `role_permissions` 保存三种业务角色与七类权限的授权矩阵；初始 migration 为全部组合授予权限，后续配置只更新 `granted`，不删除权限目录行。
 - Data API 可编辑表的 RLS 同时要求人员启用且其角色具有 `data_manage`；SvelteKit mutation 按对应权限类型由服务端授权。
 - 更新和删除携带 `updated_at` 做乐观并发检查；主键和计算列只读。
-- DDL、视图、函数或列变化后必须显式刷新 Neon Data API schema cache：`neon data-api refresh-schema --database neondb`；migration 中的 PostgreSQL `NOTIFY pgrst` 不能替代 Neon 托管 Data API 的刷新动作。
+- 当前 Auth0 模式使用同源 `/financing/data/api`，由 Worker 编译字段白名单并通过 Hyperdrive 查询，生产未启用 Neon 托管 Data API，无托管 schema cache 需要刷新。若重新启用托管 Data API，DDL 后应执行 `neon data-api refresh-schema --database neondb`，`NOTIFY pgrst` 不能替代此刷新。
 
 ## Excel 与 SQLite
 

@@ -33,4 +33,4 @@ node scripts/reconcile-client-usage.mjs /absolute/path/reconciliation.json
 
 维护清单按名称更新客户和给定别名/归属规则，不删除未提及客户或旧别名，不覆盖已有人工作出的历史关联。新增规则会补齐缺失的日期关联；改变历史归属需显式维护相应 `institution_client`，同一日期的重复品种归属会被数据库拒绝。负债详情可编辑客户 ID；修改历史金额、日期、现金流后按需要显式刷新既有月度衍生指标。
 
-DDL 完成后按融资模块规范刷新 Neon Data API schema cache；公共客户表和授信内部视图不向 Data API 开放，继续沿用融资写权限和审计。
+当前 Auth0 模式经 `/financing/data/api` 由 Worker 编译白名单 SQL、通过 Hyperdrive 访问融资 schema，并在事务内使用 `authenticated` 角色与 RLS；生产未开通 Neon 托管 Data API，因此无需刷新托管 schema cache。若将来重新启用托管 Data API，DDL 后须刷新缓存。公共客户表和授信内部视图不向数据后台开放，继续沿用融资写权限和审计。
