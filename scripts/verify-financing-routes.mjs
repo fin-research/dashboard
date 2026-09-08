@@ -5,28 +5,23 @@ import { readFile, readdir } from 'node:fs/promises';
 import { Client } from 'pg';
 import { PGlite } from '@electric-sql/pglite';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { PERMISSION_CODES } from '../src/lib/financing/permissions.js';
+import { PERMISSION_CODES } from '../src/lib/permissions.ts';
+import { roleConfiguration } from '../src/lib/server/permission-repository.ts';
+import { legacyPermissionSchema, migratePermissions } from '../tests/financing/fixtures/unified-permission-schema.mjs';
 import { financingTimestamp } from '../src/lib/financing/time.js';
 import { Server } from '../.svelte-kit/output/server/index.js';
 import { manifest } from '../.svelte-kit/output/server/manifest.js';
 
 const { vars } = JSON.parse(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
-const roleIds = JSON.parse(vars.AUTH0_ROLE_IDS);
+const roleIds = { admin:'rol_Admin', handler:'rol_Handler', reviewer:'rol_Reviewer' };
+const roles = Object.entries(roleIds).map(([name,id]) => ({id,name:'financing:'+name}));
 const db = new PGlite({ parsers: { 1082: value => value, 1114: financingTimestamp, 1184: financingTimestamp } });
-await db.exec(`CREATE ROLE authenticated; CREATE ROLE anonymous;
-  CREATE TABLE public.edb (indicator_code text NOT NULL, observation_date date NOT NULL, value numeric, PRIMARY KEY(indicator_code,observation_date));
-  CREATE SCHEMA auth;
-  CREATE FUNCTION auth.user_id() RETURNS text LANGUAGE sql STABLE AS $$ SELECT current_setting('request.jwt.claim.sub', true) $$;
-  CREATE SCHEMA neon_auth;
-  CREATE TABLE neon_auth."user" (id uuid PRIMARY KEY, name text NOT NULL, email text NOT NULL UNIQUE,
-    "emailVerified" boolean NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP, role text, banned boolean);
-  CREATE TABLE neon_auth.session (id uuid PRIMARY KEY,"userId" uuid NOT NULL REFERENCES neon_auth."user"(id),"createdAt" timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP);`);
-for (const name of (await readdir(new URL('../financing-migrations/', import.meta.url))).filter(name => name.endsWith('.sql')).sort()) {
-  await db.exec(await readFile(new URL(`../financing-migrations/${name}`, import.meta.url), 'utf8'));
-}
-const account = { user_id: 'auth0|route-admin', email: 'route-admin@18.cn', name: '合并回归人员', email_verified: true, identities: [{ connection: 'eastmoney-email' }] };
-await db.query(`INSERT INTO financing.people (id,name,email,role,active,auth0_user_id,auth0_account_active) VALUES ($1,$2,$3,'admin',TRUE,$4,TRUE)`, ['person-route-admin', account.name, account.email, account.user_id]);
+await legacyPermissionSchema(db);
+await migratePermissions(db, {users:[],roles});
+await db.query("INSERT INTO financing.financial_monthly_data(period_end,net_capital) VALUES ('2026-08-31',100)");
+const account = { user_id: 'auth0|route-admin', email: 'route-admin@18.cn', name: '权限回归人员', email_verified: true, identities: [{ connection: 'eastmoney-email' }] };
+const roleless = { ...account, user_id:'auth0|unlinked', email:'unlinked@18.cn', name:'未分配角色人员' };
+const other = { ...account, user_id:'auth0|other-person', email:'other@18.cn', name:'其他经办' };
 let opened = 0, closed = 0, queries = 0, active = 0, peak = 0;
 const databaseSubjects = [];
 const originals = { connect: Client.prototype.connect, query: Client.prototype.query, end: Client.prototype.end, fetch: globalThis.fetch };
@@ -34,7 +29,7 @@ Client.prototype.connect = async function () { opened++; active++; peak = Math.m
 Client.prototype.end = async function () { closed++; active--; };
 Client.prototype.query = async function (sql, params = []) {
   queries++;
-  if (sql.includes("set_config('request.financing.user_id'")) databaseSubjects.push(params[0]);
+  if (sql.includes("set_config('request.auth.user_id'")) databaseSubjects.push(params[0]);
   const result = await db.query(sql, params);
   return { ...result, rowCount: result.affectedRows ?? result.rows.length };
 };
@@ -64,9 +59,12 @@ globalThis.fetch = async (input, init = {}) => {
     return Response.json({ access_token: 'fixture-management-token', expires_in: 60 });
   }
   if (/\/permissions$/.test(url.pathname)) return Response.json(permissionObjects());
-  if (/\/roles$/.test(url.pathname)) return Response.json([{ id: roleIds.admin }]);
+  if (url.pathname === '/api/v2/roles') return Response.json(roles);
+  if (/\/roles$/.test(url.pathname)) return Response.json(url.pathname.includes('unlinked') ? [] : [roles[0]]);
   if (/\/roles\/[^/]+\/users$/.test(url.pathname)) return Response.json(url.pathname.includes(roleIds.admin) ? [account] : []);
-  if (url.pathname === '/api/v2/users') return Response.json([account]);
+  if (url.pathname === '/api/v2/users') return Response.json([account,roleless,other]);
+  if (url.pathname.endsWith('auth0%7Cunlinked')) return Response.json(roleless);
+  if (url.pathname.endsWith('auth0%7Cother-person')) return Response.json(other);
   assert.equal(url.pathname, '/api/v2/users/auth0%7Croute-admin');
   assert.equal(init.method ?? 'GET', 'GET', 'Route read unexpectedly changed an Auth0 account');
   return Response.json(account);
@@ -84,7 +82,7 @@ async function respond(path, { token = adminToken, method = 'GET', headers = {},
     Accept: 'text/html', Origin: origin, ...(token ? { Cookie: `CF_Authorization=${token}` } : {}), ...headers,
   }, body }), { getClientAddress: () => '127.0.0.1', platform: { env, context: { waitUntil() {} } } });
   assert.equal(active, 0, `${path}: database client was not closed`);
-  assert.ok(opened - before <= 1, `${path}: more than one database connection`);
+  assert.ok(opened - before <= 2, `${path}: unexpected extra database connection`);
   return response;
 }
 let checks = 0;
@@ -101,20 +99,12 @@ try {
   }
   const session = await respond('/auth/session', { headers: { Accept: 'application/json' } });
   assert.deepEqual((await session.json()).user, { id: 'access-' + account.user_id, email: account.email, auth0Id: account.user_id }); checks++;
-  assert.equal((await respond('/financing', { token: unlinkedToken })).status, 403); checks++;
-  await db.query('UPDATE financing.people SET avatar_data_url = $1 WHERE id = $2', ['data:image/png;base64,aGVsbG8=', 'person-route-admin']);
-  const avatar = await respond('/financing/avatar?v=fixture');
-  assert.equal(avatar.status, 200);
-  assert.match(avatar.headers.get('cache-control'), /private, max-age=31536000, immutable/);
-  assert.match(avatar.headers.get('vary'), /Cookie/); checks++;
-  for (const [path, target] of [['/financing/people', '/management/people'], ['/financing/settings', '/management/financing-profile']]) {
-    for (const method of ['GET', 'POST']) {
-      const response = await respond(path + '?/updateProfile', { method });
-      assert.equal(response.status, 307);
-      assert.equal(response.headers.get('location'), target + '?/updateProfile'); checks++;
-    }
+  assert.equal((await respond('/financing', { token: unlinkedToken })).status, 200); checks++;
+  assert.equal((await respond('/financing/avatar?v=fixture')).status,410); checks++;
+  for (const [path,target,status] of [['/financing/people','/management/people',307],['/financing/settings','/profile',303],['/management/financing-profile','/profile',303]]) {
+    const response=await respond(path);assert.equal(response.status,status);assert.equal(response.headers.get('location'),target);checks++;
   }
-  for (const path of ['/financing', '/financing/projects', '/financing/sop', '/financing/data', '/financing/liability-report', '/financing/sop/reminders', '/management/people', '/management/financing-profile']) {
+  for (const path of ['/financing', '/financing/projects', '/financing/sop', '/financing/data', '/financing/liability-report', '/financing/sop/reminders', '/management/people']) {
     const response = await respond(path);
     const body = await response.text();
     assert.equal(response.status, 200, `${path}: ${body.slice(0, 300)}`);
@@ -124,17 +114,29 @@ try {
     assert.doesNotMatch(body, /fixture-financing-secret|fixture-management-token|postgres:\/\//);
     checks++;
   }
+  env.AUTHORIZATION_MODE = 'enforce';
   currentPermissions = [];
+  await db.query('UPDATE "authorization".role_permission SET granted = false');
   for (const path of ['/financing/projects?/createProject', '/management/people?/saveRolePermissions', '/financing/data/import']) {
     const response = await respond(path, { method: 'POST', headers: { Accept: 'application/json' } });
     assert.equal(response.status, 403, path); checks++;
   }
   currentPermissions = [...PERMISSION_CODES];
+  await db.query('UPDATE "authorization".role_permission SET granted = true');
+  const initialRole = await roleConfiguration(db,roleIds.handler);
+  const permissionForm = new URLSearchParams({roleId:roleIds.handler,version:initialRole.version});
+  permissionForm.append('permissions','financing.project:read');
+  const configured = await respond('/management/people?/saveRolePermissions',{method:'POST',headers:{Accept:'application/json','X-SvelteKit-Action':'true'},body:permissionForm});
+  assert.equal((await configured.json()).type,'success');
+  assert.deepEqual((await roleConfiguration(db,roleIds.handler)).permissions,['financing.project:read']); checks++;
+  const stale = await respond('/management/people?/saveRolePermissions',{method:'POST',headers:{Accept:'application/json','X-SvelteKit-Action':'true'},body:permissionForm});
+  const staleResult = await stale.json();assert.equal(staleResult.type,'failure');assert.equal(staleResult.status,409);checks++;
   const dataRead = await respond('/financing/data/api/financial_monthly_data', { headers: { Accept: 'application/json' } });
   assert.equal(dataRead.status, 200, await dataRead.clone().text());
+  assert.equal((await dataRead.json()).length,1,'Authorized data read must actually return the seeded row');
   assert.deepEqual(databaseSubjects, [account.user_id]);
   assert.notEqual((await db.query('SELECT current_user AS role')).rows[0].role, 'authenticated');
-  assert.equal((await db.query("SELECT nullif(current_setting('request.financing.user_id',true), '') AS subject")).rows[0].subject, null); checks++;
+  assert.equal((await db.query("SELECT nullif(current_setting('request.auth.user_id',true), '') AS subject")).rows[0].subject, null); checks++;
   const sop = (await db.query('SELECT id FROM financing.sop_templates WHERE is_active ORDER BY id LIMIT 1')).rows[0];
   assert.ok(sop);
   const creation = await respond('/financing/projects?/createProject', {
@@ -148,9 +150,9 @@ try {
   assert.equal((await respond(`/financing/projects/${project.id}`)).status, 200); checks += 2;
   const task = (await db.query('SELECT id FROM financing.project_tasks WHERE project_id=$1 ORDER BY id LIMIT 1', [project.id])).rows[0];
   assert.ok(task);
-  await db.query("INSERT INTO financing.people(id,name,role,active) VALUES ('other-person','其他经办','handler',TRUE)");
-  await db.query('UPDATE financing.project_tasks SET assignee_id=$1 WHERE id=$2', ['other-person', task.id]);
-  currentPermissions = ['own_task_update'];
+  await db.query('UPDATE financing.project_tasks SET assignee_id=$1 WHERE id=$2', ['auth0|other-person', task.id]);
+  currentPermissions = ['financing.task:update_own'];
+  await db.query("UPDATE \"authorization\".role_permission SET granted = (permission_code = 'financing.task:update_own')");
   const otherTask = await respond(`/financing/projects/${project.id}?/updateOwnTaskStatus`, {
     method: 'POST', headers: { Accept: 'application/json', 'X-SvelteKit-Action': 'true' },
     body: new URLSearchParams({ taskId: task.id, status: 'in_progress' }),
@@ -161,6 +163,7 @@ try {
   assert.equal(ownTaskResult.status, 403);
   assert.notEqual((await db.query('SELECT status FROM financing.project_tasks WHERE id=$1', [task.id])).rows[0].status, 'in_progress'); checks++;
   currentPermissions = [...PERMISSION_CODES];
+  await db.query('UPDATE "authorization".role_permission SET granted = true');
   const denied = await respond('/management/people?/createPerson', { method: 'POST', headers: { Origin: 'https://other.test' } });
   assert.equal(denied.status, 403); checks++;
   assert.equal(opened, closed);

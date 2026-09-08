@@ -74,17 +74,17 @@ PostgreSQL 的主键、唯一约束和外键不会自动覆盖继承子表，因
 ## Neon Data API 与 RLS
 
 - Data API 只暴露 `financing` schema，数据库角色为 `authenticated`。
-- 可编辑表必须同时进入 `src/lib/financing/data-admin.ts` 白名单、显式 GRANT、RLS policy 和写入审计触发器。
+- 可编辑表必须同时进入 `src/lib/financing/data-admin.ts` 白名单、显式 GRANT和按操作划分的 RLS policy。
 - 数据后台写入白名单为负债品种表、`financial_monthly_data` 与 `debt_limit_configs`；通用表格组件保留但不在页面挂载。
 - `financial_monthly_data` 是月度财务宽表，以自然月末 `period_end` 为主键，一月一行，不设指标定义表。基础列为净资本 `net_capital`、证券净资产 `securities_net_assets`、集团净资产 `group_net_assets`、总资产 `total_assets`、总负债 `total_liabilities`、代理买卖证券款 `agency_brokerage_funds`，全部使用亿元；空值代表缺失，允许分次补全。未来基础指标通过 migration 加列，派生指标优先使用数据库计算列。
 - `asset_liability_ratio` 为总负债/总资产，`adjusted_asset_liability_ratio` 为（总负债−代理买卖证券款）/（总资产−代理买卖证券款），均是 stored generated columns，保存小数比率，页面转换为百分比。缺少基础金额或分母为零时返回 NULL；基础金额非负，代理买卖证券款不能超过已填总资产或总负债。证券净资产独立录入并与总资产−总负债提示勾稽差额，集团净资产保持独立主体口径。
 - 首页、额度和周报通过 `finance_parameters_as_of(date)` 读取截至对应日期的最近非空数据；净资本截至上月末，证券/集团净资产截至上年末，其他列截至报告日。结果保留真实数据日期，允许沿用更早月份并由既有缺口提醒标注，不把后续月份回填到历史报告。历史修订不自动改写已保存的 R2 周报快照，需要显式重新生成。
-- 原 `finance_parameters` 仅作为只读迁移档案保留，包括原手工比率和来源；月度维护只写新表。新表沿用 Data API、人员权限 RLS、按月审计和 `updated_at` 并发校验；修改历史月份不会覆盖其他月份。
+- 原 `finance_parameters` 仅作为只读迁移档案保留，包括原手工比率和来源；月度维护只写新表。新表沿用 Data API、统一权限 RLS 和 `updated_at` 并发校验；修改历史月份不会覆盖其他月份。
 - Data API 支持 PostgREST 过滤、关联和聚合，也支持调用数据库函数；负债周报使用固定的 `liability_weekly_report_data(date)` RPC 聚合融资业务数据，并通过只读视图 `liability_market_rate_observations` 按指标和日期直接读取原始市场观测。RPC 与视图仅向 `authenticated` 开放，不再要求 JWT 用户关联 `people`；`monthly_financing_metrics` 与底层 `public.edb` 均不直接开放。
-- 现金流、历史余额和审计记录不展示，且 `authenticated` 不得通过 Data API 访问。
+- 现金流、历史余额不展示；旧审计表已移除，且 `authenticated` 不得通过 Data API 访问。
 - 导入载荷、运行状态和结果不写入 Neon；数据库只保存原子提交后的业务表与衍生表结果。
-- `role_permissions` 保存三种业务角色与七类权限的授权矩阵；初始 migration 为全部组合授予权限，后续配置只更新 `granted`，不删除权限目录行。
-- Data API 可编辑表的 RLS 同时要求人员启用且其角色具有 `data_manage`；SvelteKit mutation 按对应权限类型由服务端授权。
+- `authorization.permission` / `authorization.role_permission` 保存全站权限目录及 Auth0 角色授权；人员与角色均不在融资 schema 维护。
+- Data API 的 RLS 按 `financing.data:read/create/update/delete` 和经验证的事务身份校验；导入单独使用 `financing.data:import`。所有页面和 API 共用统一入口检查。
 - 更新和删除携带 `updated_at` 做乐观并发检查；主键和计算列只读。
 - 当前 Auth0 模式使用同源 `/financing/data/api`，由 Worker 编译字段白名单并通过 Hyperdrive 查询，生产未启用 Neon 托管 Data API，无托管 schema cache 需要刷新。若重新启用托管 Data API，DDL 后应执行 `neon data-api refresh-schema --database neondb`，`NOTIFY pgrst` 不能替代此刷新。
 

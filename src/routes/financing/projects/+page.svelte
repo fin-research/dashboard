@@ -25,7 +25,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	import { autoSave, completeAutoSave, getAutoSaveRevision } from '$lib/financing/auto-save';
 	import { withBase } from '$lib/financing/app-paths';
 	import { globalMessages } from '$lib/global-messages';
-	import { hasPermission } from '$lib/financing/permissions.js';
+	import { hasPermission } from '$lib/permissions';
 	import { buildProjectPageData } from '$lib/financing/project-page.js';
 
 	let { data } = $props();
@@ -50,8 +50,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	let actionState = $state<{ key: string; status: 'idle' | 'pending' }>({
 		key: '', status: 'idle'
 	});
-	const canManage = $derived(hasPermission(data?.permissions, 'project_manage'));
-	const canCreate = $derived(canManage);
+	const canManage = $derived(hasPermission(data?.permissions, 'financing.project:update'));
+	const canCreate = $derived(hasPermission(data?.permissions, 'financing.project:create'));
+	const canDelete = $derived(hasPermission(data?.permissions, 'financing.project:delete'));
 
 	function showAutoSaved(message: string) {
 		globalMessages.success(message, { key: 'project-list-auto-save', duration: 3000, title: '项目已同步' });
@@ -301,8 +302,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 							<span style:z-index={3 - index}>{member}</span>
 						{/each}
 					</div>
-					{#if canManage}
+					{#if canManage || canDelete}
 						<div class="project-row-actions">
+              {#if canManage}
 							<button
 								type="button"
 								aria-label={`编辑 ${project.name}`}
@@ -311,6 +313,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 							>
 								<Pencil size={15} />
 							</button>
+              {/if}
+              {#if canDelete}
 							<form
 								method="post"
 								action="?/deleteProject"
@@ -330,6 +334,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 									<Trash2 size={15} />
 								</button>
 							</form>
+              {/if}
 						</div>
 					{/if}
 				</div>

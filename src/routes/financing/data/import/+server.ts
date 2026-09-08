@@ -8,7 +8,7 @@ import {
 import { debtImportRun } from '$lib/server/financing/debt-import-workflow.js';
 import { sha256Hex } from '../../../../../scripts/financing/lib/hash.mjs';
 import type { RequestHandler } from './$types';
-import { hasPermission } from '$lib/financing/permissions.js';
+import { hasPermission } from '$lib/permissions';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const PRIVATE_JSON_HEADERS = {
@@ -17,7 +17,7 @@ const PRIVATE_JSON_HEADERS = {
 };
 
 function canImportDebtLedger(locals: App.Locals) {
-	return hasPermission(locals.permissions, 'data_manage');
+	return hasPermission(locals.permissions, 'financing.data:import');
 }
 
 function uploadFileName(request: Request) {

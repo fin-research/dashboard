@@ -4,7 +4,7 @@
 	import { FileText } from '@lucide/svelte';
 	import { liabilityTypeColor } from '../../../charts/financing/report';
 	import { emptyLiabilityWeeklyReport } from '$lib/financing/liability-report-data.js';
-	import { hasPermission } from '$lib/financing/permissions.js';
+	import { hasPermission } from '$lib/permissions';
 	import ReportBalanceRateChart from '../../../charts/financing/ReportBalanceRateChart.svelte';
 	import ReportDonutChart from '../../../charts/financing/ReportDonutChart.svelte';
 	import ReportGaugeChart from '../../../charts/financing/ReportGaugeChart.svelte';
@@ -16,7 +16,7 @@
 	let { data } = $props();
 	let report = $derived(data.report ?? emptyLiabilityWeeklyReport(data.selectedReportDate));
 	let hasSnapshot = $derived(Boolean(data.hasSnapshot));
-	let canGenerate = $derived(hasPermission(data.permissions, 'report_generate'));
+	let canGenerate = $derived(hasPermission(data.permissions, 'financing.report:generate'));
 	let currentEvents = $derived((report?.events ?? []).filter((item: any) => item.week === 'current' && isDynamicEvent(item)));
 	let nextEvents = $derived((report?.events ?? []).filter((item: any) => item.week === 'next' && isDynamicEvent(item)));
 	let dynamicProjects = $derived((report?.projects ?? []).filter((item: any) => !['同业拆借', '浮动收益凭证'].includes(String(item.debtType ?? ''))));

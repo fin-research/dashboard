@@ -5,6 +5,10 @@
 	import { FINANCE_PARAMETER_CONFIG, FINANCIAL_INPUT_FIELDS, FINANCIAL_RATIO_FIELDS, financeParameterPayload, financialReconciliation, financialValue } from './finance-parameters';
 	import { NeonDataApi } from './neon-data-api';
 
+	import { hasPermission } from '$lib/permissions';
+	let { permissions = [] }: { permissions?: string[] } = $props();
+	const canCreate = $derived(hasPermission(permissions, 'financing.data:create'));
+	const canUpdate = $derived(hasPermission(permissions, 'financing.data:update'));
 	const api = new NeonDataApi();
 	let rows = $state<DataRow[]>([]);
 	let loading = $state(true);
@@ -105,7 +109,7 @@
 		<div class="month-toolbar">
 			<label><span>数据月份</span><select bind:value={selectedPeriod}>{#each rows as row (String(row.period_end))}<option value={String(row.period_end)}>{String(row.period_end).slice(0, 7)}</option>{/each}</select></label>
 			<span class="history-count">已保存 {rows.length} 个月</span>
-			<button class="secondary-action" type="button" onclick={() => openEditor(selected ?? null)}><Pencil size={17} />编辑本月</button>
+			{#if canUpdate}<button class="secondary-action" type="button" onclick={() => openEditor(selected ?? null)}><Pencil size={17} />编辑本月</button>{/if}
 		</div>
 		{#if selected}
 			<div class="parameter-grid">
@@ -127,7 +131,7 @@
 </section>
 
 {#if !loading && !loadError}
-	<button class="floating-create-button" type="button" aria-label="新增月份" title="新增月份" onclick={() => openEditor()}><Plus size={24} /></button>
+	{#if canCreate}<button class="floating-create-button" type="button" aria-label="新增月份" title="新增月份" onclick={() => openEditor()}><Plus size={24} /></button>{/if}
 {/if}
 
 <dialog class="config-modal" bind:this={dialog} aria-labelledby="parameter-editor-title" oncancel={(event) => { if (saving) event.preventDefault(); }}>

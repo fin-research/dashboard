@@ -1,3 +1,4 @@
+// Historical pre-0032 authentication fixture; never imported by production code.
 export const PERMISSION_DEFINITIONS = [
 	{
 		code: 'project_manage',

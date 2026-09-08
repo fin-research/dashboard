@@ -63,7 +63,6 @@ test('due reminders match selected SOP nodes and independently expose each due p
 	await database.exec(`
 		CREATE SCHEMA financing;
 		SET search_path TO financing, public;
-		CREATE TABLE people (id text PRIMARY KEY, email text);
 		CREATE TABLE sop_templates (id text PRIMARY KEY, name text, debt_type text, is_active boolean);
 		CREATE TABLE sop_nodes (id text PRIMARY KEY, template_id text, name text);
 		CREATE TABLE projects (id text PRIMARY KEY, name text, debt_type text, sop_template_id text, owner_id text);
@@ -76,7 +75,6 @@ test('due reminders match selected SOP nodes and independently expose each due p
 		);
 		CREATE TABLE reminder_rule_nodes (rule_id text, sop_node_id text);
 		CREATE TABLE reminder_rule_periods (id text PRIMARY KEY, rule_id text, lead_hours integer);
-		INSERT INTO people VALUES ('assignee', 'assignee@example.com'), ('owner', 'owner@example.com');
 		INSERT INTO sop_templates VALUES ('sop', '债券 SOP', '小公募', TRUE);
 		INSERT INTO sop_nodes VALUES ('selected-node', 'sop', '申报'), ('other-node', 'sop', '发行');
 		INSERT INTO projects VALUES ('project', '测试项目', '小公募', 'sop', 'owner');
@@ -90,22 +88,23 @@ test('due reminders match selected SOP nodes and independently expose each due p
 	`);
 
 	const db = databaseAdapter(database);
-	const beforeDailySend = await collectDueReminders({ asOf: '2026-08-23T00:59:59.000Z', db });
+	const directory = async () => [{id:'assignee',email:'assignee@example.com',active:true},{id:'owner',email:'owner@example.com',active:true}];
+	const beforeDailySend = await collectDueReminders({ asOf: '2026-08-23T00:59:59.000Z', db, directory });
 	assert.deepEqual(beforeDailySend, []);
 
-	const dailySend = await collectDueReminders({ asOf: '2026-08-23T01:00:00.000Z', db });
+	const dailySend = await collectDueReminders({ asOf: '2026-08-23T01:00:00.000Z', db, directory });
 	assert.deepEqual(dailySend.map((item) => [item.periodId, item.periodLabel, item.scheduledFor]), [
 		['period-48', '提前 2 天（09:00）', '2026-08-23T01:00:00.000Z']
 	]);
 
-	const early = await collectDueReminders({ asOf: '2026-08-24T09:00:00.000Z', db });
+	const early = await collectDueReminders({ asOf: '2026-08-24T09:00:00.000Z', db, directory });
 	assert.deepEqual(early.map((item) => [item.targetId, item.periodId, item.periodLabel]), [
 		['selected-task', 'period-48', '提前 2 天（09:00）'],
 		['selected-task', 'period-36', '提前 1 天 12 小时']
 	]);
 	assert.deepEqual(early[0].recipients, ['assignee@example.com']);
 
-	const later = await collectDueReminders({ asOf: '2026-08-24T11:00:00.000Z', db });
+	const later = await collectDueReminders({ asOf: '2026-08-24T11:00:00.000Z', db, directory });
 	assert.deepEqual(later.map((item) => item.periodId), ['period-48', 'period-36', 'period-6']);
 	assert.equal(later.every((item) => item.targetId === 'selected-task'), true);
 });

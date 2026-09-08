@@ -1,5 +1,6 @@
+// Historical pre-0032 authentication fixture; never imported by production code.
 // @ts-check
-import { PERMISSION_CODES } from '../../financing/permissions.js';
+import { PERMISSION_CODES } from './permissions.js';
 import { NeonAuthApiError } from './neon-auth-client.js';
 
 // Deployment-wide service credentials only: never cache user identity or in-flight I/O here.

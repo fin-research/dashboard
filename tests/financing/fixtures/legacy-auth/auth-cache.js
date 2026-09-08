@@ -1,3 +1,4 @@
+// Historical pre-0032 authentication fixture; never imported by production code.
 // @ts-nocheck
 
 // This caches only a business authorization decision. Central Access verification

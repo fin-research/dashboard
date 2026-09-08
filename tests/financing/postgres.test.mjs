@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPostgresDatabase } from '../../src/lib/financing/postgres.js';
 
-test('role permission queries are qualified into the financing schema', async () => {
+test('shared permission queries retain the authorization schema boundary', async () => {
 	const database = createPostgresDatabase('postgres://unused:unused@localhost/unused');
 	let executedSql = '';
 	database.client = {
@@ -17,10 +17,10 @@ test('role permission queries are qualified into the financing schema', async ()
 	try {
 		await database.prepare(`
 			SELECT permission_code AS permissionCode
-			FROM role_permissions
-			WHERE role = ?
-		`).all('admin');
-		assert.match(executedSql, /FROM financing\.role_permissions/);
+			FROM "authorization".role_permission
+			WHERE auth0_role_id = ?
+		`).all('rol_Admin');
+		assert.match(executedSql, /FROM "authorization"\.role_permission/);
 	} finally {
 		await database.close();
 	}

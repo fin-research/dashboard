@@ -6,7 +6,7 @@ const mutationSurfaces = [
 	'src/routes/management/people/+page.svelte',
 	'src/routes/financing/projects/+page.svelte',
 	'src/routes/financing/projects/[id]/+page.svelte',
-	'src/routes/management/financing-profile/+page.svelte',
+	'src/routes/profile/+page.svelte',
 	'src/routes/financing/sop/+page.svelte',
 	'src/routes/financing/sop/[id]/+page.svelte',
 	'src/routes/financing/sop/reminders/+page.svelte',

@@ -5,7 +5,8 @@
   import ModuleCard from '../../components/ModuleCard.svelte';
   import { globalMessages } from '$lib/global-messages';
   import { isLoginRedirecting } from '$lib/auth-client';
-  import { DASHBOARD_PERMISSIONS, type AccountProfile } from '$lib/profile';
+  import { type AccountProfile } from '$lib/profile';
+  import { PERMISSION_DOMAINS } from '$lib/permissions';
   import { readPreferences, savePreferences, type MarketColorConvention } from '$lib/preferences';
   import type { PageData } from './$types';
 
@@ -18,7 +19,6 @@
   let confirmed = $state(false);
   let pending = $state<'name' | 'email' | 'password' | null>(null);
   let marketColorConvention = $state<MarketColorConvention>('red-up-green-down');
-  const roleLabels: Record<string, string> = { admin: '管理员', handler: '经办', reviewer: '复核' };
 
   async function loadProfile(signal?: AbortSignal) {
     loading = true;
@@ -129,16 +129,14 @@
       <div class="profile-permissions">
         <ModuleCard labelledBy="profile-permissions-title">
           <h2 id="profile-permissions-title">账号权限</h2>
-          <h3>市场研究</h3>
-          <ul class="permission-list">{#each DASHBOARD_PERMISSIONS as permission}<li>{permission}</li>{/each}</ul>
           <h3>已分配角色</h3>
           {#if profile}
-            {#if profile.roles.length}<ul class="permission-list">{#each profile.roles as role}<li>{roleLabels[role.name] || role.name}{#if role.description && role.description !== role.name}<span>{role.description}</span>{/if}</li>{/each}</ul>{:else}<p class="profile-help">未分配业务角色</p>{/if}
-            <h3>已分配业务权限</h3>
+            {#if profile.roles.length}<ul class="permission-list">{#each profile.roles as role}<li>{role.name}{#if role.description && role.description !== role.name}<span>{role.description}</span>{/if}</li>{/each}</ul>{:else}<p class="profile-help">未分配业务角色</p>{/if}
+            <h3>当前有效权限</h3>
             {#if profile.permissions.length}
-              <ul class="permission-list">{#each profile.permissions as permission}<li><strong>{permission.description || permission.name}</strong><span>{permission.name}</span><span>{permission.resource === 'https://eastmoney.hasbai.xyz/financing' ? '融资工作台' : permission.resource}</span></li>{/each}</ul>
+              <ul class="permission-list">{#each profile.permissions as permission}<li><strong>{permission.description || permission.name}</strong><span>{permission.name}</span><span>{PERMISSION_DOMAINS[permission.resource] ?? permission.resource}</span></li>{/each}</ul>
             {:else}<p class="profile-help">未分配额外业务权限</p>{/if}
-            <p class="profile-help">融资工作台还需关联已启用的业务人员。权限由管理员维护。</p>
+            <p class="profile-help">角色及成员由 Auth0 管理，应用权限由管理中心统一配置。</p>
           {:else}<p class="profile-help">{loading ? '正在读取角色与权限…' : '角色与权限暂时无法读取，请重新读取个人信息'}</p>{/if}
         </ModuleCard>
       </div>

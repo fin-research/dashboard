@@ -3,9 +3,8 @@ import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getDatabase } from '$lib/server/financing/db.js';
 import { getWorkflowSettingsData } from '$lib/server/financing/queries.js';
-import { auditRequestMeta, prepareAudit } from '$lib/server/financing/audit.js';
 import { parseReminderPeriods } from '$lib/financing/reminder-periods.js';
-import { hasPermission } from '$lib/financing/permissions.js';
+import { hasPermission } from '$lib/permissions';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -76,22 +75,7 @@ export const actions: Actions = {
 				id: period.id,
 				lead_hours: period.leadHours,
 				sort_order: period.sortOrder
-			})))),
-			prepareAudit({
-				db,
-				...auditRequestMeta(event),
-				action: 'create',
-				entityType: 'reminder_rule',
-				entityId: id,
-				summary: `创建提醒规则：${name}`,
-				after: {
-					name,
-					nodeIds: selectedNodes.map((node) => node.id),
-					leadHours: periodRows.map((period) => period.leadHours),
-					recipientMode
-				}
-			})
-		]);
+			}))))]);
 		return {
 			success: true,
 			message: '提醒规则已保存',
@@ -112,7 +96,7 @@ export const actions: Actions = {
 		};
 	},
 	createSop: async (event) => {
-		if (!hasPermission(event.locals.permissions, 'sop_manage')) {
+		if (!hasPermission(event.locals.permissions, 'financing.sop:create')) {
 			return fail(403, { message: '当前角色无权新增 SOP' });
 		}
 		const data = await event.request.formData();
@@ -126,14 +110,7 @@ export const actions: Actions = {
 			await db.batch([db.prepare(`
 				INSERT INTO sop_templates (id, name, debt_type, description)
 				VALUES (?, ?, ?, ?)
-			`).bind(id, name, debtType, description || null), prepareAudit({
-				...auditRequestMeta(event),
-				action: 'create',
-				entityType: 'sop',
-				entityId: id,
-				summary: `创建 SOP：${name}`,
-				after: { name, debtType, description }
-			})]);
+			`).bind(id, name, debtType, description || null)]);
 		} catch (error) {
 			return fail(409, { message: error instanceof Error ? error.message : String(error) });
 		}

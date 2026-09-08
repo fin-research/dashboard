@@ -28,7 +28,7 @@
 - 新注册账号未验证邮箱时，Post Login Action 暂停登录并跳转公开 `/auth/verify-email`，提示检查邮件；不向 Access 回调发送 `access_denied`，也不签发身份声明。页面不接收或显示邮箱／账号 ID，不消费 Auth0 附带的 `state`；验证后发起全新登录，直接调用旧事务 `/continue` 仍被拒绝。原迁移账号的 UUID、账号 ID 与原邮箱绑定例外保持不变。
 - `/auth/login` 是统一登录／注册入口，返回地址只接受安全的本站路径。退出清理站点 Cookie，再退出 Auth0 和 Access，最后回到本站首页；两层退出目标由服务端生成，不采用请求中的 `returnTo`，退出响应禁止缓存。
 - 浏览器登录与退出使用 `auth.hasbai.xyz`；`AUTH0_DOMAIN` 继续指向原租户域名，仅用于服务端管理 API。新注册用户在 Auth0 Forms 中必填姓名、部门，保存成功后再进入原邮箱验证流程；资料字段不授予角色或自动关联融资人员，原有账号不强制补填。
-- `src/hooks.server.ts` 统一保护所有非 GET/HEAD/OPTIONS 操作及 `/profile*`、`/api/profile*`、`/trading-research*`、`/credit-assistant`、`/api/credit*` 和 `/api/economic-indicators`。其他页面和只读接口保持公开。Dashboard 对有效登录账号不检查角色或业务权限。
+- `src/hooks.server.ts` 对全部业务页面和 API 执行统一身份与权限检查，具体规则见下文。
 - `worker/entry.ts` 对绕过 SvelteKit 的授信问答 HTTP 入口执行相同验证；WebSocket 和 GET 也受保护。
 - 写入同时验证 Origin，文件上传继续保留类型、大小、日期、内容校验，数据库写入继续使用参数化查询和事务。登录不能替代业务输入校验。
 - 公开报告资源通道只允许报告使用的资源、字段、日期范围和有界条数，不能转发任意 URL、路径、GraphQL 或 Choice 指标。通过私有 DATA binding 读取后流式返回，客户端继续执行原有 Zod 契约校验。
@@ -46,29 +46,20 @@
   处理阶段，以及限长后的字段路径、收到类型和标量值。不得返回堆栈、Cookie、token、签名
   URL、连接串、完整正文或大段原始响应；详细堆栈仍只进入服务端日志。
 
-## 融资与管理模块的额外授权
+## 全站授权入口
 
-中央 Access 校验由 `src/lib/server/access.ts` 统一执行。全站只使用中央验证后的 `locals.user`；融资 middleware 把明确关联、启用的人员及角色权限补充到 `locals.user.financing`，不重复解析或验证 JWT，也不创建第二份身份。融资 middleware 仅对 `/financing/*` 和人员相关管理路由执行；通过 `route-contract.ts` 把新路由映射到原 named action 权限表，未登记 mutation 拒绝。
+所有业务页面、只读 API、写入 API 和 named actions 由 `src/lib/server/authorization.ts` 检查。`src/hooks.server.ts` 是 SvelteKit 的唯一检查入口；全局服务端 layout 依赖 pathname，使纯客户端页面之间的导航也经过入口检查。门户、身份流程和静态资源以明确规则公开，业务只读接口不再豁免权限。
 
-Profile 与人员管理统一读取 `AUTH0_MANAGEMENT_CLIENT_ID` 和唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`，复用已有完整管理权限的 M2M 应用。用户业务权限仍由各接口独立校验，统一管理凭据不会向用户授予额外权限。Secret 和管理 token 不进入客户端、日志或持久化文件。
+`src/lib/permissions.ts` 是权限代码及说明的唯一来源，`src/lib/server/permission-policy.ts` 按真实路由 ID、HTTP 方法、named action 分配权限。未知路由、未登记操作和含多个 action 的请求失败关闭。GET/HEAD 也校验读取权限；写入检查 Origin，前端可见性不能代替服务端校验。
 
-### 融资授权
+独立授信问答 HTTP 入口调用同一授权函数，保留原客户保密材料边界。Data Worker 的公网用户请求通过私有 `AUTHORIZATION` binding 调用 Dashboard `Authorization` entrypoint；Data 不维护第二套权限目录或授权矩阵，不信任自报身份或权限头。服务绑定和明确允许的 Access 服务身份用于机器任务，不代表用户角色。Ingest 的 HTTP 入口仅公开 health，其工作由 Cron/Workflow 执行；Quant、Choice 无新增用户权限入口。
 
-- Auth0 RBAC 是三种融资角色和七类权限的管理来源。角色名为 `financing:admin`、`financing:handler`、`financing:reviewer`，在应用中仍使用原 admin/handler/reviewer 代码和原权限代码。
-- 角色授权使用 `https://eastmoney.hasbai.xyz/financing` API 的 permissions，忽略其他 API 的同名权限。账号必须且只能关联一种融资角色。
-- `people` 保存人员主档和 Auth0 账号关联；人员启用是进入融资业务的额外条件。人员页面同步 Auth0 的角色与账号状态，角色／权限维护调用 Auth0 后读取确认结果。
-- SvelteKit 非安全方法继续按“路由 + named action”映射权限，未登记 mutation 默认拒绝。本人任务更新继续同时校验 personId 与负责人，SQL 保留负责人条件。
-- 不允许停用／删除当前人员或移除其登录权限，并至少保留一个启用管理员、一个可维护权限配置的启用角色。移除融资登录只移除融资角色和人员关联，不删除全站 Auth0 账号。
-- 融资人员停用使用人员状态与 `app_metadata.financing_enabled`；它不自动封禁其他应用。Auth0 全局 blocked 仍阻止融资访问。
+全站身份仍只有 `locals.user`：`id` 是 Access subject，`auth0Id` 来自已验证的 `eastmoney_user_id`，`authorization` 为统一授权结果。业务负责人只用 Auth0 ID；不能用 Access subject、姓名或邮箱推断关联。每次受保护请求查询 Auth0 当前账号、连接、验证状态及角色；账号停用、邮箱变更和撤销角色不受应用身份缓存影响。仅管理服务 token 可按有效期缓存，人员目录与角色列表只在单请求内复用。
 
+## 权限存储与内测模式
 
-### 融资授权缓存和数据后台
+用户、角色及成员关系仅由 Auth0 管理。应用只维护 `authorization.permission` 和 `authorization.role_permission`，详见 [管理中心](modules/management.md)。模式显式配置为 `beta-open` 或 `enforce`，未知模式拒绝受保护请求；内测开放仅发生在身份验证之后，不能匿名绕过，也不允许未登记操作。
 
-- 只读请求可复用最多 60 秒的身份判断，缓存键仍为凭证 SHA-256，不保存明文 Cookie/JWT。写请求、`/data/token` 和 `/data/api/*` 强制实时查询 Auth0。
-- 数据后台通过同源 `/financing/data/api/*` 使用原有表和字段白名单。客户端不再取得 Neon Auth JWT，禁止任意表、任意 SQL、无主键批量修改和只读字段写入；乐观版本条件继续保留。
-- Worker 在单请求同一个 Hyperdrive Client 的事务中设置已验证身份的事务上下文 `request.financing.user_id`，然后 `SET LOCAL ROLE authenticated`。所有设置在事务结束时消失；Auth0 路径不依赖旧 Neon JWT 扩展的会话初始化。
-- PostgreSQL RLS 同时检查人员启用、Auth0 账号状态、data_manage 和最长 60 秒的已确认授权有效期；过期授权拒绝读取和写入。数据写入继续由原审计触发器记录 personId、邮箱和变更前后值。
-- 导入、数据编辑和令牌／代理入口保留 data_manage 检查，POST/PATCH/DELETE 额外校验 Origin。
-- 生产账号迁移采用带原 scrypt 参数的批量导入；上线前核对全部 ID、邮箱、角色与权限。只有新认证和业务访问可用后才移除旧 Neon Auth。
+Auth0 管理请求由 `auth0-management.js` 共用唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`，禁止跟随外部重定向，限时、限长读取。应用权限不读取旧融资 resource server 的 permissions。角色权限保存使用事务、角色锁和版本比对；禁止客户端提供有效权限集合或授权模式。
 
-中央身份的 `id` 保持原 Access subject，`auth0Id` 来自已验证的 Auth0 声明；融资关联、Auth0 API 和 RLS 均使用该 `auth0Id`，不能误用 Access subject 或按邮箱猜测关联。只读请求可缓存人员授权判断，但缓存不能改写中央身份字段。`/auth/session` 保持原公开 DTO，不暴露授权细节或认证时间元数据。
+融资数据后台继续使用同源 Worker 代理、表/字段白名单、参数化 SQL、完整主键和乐观版本条件。事务内设置已验证的 `request.auth.user_id`、`request.auth.permissions`、`request.auth.operation` 后 `SET LOCAL ROLE authenticated`；提交或回滚均清除上下文。RLS 分别检查 read/create/update/delete，不再查询 people 表或保存人员授权到期时间。`authenticated` 无权修改权限表。原人员、角色权限、审计表与审计触发器在迁移中移除，不建立替代审计流程。

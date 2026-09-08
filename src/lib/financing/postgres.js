@@ -13,11 +13,11 @@ const financingTypes = {
 };
 
 const FINANCING_TABLES = [
-	'people', 'sop_templates', 'sop_nodes', 'projects',
+	'sop_templates', 'sop_nodes', 'projects',
 	'project_tasks', 'debt', 'bond', 'income_certificate', 'income_right', 'refinancing',
 	'swap_facility', 'cashflow', 'balance_snapshot', 'reminder_rules', 'reminder_rule_nodes',
 	'reminder_rule_periods', 'reminder_deliveries',
-	'finance_parameters', 'financial_monthly_data', 'debt_limit_configs', 'audit_logs', 'role_permissions',
+	'finance_parameters', 'financial_monthly_data', 'debt_limit_configs',
 	'liability_weekly_report_runs', 'debt_overview',
 	'cashflow_overview', 'data_overview',
 	'monthly_financing_metrics'

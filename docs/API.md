@@ -54,8 +54,10 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 
 ## 融资与管理路由
 
-`/financing/*` 属于 Dashboard 的真实路由子树，SvelteKit 全局 base 仍为空；URL 使用 `src/lib/financing/app-paths.ts`。人员与融资资料使用 `/management/people`、`/management/financing-profile`，兼容路径保持重定向。
+`/financing/*` 属于 Dashboard 的真实路由子树，SvelteKit 全局 base 仍为空；URL 使用 `src/lib/financing/app-paths.ts`。`/management/people` 统一配置角色权限，个人资料使用 `/profile`；旧融资资料入口重定向。
 
 页面 load 仅返回所需数据，通用预取使用 tap，固定工作台导航允许 hover。普通 mutation 返回单个确认实体或删除 ID，增强表单使用 `update({ reset: false, invalidateAll: false })`；身份与提醒只按 dependencies 定向失效。负债周报的显式生成按新快照版本刷新，具体例外见模块文档。
 
 内部数据接口保持 `/financing/data/token`、`/financing/data/api/*`、`/financing/data/import`、`/financing/data/import/[id]`。Auth0 模式不向浏览器返回 Neon JWT。字段、表、主键与分页仍使用原白名单；请求身份在事务内设置并执行 RLS。
+
+全站业务 GET/HEAD、API 写入及 named actions 均由 `permission-policy.ts` 登记和检查，门户及身份 bootstrap 除外。权限目录见 `src/lib/permissions.ts`；请求传入的权限、角色、人员身份或来源标记不能代替服务端授权。

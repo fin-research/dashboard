@@ -15,8 +15,8 @@ export function dashboardRequiresLogin(request: Request): boolean {
     || path === '/auth/login';
 }
 
-export async function dashboardIdentity(request: Request, env: Env): Promise<SiteIdentity | null> {
-  const required = dashboardRequiresLogin(request);
+export async function dashboardIdentity(request: Request, env: Env, forceRequired = false): Promise<SiteIdentity | null> {
+  const required = forceRequired || dashboardRequiresLogin(request);
   const sessionRequest = new URL(request.url).pathname === '/auth/session';
   // Public reports and assets do not depend on the identity provider or vary by user.
   if (!required && !sessionRequest) return null;

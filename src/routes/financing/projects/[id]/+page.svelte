@@ -15,8 +15,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	} from '@lucide/svelte';
 	import { autoSave, completeAutoSave, getAutoSaveRevision } from '$lib/financing/auto-save';
 	import { globalMessages } from '$lib/global-messages';
-	import { roleLabel } from '$lib/financing/roles';
-	import { hasPermission } from '$lib/financing/permissions.js';
+		import { hasPermission } from '$lib/permissions';
 	import { withBase } from '$lib/financing/app-paths';
 
 	let { data: routeData, form } = $props();
@@ -33,9 +32,11 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	let suppressFormFeedback = $state(false);
 	let handledForm = $state<unknown>(null);
 	const pendingAction = $derived(pendingActions.at(-1) ?? '');
-	const canManage = $derived(hasPermission(data?.permissions, 'project_manage'));
+	const canManage = $derived(hasPermission(data?.permissions, 'financing.task:update'));
+	const canManageProject = $derived(hasPermission(data?.permissions, 'financing.project:update'));
+	const canCreateTask = $derived(hasPermission(data?.permissions, 'financing.task:create'));
 	const canUpdateTaskStatus = (task: any) => canManage || (
-		hasPermission(data?.permissions, 'own_task_update') && task.assigneeId === data?.user?.personId
+		hasPermission(data?.permissions, 'financing.task:update_own') && task.assigneeId === data?.user?.personId
 	);
 	$effect(() => {
 		if (!form?.message || suppressFormFeedback || handledForm === form) return;
@@ -96,15 +97,11 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 				: [...tasks, task]
 			).sort((left: any, right: any) => Number(left.sortOrder) - Number(right.sortOrder));
 		}
-		const auditLogs = resultData?.auditLog
-			? [resultData.auditLog, ...data.auditLogs].slice(0, 30)
-			: data.auditLogs;
 		data = {
 			...data,
 			project,
 			tasks,
-			members: membersFor(project, tasks, data.people),
-			auditLogs
+			members: membersFor(project, tasks, data.people)
 		};
 	}
 
@@ -260,7 +257,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 					<p class="empty-state">{canManage ? '尚无任务节点，可在下方添加第一个任务。' : '尚无任务节点。'}</p>
 				{/each}
 			</div>
-			{#if canManage}
+			{#if canCreateTask}
 			<form method="post" action="?/addTask" use:enhance={enhanceForm('add-task', { resetOnSuccess: true })} class="add-task">
 				<label>
 					<span>任务名称</span>
@@ -287,26 +284,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			{/if}
 		</section>
 
-		<section class="panel audit-panel">
-			<header>
-				<div>
-					<h2>操作日志</h2>
-					<p>{data.auditLogs.length ? '按时间倒序展示项目操作' : '尚无操作记录'}</p>
-				</div>
-			</header>
-			<ol class="audit-list">
-				{#each data.auditLogs as item}
-					<li>
-						<i></i>
-						<div>
-							<strong>{item.action}</strong>
-							<p>{item.detail ?? '未记录变更明细'}</p>
-							<small>{item.actor ?? '系统'} · {formatDateTime(item.createdAt)}</small>
-						</div>
-					</li>
-				{/each}
-			</ol>
-		</section>
 	</main>
 
 	<aside>
@@ -314,7 +291,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<header>
 				<div>
 					<h2>基本信息</h2>
-					<p>{canManage ? '修改后自动保存' : '当前为只读视图'}</p>
+					<p>{canManageProject ? '修改后自动保存' : '当前为只读视图'}</p>
 				</div>
 			</header>
 			<form
@@ -326,7 +303,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			>
 				<label>
 					<span>项目状态</span>
-					<select name="status" value={data.project.status} disabled={!canManage}>
+					<select name="status" value={data.project.status} disabled={!canManageProject}>
 						{#each Object.entries(statusLabels) as [value, label]}
 							<option {value}>{label}</option>
 						{/each}
@@ -334,16 +311,16 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 				</label>
 				<label>
 					<span>负责人</span>
-					<select name="ownerId" value={data.project.ownerId ?? ''} disabled={!canManage}>
+					<select name="ownerId" value={data.project.ownerId ?? ''} disabled={!canManageProject}>
 						<option value="">待分配</option>
 						{#each data.people as person}
-							<option value={person.id}>{person.name} · {roleLabel(person.role)}</option>
+							<option value={person.id}>{person.name} · {person.roles?.map((role: { name: string }) => role.name).join('、') || '未分配角色'}</option>
 						{/each}
 					</select>
 				</label>
 				<label>
 					<span>项目说明</span>
-					<textarea name="notes" rows="5" placeholder="补充项目背景、风险或执行说明" disabled={!canManage}>{data.project.notes ?? ''}</textarea>
+					<textarea name="notes" rows="5" placeholder="补充项目背景、风险或执行说明" disabled={!canManageProject}>{data.project.notes ?? ''}</textarea>
 				</label>
 			</form>
 			<dl class="metadata">
@@ -371,7 +348,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						<span>{member.name.slice(0, 1)}</span>
 						<div>
 							<strong>{member.name}</strong>
-							<p>{member.responsibility} · {roleLabel(member.role)}</p>
+							<p>{member.responsibility} · {member.roles?.map((role: { name: string }) => role.name).join('、') || '未分配角色'}</p>
 							<small>{member.email ?? '未填写邮箱'}</small>
 						</div>
 					</li>
@@ -649,11 +626,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		color: #344054;
 	}
 	.member-list,
-	.audit-list {
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
 	.member-list li {
 		display: flex;
 		align-items: center;
@@ -687,47 +659,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		font-size: 0.75rem;
 		color: var(--muted);
 		overflow-wrap: anywhere;
-	}
-	.audit-list {
-		padding: 0.5rem 1rem 1rem;
-	}
-	.audit-list li {
-		position: relative;
-		display: grid;
-		grid-template-columns: 1rem minmax(0, 1fr);
-		gap: 0.75rem;
-		padding: 0.75rem 0;
-	}
-	.audit-list i {
-		width: 0.65rem;
-		height: 0.65rem;
-		margin-top: 0.35rem;
-		border: 0.15rem solid #b9ccff;
-		border-radius: 999rem;
-		background: var(--blue);
-	}
-	.audit-list li:not(:last-child)::before {
-		position: absolute;
-		top: 1.75rem;
-		bottom: -0.75rem;
-		left: 0.27rem;
-		width: 1px;
-		content: '';
-		background: var(--line);
-	}
-	.audit-list strong,
-	.audit-list p,
-	.audit-list small {
-		display: block;
-		font-size: 1rem;
-	}
-	.audit-list p {
-		margin: 0.15rem 0;
-		color: var(--muted);
-	}
-	.audit-list small {
-		font-size: 0.75rem;
-		color: var(--subtle);
 	}
 	@media (max-width: 75rem) {
 		.summary-grid {

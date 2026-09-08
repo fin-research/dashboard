@@ -1,17 +1,13 @@
-const PRIVATE_PAGES = ['/profile', '/management', '/financing', '/trading-research', '/credit-workbench', '/credit-assistant'];
-const PRIVATE_APIS = ['/api/profile', '/api/credit-assistant', '/api/credit', '/api/economic-indicators'];
-
-function matches(path: string, prefixes: string[]): boolean {
-  return prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
-}
-
+/** Public navigation is limited to the portal and authentication bootstrap. */
 export function pageRequiresLogin(path: string): boolean {
-  try { return matches(decodeURIComponent(path), PRIVATE_PAGES); }
-  catch { return true; }
+  try {
+    const normalized = decodeURIComponent(path).replace(/\/__data\.json$/, '').replace(/\/$/, '') || '/';
+    return !['/', '/auth/verify-email', '/auth/logout', '/auth/session'].includes(normalized)
+      && !normalized.startsWith('/_app/');
+  } catch { return true; }
 }
-
 export function apiRequiresLogin(path: string): boolean {
-  return matches(path, PRIVATE_APIS);
+  return path === '/api' || path.startsWith('/api/');
 }
 
 export function safeReturnTo(value: string | null): string {

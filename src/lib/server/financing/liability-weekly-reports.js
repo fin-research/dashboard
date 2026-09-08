@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { randomUUID } from 'node:crypto';
-import { prepareAudit } from './audit.js';
 import { normalizeManualLiabilitySources } from '../../financing/liability-choice.js';
 import { LIABILITY_REPORT_EDB_CODES, normalizeLiabilityReportDatabasePayload } from '../../financing/liability-report-data.js';
 
@@ -121,7 +120,7 @@ export async function getLiabilityWeeklyReportRunByDate(database, asOfDate) {
 	// The real-time predicate keeps this read-after-write path outside its query cache.
 	return database.prepare(`
 		SELECT id, as_of_date AS "asOfDate", generated_at AS "generatedAt",
-			generated_by_person_id AS "generatedByPersonId", r2_key AS "r2Key",
+			generated_by AS "generatedByPersonId", r2_key AS "r2Key",
 			content_sha256 AS "contentSha256", status, source_manifest AS "sourceManifest",
 			missing_modules AS "missingModules", error_message AS "errorMessage"
 		FROM liability_weekly_report_runs
@@ -204,7 +203,7 @@ export async function saveLiabilityWeeklyReportSnapshot({ database, env, actor, 
 	await database.transaction(async (transaction) => {
 		previousRun = await transaction.prepare(`
 			SELECT id, as_of_date AS "asOfDate", generated_at AS "generatedAt",
-				generated_by_person_id AS "generatedByPersonId", r2_key AS "r2Key",
+				generated_by AS "generatedByPersonId", r2_key AS "r2Key",
 				content_sha256 AS "contentSha256", status
 			FROM liability_weekly_report_runs
 			WHERE as_of_date = ?
@@ -214,7 +213,7 @@ export async function saveLiabilityWeeklyReportSnapshot({ database, env, actor, 
 		if (previousRun) {
 			await transaction.prepare(`
 			UPDATE liability_weekly_report_runs
-				SET generated_at = CURRENT_TIMESTAMP, generated_by_person_id = ?,
+				SET generated_at = CURRENT_TIMESTAMP, generated_by = ?,
 					r2_key = ?, content_sha256 = ?, status = 'pending',
 					source_manifest = ?::jsonb, missing_modules = ?::jsonb, error_message = NULL,
 					updated_at = CURRENT_TIMESTAMP
@@ -224,22 +223,12 @@ export async function saveLiabilityWeeklyReportSnapshot({ database, env, actor, 
 		} else {
 			await transaction.prepare(`
 				INSERT INTO liability_weekly_report_runs (
-					id, as_of_date, generated_by_person_id, r2_key, content_sha256, status,
+					id, as_of_date, generated_by, r2_key, content_sha256, status,
 					source_manifest, missing_modules
 				) VALUES (?, ?, ?, ?, ?, 'pending', ?::jsonb, ?::jsonb)
 			`).run(id, asOfDate, actor?.personId ?? null, r2Key, contentSha256,
 				JSON.stringify(snapshot.provenance), JSON.stringify(sourceStatus.missingModules));
 		}
-		await prepareAudit({
-			db: transaction,
-			actor,
-			action: 'liability_weekly_report.save_snapshot',
-			entityType: 'liability_weekly_report',
-			entityId: id,
-			summary: `保存负债周报快照：${asOfDate}`,
-			before: previousRun,
-			after: { id, asOfDate, r2Key, contentSha256, provenance: snapshot.provenance, replaces: previousRun?.id ?? null }
-		}).run();
 	});
 	try {
 		await bucket.put(r2Key, content, {

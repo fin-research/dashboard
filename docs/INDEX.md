@@ -34,3 +34,5 @@
 | `/credit-workbench/assistant` 与授信材料 | [授信问答](CREDIT_ASSISTANT.md) |
 
 公共文档只维护跨模块规则；页面字段、业务公式、图表、特定 action、查询预算与例外放在模块文档。一个事实只保留一个权威位置，其他位置使用链接。`docs/history/` 只供历史迁移排查，不是当前部署说明；原 financing checkout 为历史归档，不再作为源码或规范来源。
+
+- 全站权限、Auth0 角色授权与迁移发布 → [统一权限](UNIFIED_PERMISSIONS.md)

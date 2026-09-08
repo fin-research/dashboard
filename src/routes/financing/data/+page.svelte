@@ -3,7 +3,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	import '../management.css';
 	import FinanceParametersPanel from '$lib/financing/FinanceParametersPanel.svelte';
 	import DebtImportPanel from '$lib/financing/DebtImportPanel.svelte';
-	import { hasPermission } from '$lib/financing/permissions.js';
+	import { hasPermission } from '$lib/permissions';
 
 	let { data } = $props();
 </script>
@@ -13,9 +13,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 </svelte:head>
 
 <div class="management-page data-page">
-	{#if hasPermission(data.permissions, 'data_manage')}
-		<DebtImportPanel />
-		<FinanceParametersPanel />
+	{#if hasPermission(data.permissions, 'financing.data:read')}
+		{#if hasPermission(data.permissions, 'financing.data:import')}<DebtImportPanel />{/if}
+		<FinanceParametersPanel permissions={data.permissions} />
 		<!-- 通用大表格保留在 $lib/DataAdminTable.svelte，需要恢复时重新挂载。 -->
 	{:else}
 		<ModuleCard class="section-card permission-empty">

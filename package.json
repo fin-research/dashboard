@@ -31,7 +31,8 @@
     "financing:db:migrate:sqlite": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/migrate-sqlite-to-postgres.mjs",
     "financing:reminders:send": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/send-reminders.mjs",
     "financing:proto:generate": "protoc -I proto/financing --es_out=src/lib/financing/generated --es_opt=target=js+dts,import_extension=js proto/financing/debt_import.proto",
-    "verify:routes": "node scripts/verify-profile-routes.mjs && node scripts/verify-financing-routes.mjs"
+    "verify:routes": "node scripts/verify-profile-routes.mjs && node scripts/verify-financing-routes.mjs",
+    "auth:db:migrate": "node --env-file-if-exists=.env.local scripts/apply-unified-permissions.mjs"
   },
   "dependencies": {
     "@sveltejs/adapter-cloudflare": "^7.2.9",

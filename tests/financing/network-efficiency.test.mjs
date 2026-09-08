@@ -31,14 +31,14 @@ test('slow navigations expose pending and accessible loading states', async () =
 
 test('authenticated page loads do not transfer the base64 avatar through locals', async () => {
 	const [auth, layout, avatar] = await Promise.all([
-		readFile(new URL('../../src/lib/server/financing/auth.js', import.meta.url), 'utf8'),
+		readFile(new URL('../../src/lib/server/auth0-directory.ts', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/+layout.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/avatar/+server.ts', import.meta.url), 'utf8')
 	]);
 	assert.doesNotMatch(auth, /avatar_data_url AS avatarDataUrl/);
-	assert.match(auth, /avatar_data_url IS NOT NULL AS hasAvatar/);
-	assert.match(layout, /withBase\('\/avatar'\)/);
-	assert.match(avatar, /Cache-Control': 'private, max-age=31536000, immutable'/);
+	assert.match(auth, /profile.name \|\| profile.email/);
+	assert.doesNotMatch(layout, /avatar_data_url|avatarVersion/);
+	assert.match(avatar, /error\(410/);
 });
 
 test('reminder history is cursor-paginated in bounded batches', async () => {
@@ -53,19 +53,18 @@ test('reminder history is cursor-paginated in bounded batches', async () => {
 	assert.match(query, /safeLimit \+ 1/);
 });
 
-test('authenticated GET navigation reuses a bounded server-side session decision', async () => {
-	const [hooks, auth, cache] = await Promise.all([
-		readFile(new URL('../../src/lib/server/financing/handle.ts', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/lib/server/financing/auth.js', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/lib/server/financing/auth-cache.js', import.meta.url), 'utf8')
-	]);
-	assert.match(hooks, /useSessionCache: safeRequest && routeId !== '\/data\/token'/);
-	assert.match(hooks, /!safeRequest\) await invalidateCachedSession/);
-	assert.match(auth, /readCachedSessionUser/);
-	assert.match(cache, /CACHE_TTL_SECONDS = 60/);
-	assert.match(cache, /crypto\.subtle\.digest\('SHA-256'/);
-	assert.doesNotMatch(cache, /Map\s*\(/);
-	assert.match(hooks, /queryCount/);
+test('authorization decisions are fresh while directory requests are reused only within one request', async () => {
+ const [hooks, directory, authorization] = await Promise.all([
+   readFile(new URL('../../src/hooks.server.ts', import.meta.url), 'utf8'),
+   readFile(new URL('../../src/lib/server/auth0-directory.ts', import.meta.url), 'utf8'),
+   readFile(new URL('../../src/lib/server/authorization.ts', import.meta.url), 'utf8')
+ ]);
+ assert.match(hooks, /await authorizeRequest/);
+ assert.match(directory, /let peopleRequest:/);
+ assert.match(directory, /let roleRequest:/);
+ assert.match(authorization, /await directory.current/);
+ assert.doesNotMatch(authorization, /readCachedSessionUser|cacheSessionUser/);
+ assert.match(hooks, /finally.*closeDatabase/);
 });
 
 test('page loads defer form-only options and remove duplicate identity queries', async () => {
@@ -74,14 +73,14 @@ test('page loads defer form-only options and remove duplicate identity queries',
 		readFile(new URL('../../src/routes/financing/projects/options/+server.ts', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/projects/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/management/financing-profile/+page.server.ts', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/routes/management/financing-profile/+page.svelte', import.meta.url), 'utf8'),
+		readFile(new URL('../../src/routes/profile/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/sop/[id]/+page.server.ts', import.meta.url), 'utf8')
 	]);
 	assert.doesNotMatch(projectsPage, /getProjectFormOptions|getActiveProjectSopOptions/);
 	assert.match(projectOptions, /getProjectFormOptions/);
 	assert.match(projectComponent, /fetch\(withBase\('\/projects\/options'\)/);
-	assert.doesNotMatch(settingsPage, /export const load/);
-	assert.match(settingsComponent, /data\.user\?\.personName/);
+	assert.match(settingsPage, /redirect\(303, '\/profile'\)/);
+	assert.match(settingsComponent, /profile\.name/);
 	assert.match(sopDetail, /async function loadSopDetail/);
 	assert.match(sopDetail, /jsonb_agg\(jsonb_build_object/);
 });
@@ -99,16 +98,16 @@ test('data administration gets its endpoint with the private token request', asy
 		readFile(new URL('../../src/routes/financing/data/+page.server.ts', import.meta.url), 'utf8'),
 		(error) => error?.code === 'ENOENT'
 	);
-	assert.match(endpoint, /\{ token, dataApiUrl: getDataApiUrl\(\) \}/);
+	assert.match(endpoint, /transport: 'worker', dataApiUrl:/);
 	assert.match(endpoint, /'cache-control': 'no-store, private'/);
 	assert.match(endpoint, /vary: 'Cookie'/);
 	assert.match(client, /dataApiUrl\?: string/);
 	assert.match(client, /parsed\.protocol !== 'https:'/);
 	assert.doesNotMatch(page, /import DataAdminTable|<DataAdminTable/);
-	assert.match(page, /<FinanceParametersPanel \/>/);
+	assert.match(page, /<FinanceParametersPanel permissions=\{data.permissions\} \/>/);
 	assert.match(parameters, /new NeonDataApi\(\)/);
 	assert.doesNotMatch(parameters.slice(parameters.indexOf('async function save()')), /api\.list\(|loadRows\(\);|invalidateAll/);
-	assert.match(page, /hasPermission\(data\.permissions, 'data_manage'\)/);
+	assert.match(page, /hasPermission\(data\.permissions, 'financing.data:read'\)/);
 	assert.match(page, /<DebtImportPanel \/>/);
 	assert.match(table, /new NeonDataApi\(\)/);
 	assert.doesNotMatch(page, /dataApiUrl/);

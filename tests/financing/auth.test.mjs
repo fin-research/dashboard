@@ -4,14 +4,14 @@ import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { isValidEmail, normalizeEmail } from '../../src/lib/financing/email.js';
 import { DATA_ADMIN_DEBT_TYPES, DEBT_TYPES } from '../../src/lib/financing/debt-types.js';
-import { cacheSessionUser, invalidateCachedSession, readCachedSessionUser } from '../../src/lib/server/financing/auth-cache.js';
-import { createNeonAuthClient, jwtFromResponseHeaders, NEON_SESSION_COOKIE, sessionMaxAgeFromSetCookie, sessionTokenFromSetCookie } from '../../src/lib/server/financing/neon-auth-client.js';
+import { cacheSessionUser, invalidateCachedSession, readCachedSessionUser } from './fixtures/legacy-auth/auth-cache.js';
+import { createNeonAuthClient, jwtFromResponseHeaders, NEON_SESSION_COOKIE, sessionMaxAgeFromSetCookie, sessionTokenFromSetCookie } from './fixtures/legacy-auth/neon-auth-client.js';
 import { dataApiUrlFromAuthUrl } from '../../src/lib/financing/neon-urls.js';
 import { deleteProjectWithReminders } from '../../src/lib/server/financing/project-deletion.js';
 import { decodeDebtImportPayload, encodeDebtImportPayload } from '../../src/lib/financing/debt-import-codec.js';
 import { importDebtWorkbook, refreshDebtImportDerivatives } from '../../src/lib/server/financing/debt-importer.js';
-import { actionNameFromUrl, isAuthorizedRequest, isSafeRequestMethod } from '../../src/lib/server/financing/request-authorization.js';
-import { PERMISSION_CODES } from '../../src/lib/financing/permissions.js';
+import { actionNameFromUrl, isAuthorizedRequest, isSafeRequestMethod } from './fixtures/legacy-auth/request-authorization.js';
+import { PERMISSION_CODES } from './fixtures/legacy-auth/permissions.js';
 
 function migrationSql(name) {
 	return fs.readFileSync(new URL(`../../financing-migrations/${name}`, import.meta.url), 'utf8')
@@ -162,8 +162,9 @@ test('Data API token requests bypass the Neon Auth session cookie cache', async 
 	const session = await client.getSession({ disableCookieCache: true });
 	assert.equal(session.jwt, 'short-lived-jwt');
 	assert.equal(new URL(requests[0]).searchParams.get('disableCookieCache'), 'true');
-	const hooksSource = fs.readFileSync(new URL('../../src/lib/server/financing/handle.ts', import.meta.url), 'utf8');
-	assert.match(hooksSource, /useSessionCache: safeRequest && routeId !== '\/data\/token' && routeId !== '\/data\/api\/\[\.\.\.path\]'/);
+	const hooksSource = fs.readFileSync(new URL('../../src/lib/server/authorization.ts', import.meta.url), 'utf8');
+	assert.match(hooksSource, /await directory.current\(user\)/);
+	assert.doesNotMatch(hooksSource, /readCachedSessionUser/);
 });
 
 test('short-lived Worker auth cache hashes opaque tokens and can be invalidated', async () => {

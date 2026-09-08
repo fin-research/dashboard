@@ -72,3 +72,5 @@ git diff --check
 统一凭据版本上线并确认后，删除 Dashboard 已无调用方的 `FINANCING_AUTH0_MANAGEMENT_CLIENT_SECRET`。此后 Git 自动构建沿用统一 Secret；常规代码发布无需重复执行凭据切换脚本。合并切换历史见 [合并记录](FINANCING_MERGE.md)。
 
 浏览器关键表单交互、200% 缩放和甘特图大字号视觉回归仍作为专项验收；未执行时不得写成已通过。仓库内已覆盖 Excel 映射/勾稽、提醒周期、项目建档和构建后路由测试，旧待办中的对应“缺少单元测试”不再重复列为待办。
+
+统一权限迁移与发布步骤见 [UNIFIED_PERMISSIONS](UNIFIED_PERMISSIONS.md)。旧融资人员管理和 Auth0 初次账号导入脚本仅供历史迁移参考；当前人员和角色直接在 Auth0 管理，不重建已删除人员表。

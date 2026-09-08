@@ -3,8 +3,7 @@ import './layout.css';
 import { navigating, page } from '$app/state';
 import WorkbenchShell from '$lib/workbench/WorkbenchShell.svelte';
 import type { WorkbenchIconName } from '$lib/trading-research/demo-data';
-import { hasPermission } from '$lib/financing/permissions.js';
-import { roleLabel } from '$lib/financing/roles';
+import { hasPermission } from '$lib/permissions';
 import { withBase, withoutBase } from '$lib/financing/app-paths';
 let { data, children } = $props();
 let navigationSlow = $state(false);
@@ -19,13 +18,12 @@ const views = $derived([
   { id: 'liability-report', href: '/financing/liability-report', label: '负债周报', icon: 'file' as WorkbenchIconName },
   { id: 'projects', href: '/financing/projects', label: '项目进度', icon: 'workflow' as WorkbenchIconName },
   { id: 'sop', href: '/financing/sop', label: 'SOP 管理', icon: 'check' as WorkbenchIconName },
-  ...(hasPermission(data.permissions, 'data_manage') ? [{ id: 'data', href: '/financing/data', label: '融资数据', icon: 'database' as WorkbenchIconName }] : []),
+  ...(hasPermission(data.permissions, 'financing.data:read') ? [{ id: 'data', href: '/financing/data', label: '融资数据', icon: 'database' as WorkbenchIconName }] : []),
   { id: 'management', href: '/management', label: '管理中心', icon: 'menu' as WorkbenchIconName }
 ]);
 const path = $derived(withoutBase(page.url.pathname));
 const activeViewId = $derived(path === '/' || path.startsWith('/debts/') ? 'overview' : path.split('/')[1] ?? 'overview');
 const isLiabilityReport = $derived(path === '/liability-report');
-const avatarUrl = (user: NonNullable<typeof data.user>) => `${withBase('/avatar')}?v=${encodeURIComponent(`${user.personId}:${user.avatarVersion}`)}`;
 </script>
 
 {#if data.user}
@@ -33,9 +31,9 @@ const avatarUrl = (user: NonNullable<typeof data.user>) => `${withBase('/avatar'
   class="financing-scope" layoutReport={isLiabilityReport} reportKind={isLiabilityReport ? 'liability' : null}>
   {#snippet account()}
     {#if data.user}
-    <span class={`role-chip role-${data.user.role}`}>{roleLabel(data.user.role)}</span>
+    <span class="role-chip">{data.user.role || '未分配角色'}</span>
     <a class="profile-button" href="/profile" aria-label="个人信息">
-      {#if data.user.hasAvatar}<img class="avatar" src={avatarUrl(data.user)} alt="" />{/if}
+
       <strong class="profile-name">{data.user.personName}</strong>
     </a>
     {/if}

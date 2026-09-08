@@ -1,7 +1,7 @@
+import { hasPermission } from '$lib/permissions';
 import { financingPersonView } from '$lib/identity';
 import type { LayoutServerLoad } from './$types';
 import { getLayoutData } from '$lib/server/financing/queries.js';
-import { usesAuth0 } from '$lib/server/financing/auth-provider.js';
 
 export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	depends('financing:identity', 'financing:permissions', 'financing:reminders');
@@ -11,16 +11,16 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	const reminderEnd = new Date(Date.parse(`${todayIso}T00:00:00Z`) + 7 * 86_400_000)
 		.toISOString()
 		.slice(0, 10);
-	const layout = locals.user?.financing
+	const layout = locals.user?.authorization && hasPermission(locals.permissions, 'financing.reminder:read') && hasPermission(locals.permissions, 'financing.project:read')
 		? await getLayoutData({
 				today: todayIso,
 				toDate: reminderEnd,
-				personId: locals.user.financing.personId,
+				personId: locals.user.auth0Id,
 				ownOnly: false
 			})
 		: { reminders: { items: [], total: 0 } };
 	return {
-		auth0: usesAuth0(),
+		auth0: true,
 		user: financingPersonView(locals.user),
 		permissions: locals.permissions,
 		reminders: layout.reminders

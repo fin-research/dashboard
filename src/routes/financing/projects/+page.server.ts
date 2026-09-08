@@ -1,11 +1,11 @@
+import { activePerson, getDirectory } from '$lib/server/directory';
 import { randomUUID } from 'node:crypto';
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getDatabase } from '$lib/server/financing/db.js';
 import { getProjectGanttData } from '$lib/server/financing/queries.js';
-import { auditRequestMeta, prepareAudit } from '$lib/server/financing/audit.js';
 import { deleteProjectWithReminders } from '$lib/server/financing/project-deletion.js';
-import { hasPermission } from '$lib/financing/permissions.js';
+import { hasPermission } from '$lib/permissions';
 
 const PROJECT_STATUSES = new Set(['planning', 'in_progress', 'at_risk', 'completed', 'cancelled']);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -42,9 +42,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		projectSources: projectData.projects,
 		today,
 		viewContext: {
-			role: locals.user?.financing?.role ?? 'reviewer',
-			personId: locals.user?.financing?.personId ?? null,
-			personName: locals.user?.financing?.personName ?? null,
+			role: locals.user?.authorization?.roles.map(role => role.name).join('、') ?? '',
+			personId: locals.user?.auth0Id ?? null,
+			personName: locals.user?.authorization?.name ?? null,
 			defaultOwnProjects: false
 		}
 	};
@@ -52,7 +52,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	createProject: async (event) => {
-		if (!hasPermission(event.locals.permissions, 'project_manage')) {
+		if (!hasPermission(event.locals.permissions, 'financing.project:create')) {
 			return fail(403, { message: '当前角色无权新增项目' });
 		}
 		const data = await event.request.formData();
@@ -71,7 +71,7 @@ export const actions: Actions = {
 		if (!ISO_DATE.test(plannedBookbuildingDate)) return fail(400, { message: '请填写有效的计划簿记日期' });
 
 		const db = getDatabase();
-		if (ownerId && !await db.prepare('SELECT 1 FROM people WHERE id = ? AND active = TRUE').get(ownerId)) {
+		if (ownerId && !await activePerson(ownerId)) {
 			return fail(400, { message: '负责人不存在或已停用' });
 		}
 		const sop = await db.prepare(`
@@ -87,10 +87,10 @@ export const actions: Actions = {
 				default_owner_role AS ownerRole
 			FROM sop_nodes WHERE template_id = ? ORDER BY sort_order
 		`).all(sop.id);
-		const assignees = await db.prepare('SELECT id, role FROM people WHERE active = TRUE ORDER BY name').all();
+		const assignees = (await getDirectory().people()).filter(person => person.active);
 		const assigneeByRole = new Map<string, { id: string }>();
-		for (const assignee of assignees as Array<{ id: string; role: string }>) {
-			if (!assigneeByRole.has(assignee.role)) assigneeByRole.set(assignee.role, assignee);
+		for (const assignee of assignees) {
+			for (const role of assignee.roles) if (!assigneeByRole.has(role.id)) assigneeByRole.set(role.id, assignee);
 		}
 		const startDate = projectStartDate(plannedBookbuildingDate, nodes as Array<{ offsetDays: number }>);
 		await db.transaction(async (transaction: ReturnType<typeof getDatabase>) => {
@@ -116,25 +116,6 @@ export const actions: Actions = {
 					startDate, dueDate, node.sortOrder, node.description || null
 				);
 			}
-			await prepareAudit({
-				...auditRequestMeta(event),
-				db: transaction,
-				action: 'project.create',
-				entityType: 'project',
-				entityId: projectId,
-				summary: `创建独立融资项目：${name}`,
-				after: {
-					code,
-					name,
-					debtType: sop.debtType,
-					amountYi: amountYi || null,
-					status: 'planning',
-					plannedStartDate: startDate,
-					plannedIssueDate: plannedBookbuildingDate,
-					sopTemplateId: sop.id,
-					ownerId: ownerId || null
-				}
-			}).run();
 		});
 		return {
 			success: true,
@@ -159,7 +140,7 @@ export const actions: Actions = {
 		if (!ISO_DATE.test(plannedBookbuildingDate)) return fail(400, { message: '请填写有效的计划簿记日期' });
 
 		const db = getDatabase();
-		if (ownerId && !await db.prepare('SELECT 1 FROM people WHERE id = ? AND active = TRUE').get(ownerId)) {
+		if (ownerId && !await activePerson(ownerId)) {
 			return fail(400, { message: '负责人不存在或已停用' });
 		}
 		const before = await db.prepare(`
@@ -208,11 +189,6 @@ export const actions: Actions = {
 					planned_issue_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
 				WHERE id = ?
 			`).run(name, status, ownerId || null, schedule.startDate, plannedBookbuildingDate, notes || null, projectId);
-			await prepareAudit({
-				...auditRequestMeta(event), db: transaction,
-				action: 'project.update', entityType: 'project', entityId: projectId,
-				summary: `更新项目：${name}`, before, after
-			}).run();
 		});
 		return {
 			success: true,
@@ -231,13 +207,7 @@ export const actions: Actions = {
 		const projectId = String(data.get('id') ?? '').trim();
 		const db = getDatabase();
 		if (!projectId) return fail(400, { message: '项目参数无效' });
-		const before = await deleteProjectWithReminders(db, projectId, async ({ transaction, before: deleted }: any) => {
-			await prepareAudit({
-				...auditRequestMeta(event), db: transaction,
-				action: 'project.delete', entityType: 'project', entityId: projectId,
-				summary: `删除项目：${deleted.name}`, before: deleted
-			}).run();
-		});
+		const before = await deleteProjectWithReminders(db, projectId, undefined);
 		if (!before) {
 			return {
 				success: true,

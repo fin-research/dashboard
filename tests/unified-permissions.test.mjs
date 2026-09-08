@@ -1,0 +1,103 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { readdir, readFile } from 'node:fs/promises';
+import { generateKeyPair, exportJWK, SignJWT } from 'jose';
+import { Client } from 'pg';
+import { PERMISSION_CODES, hasPermission } from '../src/lib/permissions.ts';
+import { requestPolicy, ROUTE_PERMISSIONS } from '../src/lib/server/permission-policy.ts';
+import { authorizeRequest, authorizationMode } from '../src/lib/server/authorization.ts';
+import { createDirectory } from '../src/lib/server/auth0-directory.ts';
+
+const request = (path, method = 'GET', headers = {}) => new Request('https://eastmoney.hasbai.xyz' + path, { method, headers: { Origin: 'https://eastmoney.hasbai.xyz', ...headers } });
+
+test('every application route and named mutation is registered in the one permission catalogue', async () => {
+  const root = new URL('../src/routes/', import.meta.url);
+  const files = await readdir(root, { recursive: true });
+  for (const path of files.filter(path => /\+(page\.server|server)\.ts$/.test(path) || /\+page\.svelte$/.test(path))) {
+    const id = '/' + path.split('/').slice(0, -1).join('/');
+    assert.ok(ROUTE_PERMISSIONS[id], `Missing route: ${id}`);
+    const source = await readFile(new URL(path, root), 'utf8');
+    if (path.endsWith('+server.ts')) for (const method of ['GET','POST','PUT','PATCH','DELETE']) {
+      if (new RegExp(`export (?:const|(?:async )?function) ${method}\\b`).test(source)) assert.ok(ROUTE_PERMISSIONS[id][method], `${id}:${method}`);
+    }
+    const actions = source.split(/export const actions[^=]*=/)[1];
+    if (actions) for (const [,name] of actions.matchAll(/(?:^|\n)\s*([A-Za-z][A-Za-z0-9]*): async \(/g)) assert.ok(ROUTE_PERMISSIONS[id][`POST:${name}`], `${id}:${name}`);
+  }
+  for (const methods of Object.values(ROUTE_PERMISSIONS)) for (const code of Object.values(methods)) assert.ok(['public','login'].includes(code) || PERMISSION_CODES.includes(code), code);
+  assert.equal(new Set(PERMISSION_CODES).size, PERMISSION_CODES.length);
+  assert.ok(PERMISSION_CODES.every(code => /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/.test(code)));
+});
+
+test('read and write policies are distinct, and unknown routes/actions and ambiguous action names fail closed', () => {
+  assert.equal(requestPolicy(request('/market-briefing'), '/market-briefing').public, undefined);
+  assert.equal(requestPolicy(request('/api/market-resources/omo'), '/api/market-resources/[resource]').permission, 'research.market_report:read');
+  assert.equal(requestPolicy(request('/financing/projects'), '/financing/projects').permission, 'financing.project:read');
+  assert.equal(requestPolicy(request('/financing/projects?/createProject','POST'), '/financing/projects').permission, 'financing.project:create');
+  assert.equal(requestPolicy(request('/api/credit-assistant/session','DELETE'), '/api/credit-assistant/session').permission, 'credit.assistant:delete');
+  assert.equal(requestPolicy(request('/data/graphql','POST'), '/data/[...path]').permission, 'data.graphql:read');
+  assert.equal(requestPolicy(request('/data/choice/css','POST'), '/data/[...path]').permission, 'data.choice:read');
+  assert.equal(requestPolicy(request('/financing/data/api/rpc/liability_weekly_report_data','POST'), '/financing/data/api/[...path]').permission, 'financing.report:read');
+  assert.throws(() => requestPolicy(request('/unregistered'), null), { status: 403 });
+  assert.throws(() => requestPolicy(request('/financing/projects?/deleteEverything','POST'), '/financing/projects'), { status: 403 });
+  assert.throws(() => requestPolicy(request('/financing/projects?/createProject&/deleteProject','POST'), '/financing/projects'), { status: 403 });
+  assert.equal(hasPermission(['financing.project:create'], 'financing.project:delete'), false);
+  for (const mode of [undefined, '', 'legacy', 'open', 'typo']) assert.throws(() => authorizationMode(mode), { status: 503 });
+});
+
+test('central authorization validates Auth0 accounts, opens beta to roleless users, and unions live role permissions in enforcement', async () => {
+  const { privateKey, publicKey } = await generateKeyPair('RS256');
+  const jwk = { ...await exportJWK(publicKey), alg: 'RS256', kid: 'unified-permissions-test', use: 'sig' };
+  const env = { ACCESS_MODE:'enforce', ACCESS_TEAM_DOMAIN:'unified-permissions.cloudflareaccess.com', ACCESS_AUD:'site', AUTHORIZATION_MODE:'beta-open', AUTH0_DOMAIN:'permissions.eu.auth0.com', AUTH0_MANAGEMENT_CLIENT_ID:'app', AUTH0_MANAGEMENT_CLIENT_SECRET:'fixture', HYPERDRIVE:{connectionString:'postgres://fixture'} };
+  const token = await new SignJWT({ type:'app', email:'person@18.cn', custom:{eastmoney_user_id:'auth0|person'} }).setProtectedHeader({alg:'RS256',kid:jwk.kid}).setSubject('access-person').setIssuer('https://' + env.ACCESS_TEAM_DOMAIN).setAudience('site').setIssuedAt().setExpirationTime('5m').sign(privateKey);
+  let blocked = false; let email = 'person@18.cn'; let roles = []; let granted = ['financing.project:read'];
+  const originalFetch = globalThis.fetch;
+  const original = { connect:Client.prototype.connect, query:Client.prototype.query, end:Client.prototype.end };
+  const fetcher = async (input) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (url.pathname.endsWith('/certs')) return Response.json({keys:[jwk]});
+    if (url.pathname === '/oauth/token') return Response.json({access_token:'fixture',expires_in:3600});
+    if (url.pathname.endsWith('/roles')) return Response.json(roles);
+    return Response.json({user_id:'auth0|person',email,name:'测试人员',email_verified:true,blocked,identities:[{connection:'eastmoney-email'}]});
+  };
+  globalThis.fetch=fetcher;
+  Client.prototype.connect=async function(){}; Client.prototype.end=async function(){};
+  Client.prototype.query=async function(sql, values) { assert.deepEqual(values, [['rol_A','rol_B']]); return {rows:granted.map(permission_code=>({permission_code}))}; };
+  try {
+    const req = request('/financing/projects','GET',{Cookie:'CF_Authorization=' + token});
+    const beta = await authorizeRequest(req,env,'/financing/projects',fetcher);
+    assert.equal(beta.user.auth0Id,'auth0|person'); assert.equal(beta.user.id,'access-person');
+    assert.deepEqual(beta.permissions,PERMISSION_CODES); assert.deepEqual(beta.user.authorization.roles,[]);
+    await assert.rejects(authorizeRequest(request('/financing/projects'),env,'/financing/projects',fetcher), {status:401});
+    blocked=true; await assert.rejects(authorizeRequest(req,env,'/financing/projects',fetcher), {status:403}); blocked=false;
+    email='changed@18.cn'; await assert.rejects(authorizeRequest(req,env,'/financing/projects',fetcher), {status:401}); email='person@18.cn';
+    roles=[{id:'rol_A',name:'任意角色 A'},{id:'rol_B',name:'任意角色 B'}]; env.AUTHORIZATION_MODE='enforce';
+    assert.deepEqual((await authorizeRequest(req,env,'/financing/projects',fetcher)).permissions,granted);
+    granted=[]; await assert.rejects(authorizeRequest(req,env,'/financing/projects',fetcher), {status:403});
+    await assert.rejects(authorizeRequest(request('/financing/projects?/createProject','POST',{Cookie:'CF_Authorization='+token,Origin:'https://other.test'}),env,'/financing/projects',fetcher), {status:403});
+  } finally { globalThis.fetch=originalFetch; Object.assign(Client.prototype,original); }
+});
+
+test('Auth0 roles are paginated and no user/role tables or permission writes are needed for the directory', async () => {
+  let calls=0;
+  const directory=createDirectory({AUTH0_DOMAIN:'directory.eu.auth0.com',AUTH0_MANAGEMENT_CLIENT_ID:'directory',AUTH0_MANAGEMENT_CLIENT_SECRET:'fixture'}, async input=>{
+    const url=new URL(input); if(url.pathname==='/oauth/token')return Response.json({access_token:'fixture'});
+    calls++;assert.equal(url.pathname,'/api/v2/roles');return Response.json(url.searchParams.get('page')==='0'?Array.from({length:100},(_,i)=>({id:`rol_R${i}`,name:`Role ${i}`})):[]);
+  });
+  assert.equal((await directory.roles()).length,100);assert.equal((await directory.roles()).length,100);assert.equal(calls,2);
+});
+
+ test('public static assets do not consult identity or database services', async () => {
+   for(const path of ['/favicon.svg','/institution-logos/cicc.ico','/_app/immutable/chunks/app.js']) {
+     const result=await authorizeRequest(request(path),{},null,async()=>{throw new Error('unexpected identity lookup')});
+     assert.equal(result.user,null);assert.deepEqual(result.permissions,[]);
+   }
+ });
+
+test('client navigation and legacy workbench aliases require the same resource permission as their destination', () => {
+ for(const [path,route,permission] of [
+   ['/credit-workbench/assistant/__data.json','/credit-workbench/[[view]]','credit.assistant:read'],
+   ['/trading-research/secondary-bond-pool/__data.json','/trading-research/[view]','bond.ledger:read'],
+   ['/trading-research/bond','/trading-research/[view]','bond.ledger:read'],
+   ['/trading-research/credit-assistant','/trading-research/[view]','credit.assistant:read'],
+ ]) assert.equal(requestPolicy(request(path),route).permission,permission);
+});

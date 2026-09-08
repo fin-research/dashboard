@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import { AccessError } from './access.ts';
 import type { AccountProfile } from '../profile.ts';
+import { createAuth0ManagementClient } from './auth0-management.js';
+import { PERMISSION_DEFINITIONS } from '../permissions.ts';
+import type { SiteAuthorization } from '../identity.ts';
 
-type Identity = { email: string; auth0Id: string | null };
+type Identity = { email: string; auth0Id: string | null; authorization?: SiteAuthorization };
 type Config = Pick<Env, 'AUTH0_DOMAIN' | 'AUTH0_CLIENT_ID' | 'AUTH0_MANAGEMENT_CLIENT_ID' | 'AUTH0_MANAGEMENT_CLIENT_SECRET'>;
 
 export class ProfileError extends Error {
@@ -49,7 +52,7 @@ export function createProfileService(config: Config, identity: Identity | null, 
   const email = identity.email;
   const origin = `https://${config.AUTH0_DOMAIN}`;
   const userPath = `users/${encodeURIComponent(userId)}`;
-  let tokenRequest: Promise<string> | undefined;
+  const manager = createAuth0ManagementClient({ domain: config.AUTH0_DOMAIN, clientId: config.AUTH0_MANAGEMENT_CLIENT_ID, clientSecret: config.AUTH0_MANAGEMENT_CLIENT_SECRET, fetchImpl: fetcher });
 
   async function send(path: string, init: RequestInit): Promise<Response> {
     let response: Response;
@@ -70,24 +73,12 @@ export function createProfileService(config: Config, identity: Identity | null, 
     catch { throw new ProfileError(503, '账号服务响应无效，请稍后重试'); }
   }
 
-  async function token(): Promise<string> {
-    tokenRequest ??= (async () => {
-      const response = await send('/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grant_type: 'client_credentials', client_id: config.AUTH0_MANAGEMENT_CLIENT_ID,
-          client_secret: config.AUTH0_MANAGEMENT_CLIENT_SECRET, audience: `${origin}/api/v2/` }) });
-      const value = z.object({ access_token: z.string().min(1) }).safeParse(await json(response));
-      if (!value.success) throw new ProfileError(503, '账号服务授权不可用');
-      return value.data.access_token;
-    })();
-    return tokenRequest;
-  }
-
   async function request(path: string, method = 'GET', body?: unknown): Promise<unknown> {
-    const response = await send(`/api/v2/${path}`, { method,
-      headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-    if (response.status === 204) return null;
-    return json(response);
+    try { return await manager.request(path, method, body); }
+    catch (cause) {
+      const status = cause && typeof cause === 'object' && 'status' in cause ? cause.status : 503;
+      throw new ProfileError(status === 409 || status === 400 ? status : 503, status === 409 ? '该邮箱已被使用，请更换邮箱' : '账号服务暂时不可用，请稍后重试');
+    }
   }
 
   async function currentUser() {
@@ -115,12 +106,11 @@ export function createProfileService(config: Config, identity: Identity | null, 
   return {
     async read(): Promise<AccountProfile> {
       const user = await currentUser();
-      const [roleRows, permissionRows] = await Promise.all([list('roles'), list('permissions')]);
-      const roles = z.array(z.object({ name: z.string(), description: z.string().optional().default('') })).safeParse(roleRows);
-      const permissions = z.array(z.object({ permission_name: z.string(), description: z.string().optional().default(''), resource_server_identifier: z.string() })).safeParse(permissionRows);
-      if (!roles.success || !permissions.success) throw new ProfileError(503, '账号权限响应无效');
+      const roles = identity.authorization?.roles ?? z.array(z.object({ name: z.string(), description: z.string().optional().default('') })).parse(await list('roles'));
+      const permissions = identity.authorization?.permissions ?? [];
       return { name: user.name ?? '', email: user.email, emailVerified: user.email_verified === true,
-        roles: roles.data, permissions: permissions.data.map((item) => ({ name: item.permission_name, description: item.description, resource: item.resource_server_identifier })) };
+        roles, permissions: PERMISSION_DEFINITIONS.filter(([code]) => permissions.includes(code)).map(([code, label, description]) => ({ name: code, description: `${label}：${description}`, resource: code.split('.')[0]! })) };
+
     },
     async update(input: unknown) {
       const parsed = profileChange.safeParse(input);

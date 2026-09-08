@@ -1,4 +1,5 @@
-import { isPermissionAuthorizedRequest } from '../../financing/permissions.js';
+// Historical pre-0032 authentication fixture; never imported by production code.
+import { isPermissionAuthorizedRequest } from './permissions.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 

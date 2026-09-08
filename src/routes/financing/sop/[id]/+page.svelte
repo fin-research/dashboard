@@ -16,7 +16,7 @@
 	import { globalMessages } from '$lib/global-messages';
 	import { withBase } from '$lib/financing/app-paths';
 	import { hasSameOrder, reorderByOffset, reorderRelative } from '$lib/financing/reorder-items.js';
-	import { hasPermission } from '$lib/financing/permissions.js';
+	import { hasPermission } from '$lib/permissions';
 
 	type SopNode = {
 		id: string;
@@ -49,7 +49,8 @@
 	let dragChanged = $state(false);
 	let keyboardGrabbedId = $state<string | null>(null);
 	let reorderAnnouncement = $state('');
-	const canManage = $derived(hasPermission(data?.permissions, 'sop_manage'));
+	const canManage = $derived(hasPermission(data?.permissions, 'financing.sop:update'));
+	const canDelete = $derived(hasPermission(data?.permissions, 'financing.sop:delete'));
 	$effect(() => {
 		if (!form?.message || suppressFormFeedback || handledForm === form) return;
 		handledForm = form;
@@ -351,7 +352,7 @@
 									<input name="description" bind:value={node.description} placeholder="可选：说明交付物或控制要求" disabled={!canManage} />
 								</label>
 							</form>
-							{#if canManage}
+							{#if canDelete}
 							<form
 								method="post"
 								action="?/deleteNode"

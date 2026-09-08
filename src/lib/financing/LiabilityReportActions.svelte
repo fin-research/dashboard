@@ -8,7 +8,7 @@ import { withBase } from '$lib/financing/app-paths';
 import { fetchManualLiabilitySources } from '$lib/financing/liability-choice.js';
 import { attachLiabilityMarketRates } from '$lib/financing/liability-report-data.js';
 import { NeonDataApi } from '$lib/financing/neon-data-api';
-import { hasPermission } from '$lib/financing/permissions.js';
+import { hasPermission } from '$lib/permissions';
 import { globalMessages } from '$lib/global-messages';
 let { permissions }: { permissions: string[] } = $props();
 	let reportGenerating = $state(false);
@@ -156,7 +156,7 @@ let { permissions }: { permissions: string[] } = $props();
 						<button class="header-action" type="button" disabled={!Boolean((page.data as any)?.hasSnapshot)} onclick={() => window.print()} aria-label="导出 PDF" title="导出 PDF">
 							<Printer size={17} /><span class="header-action-label">导出 PDF</span>
 						</button>
-						{#if hasPermission(permissions, 'report_generate')}
+						{#if hasPermission(permissions, 'financing.report:generate')}
 							<form bind:this={reportSnapshotForm} method="POST" action={withBase('/liability-report?/saveSnapshot')} use:enhance={enhanceReportSnapshotSaving}>
 								<input type="hidden" name="asOfDate" value={selectedLiabilityReportDate()} />
 								<input type="hidden" name="payload" value={reportSourcesPayload} />

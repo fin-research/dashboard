@@ -1,3 +1,4 @@
+// Historical pre-0032 authentication fixture; never imported by production code.
 // @ts-nocheck
 export const NEON_SESSION_COOKIE = '__Secure-neon-auth.session_token';
 

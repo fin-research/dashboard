@@ -16,7 +16,7 @@ function fixture({ account = user, respond } = {}) {
       const result = await respond({ url, path, ...init, body });
       if (result) return result;
     }
-    if (path === '/oauth/token') return Response.json({ access_token: 'service-token' });
+    if (path === '/oauth/token') return Response.json({ access_token: 'service-token', expires_in:60 });
     if (path === '/dbconnections/change_password') return new Response('sent');
     assert.equal(init.headers.Authorization, 'Bearer service-token');
     if (path.endsWith('/roles')) return Response.json([{ id: 'role-admin', name: 'admin', description: '管理员', secret: 'private' }]);
@@ -31,7 +31,7 @@ function fixture({ account = user, respond } = {}) {
 test('profile reads the signed subject and returns only public profile and permission fields', async () => {
   const { service, calls } = fixture();
   assert.deepEqual(await service.read(), { name: '原姓名', email: 'me@18.cn', emailVerified: true,
-    roles: [{ name: 'admin', description: '管理员' }], permissions: [{ name: 'report_generate', description: '周报生成', resource: 'https://eastmoney.hasbai.xyz/financing' }] });
+    roles: [{ name: 'admin', description: '管理员' }], permissions: [] });
   assert.equal(calls.filter((call) => call.path === '/oauth/token').length, 1);
   assert.ok(calls.every((call) => !call.path.includes('users-by-email')));
 });
@@ -106,14 +106,16 @@ test('upstream credential errors and redirects are service failures without cred
   }
 });
 
-test('permission listing consumes pagination without treating partial results as complete', async () => {
-  const { service, calls } = fixture({ respond: ({ url, path }) => {
-    if (!path.endsWith('/permissions')) return;
-    return Response.json(new URL(url).searchParams.get('page') === '0'
-      ? Array.from({ length: 100 }, (_, i) => ({ permission_name: `p${i}`, resource_server_identifier: 'resource' })) : []);
-  } });
-  assert.equal((await service.read()).permissions.length, 100);
-  assert.equal(calls.filter((call) => call.path.endsWith('/permissions')).length, 2);
+test('role listing consumes pagination while permission display uses application authorization', async () => {
+ const { service, calls } = fixture({ respond: ({ url, path }) => {
+   if (!path.endsWith('/roles')) return;
+   return Response.json(new URL(url).searchParams.get('page') === '0' ? Array.from({length:100}, (_,i)=>({name:`role${i}`})) : []);
+ } });
+ const profile=await service.read();
+ assert.equal(profile.roles.length,100);
+ assert.equal(calls.filter(call=>call.path.endsWith('/roles')).length,2);
+ assert.deepEqual(profile.permissions,[]);
+ assert.equal(calls.filter(call=>call.path.endsWith('/permissions')).length,0);
 });
 
 test('malformed or oversized upstream responses are rejected', async () => {

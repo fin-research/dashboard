@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { accountSql, usesAuth0 } from './auth-provider.js';
+import { getDirectory } from '../directory.ts';
 import { REPORTING_DEBT_TYPES } from '../../financing/debt-types.js';
 import { reminderPeriodLabel } from '../../financing/reminder-periods.js';
 import {
@@ -10,7 +10,6 @@ import {
 	shortDebtPredicateSql
 } from './dashboard-metrics.js';
 import { getDatabase } from './db.js';
-import { getRolePermissionMatrix } from './role-permissions.js';
 
 const number = (value) => Number(value ?? 0);
 const REPORTING_TYPE_SQL = reportingTypeSql;
@@ -274,15 +273,13 @@ export async function getProjectGanttData(filters = {}) {
 			p.expected_rate_min AS expectedRateMin, p.expected_rate_max AS expectedRateMax,
 			p.funding_cost_rate AS fundingCostRate, p.tenor_description AS tenorDescription,
 			p.amount_description AS amountDescription,
-			p.owner_id AS ownerId, owner.name AS ownerName,
+			p.owner_id AS ownerId,
 			pt.id AS taskId, pt.name AS taskName, pt.status AS taskStatus,
 			pt.planned_start_date AS taskPlannedStartDate, pt.due_date AS taskDueDate,
 			pt.completed_at AS taskCompletedAt, pt.sort_order AS taskSortOrder,
-			assignee.name AS taskAssigneeName
+			pt.assignee_id AS taskAssigneeId
 		FROM projects p
-		LEFT JOIN people owner ON owner.id = p.owner_id
 		LEFT JOIN project_tasks pt ON pt.project_id = p.id
-		LEFT JOIN people assignee ON assignee.id = pt.assignee_id
 		WHERE (?::text IS NULL OR p.id = ?)
 			AND (?::text IS NULL OR p.debt_type = ?)
 			AND (?::text IS NULL OR p.owner_id = ? OR EXISTS (
@@ -297,6 +294,7 @@ export async function getProjectGanttData(filters = {}) {
 		filters.personId ?? null, filters.personId ?? null, filters.personId ?? null,
 		filters.status ?? null, filters.status ?? null
 	);
+	const people = new Map((await getDirectory().people()).map(person => [person.id, person]));
 	const projects = new Map();
 	for (const row of rows) {
 		if (!projects.has(row.id)) {
@@ -308,7 +306,7 @@ export async function getProjectGanttData(filters = {}) {
 				expectedRateMax: row.expectedRateMax == null ? null : number(row.expectedRateMax),
 				fundingCostRate: row.fundingCostRate == null ? null : number(row.fundingCostRate),
 				tenorDescription: row.tenorDescription, amountDescription: row.amountDescription,
-				ownerId: row.ownerId, ownerName: row.ownerName, notes: row.notes,
+				ownerId: row.ownerId, ownerName: people.get(row.ownerId)?.name ?? (row.ownerId ? '已移除账号' : null), notes: row.notes,
 				tasks: []
 			});
 		}
@@ -316,31 +314,15 @@ export async function getProjectGanttData(filters = {}) {
 			id: row.taskId, name: row.taskName, status: row.taskStatus,
 			plannedStartDate: row.taskPlannedStartDate, dueDate: row.taskDueDate,
 			completedAt: row.taskCompletedAt, sortOrder: row.taskSortOrder,
-			assigneeName: row.taskAssigneeName
+			assigneeName: people.get(row.taskAssigneeId)?.name ?? (row.taskAssigneeId ? '已移除账号' : null)
 		});
 	}
 	return { filters, projects: [...projects.values()] };
 }
 
 export async function getProjectFormOptions(database = getDatabase()) {
-	const result = await database.prepare(`
-		SELECT COALESCE((
-			SELECT jsonb_agg(jsonb_build_object(
-				'id', person.id, 'name', person.name, 'role', person.role
-			) ORDER BY person.name, person.id)
-			FROM people person WHERE person.active = TRUE
-		), '[]'::jsonb) AS people,
-		COALESCE((
-			SELECT jsonb_agg(jsonb_build_object(
-				'id', template.id, 'name', template.name, 'debtType', template.debt_type
-			) ORDER BY template.debt_type, template.name, template.id)
-			FROM sop_templates template WHERE template.is_active = TRUE
-		), '[]'::jsonb) AS projectSops
-	`).get();
-	return {
-		people: result?.people ?? [],
-		projectSops: result?.projectSops ?? []
-	};
+ const projectSops = await database.prepare(`SELECT id, name, debt_type AS debtType FROM sop_templates WHERE is_active = TRUE ORDER BY debt_type, name, id`).all();
+ return { people: (await getDirectory().people()).filter(person => person.active), projectSops };
 }
 
 export async function getDebtLimitSummary(database = getDatabase()) {
@@ -595,48 +577,6 @@ export async function getWorkflowSettingsData() {
 	};
 }
 
-export async function getPeopleAccessData() {
-	const account = accountSql();
-	const db = getDatabase();
-	const people = (await db.prepare(`
-		SELECT p.id, p.name, p.email, p.role, p.active,
-			${account.id} AS accountId, ${account.active} AS accountActive,
-			${usesAuth0() ? 'p.auth0_last_login_at' : 'login.last_login_at'} AS lastLoginAt
-		FROM people p
-		${usesAuth0() ? '' : `LEFT JOIN neon_auth."user" u ON u.id = p.neon_auth_user_id
-		LEFT JOIN LATERAL (SELECT MAX(s."createdAt") AS last_login_at FROM neon_auth.session s WHERE s."userId" = u.id) login ON TRUE`}
-		ORDER BY p.active DESC, CASE p.role WHEN 'admin' THEN 1 WHEN 'handler' THEN 2 ELSE 3 END, p.name
-	`).all()).map((person) => ({
-		...person, active: Boolean(person.active),
-		accountActive: person.accountId ? Boolean(person.accountActive) : null
-	}));
-	return {
-		people,
-		rolePermissions: await getRolePermissionMatrix(db),
-		roleCounts: ['admin', 'handler', 'reviewer'].map((role) => ({
-			role, count: people.filter((person) => person.role === role).length
-		}))
-	};
-}
-
-export async function getPersonAccessData(id, database = getDatabase()) {
-	const account = accountSql();
-	const person = await database.prepare(`
-		SELECT p.id, p.name, p.email, p.role, p.active,
-			${account.id} AS accountId, ${account.active} AS accountActive,
-			${usesAuth0() ? 'p.auth0_last_login_at' : 'login.last_login_at'} AS lastLoginAt
-		FROM people p
-		${usesAuth0() ? '' : `LEFT JOIN neon_auth."user" u ON u.id = p.neon_auth_user_id
-		LEFT JOIN LATERAL (SELECT MAX(s."createdAt") AS last_login_at FROM neon_auth.session s WHERE s."userId" = u.id) login ON TRUE`}
-		WHERE p.id = ?
-	`).get(id);
-	return person ? {
-		...person,
-		active: Boolean(person.active),
-		accountActive: person.accountId ? Boolean(person.accountActive) : null
-	} : null;
-}
-
 const SOP_EVENT_DEBT_TYPE_SCOPE = { 公司债: ['公司债', '小公募', '私募债', '次级债'] };
 
 async function getActiveSopEventDebtTypes(db) {
@@ -657,11 +597,10 @@ export async function getLayoutData({ today, toDate, personId = null, ownOnly = 
 		WITH reminders AS (
 		SELECT pt.id, pt.name AS taskName, pt.status, pt.due_date AS dueDate,
 			p.id AS projectId, p.name AS projectName, p.debt_type AS debtType,
-			assignee.name AS assigneeName, COUNT(*) OVER() AS totalCount
+			pt.assignee_id AS assigneeId, COUNT(*) OVER() AS totalCount
 		FROM project_tasks pt
 		JOIN projects p ON p.id = pt.project_id
 		JOIN sop_templates st ON st.id = p.sop_template_id AND st.is_active = TRUE
-		LEFT JOIN people assignee ON assignee.id = pt.assignee_id
 		WHERE pt.status <> 'completed' AND p.status NOT IN ('completed', 'cancelled')
 			AND pt.due_date IS NOT NULL AND pt.due_date <= @toDate
 			AND (@ownOnly::boolean = FALSE OR pt.assignee_id = @personId OR p.owner_id = @personId)
@@ -672,11 +611,12 @@ export async function getLayoutData({ today, toDate, personId = null, ownOnly = 
 		SELECT COALESCE((SELECT jsonb_agg(jsonb_build_object(
 				'id', id, 'taskName', taskname, 'status', status, 'dueDate', duedate,
 				'projectId', projectid, 'projectName', projectname, 'debtType', debttype,
-				'assigneeName', assigneename, 'totalCount', totalcount
+				'assigneeId', assigneeid, 'totalCount', totalcount
 			) ORDER BY CASE WHEN status = 'blocked' THEN 0 WHEN duedate < @today THEN 1
 				WHEN duedate = @today THEN 2 ELSE 3 END, duedate, projectname, id
 			) FROM reminders), '[]'::jsonb) AS reminders
 	`).get({ today, toDate, personId, ownOnly: Boolean(ownOnly && personId), limit: safeLimit });
+	const people = new Map((await getDirectory().people()).map(person => [person.id, person]));
 	const rows = result.reminders ?? [];
 	const items = rows.map((item) => {
 		const dueDays = Math.round((Date.parse(`${item.dueDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
@@ -686,7 +626,7 @@ export async function getLayoutData({ today, toDate, personId = null, ownOnly = 
 				: dueDays === 0 ? '今天到期' : dueDays === 1 ? '明天到期' : `${dueDays} 天后到期`;
 		return {
 			id: item.id, projectId: item.projectId, projectName: item.projectName,
-			taskName: item.taskName, debtType: item.debtType, assigneeName: item.assigneeName,
+			taskName: item.taskName, debtType: item.debtType, assigneeName: people.get(item.assigneeId)?.name ?? (item.assigneeId ? '已移除账号' : null),
 			dueDate: item.dueDate, dueLabel, level: isDanger ? 'danger' : dueDays <= 1 ? 'warning' : 'info',
 			href: `/projects/${item.projectId}`
 		};

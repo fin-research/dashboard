@@ -1,4 +1,4 @@
-/** Map canonical SvelteKit routes onto the unchanged financing permission catalogue. */
+/** Identify financing UI routes for navigation compatibility; authorization lives in the central policy. */
 export function financingRouteId(routeId: string | null): string | null {
   if (routeId === '/management/people') return '/people';
   if (routeId === '/management/financing-profile') return '/settings';

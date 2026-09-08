@@ -1,26 +1,28 @@
-export interface FinancingAuthorization {
-  personId: string;
-  personName: string;
-  role: 'admin' | 'handler' | 'reviewer';
+export interface SiteAuthorization {
+  name: string;
+  roles: import('./server/auth0-directory').Auth0Role[];
   permissions: string[];
-  hasAvatar: boolean;
-  avatarVersion: string;
+  mode: import('./permissions').AuthorizationMode;
+  picture: string;
 }
 
-/** One verified site identity, with business authorization loaded only when needed. */
+/** One verified site identity and one application authorization result. */
 export interface SiteIdentity {
   readonly id: string;
   readonly email: string;
   readonly auth0Id: string | null;
   readonly issuedAt: number;
   readonly expiresAt: number;
-  financing?: FinancingAuthorization;
+  authorization?: SiteAuthorization;
 }
 
-/** Keep the existing financing page/audit DTO without creating another identity. */
+/** Project business responsibility uses the Auth0 ID directly; this is a presentation DTO. */
 export function financingPersonView(identity: SiteIdentity | null) {
-  if (!identity?.financing || !identity.auth0Id) return null;
-  return { ...identity.financing, id: identity.auth0Id, email: identity.email };
+  if (!identity?.authorization || !identity.auth0Id) return null;
+  return { id: identity.auth0Id, personId: identity.auth0Id, email: identity.email,
+    personName: identity.authorization.name, roles: identity.authorization.roles,
+    role: identity.authorization.roles.map((role) => role.name).join('、'),
+    picture: identity.authorization.picture };
 }
 
 /** Authentication metadata and business authorization remain server-side. */

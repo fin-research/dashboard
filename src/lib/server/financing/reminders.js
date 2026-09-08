@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { randomUUID } from 'node:crypto';
 import { Resend } from 'resend';
+import { createDirectory } from '../auth0-directory.ts';
 import { reminderPeriodLabel } from '../../financing/reminder-periods.js';
 
 function isoDate(value = new Date()) {
@@ -42,7 +43,7 @@ function requireDatabase(db) {
 	return db;
 }
 
-export async function collectDueReminders({ asOf, asOfDate, db } = {}) {
+export async function collectDueReminders({ asOf, asOfDate, db, directory } = {}) {
 	db = requireDatabase(db);
 	const instant = normaliseAsOf(asOf, asOfDate);
 	const asOfIso = instant.toISOString();
@@ -62,7 +63,7 @@ export async function collectDueReminders({ asOf, asOfDate, db } = {}) {
 					ELSE (task.due_date::timestamp AT TIME ZONE 'Asia/Shanghai')
 						- make_interval(hours => period.lead_hours)
 				END AS scheduledFor,
-				assignee.email AS assigneeEmail, owner.email AS ownerEmail
+				task.assignee_id AS assigneeId, project.owner_id AS ownerId
 			FROM reminder_rules rule
 			JOIN reminder_rule_nodes target ON target.rule_id = rule.id
 			JOIN sop_nodes node ON node.id = target.sop_node_id
@@ -70,8 +71,6 @@ export async function collectDueReminders({ asOf, asOfDate, db } = {}) {
 			JOIN project_tasks task ON task.sop_node_id = node.id AND task.status <> 'completed'
 			JOIN projects project ON project.id = task.project_id AND project.sop_template_id = template.id
 			JOIN reminder_rule_periods period ON period.rule_id = rule.id
-			LEFT JOIN people assignee ON assignee.id = task.assignee_id
-			LEFT JOIN people owner ON owner.id = project.owner_id
 			WHERE rule.is_active = TRUE AND task.due_date IS NOT NULL
 		)
 		SELECT * FROM candidates
@@ -79,10 +78,12 @@ export async function collectDueReminders({ asOf, asOfDate, db } = {}) {
 			AND ?::timestamptz < triggerAt + INTERVAL '1 day'
 		ORDER BY scheduledFor, ruleId, targetId, periodId
 	`).all(asOfIso, asOfIso);
+	const people = rows.length ? await directory() : [];
+	const accounts = new Map(people.filter(person => person.active).map(person => [person.id, person]));
 	const reminders = [];
 
 	for (const row of rows) {
-		const recipients = recipientsFor(row);
+		const recipients = recipientsFor({ ...row, ownerEmail: accounts.get(row.ownerId)?.email, assigneeEmail: accounts.get(row.assigneeId)?.email });
 		if (!recipients.length) continue;
 		const leadHours = Number(row.leadHours);
 		reminders.push({
@@ -107,10 +108,10 @@ export async function collectDueReminders({ asOf, asOfDate, db } = {}) {
 	return reminders;
 }
 
-export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, config = process.env } = {}) {
+export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, config = process.env, directory } = {}) {
 	db = requireDatabase(db);
 	const instant = normaliseAsOf(asOf, asOfDate);
-	const reminders = await collectDueReminders({ asOf: instant, db });
+	const reminders = await collectDueReminders({ asOf: instant, db, directory: directory ?? (() => createDirectory(config).people()) });
 	const apiKey = config.RESEND_API_KEY;
 	const from = config.FROM_EMAIL
 		?? config.REMINDER_FROM_EMAIL

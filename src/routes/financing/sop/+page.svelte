@@ -20,7 +20,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	import { globalMessages } from '$lib/global-messages';
 	import { withBase } from '$lib/financing/app-paths';
 	import { MAX_REMINDER_PERIODS, reminderPeriodLabel } from '$lib/financing/reminder-periods.js';
-	import { hasPermission } from '$lib/financing/permissions.js';
+	import { hasPermission } from '$lib/permissions';
 
 	let { data } = $props();
 	let reminderDialog = $state<HTMLDialogElement>();
@@ -42,8 +42,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		displayedSettings = data?.settings ?? fallback;
 	});
 	const settings = $derived(displayedSettings);
-	const canManage = $derived(hasPermission(data?.permissions, 'sop_manage'));
-	const canCreateSop = $derived(canManage);
+	const canManage = $derived(hasPermission(data?.permissions, 'financing.sop:update'));
+	const canCreateSop = $derived(hasPermission(data?.permissions, 'financing.sop:create'));
+	const canCreateReminder = $derived(hasPermission(data?.permissions, 'financing.reminder:create'));
 	const activeSopTemplates = $derived(
 		settings.sopTemplates.filter((sop: { isActive: boolean }) => sop.isActive)
 	);
@@ -157,7 +158,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		<ModuleCard class="section-card">
 			<PanelHeading id="sop-heading-1" title="提醒规则" controlsInline><div class="header-actions">
 					<a class="link-button" href={withBase('/sop/reminders')}>发送历史</a>
-					{#if canManage}
+					{#if canCreateReminder}
 						<button class="link-button" type="button" onclick={() => reminderDialog?.showModal()}>
 							<Plus size={14} /> 新建
 						</button>
@@ -193,7 +194,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				{:else}
 					<p class="empty-state">尚未配置提醒规则。</p>
 				{/each}
-				{#if canManage}
+				{#if canCreateReminder}
 					<button class="add-rule" type="button" onclick={() => reminderDialog?.showModal()}>
 						<Plus size={15} />
 						添加提醒规则
@@ -215,7 +216,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	</button>
 	{/if}
 
-	{#if canManage}
+	{#if canCreateReminder}
 	<dialog class="config-modal" bind:this={reminderDialog}>
 		<form method="post" action="?/createReminder" use:enhance={enhanceAction('reminder', '提醒规则已保存')}>
 			<div class="modal-header">
@@ -316,7 +317,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				<div>
 					<p class="eyebrow">SOP TEMPLATE</p>
 					<h2>新建负债品种 SOP</h2>
-					<p>{canManage ? '保存后再编排节点、默认角色和相对日期。' : '复核可新建模板，节点编排和启停由管理员维护。'}</p>
+					<p>{canManage ? '保存后再编排节点、默认角色和相对日期。' : '模板创建后，可由有权限的角色编排节点。'}</p>
 				</div>
 				<button type="button" aria-label="关闭" onclick={() => sopDialog?.close()}>×</button>
 			</div>

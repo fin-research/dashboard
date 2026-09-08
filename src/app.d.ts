@@ -5,9 +5,8 @@ declare global {
     interface Locals {
       user: import('$lib/identity').SiteIdentity | null;
       database: import('$lib/server/financing/db.js').PostgresDatabase | null;
-      dataApiJwt: string | null;
-      authCacheStatus: 'hit' | 'miss' | 'bypass';
       permissions: string[];
+      directory?: import('$lib/server/auth0-directory').Auth0Directory;
     }
     interface Platform {
       env: Env;

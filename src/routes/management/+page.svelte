@@ -3,8 +3,7 @@ import ModuleCard from '../../components/ModuleCard.svelte';
 import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
 const entries = [
   { href: '/profile', title: '个人信息', text: '维护账号资料、登录邮箱、密码和显示偏好' },
-  { href: '/management/people', title: '人员与权限', text: '维护业务人员、登录账号关联、角色和权限' },
-  { href: '/management/financing-profile', title: '融资人员资料', text: '维护融资人员名称与头像' },
+  { href: '/management/people', title: '角色权限', text: '按业务域配置 Auth0 角色的应用权限' },
   { href: '/fund-report?upload=1', title: '资金日报', text: '查看与上传资金日报' }
 ];
 </script>

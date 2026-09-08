@@ -4,7 +4,7 @@
 
 债券市场研究全栈应用，提供市场点评、市场热点、二级池周报及融资业务管理。技术栈为 SvelteKit、Svelte 5、TypeScript、Tailwind CSS 4、daisyUI、ECharts、Cloudflare Workers/D1/R2/Workflows/Hyperdrive、Neon PostgreSQL 与 AI Gateway。
 
-融资入口 `/financing`（仪表盘、负债周报、项目、SOP、台账）；管理中心 `/management`（人员权限、融资人员资料）与全站个人信息 `/profile`。
+融资入口 `/financing`（仪表盘、负债周报、项目、SOP、台账）；管理中心 `/management`（角色权限配置）与全站个人信息 `/profile`。
 
 运行入口：门户 `/`，资金日报 `/fund-report`，个人信息 `/profile`（`/management?upload=1` 兼容资金日报上传），市场点评 `/market-briefing`，文字版 `/market-briefing/text`，交易研究工作台 `/trading-research`（含市场热点 `/trading-research/market-hotspots`、政策跟踪 `/trading-research/policy-tracking`），授信工作台 `/credit-workbench`（一览表、日历、周报、问答），新闻资讯 `/news/[id]`，研报详情 `/articles/[id]`，研究点评 `/commentaries/[id]`，融资择时模型 `/financing-model`，二级债券池运营周报 `/secondary-bond-pool`；旧二级池 `/bond` 作为隐藏深链保留。
 
@@ -18,6 +18,7 @@
 - `src/lib/bond-ledger/`：Excel 解析、校验、格式化与分析。
 - `worker/`：自定义 Worker 入口和二级池导入 Workflow。
 - `migrations/`：D1 migration；`postgres-migrations/`：Neon `bond` schema migration；`financing-model-migrations/`：Neon `financing_model` schema migration。
+- `authorization-migrations/`：统一权限 schema migration；`scripts/apply-unified-permissions.mjs` 负责 Auth0 身份核对与跨 schema 原子迁移。
 - `auth0/`：Auth0 中文主题、注册字段和登录 Actions；配置与启用顺序见 `auth0/README.md`。公开提示页先上线，注册字段须先有已验证自定义域名。
 - `scripts/`：类型生成、D1 同步、Neon migration 与台账回填。
 - `tests/`：Node 单元与契约测试，融资原有回归位于 `tests/financing/`。
@@ -27,11 +28,11 @@
 
 - 修改前先搜索现有页面、组件、图表、派生函数和测试；优先复用，不建立平行实现。
 - UI 变更必须读取 `DESIGN.md`；保持既有桌面布局和移动端模块顺序，不自行引入新设计体系。
-- 公网 `/data/*` 由 Data Worker 管理并要求登录。公开市场点评经同源 `/api/market-resources/*` 的限定资源通道读取，Dashboard 通过 `DATA` / `InternalData` 私有 Service Binding 访问上游。
-- 市场点评仍按单一上游映射 REST 资源读取，在 `src/market-report-resources.ts` 加工为视觉版与文字版共享的完整契约；公开资源通道只验证资源、字段和查询范围，不聚合整份报告。Data GraphQL 仅是同资源薄镜像，不作为整份报告主链路；不得新增 GraphQL 市场报告业务字段。
+- 公网 `/data/*` 由 Data Worker 管理并要求登录。市场点评经同源 `/api/market-resources/*` 的限定资源通道读取，Dashboard 通过 `DATA` / `InternalData` 私有 Service Binding 访问上游。
+- 市场点评仍按单一上游映射 REST 资源读取，在 `src/market-report-resources.ts` 加工为视觉版与文字版共享的完整契约；限定资源通道在统一权限检查后验证资源、字段和查询范围，不聚合整份报告。Data GraphQL 仅是同资源薄镜像，不作为整份报告主链路；不得新增 GraphQL 市场报告业务字段。
 - Data REST 列表按顶层 JSON array 消费，每次请求必须用 `fields` 只选择实际使用字段，并以 `src/data-contracts.ts` 的 Zod Schema 校验响应。债券基础信息代码只能从当次成交与收藏报价动态派生，不得硬编码债券清单；公募公司债筛选使用结构化 `bondType` 与 `bondOfferingType`，不得按名称字母猜测。
 - Dashboard Worker 服务端访问 Data Worker 必须优先使用 `DATA` Service Binding；不得从同一 Cloudflare zone 通过全局公网 `fetch` 回环。新闻详情扇出必须保持有界并发。
-- 身份由 Auth0 与 Cloudflare Access 统一管理，服务端仅使用 `locals.user`；融资人员和权限按需附加到 `user.financing`。Auth0 管理请求共用唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`。所有写入、AI 和交易研究工作台入口均须通过中央 Access 校验；普通研究模块只检查有效登录；融资与人员管理模块额外检查明确关联的启用人员及 Auth0 角色权限。独立 Worker HTTP 入口同样需要保护。
+- 身份由 Auth0 与 Cloudflare Access 统一管理，服务端仅使用 `locals.user`；应用权限统一附加到 `user.authorization`，人员、角色和成员关系只在 Auth0 管理。Auth0 管理请求共用唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`。全部业务页面与 API（含 GET/HEAD）由统一授权入口校验 `<domain>.<resource>:<action>`；未知路由和操作失败关闭。权限仅存于 `authorization.permission` / `authorization.role_permission`；内测使用显式 `AUTHORIZATION_MODE=beta-open`，仍须验证登录。融资负责人直接保存 Auth0 ID，不维护本地人员、角色或审计表。独立 Worker 与 Data 公网用户入口共用此授权。
 - 一级发行视觉与文字输出必须共用 `src/primary-issues.ts`；文字报告不得读取 Python 归档文本。
 - 热点首次访问只读最近成功快照；只有用户手动生成才调用模型并追加 `hotspot_snapshot`。旧快照的证据范围以快照自身为准。
 - 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。
@@ -55,6 +56,7 @@
 - Worker 类型：`pnpm worker:typegen`
 - D1 migration：`pnpm db:migrate:local` / `pnpm db:migrate:remote`
 - 显式同步远程 D1：`pnpm db:sync:remote`
+- 权限 migration：`pnpm auth:db:migrate` 默认只读盘点；显式 `--apply` 才执行，替换账号需提供经确认的 `--person-map` JSON。
 - Neon migration：`pnpm bond:db:migrate`
 - 融资择时 Neon migration：`pnpm financing-model:db:migrate`
 - 台账回填盘点：`pnpm bond:db:backfill`；只有显式增加 `--apply` 才写入

@@ -26,16 +26,25 @@ Worker 只绑定私有 `eastmoney` R2 bucket，并通过固定小写前缀隔离
 | 二级池 | `bond` | `postgres-migrations/` | 二级池 repository |
 | 授信 | `credit` | `credit-migrations/` | 授信 repository |
 | 融资模型 | `financing_model` | `financing-model-migrations/` | 模型 repository |
+| 全站权限 | `authorization` | `authorization-migrations/` | `permission-repository.ts`；Auth0 管理用户和角色 |
 | 融资业务 | `financing` | `financing-migrations/` | `src/lib/server/financing/` |
 | 客户主数据 | `public.client` / `public.client_alias` | `financing-migrations/0028*`、`0031*`；集成迁移 `credit-migrations/0006*`、`0007*` | [客户与领域关联](modules/clients.md) |
 | 公共经济观测 | `public.edb` | `edb-migrations/` | 增量同步写入，业务只读 |
 
 同一个 Hyperdrive binding 不合并业务 schema。融资请求通过 `locals.database` 至多创建一个 Client，在 middleware 的 finally 中关闭；其他模块继续使用其既有 repository。日期字符串解析器只绑定融资 Client，禁止全局修改 pg 的 type parsers。数据库连接、临时身份与事务状态不能跨请求复用。
 
-融资 migration 原样迁入并沿用 `financing.schema_migrations`，此次仓库合并不重建表、不重放已执行 migration，也不复制生产数据。数据后台的 RLS、审计、字段白名单及台账继承结构见 [融资数据模块](modules/financing-data.md)。
+融资 migration 原样迁入并沿用 `financing.schema_migrations`，此次仓库合并不重建表、不重放已执行 migration，也不复制生产数据。数据后台的 RLS、字段白名单及台账继承结构见 [融资数据模块](modules/financing-data.md)。
 
 ## 日期与时间戳
 
 融资上传原始文件中的无时区时间以 UTC+8 为准。`date` 是业务自然日，不做时区转换。`timestamp without time zone` 在融资 Client 的解析边界显式补 `+08:00`；`timestamptz` 保留来源明确的 offset 和微秒精度，不能再补 Z 或重复平移八小时。页面显示固定为 `Asia/Shanghai`。
 
 不得调用全局 `pg.types.setTypeParser`。融资 Client 使用自己的 parser 配置，其他 schema 保持默认语义。乐观锁用的 `updated_at` 不转成丢失微秒的 JavaScript Date。SQLite 本地维护脚本按字段类型补全缺失时区，已有数据库历史不因代码合并批量改写。Excel 的业务日期继续按 `cellDates:false` 提取日历日期；用 UTC 做 date 加减只是日历算法，不能把它当原始 timestamp。
+
+## 统一权限迁移
+
+`pnpm auth:db:migrate` 通过 Auth0 管理 API 核对旧人员关联，默认只读。以直连数据库环境执行 `--apply` 后，在一个事务中应用 `authorization-migrations/` 与 `financing-migrations/0032_unified_permissions.sql`，分别登记原 migration ledger。替换账号的旧人员 ID 到 Auth0 ID 映射通过 `--person-map` 文件提供；不按姓名或邮箱猜测。缺失、重复映射或未预期的数据库依赖会使整个事务回滚。
+
+迁移将 `projects.owner_id`、`project_tasks.assignee_id` 和周报生成人改为 Auth0 ID，并将 `generated_by_person_id` 重命名为 `generated_by`。SOP 默认角色替换为 Auth0 role ID。原 `financing.people`、`financing.role_permissions`、`financing.audit_logs` 及审计触发器移除；不复制到其他人员、角色或审计表。负债周报 SQL 保留业务口径，仅输出 ownerId，应用再从 Auth0 解析姓名。
+
+首次迁移为当时存在的 Auth0 角色播种全部权限，不覆盖后续人工配置。新增角色的正式授权默认关闭；内测有效权限由部署模式统一开放。切换步骤与验证见 [权限发布](UNIFIED_PERMISSIONS.md)。

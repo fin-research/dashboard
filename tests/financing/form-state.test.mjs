@@ -6,18 +6,17 @@ const mutationPages = [
 	'src/routes/management/people/+page.svelte',
 	'src/routes/financing/projects/+page.svelte',
 	'src/routes/financing/projects/[id]/+page.svelte',
-	'src/routes/management/financing-profile/+page.svelte',
 	'src/routes/financing/sop/+page.svelte',
 	'src/routes/financing/sop/[id]/+page.svelte'
 ];
 
 const incrementalContracts = [
 	{
-		name: 'people',
+		name: 'role permissions',
 		server: 'src/routes/management/people/+page.server.ts',
 		client: 'src/routes/management/people/+page.svelte',
-		response: /person:\s*personId \? await getPersonAccessData\(personId\) : undefined/,
-		apply: /result\.data\?\.person/
+		response: /success: true, roleId, configuration/,
+		apply: /result\.data\?\.configuration/
 	},
 	{
 		name: 'projects',
@@ -30,7 +29,7 @@ const incrementalContracts = [
 		name: 'project detail',
 		server: 'src/routes/financing/projects/[id]/+page.server.ts',
 		client: 'src/routes/financing/projects/[id]/+page.svelte',
-		response: /auditLog:\s*actionAudit/,
+		response: /task:\s*after|task:\s*\{/,
 		apply: /applyActionDelta\(result\.data\)/
 	},
 	{
@@ -42,10 +41,10 @@ const incrementalContracts = [
 	},
 	{
 		name: 'profile settings',
-		server: 'src/routes/management/financing-profile/+page.server.ts',
-		client: 'src/routes/management/financing-profile/+page.svelte',
-		response: /profile:\s*publicProfile\(/,
-		apply: /result\.data\?\.profile/
+		server: 'src/lib/server/profile.ts',
+		client: 'src/routes/profile/+page.svelte',
+		response: /name: updated.data.name/,
+		apply: /result.name/
 	}
 ];
 
@@ -112,14 +111,14 @@ test('only global identity or reminder data is invalidated after relevant deltas
 		readFile(new URL('../../src/routes/financing/projects/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/projects/[id]/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/management/people/+page.svelte', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/routes/management/financing-profile/+page.svelte', import.meta.url), 'utf8')
+		readFile(new URL('../../src/routes/profile/+page.svelte', import.meta.url), 'utf8')
 	]);
 	assert.match(layout, /depends\('financing:identity', 'financing:permissions', 'financing:reminders'\)/);
 	assert.match(projects, /invalidate\('financing:reminders'\)/);
 	assert.match(projectDetail, /invalidate\('financing:reminders'\)/);
-	assert.match(people, /invalidate\('financing:identity'\)/);
-	assert.match(settings, /invalidate\('financing:identity'\)/);
-	assert.match(people, /invalidate\('financing:permissions'\)/);
+	assert.match(people, /configurations\[id\] = result.data.configuration/);
+	assert.match(settings, /result.name/);
+	assert.doesNotMatch(people, /invalidateAll/);
 });
 
 test('role permission changes return and apply one confirmed role delta', async () => {
@@ -127,9 +126,9 @@ test('role permission changes return and apply one confirmed role delta', async 
 		readFile(new URL('../../src/routes/management/people/+page.server.ts', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/management/people/+page.svelte', import.meta.url), 'utf8')
 	]);
-	assert.match(server, /rolePermissions:\s*\{ role, permissions: confirmed\[role\] \?\? \[\] \}/);
-	assert.match(client, /result\.data\?\.rolePermissions/);
-	assert.match(client, /displayedRolePermissions\[role\] = permissions/);
+	assert.match(server, /success: true, roleId, configuration/);
+	assert.match(client, /result\.data\?\.configuration/);
+	assert.match(client, /drafts\[id\] = \[\.\.\.configurations\[id\].permissions\]/);
 });
 
 test('project and SOP edit forms auto-save without per-item save buttons', async () => {

@@ -4,7 +4,7 @@ import { scryptSync } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { tsImport } from 'tsx/esm/api';
 import { auth0ImportUser, buildAuth0Import } from '../../scripts/financing/lib/auth0-migration.mjs';
-import { createAuth0ManagementClient } from '../../src/lib/server/financing/auth0-client.js';
+import { createAuth0ManagementClient } from './fixtures/legacy-auth/auth0-client.js';
 
 const require = createRequire(import.meta.url);
 const { onExecutePreUserRegistration } = require('./fixtures/auth0/pre-registration.cjs');

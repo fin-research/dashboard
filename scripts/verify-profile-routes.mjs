@@ -83,7 +83,7 @@ try {
   assert.equal(storage.size, 0); checks++;
   const legacy = await respond('/management?upload=1', { authenticated: true });
   assert.equal(legacy.headers.get('location'), '/fund-report?upload=1'); checks++;
-  const history = await respond('/fund-report');
+  const history = await respond('/fund-report', { authenticated: true });
   assert.equal(history.status, 200);
   assert.match(await history.text(), /上传资金日报/); checks++;
   const profile = await respond('/profile', { authenticated: true });
@@ -101,7 +101,7 @@ try {
   assert.equal(uploaded.status, 201);
   assert.equal((await uploaded.json()).fileName, '2026-09-07.html');
   assert.equal(storage.size, 1); checks++;
-  const updatedHistory = await respond('/fund-report');
+  const updatedHistory = await respond('/fund-report', { authenticated: true });
   assert.match(await updatedHistory.text(), /2026-09-07\.html/); checks++;
   const crossSite = await respond('/api/profile', { authenticated: true, method: 'POST', headers: { Accept: 'application/json', Origin: 'https://other.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'name', name: 'bad' }) });
   assert.equal(crossSite.status, 403);
