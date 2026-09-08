@@ -4,33 +4,11 @@
 
 当前数据库的 `auth` schema 属于 Neon 内部 `cloud_admin`，普通数据库 owner 不能创建或删除其中的对象；已根据实际权限限制统一选择 `authorization`。该名称是 SQL 关键字，SQL 中必须写为 `"authorization".permission`、`"authorization".role_permission`。
 
-## 调用结构
+## 架构与权限范围
 
-```mermaid
-flowchart LR
-  U[页面与 API 请求] --> H[Dashboard hooks]
-  D[Data 公网用户请求] --> B[私有 Authorization binding]
-  W[授信问答 Worker 入口] --> A[authorizeRequest]
-  H --> A
-  B --> A
-  A --> P[路由与操作权限目录]
-  A --> I[Access JWT 与 Auth0 当前账号和角色]
-  A --> R[authorization.role_permission]
-  A --> S[业务处理]
-```
+现行架构、公开/仅登录/业务权限、内测与正式模式以及完整权限表已集中到 [项目组 AUTH](../../eastmoney/docs/AUTH.md)。本文件只维护数据库迁移、发布与历史记录，避免重复阅读两套权限架构。
 
-- 代码目录：`src/lib/permissions.ts`；路由策略：`src/lib/server/permission-policy.ts`；唯一授权函数：`src/lib/server/authorization.ts`。
-- 业务域包括研究、二级池、授信、资金日报、量化模型、融资、账号、权限管理及数据服务。所有业务 GET/HEAD、named actions、写入 API 都要登记，未知入口失败关闭。
-- 门户、登录退出、邮箱验证提示及静态资源公开。全局服务端 layout 依赖 pathname，确保客户端导航也经过中央入口。
-- 内部 `InternalData` binding 和明确允许的机器身份保持服务边界；Ingest 只有公开健康检查，采集由 Cron/Workflow 执行。Quant 与 office Choice 不增加用户管理系统。
-
-## 内测与正式授权
-
-当前 `AUTHORIZATION_MODE=beta-open`：有效登录账号可使用全部已登记权限，包括未分配角色的账号。后台配置持续保存，页面明确显示内测状态；匿名、停用、邮箱不匹配和未登记操作仍拒绝。
-
-正式启用时先配置并核对各角色的必要页面、读取及操作权限，再将部署变量切为 `enforce`。系统按 Auth0 角色 ID 查询并合并权限；新角色、空配置及未授予操作默认拒绝。权限检查不读取旧融资 API permissions，不缓存用户授权结果。角色重命名不影响授权。
-
-管理入口为 `/management/people`。表单使用版本比对和事务内角色锁，空权限明确保存为 false，避免丢失修改或重新初始化。权限管理 UI 不向 Auth0 创建人员、角色或成员关系。
+管理入口为 `/management/people`；表单使用版本比对和事务内角色锁，空权限明确保存为 false。权限管理 UI 不向 Auth0 创建人员、角色或成员关系。
 
 ## 迁移和发布
 
@@ -49,7 +27,7 @@ flowchart LR
 - `pnpm test` 包含权限格式、全路由登记、匿名/停用/邮箱变更、内测开放、正式多角色授权及撤销、事务回滚、业务 ID 迁移、空角色保存、并发版本冲突与 RLS 测试。
 - `pnpm build` 后执行 `node scripts/verify-financing-routes.mjs`、`node scripts/verify-profile-routes.mjs`，使用真实构建产物、签名测试会话、PGlite 与模拟 Auth0/R2，不修改生产账号或发送邮件。
 - Data 执行 `pnpm check`、`pnpm deploy:dry`、`git diff --check`，覆盖 binding 拒绝、意外响应、故障关闭和机器身份边界。
-- 浏览器和截图验收不属于默认检查，未实际执行时不得声明通过。
+- 权限登录与验收禁止使用 browser；匿名/测试账号单元测试为 `pnpm test:auth`，真实 HTTP 登录与只读验证为 `pnpm auth:verify`。凭据、账号准备和失败边界见共享 AUTH。
 
 ## 本次迁移记录
 

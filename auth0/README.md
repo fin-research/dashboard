@@ -2,6 +2,12 @@
 
 账号租户为 `hasbai.eu.auth0.com`，用户登录域名为 `auth.hasbai.xyz`。继续使用 New Universal Login，Auth0 负责密码和身份验证；Access 回调与稳定账号 ID 保持原契约。
 
+## 当前管理入口
+
+后续租户配置按 [项目组 AUTH 的 Deploy CLI 规范](../../eastmoney/docs/AUTH.md#auth0-配置管理deploy-cli) 使用 `pnpm auth0:export`、`pnpm auth0:plan`、`pnpm auth0:apply`，每次显式限定资源。机器凭据读取项目组根 `.env`，不再依赖个人 CLI 登录。单个用户操作和 Deploy CLI 尚未支持的配置由同一机器应用通过既有 Management API adapter 执行。
+
+本文件下面的专题脚本继续保存已实现配置的细节；其 `management()` helper 已改用机器凭据。当前套餐的 Universal Login template 402 会使 Deploy CLI `branding` 导出失败，按共享 AUTH 记录边界。权限和登录验收禁止 browser，使用 `pnpm test:auth` 与 `pnpm auth:verify`。
+
 ## 中文主题
 
 - `branding/theme.json` 映射 `DESIGN.md`：品牌蓝 `#2f6fd6`、冷灰 `#f6f8fb`、白色卡片、8px 控件和 10px 卡片圆角。

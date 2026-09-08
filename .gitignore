@@ -15,3 +15,5 @@ dist/
 .env.*
 !.env.dev
 !.env.local.example
+
+.auth0-deploy/

@@ -75,3 +75,9 @@
 - AI 调用：加读 [共享 AI](../eastmoney/docs/AI.md) 与模块 Prompt/Schema；授信问答 `credit_answer` 例外由 [CREDIT_ASSISTANT](docs/CREDIT_ASSISTANT.md) 维护。
 
 融资和管理功能不读取旧 Financing 文档作为当前规范。共享文档总入口为 [项目组索引](../eastmoney/docs/INDEX.md)。
+
+## 权限测试
+
+共享认证架构、各权限范围及测试账号配置见 [项目组 AUTH](../eastmoney/docs/AUTH.md)。权限登录与验收只使用程序化 HTTP、单元测试与 CLI，禁止 browser、Chrome、Playwright 和浏览器 MCP。新增测试仅使用匿名和 `test@18.cn` 两种身份；真实密码只读根目录 `.env`，不进入测试夹具或日志。
+
+Auth0 租户配置按共享 AUTH 使用 Deploy CLI 的显式资源 export / plan / apply；凭据来自根 `.env` 的机器应用，不依赖个人 CLI 会话。用户资料操作复用同一机器应用的 Management API。

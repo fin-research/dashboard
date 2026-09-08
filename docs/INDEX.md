@@ -48,3 +48,5 @@
 共享专题只记录跨模块实现规则；页面字段、公式、图表、特定 action、查询预算与例外放在模块文档。跨项目关系在项目组 docs 维护，不在本仓库再复制总架构或 schema 所有权表。
 
 [融资合并记录](FINANCING_MERGE.md)、`docs/history/` 与 [授信需求底稿](授信管理需求文档.md) 仅按迁移排查或需求溯源读取，不作为当前运行状态。原 Financing checkout 不再作为生产源码或规范来源。
+
+权限架构、权限范围与匿名/测试账号程序化验收 → [共享 AUTH](../../eastmoney/docs/AUTH.md)。禁止 browser；本仓库覆盖范围与命令见 AUTH 的测试表。
