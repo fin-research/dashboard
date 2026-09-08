@@ -82,6 +82,10 @@
     {
       "binding": "HYPERDRIVE",
       "id": "26b76413a03a4328836d95f3ca320a1e"
+    },
+    {
+      "binding": "AUTHORIZATION_DB",
+      "id": "4029d2cc81ff452bbc2c907162273162"
     }
   ],
   "workflows": [

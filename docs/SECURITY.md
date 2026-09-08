@@ -63,3 +63,5 @@
 Auth0 管理请求由 `auth0-management.js` 共用唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`，禁止跟随外部重定向，限时、限长读取。应用权限不读取旧融资 resource server 的 permissions。角色权限保存使用事务、角色锁和版本比对；禁止客户端提供有效权限集合或授权模式。
 
 融资数据后台继续使用同源 Worker 代理、表/字段白名单、参数化 SQL、完整主键和乐观版本条件。事务内设置已验证的 `request.auth.user_id`、`request.auth.permissions`、`request.auth.operation` 后 `SET LOCAL ROLE authenticated`；提交或回滚均清除上下文。RLS 分别检查 read/create/update/delete，不再查询 people 表或保存人员授权到期时间。`authenticated` 无权修改权限表。原人员、角色权限、审计表与审计触发器在迁移中移除，不建立替代审计流程。
+
+权限矩阵的读取、配置和保存只使用 `AUTHORIZATION_DB`，它连接同一 Neon 数据库并明确禁用 Hyperdrive 查询缓存；业务读取继续使用既有 `HYPERDRIVE`。部署配置缺少该权限连接时，正式授权与后台配置失败关闭，不回退到缓存连接。

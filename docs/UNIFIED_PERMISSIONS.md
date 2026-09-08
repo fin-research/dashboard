@@ -54,3 +54,5 @@ flowchart LR
 ## 本次迁移记录
 
 2026-09-08：旧“时阅”人员记录已按用户确认映射到 `auth0|6a9e921870e37d7bbfb76c8f`，其余人员沿用已核实的 Auth0 ID。生产迁移前保留分支 `backup-unified-permissions-20260908`（`br-odd-scene-a6fcavwe`）。账号映射文件位于仓库外，不保存凭证。
+
+权限矩阵的读取、配置和保存只使用 `AUTHORIZATION_DB`，它连接同一 Neon 数据库并明确禁用 Hyperdrive 查询缓存；业务读取继续使用既有 `HYPERDRIVE`。部署配置缺少该权限连接时，正式授权与后台配置失败关闭，不回退到缓存连接。

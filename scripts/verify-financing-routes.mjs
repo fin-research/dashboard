@@ -69,7 +69,7 @@ globalThis.fetch = async (input, init = {}) => {
   assert.equal(init.method ?? 'GET', 'GET', 'Route read unexpectedly changed an Auth0 account');
   return Response.json(account);
 };
-const env = { ...vars, HYPERDRIVE: { connectionString: 'postgres://fixture:fixture@localhost/fixture' },
+const env = { ...vars, AUTHORIZATION_DB: { connectionString: 'postgres://fixture:fixture@localhost/fixture' }, HYPERDRIVE: { connectionString: 'postgres://fixture:fixture@localhost/fixture' },
   AUTH0_MANAGEMENT_CLIENT_SECRET: 'fixture-profile-secret',
   LIABILITY_REPORT_SNAPSHOTS: { async get() { return null; } },
   EASTMONEY: { async list() { return { objects: [], truncated: false }; } },

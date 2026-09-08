@@ -47,7 +47,7 @@ test('read and write policies are distinct, and unknown routes/actions and ambig
 test('central authorization validates Auth0 accounts, opens beta to roleless users, and unions live role permissions in enforcement', async () => {
   const { privateKey, publicKey } = await generateKeyPair('RS256');
   const jwk = { ...await exportJWK(publicKey), alg: 'RS256', kid: 'unified-permissions-test', use: 'sig' };
-  const env = { ACCESS_MODE:'enforce', ACCESS_TEAM_DOMAIN:'unified-permissions.cloudflareaccess.com', ACCESS_AUD:'site', AUTHORIZATION_MODE:'beta-open', AUTH0_DOMAIN:'permissions.eu.auth0.com', AUTH0_MANAGEMENT_CLIENT_ID:'app', AUTH0_MANAGEMENT_CLIENT_SECRET:'fixture', HYPERDRIVE:{connectionString:'postgres://fixture'} };
+  const env = { ACCESS_MODE:'enforce', ACCESS_TEAM_DOMAIN:'unified-permissions.cloudflareaccess.com', ACCESS_AUD:'site', AUTHORIZATION_MODE:'beta-open', AUTH0_DOMAIN:'permissions.eu.auth0.com', AUTH0_MANAGEMENT_CLIENT_ID:'app', AUTH0_MANAGEMENT_CLIENT_SECRET:'fixture', AUTHORIZATION_DB:{connectionString:'postgres://fixture'} };
   const token = await new SignJWT({ type:'app', email:'person@18.cn', custom:{eastmoney_user_id:'auth0|person'} }).setProtectedHeader({alg:'RS256',kid:jwk.kid}).setSubject('access-person').setIssuer('https://' + env.ACCESS_TEAM_DOMAIN).setAudience('site').setIssuedAt().setExpirationTime('5m').sign(privateKey);
   let blocked = false; let email = 'person@18.cn'; let roles = []; let granted = ['financing.project:read'];
   const originalFetch = globalThis.fetch;
@@ -100,4 +100,11 @@ test('client navigation and legacy workbench aliases require the same resource p
    ['/trading-research/bond','/trading-research/[view]','bond.ledger:read'],
    ['/trading-research/credit-assistant','/trading-research/[view]','credit.assistant:read'],
  ]) assert.equal(requestPolicy(request(path),route).permission,permission);
+});
+
+test('permission reads and role configuration cannot fall back to the cached business binding', async () => {
+ const authorization=await readFile(new URL('../src/lib/server/authorization.ts',import.meta.url),'utf8');
+ const configuration=await readFile(new URL('../src/routes/management/people/+page.server.ts',import.meta.url),'utf8');
+ assert.match(authorization,/AUTHORIZATION_DB/);assert.doesNotMatch(authorization,/env\.HYPERDRIVE/);
+ assert.match(configuration,/AUTHORIZATION_DB/);assert.doesNotMatch(configuration,/getDatabase|env\.HYPERDRIVE/);
 });

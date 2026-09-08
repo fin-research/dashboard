@@ -1,21 +1,21 @@
 import { error, fail } from '@sveltejs/kit';
 import { getDirectory } from '$lib/server/directory';
-import { getDatabase } from '$lib/server/financing/db.js';
+import { withPostgres } from '$lib/server/postgres';
 import { roleConfiguration, saveRoleConfiguration, PermissionConfigurationError } from '$lib/server/permission-repository';
 import { hasPermission, isPermissionCode } from '$lib/permissions';
-import { AccessError } from '$lib/server/access';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, platform }) => {
   const roles = await getDirectory().roles();
   const configurations: Record<string, { permissions: string[]; version: string }> = {};
-  const db = getDatabase();
-  for (const role of roles) configurations[role.id] = await roleConfiguration(db, role.id);
+  await withPostgres(platform?.env.AUTHORIZATION_DB?.connectionString, 'eastmoney-role-configuration', async db => {
+    for (const role of roles) configurations[role.id] = await roleConfiguration(db, role.id);
+  });
   return { roles, configurations, mode: locals.user?.authorization?.mode };
 };
 
 export const actions: Actions = {
-  saveRolePermissions: async ({ request, locals }) => {
+  saveRolePermissions: async ({ request, locals, platform }) => {
     if (!hasPermission(locals.permissions, 'auth.permission:update') || !locals.user?.auth0Id) error(403, '当前角色无权配置权限');
     const reader = request.body?.getReader();
     if (!reader) return fail(400, { message: '缺少权限配置' });
@@ -40,7 +40,14 @@ export const actions: Actions = {
     const role = (await getDirectory().roles()).find(role => role.id === roleId);
     if (!role) return fail(400, { message: 'Auth0 角色已不存在，请刷新页面' });
     try {
-      const configuration = await getDatabase().transaction((db: ReturnType<typeof getDatabase>) => saveRoleConfiguration(db, roleId, permissions, version, locals.user!.auth0Id!));
+      const configuration = await withPostgres(platform?.env.AUTHORIZATION_DB?.connectionString, 'eastmoney-role-configuration', async db => {
+        await db.query('BEGIN');
+        try {
+          const confirmed = await saveRoleConfiguration(db, roleId, permissions, version, locals.user!.auth0Id!);
+          await db.query('COMMIT');
+          return confirmed;
+        } catch (cause) { await db.query('ROLLBACK'); throw cause; }
+      });
       return { success: true, roleId, configuration, message: `${role.name} 的权限已保存` };
     } catch (cause) {
       if (cause instanceof PermissionConfigurationError) return fail(cause.status, { message: cause.message });
