@@ -117,12 +117,13 @@ const save: SubmitFunction = () => {
   .permissions-page { display: grid; gap: 1.25rem; }
   .authorization-state { grid-template-columns: auto 1fr auto; }
   .authorization-state p { margin: .375rem 0 0; line-height: 1.6; }
-  .permission-workspace { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 1.25rem; }
+  .permission-workspace { display: grid; grid-template-columns: 260px minmax(0, 1fr); align-items: start; gap: 1.25rem; }
   .permission-workspace :global(.role-catalog) { position: sticky; top: 1rem; }
   .role-search, .permission-search { width: 100%; }
   .role-list { display: grid; width: 100%; gap: .375rem; margin: 0; padding: .75rem 0 0; list-style: none; }
-  .role-list button { display: flex; width: 100%; min-height: 48px; justify-content: space-between; gap: .5rem; padding-inline: .75rem; }
-  .role-label { min-width: 0; overflow-wrap: anywhere; }
+  .role-list button { display: flex; width: 100%; min-height: 48px; justify-content: space-between; gap: .5rem; padding-inline: .75rem; text-align: left; }
+  .role-label { min-width: 0; overflow-wrap: anywhere; font-weight: normal; }
+  .role-list button[aria-pressed="true"] .role-label { font-weight: bold; }
   .permission-editor-heading, .permission-toolbar, .domain-heading, .domain-heading h2 { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
   .permission-editor-heading :global(.tr-panel-heading) { margin-bottom: 0; }
   .permission-editor-heading { margin-bottom: 1rem; }
@@ -146,6 +147,7 @@ const save: SubmitFunction = () => {
   .permission-item > span { display: grid; gap: .375rem; overflow-wrap: anywhere; }
   .permission-item > code { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; }
   .permission-item code, .permission-item span span { font-family: inherit; font-size: .875rem; color: var(--muted); line-height: 1.5; }
+  .permission-item code { font-size: .8125rem; }
   .empty-copy { padding: 1rem 0; color: var(--muted); }
   @media (max-width: 1100px) { .permission-workspace { grid-template-columns: 1fr; } .permission-workspace :global(.role-catalog) { position: static; } .role-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); } }
   @media (max-width: 720px) { .authorization-state { grid-template-columns: auto 1fr; } .authorization-state > a { grid-column: 1 / -1; } .permission-save { width: 100%; } .permission-actions { position: static; } }

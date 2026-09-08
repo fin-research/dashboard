@@ -1133,6 +1133,7 @@
   }
 
   @media (max-width: 860px) {
+    .hotspot-page--embedded .hotspot-stage:has(.detail-panel) { z-index: auto; }
     .hotspot-page {
       min-height: 520px;
     }
@@ -1291,6 +1292,7 @@
     }
     .hotspot-page--embedded .detail-panel {
       position: fixed;
+      z-index: 50;
       top: calc(var(--tr-topbar-height, 80px) + 12px);
       right: 12px;
       bottom: 12px;
@@ -1300,6 +1302,7 @@
     .hotspot-page--embedded .detail-scroll { max-height: none; }
     .hotspot-page--embedded .detail-scrim {
       position: fixed;
+      z-index: 40;
       top: var(--tr-topbar-height, 80px);
     }
   }

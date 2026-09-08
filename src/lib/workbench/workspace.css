@@ -87,6 +87,10 @@
 }
 .tr-shell--workspace main:focus-visible { outline-offset: -4px; }
 .tr-shell--workspace #tr-workbench-main:has(.floating-create-button) { padding-bottom: 104px; }
+.tr-shell--workspace .tr-credit-calendar-panel { overflow: visible; }
+.tr-shell--workspace .tr-credit-calendar-toolbar { min-width: 0; flex-wrap: wrap; }
+.tr-shell--workspace .tr-credit-calendar-scroll { min-width: 0; max-width: 100%; overflow-x: auto; }
+.tr-shell--workspace .tr-credit-calendar-event :is(strong, span) { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 
 /* Intrinsic card widths also work when the app is shown in a narrow panel. */
 .tr-shell--workspace .tr-metric-grid {
@@ -126,4 +130,5 @@
 @media (max-width: 720px) {
   .tr-shell.tr-shell--workspace .tr-topbar { gap: 8px 12px; }
   .tr-shell--workspace .tr-breadcrumb a { font-size: .875rem; }
+  .tr-shell--workspace .tr-credit-calendar-nav { width: 100%; justify-content: space-between; }
 }

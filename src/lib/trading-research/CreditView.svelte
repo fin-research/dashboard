@@ -6,6 +6,7 @@
   import ModuleCard from "../../components/ModuleCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import { portal } from "../portal.ts";
+  import { scrollableRegion } from "../scrollable-region";
   import {
     fetchCreditReport,
     updateCreditInstitution,
@@ -841,6 +842,7 @@
             <button class="btn" type="button" aria-label="下一个月" onclick={() => shiftCalendarMonth(1)}>›</button>
           </div>
         </div>
+        <div class="tr-credit-calendar-scroll" role="region" aria-label="授信日历，左右滚动查看完整日期" use:scrollableRegion>
         <div class="tr-credit-calendar" role="grid" aria-label={`${calendarMonthLabel(calendarMonth)}授信事件`}>
           {#each weekdays as weekday}<div class="tr-credit-calendar-weekday" role="columnheader">{weekday}</div>{/each}
           {#each calendarCells as cell (cell.date)}
@@ -857,6 +859,7 @@
               </div>
             </div>
           {/each}
+        </div>
         </div>
       </ModuleCard>
     </section>
