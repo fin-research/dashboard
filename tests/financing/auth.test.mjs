@@ -62,7 +62,8 @@ async function installSchema(db, { beforeReminderMigration } = {}) {
 		'0020_optimize_liability_report_query.sql',
 		'0021_online_debt_import_workflow.sql',
 		'0022_remove_debt_import_state.sql',
-		'0023_role_permissions.sql'
+		'0023_role_permissions.sql',
+		'0028_client_master.sql'
 	]) {
 		if (name === '0008_sop_node_reminder_periods.sql' && beforeReminderMigration) {
 			await beforeReminderMigration(db);
@@ -322,7 +323,7 @@ test('online debt imports do not persist payload or status tables in Neon', asyn
 	assert.equal(relations.payload_table, null);
 });
 
-test('shared debt importer is idempotent and updates mutable workbook fields', async (t) => {
+test('shared debt importer is idempotent and preserves mutable historical fields', async (t) => {
 	const db = new PGlite();
 	t.after(() => db.close());
 	await installSchema(db);
@@ -344,15 +345,16 @@ test('shared debt importer is idempotent and updates mutable workbook fields', a
 	transformed.debts[0].annualRate = 0.025;
 	const updated = await importDebtWorkbook(db, transformed);
 	assert.equal(updated.insertedDebtCount, 0);
-	assert.equal(updated.updatedDebtCount, 1);
+	assert.equal(updated.updatedDebtCount, 0);
+	assert.equal(updated.skippedDebtCount, 1);
 	const decoded = decodeDebtImportPayload(encodeDebtImportPayload(transformed));
 	const protobufUpdated = await importDebtWorkbook(db, decoded);
 	assert.equal(protobufUpdated.insertedDebtCount, 0);
-	assert.equal(protobufUpdated.updatedDebtCount, 1);
+	assert.equal(protobufUpdated.updatedDebtCount, 0);
 	const rows = (await db.query("SELECT amount, annual_rate FROM financing.debt WHERE name = '集团借款·集团公司·2026-09-01'")).rows;
 	assert.equal(rows.length, 1);
 	assert.equal(Number(rows[0].amount), 100000000);
-	assert.equal(Number(rows[0].annual_rate), 0.025);
+	assert.equal(Number(rows[0].annual_rate), 0.02);
 });
 
 test('Data API RLS lets every active financing role edit and writes audit records', async (t) => {

@@ -46,6 +46,7 @@ const commonDebtFields: FieldConfig[] = [
 	{ key: 'id', label: 'ID', type: 'number', readOnly: true },
 	{ key: 'name', label: '负债简称', required: true },
 	{ key: 'counterparty', label: '交易对手' },
+	{ key: 'client_id', label: '客户 ID', type: 'number', min: 1, step: '1', table: false },
 	{ key: 'amount', label: '本金（元）', type: 'number', required: true, min: 0, step: '0.01' },
 	{ key: 'interest_payable', label: '应付利息（元）', type: 'number', min: 0, step: '0.01', omitWhenEmptyOnCreate: true },
 	{ key: 'total_amount', label: '本息合计（元）', type: 'number', readOnly: true, form: false },

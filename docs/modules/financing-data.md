@@ -7,6 +7,7 @@
 - 负债品种目录以 `src/lib/financing/debt-types.js` 为唯一代码配置，不建立目录表。
 - 基类保存通用金额、利率和生命周期字段；品种表只保存真正专属字段。
 - 浮动与固定收益凭证在数据后台合并为“收益凭证”，以 subtype 保留仪表盘筛选维度。
+- `client_id` 是单客户关联，继承子表各自显式安装外键；客户主数据、别名及人工维护见 [客户与授信关联](clients.md)。新行按交易对手自动识别，人工指定优先，无法识别时提示待维护。
 - 转融资的页面简称和数据库 `name` 统一固定为“转融资”，对手方、市场和日期保留在各自字段，不拼接进简称。
 - `total_amount`、`term_days` 和状态由数据库计算，不允许页面自行写入。
 - 所有本金、利息、费用和补充流统一为现金流，不建立品种专属 schedule。
@@ -29,11 +30,11 @@
 
 ## 业务不变量
 
-- 线上借入资金汇总表导入以工作簿基准日合计为提交后硬校验；同一浏览器只发起一个任务，线上写入由数据库 advisory lock 串行化。同一编码载荷以内容哈希映射唯一 Workflow 实例。线上独有负债不得因新工作簿缺失而删除，工作簿中同一稳定业务身份的金额、利率、日期和状态等可变字段按新值更新。
+- 线上借入资金汇总表仅导入增量：同一浏览器只发起一个任务，advisory lock 串行化写入，同一编码载荷以内容哈希映射唯一 Workflow 实例。按稳定业务身份匹配的历史负债及其现金流全部保留，包括金额、利率、生命周期日期和人工客户关联；仅为新增负债插入现金流。历史余额按日期/品种键冲突跳过。工作簿自身分项与合计仍硬校验；历史余额与新工作簿不同只提示管理员维护，不覆盖历史。唯一匹配产品的到期日修订不产生新负债，重复身份拒绝导入。
 
 ## 业务不变量
 
-- 台账写入完成后必须重建 `monthly_financing_metrics`，使历史月度余额、加权利率和剩余期限与本次权威导入一致；衍生刷新失败不得把任务标记为成功。
+- 台账增量写入后只补充 `monthly_financing_metrics` 缺失月份，已存历史月度指标不变；衍生刷新失败不得把任务标记为成功。管理员修订历史后可显式调用既有历史重建维护函数。
 
 ## 业务不变量
 
@@ -65,7 +66,7 @@ PostgreSQL 的主键、唯一约束和外键不会自动覆盖继承子表，因
 - `cashflow` 统一保存本金、利息、费用与补充流，主键 `(debt_id, sequence)`。
 - `balance_snapshot` 以 `(as_of_date, debt_type, subtype)` 保存历史余额。
 - `monthly_financing_metrics` 固化 2021 年以来已结束月份的余额、加权融资利率和加权剩余期限；migration 一次性回填，之后由周报 RPC 只补缺失的已结束月份，历史行不反复刷新，当前报告月份仍实时计算。
-- 管理员线上导入权威借入资金汇总表时例外地清空并重建全部 `monthly_financing_metrics`，使历史台账修订同步进入衍生趋势；日常周报 RPC 仍只惰性补缺失月份。
+- 线上导入与日常周报 RPC 均只惰性补缺失月份；重建全部历史指标仅属于管理员显式历史维护。
 - 常用读取优先使用 `debt_overview`、`cashflow_overview`、`data_overview` 或明确的集合查询。
 - 页面数据缺口不能通过新建冗余汇总表临时解决；先评估视图或集合查询。
 - `liability_weekly_report_runs` 只保存报告日、R2 key、来源清单、缺失模块和内容哈希；完整报告保存在 R2。安装包导入的 `liability_market_observations`、`liability_peer_issuances`、`liability_registration_progress` 已删除，不得重新作为回退数据源。
@@ -91,7 +92,7 @@ PostgreSQL 的主键、唯一约束和外键不会自动覆盖继承子表，因
 
 - 借入资金汇总表可由管理员通过线上内部接口导入。浏览器内解析 `.xlsx` 并生成分批 Protobuf/Brotli 载荷，原始 Excel 不上传；文件上限 10 MB，压缩载荷上限 720 KiB。
 - 导入载荷、运行状态和结果只由 Cloudflare Workflow 按短保留期临时保存；Neon 不建立导入临时表、状态表或完成审计。Workflow 只通过 Hyperdrive 在单一事务中更新负债、现金流、余额历史和衍生指标。
-- `scripts/financing/import-debts.mjs` 与线上 Workflow 共用同一单事务、advisory lock 和批量写入实现；收益凭证重导时先按规范简称匹配，存量历史数据可按原系列名回退匹配；不得删除线上新增数据。
+- `scripts/financing/import-debts.mjs` 与线上 Workflow 共用同一单事务、advisory lock 和增量批量写入实现；收益凭证重导时先按规范简称匹配，存量历史数据可按原系列名回退匹配；不得删除线上新增数据。集团借款中无金额、无日期、无现金流的可转债说明段落不作为负债导入。
 - SQLite 只作为一次性迁移来源；目标负债非空时迁移脚本应拒绝重复覆盖。
 - 解析变化先运行 `pnpm financing:db:import -- --dry-run`；SQLite 变化先运行 `pnpm financing:db:migrate:sqlite -- --dry-run`。
 

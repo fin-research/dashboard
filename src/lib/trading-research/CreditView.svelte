@@ -381,7 +381,7 @@
   }
 
   function setEditorAmount(
-    field: "totalLimit" | "totalUsed",
+    field: "totalLimit",
     event: Event,
   ): void {
     if (!editor) return;
@@ -431,6 +431,7 @@
     event: Event,
   ): void {
     if (!editor?.items[index]) return;
+    if (field === "usedAmount" && ["yield_certificate", "interbank_lending"].includes(editor.items[index].type)) return;
     editor.items[index][field] = inputAmount(event);
     queueItemChange(index, field);
     scheduleEditorSave();
@@ -796,10 +797,11 @@
                         <label><span>保密协议</span><select value={editor.confidentialityStatus} onchange={setEditorConfidentiality}><option value="signed">已签署</option><option value="not_signed">未签署</option><option value="unknown">未标记</option></select></label>
                         <label class="tr-credit-checkbox"><input type="checkbox" checked={editor.includedInWeeklyReport} onchange={setEditorWeekly} /><span>纳入周报名单</span></label>
                         <label><span>授信总额（亿元）</span><input type="number" step="0.000001" min="0" value={editor.totalLimit ?? ""} oninput={(event) => setEditorAmount("totalLimit", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>已用额度（亿元）</span><input type="number" step="0.000001" value={editor.totalUsed ?? ""} oninput={(event) => setEditorAmount("totalUsed", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>可用额度（亿元）</span><input readonly value={formatAmount(editor.totalLimit == null ? null : editor.totalLimit - (editor.totalUsed ?? 0))} /></label>
+                        <label><span>已用额度（亿元）</span><input readonly value={formatAmount(editor.totalUsed)} /></label>
+                        <label><span>可用额度（亿元）</span><input readonly value={formatAmount(editor.totalLimit == null || editor.totalUsed == null ? null : editor.totalLimit - editor.totalUsed)} /></label>
                         <label><span>生效日</span><input type="date" value={editor.effectiveDate ?? ""} onchange={(event) => setEditorDate("effectiveDate", event)} /></label>
                         <label><span>到期日</span><input type="date" value={editor.expiryDate ?? ""} onchange={(event) => setEditorDate("expiryDate", event)} /></label>
+                        <label><span>关联客户</span><input readonly value={editor.clients?.map(client => client.name).join("、") || "待维护"} /></label>
                         <label><span>银行经办机构</span><input value={editor.bankOffice ?? ""} oninput={(event) => setEditorText("bankOffice", event)} onblur={() => void flushEditor()} /></label>
                         <label><span>我司申请部门</span><input value={editor.applyingDepartment ?? ""} oninput={(event) => setEditorText("applyingDepartment", event)} onblur={() => void flushEditor()} /></label>
                         <label><span>我司经办人</span><input value={editor.handler ?? ""} oninput={(event) => setEditorText("handler", event)} onblur={() => void flushEditor()} /></label>
@@ -809,8 +811,11 @@
                           <fieldset>
                             <legend>{creditItemLabels[item.type]}</legend>
                             {#if item.type !== "other"}<label><span>额度（亿元）</span><input type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>{/if}
-                            <label><span>已用（亿元）</span><input type="number" step="0.000001" value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
-                            {#if item.type !== "other"}<label><span>可用（亿元）</span><input readonly value={formatAmount(item.limitAmount == null ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
+                            <label><span>{item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><input type="number" step="0.000001" readonly={item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
+                            {#if item.type !== "other"}<label><span>可用（亿元）</span><input readonly value={formatAmount(item.limitAmount == null || (item.usageSource === "financing" && item.usedAmount == null) ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
+                            {#if item.usageSource === "financing" && item.usedAmount != null && Math.abs(item.usedAmount - (item.importedUsedAmount ?? 0)) > 0.0001}
+                              <label><span>原报表已用（亿元）</span><input readonly value={formatAmount(item.importedUsedAmount)} /></label>
+                            {/if}
                             <label><span>说明</span><input value={item.details ?? ""} oninput={(event) => setItemDetails(itemIndex, event)} onblur={() => void flushEditor()} /></label>
                           </fieldset>
                         {/each}

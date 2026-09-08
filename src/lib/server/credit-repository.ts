@@ -92,12 +92,18 @@ export async function persistCreditWorkbook(
       "SELECT 1 FROM credit.institution WHERE report_date = $1::date LIMIT 1",
       [parsed.reportDate],
     );
+    await client.query(`CREATE TEMP TABLE preserved_credit_clients ON COMMIT DROP AS
+      SELECT * FROM credit.institution_client WHERE report_date=$1::date`, [parsed.reportDate]);
     await client.query(
       "DELETE FROM credit.institution WHERE report_date = $1::date",
       [parsed.reportDate],
     );
     await insertInstitutions(client, parsed);
     await insertItems(client, parsed);
+    await client.query(`DELETE FROM credit.institution_client m
+      WHERE EXISTS (SELECT 1 FROM preserved_credit_clients p WHERE p.report_date=m.report_date AND p.institution_name=m.institution_name)`);
+    await client.query(`INSERT INTO credit.institution_client
+      SELECT p.* FROM preserved_credit_clients p JOIN credit.institution i USING(report_date,institution_name)`);
     await client.query("SELECT credit.refresh_institution_events()");
     await client.query("COMMIT");
     return {
@@ -150,7 +156,11 @@ export async function loadCreditReport(
          status::text AS status,
          included_in_weekly_report,
          total_limit::double precision,
-         total_used::double precision,
+         effective_total_used::double precision AS total_used,
+         imported_total_used::double precision,
+         (SELECT coalesce(jsonb_agg(jsonb_build_object('id', c.id::text, 'name', c.name)), '[]'::jsonb)
+          FROM credit.institution_client m JOIN public.client c ON c.id=m.client_id
+          WHERE m.report_date=credit.institution_usage.report_date AND m.institution_name=credit.institution_usage.institution_name) AS clients,
          to_char(effective_date, 'YYYY-MM-DD') AS effective_date,
          to_char(expiry_date, 'YYYY-MM-DD') AS expiry_date,
          bank_office,
@@ -160,7 +170,7 @@ export async function loadCreditReport(
          bond_preference,
          usage_details,
          to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at
-       FROM credit.institution
+       FROM credit.institution_usage
        WHERE report_date = ANY($1::date[])
        ORDER BY report_date, source_row`,
     [reportDates],
@@ -171,9 +181,12 @@ export async function loadCreditReport(
          institution_name,
          item_type::text AS item_type,
          limit_amount::double precision,
-         used_amount::double precision,
+         effective_used_amount::double precision AS used_amount,
+         imported_used_amount::double precision,
+         usage_source,
+         linked_client_count,
          details
-       FROM credit.item
+       FROM credit.item_usage
        WHERE report_date = ANY($1::date[])
        ORDER BY report_date, institution_name, item_type`,
     [reportDates],
@@ -322,11 +335,6 @@ export async function saveCreditInstitution(
              WHEN patch.data ? 'totalLimit'
                THEN (patch.data ->> 'totalLimit')::numeric
              ELSE institution.total_limit
-           END,
-           total_used = CASE
-             WHEN patch.data ? 'totalUsed'
-               THEN (patch.data ->> 'totalUsed')::numeric
-             ELSE institution.total_used
            END,
            effective_date = CASE
              WHEN patch.data ? 'effectiveDate'
@@ -765,10 +773,12 @@ function toInstitutionView(
     includedInWeeklyReport: row.included_in_weekly_report,
     totalLimit,
     totalUsed,
-    totalRemaining: totalLimit == null ? null : totalLimit - (totalUsed ?? 0),
-    availableAmount: totalLimit == null ? null : totalLimit - (totalUsed ?? 0),
+    importedTotalUsed: nullableNumber(row.imported_total_used),
+    clients: row.clients ?? [],
+    totalRemaining: totalLimit == null || totalUsed == null ? null : totalLimit - totalUsed,
+    availableAmount: totalLimit == null || totalUsed == null ? null : totalLimit - totalUsed,
     utilization:
-      totalLimit && totalLimit > 0 ? ((totalUsed ?? 0) / totalLimit) * 100 : null,
+      totalLimit && totalLimit > 0 && totalUsed != null ? (totalUsed / totalLimit) * 100 : null,
     effectiveDate: row.effective_date,
     expiryDate: row.expiry_date,
     bankOffice: row.bank_office,
@@ -803,7 +813,10 @@ function groupItems(
           type: row.item_type,
           limitAmount,
           usedAmount,
-          remainingAmount: limitAmount == null ? null : limitAmount - (usedAmount ?? 0),
+          importedUsedAmount: nullableNumber(row.imported_used_amount),
+          usageSource: row.usage_source ?? "credit",
+          linkedClientCount: nullableNumber(row.linked_client_count),
+          remainingAmount: limitAmount == null || (row.usage_source === "financing" && usedAmount == null) ? null : limitAmount - (usedAmount ?? 0),
           details: row.details,
         },
       ];
@@ -1072,6 +1085,8 @@ interface InstitutionRow extends QueryResultRow {
   included_in_weekly_report: boolean;
   total_limit: number | null;
   total_used: number | null;
+  imported_total_used?: number | null;
+  clients?: Array<{ id: string; name: string }>;
   effective_date: string | null;
   expiry_date: string | null;
   bank_office: string | null;
@@ -1089,6 +1104,9 @@ interface ItemRow extends QueryResultRow {
   item_type: CreditItemType;
   limit_amount: number | null;
   used_amount: number | null;
+  imported_used_amount?: number | null;
+  usage_source?: "credit" | "financing";
+  linked_client_count?: number | null;
   details: string | null;
 }
 

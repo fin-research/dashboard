@@ -23,6 +23,7 @@
 | /financing-model | [融资择时模型](modules/financing-model.md) |
 | /fund-report | [资金日报](modules/fund-report.md) |
 | /credit-workbench | [授信工作台](modules/credit-workbench.md) |
+| 客户主数据、融资/授信关联 | [客户与授信关联](modules/clients.md) |
 | /management、/profile、/management/people、/management/financing-profile | [管理中心与账号](modules/management.md) |
 | /financing | [融资仪表盘](modules/financing-overview.md) |
 | /financing/projects、/financing/projects/[id] | [融资项目](modules/financing-projects.md) |

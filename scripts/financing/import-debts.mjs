@@ -38,7 +38,7 @@ const client = new Client({
 
 await client.connect();
 try {
-	const result = await importDebtWorkbook(client, transformed, { rollback });
+	const result = await importDebtWorkbook(client, transformed, { rollback, refreshDerivatives: true });
 	console.log(JSON.stringify({ ...result, source: path.basename(source) }, null, 2));
 } finally {
 	await client.end();

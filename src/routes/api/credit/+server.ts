@@ -22,7 +22,17 @@ export const GET: RequestHandler = async ({ platform, url }) => {
     const report = await withPostgres(
       platform?.env.HYPERDRIVE?.connectionString,
       "eastmoney-credit-report",
-      (client) => loadCreditReport(client, date),
+      async (client) => {
+        await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+        try {
+          const report = await loadCreditReport(client, date);
+          await client.query('COMMIT');
+          return report;
+        } catch (error) {
+          await client.query('ROLLBACK').catch(() => undefined);
+          throw error;
+        }
+      },
     );
     return Response.json(report, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

@@ -27,6 +27,7 @@ Worker 只绑定私有 `eastmoney` R2 bucket，并通过固定小写前缀隔离
 | 授信 | `credit` | `credit-migrations/` | 授信 repository |
 | 融资模型 | `financing_model` | `financing-model-migrations/` | 模型 repository |
 | 融资业务 | `financing` | `financing-migrations/` | `src/lib/server/financing/` |
+| 客户主数据 | `public.client` / `public.client_alias` | `financing-migrations/0028*` | [客户与领域关联](modules/clients.md) |
 | 公共经济观测 | `public.edb` | `edb-migrations/` | 增量同步写入，业务只读 |
 
 同一个 Hyperdrive binding 不合并业务 schema。融资请求通过 `locals.database` 至多创建一个 Client，在 middleware 的 finally 中关闭；其他模块继续使用其既有 repository。日期字符串解析器只绑定融资 Client，禁止全局修改 pg 的 type parsers。数据库连接、临时身份与事务状态不能跨请求复用。

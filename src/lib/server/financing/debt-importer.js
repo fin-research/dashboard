@@ -76,7 +76,7 @@ function workbookSnapshot(transformed) {
 
 /**
  * Applies one parsed workbook to the financing base tables in one transaction.
- * Existing records are matched by stable business identity and updated; records
+ * Existing records are matched by stable business identity and left unchanged; records
  * that exist only online are retained.
  */
 export async function importDebtWorkbook(database, transformed, {
@@ -88,7 +88,7 @@ export async function importDebtWorkbook(database, transformed, {
 	await database.query('BEGIN');
 	try {
 		await database.query("SELECT pg_advisory_xact_lock(hashtext('financing.local_debt_maintenance'))");
-		await onStage({ stage: 'importing', progress: 65, message: '正在原子更新负债、现金流与余额历史' });
+		await onStage({ stage: 'importing', progress: 65, message: '正在原子加入新增负债、现金流与余额日期' });
 		await database.query(`
 			CREATE TEMP TABLE maintenance_debt (
 				source_ordinal bigint GENERATED ALWAYS AS IDENTITY,
@@ -213,6 +213,25 @@ export async function importDebtWorkbook(database, transformed, {
 				AND existing.maturity_date IS NOT DISTINCT FROM source.maturity_date
 				AND existing.occurrence = source.legacy_occurrence
 		`);
+		// A corrected maturity on a uniquely identified existing instrument is history,
+		// not a new debt. Never reuse an id already matched by another workbook row.
+		await database.query(`
+			WITH candidates AS (
+				SELECT source.source_ordinal, d.id, d.tableoid::regclass::text AS physical_table,
+					count(*) OVER (PARTITION BY source.source_ordinal) AS source_matches,
+					count(*) OVER (PARTITION BY d.id) AS debt_matches
+				FROM maintenance_debt source JOIN financing.debt d
+					ON d.debt_type=source.debt_type AND d.subtype IS NOT DISTINCT FROM source.subtype
+					AND d.name=source.name AND d.counterparty IS NOT DISTINCT FROM source.counterparty
+					AND d.issue_date IS NOT DISTINCT FROM source.issue_date
+				WHERE source.debt_id IS NULL AND NOT EXISTS (SELECT 1 FROM maintenance_debt matched WHERE matched.debt_id=d.id)
+			)
+			UPDATE maintenance_debt source SET debt_id=c.id, existing_table=c.physical_table
+			FROM candidates c WHERE c.source_ordinal=source.source_ordinal AND c.source_matches=1 AND c.debt_matches=1
+		`);
+		const duplicateMatches = await database.query(`SELECT debt_id FROM maintenance_debt
+			WHERE debt_id IS NOT NULL GROUP BY debt_id HAVING count(*)>1`);
+		if (duplicateMatches.rowCount) throw new Error('台账业务身份重复匹配，请管理员核对客户、日期与产品名称');
 		const mismatches = await database.query(`
 			SELECT source_key, target_table, existing_table FROM maintenance_debt
 			WHERE debt_id IS NOT NULL AND existing_table <> 'financing.' || target_table
@@ -226,19 +245,6 @@ export async function importDebtWorkbook(database, transformed, {
 		`);
 
 		for (const [table, extensions] of Object.entries(tableExtensions)) {
-			const updateAssignments = [
-				'debt_type = source.debt_type', 'subtype = source.subtype', 'name = source.name',
-				'counterparty = source.counterparty', 'amount = source.amount',
-				'interest_payable = source.interest_payable', 'annual_rate = source.annual_rate',
-				'issue_date = source.issue_date', 'maturity_date = source.maturity_date',
-				'activated_at = source.activated_at', 'settled_at = source.settled_at', 'closed_at = source.closed_at',
-				...extensions.map(([column, key, type]) => `${column} = ${extensionExpression(key, type)}`)
-			];
-			await database.query(`
-				UPDATE ONLY financing.${table} target SET ${updateAssignments.join(', ')}
-				FROM maintenance_debt source
-				WHERE source.target_table = $1 AND source.is_new = false AND target.id = source.debt_id
-			`, [table]);
 			const extensionColumns = extensions.map(([column]) => column);
 			const selectValues = [
 				...commonSelect(),
@@ -310,8 +316,10 @@ export async function importDebtWorkbook(database, transformed, {
 		`);
 		await database.query(`
 			UPDATE maintenance_cashflow flow SET debt_id = debt.debt_id
-			FROM maintenance_debt debt WHERE debt.source_key = flow.source_key
+			FROM maintenance_debt debt WHERE debt.source_key = flow.source_key AND debt.is_new
 		`);
+		// Cashflows of existing debts belong to administrator-maintained history.
+		await database.query('DELETE FROM maintenance_cashflow WHERE debt_id IS NULL');
 		await database.query(`
 			WITH existing AS (
 				SELECT c.debt_id, c.sequence, c.cashflow_type, c.due_date, c.amount,
@@ -340,15 +348,6 @@ export async function importDebtWorkbook(database, transformed, {
 			WHERE source.ctid = numbered.ctid
 		`);
 		await database.query(`
-			UPDATE financing.cashflow target SET
-				cashflow_type = source.cashflow_type, due_date = source.due_date, amount = source.amount,
-				paid_amount = source.paid_amount, paid_at = source.paid_at,
-				accrual_start_date = source.accrual_start_date, accrual_end_date = source.accrual_end_date,
-				note = source.note
-			FROM maintenance_cashflow source
-			WHERE source.is_new = false AND target.debt_id = source.debt_id AND target.sequence = source.sequence
-		`);
-		await database.query(`
 			INSERT INTO financing.cashflow (
 				debt_id, sequence, cashflow_type, due_date, amount, paid_amount, paid_at,
 				accrual_start_date, accrual_end_date, note
@@ -357,14 +356,18 @@ export async function importDebtWorkbook(database, transformed, {
 				accrual_start_date, accrual_end_date, note
 			FROM maintenance_cashflow WHERE is_new = true ORDER BY debt_id, sequence
 		`);
+		let sourceSnapshotTotal = 0;
 		for await (const batch of importBatches(transformed, 'balances', 'balanceBatches')) {
+			for (const balance of batch) {
+				if (balance.asOfDate === snapshot.asOfDate) sourceSnapshotTotal += Number(balance.amount) / 100_000_000;
+			}
 			await database.query(`
 				INSERT INTO financing.balance_snapshot (as_of_date, debt_type, subtype, amount)
 				SELECT as_of_date, debt_type, subtype, amount
 				FROM jsonb_to_recordset($1::jsonb) AS source(
 					as_of_date date, debt_type text, subtype text, amount numeric
 				)
-				ON CONFLICT (as_of_date, debt_type, subtype) DO UPDATE SET amount = EXCLUDED.amount
+				ON CONFLICT (as_of_date, debt_type, subtype) DO NOTHING
 			`, [JSON.stringify(batch.map((item) => ({
 				as_of_date: item.asOfDate,
 				debt_type: item.debtType,
@@ -380,24 +383,28 @@ export async function importDebtWorkbook(database, transformed, {
 				(SELECT COUNT(DISTINCT as_of_date) FROM financing.balance_snapshot) AS history_date_count,
 				(SELECT SUM(amount) / 100000000.0 FROM financing.balance_snapshot WHERE as_of_date = $1::date) AS snapshot_total_yi,
 				(SELECT COUNT(*) FROM maintenance_debt WHERE is_new) AS inserted_debt_count,
-				(SELECT COUNT(*) FROM maintenance_debt WHERE NOT is_new) AS updated_debt_count,
+				0 AS updated_debt_count,
+				(SELECT COUNT(*) FROM maintenance_debt WHERE NOT is_new) AS skipped_debt_count,
 				(SELECT COUNT(*) FROM maintenance_cashflow WHERE is_new) AS inserted_cashflow_count,
-				(SELECT COUNT(*) FROM maintenance_cashflow WHERE NOT is_new) AS updated_cashflow_count
+				0 AS updated_cashflow_count,
+				(SELECT json_agg(DISTINCT counterparty) FROM maintenance_debt WHERE is_new AND counterparty IS NOT NULL
+				 AND public.resolve_client(counterparty) IS NULL) AS unlinked_client_names
 		`, [snapshot.asOfDate]);
 		const result = verification.rows[0];
-		if (Math.abs(Number(result.snapshot_total_yi) - Number(snapshot.totalYi)) > 0.0001) {
-			throw new Error(`余额核对失败：数据库 ${result.snapshot_total_yi} 亿元，工作簿 ${snapshot.totalYi} 亿元`);
+		if (Math.abs(sourceSnapshotTotal - Number(snapshot.totalYi)) > 0.0001) {
+			throw new Error(`余额核对失败：工作簿分项 ${sourceSnapshotTotal} 亿元，合计 ${snapshot.totalYi} 亿元`);
 		}
+		const snapshotDifferenceYi = Number(result.snapshot_total_yi) - Number(snapshot.totalYi);
 		let derivativeResult = { deletedCount: 0, refreshedCount: 0 };
 		if (refreshDerivatives) {
-			await onStage({ stage: 'refreshing', progress: 88, message: '正在重算月度融资衍生指标' });
-			const deleted = await database.query('DELETE FROM financing.monthly_financing_metrics');
+			await onStage({ stage: 'refreshing', progress: 88, message: '正在补充缺失月份的融资指标' });
+
 			const refreshed = await database.query(
 				'SELECT financing.refresh_monthly_financing_metrics($1::date) AS refreshed_count',
 				[snapshot.asOfDate]
 			);
 			derivativeResult = {
-				deletedCount: databaseNumber(deleted.rowCount),
+				deletedCount: 0,
 				refreshedCount: databaseNumber(refreshed.rows[0]?.refreshed_count)
 			};
 		}
@@ -413,6 +420,13 @@ export async function importDebtWorkbook(database, transformed, {
 			historyDateCount: databaseNumber(result.history_date_count),
 			insertedDebtCount: databaseNumber(result.inserted_debt_count),
 			updatedDebtCount: databaseNumber(result.updated_debt_count),
+			skippedDebtCount: databaseNumber(result.skipped_debt_count),
+			snapshotDifferenceYi,
+			unlinkedClientNames: result.unlinked_client_names ?? [],
+			warnings: [
+				...(Math.abs(snapshotDifferenceYi) > 0.0001 ? [`历史余额保持不变：数据库与本次工作簿相差 ${snapshotDifferenceYi.toFixed(6)} 亿元，请管理员核对`] : []),
+				...(result.unlinked_client_names?.length ? [`${result.unlinked_client_names.length} 个新增客户名称未能关联，请管理员维护客户清单：${result.unlinked_client_names.slice(0,5).join('、')}`] : [])
+			],
 			insertedCashflowCount: databaseNumber(result.inserted_cashflow_count),
 			updatedCashflowCount: databaseNumber(result.updated_cashflow_count),
 			derivedMetricCount: derivativeResult.refreshedCount

@@ -30,6 +30,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		sourceBalanceCount: number | null;
 		insertedDebtCount: number | null;
 		updatedDebtCount: number | null;
+		skippedDebtCount?: number;
+		warnings?: string[];
 		insertedCashflowCount: number | null;
 		updatedCashflowCount: number | null;
 		databaseDebtCount: number | null;
@@ -118,6 +120,9 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			if (!response.ok) throw new Error(payload.error ?? '导入进度读取失败');
 			if (!currentRun || currentRun.id !== runId) return;
 			setRun({ ...currentRun, ...payload.run });
+			if (payload.run.status === 'succeeded') {
+				for (const warning of payload.run.warnings ?? []) globalMessages.warning(warning, { key: 'debt-import-warning', title: '历史数据待核对', duration: 0 });
+			}
 			if (['parsing', 'queued', 'running'].includes(payload.run.status)) schedulePoll(runId);
 		} catch (error) {
 			if (currentRun?.id === runId && ['parsing', 'queued', 'running'].includes(currentRun.status)) {
@@ -318,7 +323,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		<div class="header-icon blue"><FileSpreadsheet size={20} /></div>
 		<div>
 			<h2 id="debt-import-title">在线导入借入资金汇总表</h2>
-			<p>浏览器内解析并压缩，原始 Excel 不上传；Workflow 原子更新线上台账和衍生指标。</p>
+			<p>浏览器内解析并压缩，原始 Excel 不上传；仅加入增量，历史记录由管理员手动维护。</p>
 		</div>
 		<div class="header-actions">
 			<label class="secondary-action file-picker" class:disabled={Boolean(activeRun) || uploading}>
@@ -381,8 +386,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						<div><span>负债记录</span><strong>{displayedRun.sourceDebtCount?.toLocaleString('zh-CN')} 笔</strong></div>
 						<div><span>现金流记录</span><strong>{displayedRun.sourceCashflowCount?.toLocaleString('zh-CN')} 笔</strong></div>
 						{#if displayedRun.status === 'succeeded'}
-							<div><span>负债新增 / 更新</span><strong>{displayedRun.insertedDebtCount} / {displayedRun.updatedDebtCount}</strong></div>
-							<div><span>现金流新增 / 更新</span><strong>{displayedRun.insertedCashflowCount} / {displayedRun.updatedCashflowCount}</strong></div>
+							<div><span>负债新增 / 保留</span><strong>{displayedRun.insertedDebtCount} / {displayedRun.skippedDebtCount ?? 0}</strong></div>
+							<div><span>现金流新增</span><strong>{displayedRun.insertedCashflowCount}</strong></div>
 							<div><span>余额历史日期</span><strong>{displayedRun.historyDateCount} 个</strong></div>
 							<div><span>衍生月度指标</span><strong>{displayedRun.derivedMetricCount} 期</strong></div>
 						{/if}

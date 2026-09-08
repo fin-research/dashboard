@@ -21,12 +21,12 @@ export function debtImportRun(instanceId, details, metadata = {}) {
 		stage: details.status === 'complete' ? 'completed' : details.status === 'queued' ? 'queued' : 'importing',
 		progress: details.status === 'complete' || errored ? 100 : details.status === 'queued' ? 45 : 70,
 		message: details.status === 'complete'
-			? '线上数据与衍生指标已更新'
+			? '新增台账已导入，历史记录保持不变'
 			: errored
 				? '导入失败，请按提示修正后重新上传'
 				: details.status === 'queued'
 					? '数据已进入 Workflow，等待执行'
-					: 'Workflow 正在原子更新线上数据',
+					: 'Workflow 正在导入增量数据',
 		errorMessage: errored ? safeWorkflowError(details) : null
 	};
 }

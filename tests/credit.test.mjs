@@ -152,7 +152,7 @@ test("只有一个报告日时不生成周度变化且数据库查询顺序执�
       if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
         return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
       }
-      if (/FROM credit\.institution\s[\s\S]*WHERE report_date/.test(sql)) {
+      if (/FROM credit\.institution_usage\s[\s\S]*WHERE report_date/.test(sql)) {
         return { rows: [institutionRow()], rowCount: 1 };
       }
       if (/FROM credit\.item/.test(sql)) {
@@ -192,7 +192,7 @@ test("周报从独立事件表读取全部事件并筛选近6个月批复", asyn
       if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
         return { rows: [{ report_date: "2026-08-14" }, { report_date: "2026-08-21" }], rowCount: 2 };
       }
-      if (/FROM credit\.institution\s[\s\S]*WHERE report_date/.test(sql)) {
+      if (/FROM credit\.institution_usage\s[\s\S]*WHERE report_date/.test(sql)) {
         return { rows, rowCount: rows.length };
       }
       if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };
@@ -271,7 +271,7 @@ test("授信详情只更新机构增量字段并在同一事务返回服务端�
       if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
         return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
       }
-      if (/FROM credit\.institution\s[\s\S]*WHERE report_date/.test(sql)) {
+      if (/FROM credit\.institution_usage\s[\s\S]*WHERE report_date/.test(sql)) {
         return { rows: [institutionRow({ notes: "已更新", updated_at: "2026-08-21T10:00:00.000Z" })], rowCount: 1 };
       }
       if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };
@@ -320,7 +320,7 @@ test("授信详情只更新发生变化的单个分项字段", async () => {
       if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
         return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
       }
-      if (/FROM credit\.institution\s[\s\S]*WHERE report_date/.test(sql)) {
+      if (/FROM credit\.institution_usage\s[\s\S]*WHERE report_date/.test(sql)) {
         return { rows: [institutionRow()], rowCount: 1 };
       }
       if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };

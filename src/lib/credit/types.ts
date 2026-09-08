@@ -67,13 +67,20 @@ export interface ParsedCreditWorkbook {
   warnings: string[];
 }
 
-export interface CreditItemView extends ParsedCreditItem {}
+export interface CreditItemView extends ParsedCreditItem {
+  importedUsedAmount?: number | null;
+  usageSource?: "credit" | "financing";
+  linkedClientCount?: number | null;
+}
 
 export interface CreditInstitutionView
   extends Omit<ParsedCreditInstitution, "sourceRow"> {
   reportDate: string;
   sourceRow: number;
   updatedAt: string;
+  items: CreditItemView[];
+  importedTotalUsed?: number | null;
+  clients?: Array<{ id: string; name: string }>;
   utilization: number | null;
   availableAmount: number | null;
 }

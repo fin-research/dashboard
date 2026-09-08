@@ -214,8 +214,13 @@ function commonDebt(row, records) {
 
 export function transformWorkbook(parsed) {
 	const records = recordsBySourceKey(parsed);
-	const debts = parsed.debts.map((row) => commonDebt(row, records.get(row[1]) ?? []));
-	const cashflows = parsed.cashflows.map(([_eventKey, sourceKey, eventType, eventDate, amount, sourceSequence]) => ({
+	const debts = parsed.debts.map((row) => commonDebt(row, records.get(row[1]) ?? []))
+		.filter((debt) => !(debt.debtType === '集团借款' && debt.amount === 0 && debt.interestPayable === 0
+			&& !debt.issueDate && !debt.maturityDate && !debt.activatedAt
+			&& /^(?:[123]、东财转[123][（(]|截至目前集团共发行3次可转债)/u.test(debt.counterparty ?? '')
+			&& !parsed.cashflows.some((flow) => flow[1] === debt.sourceKey)));
+	const debtKeys = new Set(debts.map((debt) => debt.sourceKey));
+	const cashflows = parsed.cashflows.filter((flow) => debtKeys.has(flow[1])).map(([_eventKey, sourceKey, eventType, eventDate, amount, sourceSequence]) => ({
 		sourceKey,
 		cashflowType: eventType,
 		dueDate: eventDate,
