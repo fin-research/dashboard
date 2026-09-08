@@ -12,6 +12,28 @@
       "signupActionText": "还没有账号？"
     }
   },
+  "login-id": {
+    "login-id": {
+      "pageTitle": "登录 · 东方财富证券资金管理部",
+      "title": "工作台",
+      "description": " ",
+      "buttonText": "继续",
+      "emailPlaceholder": "邮箱",
+      "passkeyButtonText": "使用通行密钥登录",
+      "signupActionLinkText": "注册账号",
+      "signupActionText": "还没有账号？"
+    }
+  },
+  "login-password": {
+    "login-password": {
+      "pageTitle": "登录 · 东方财富证券资金管理部",
+      "title": "输入密码",
+      "description": " ",
+      "buttonText": "登录",
+      "passwordPlaceholder": "密码",
+      "forgotPasswordText": "忘记密码？"
+    }
+  },
   "signup": {
     "signup": {
       "pageTitle": "注册 · 东方财富证券资金管理部",
@@ -22,6 +44,34 @@
       "passwordPlaceholder": "密码",
       "loginActionLinkText": "登录",
       "loginActionText": "已有账号？"
+    }
+  },
+  "signup-id": {
+    "signup-id": {
+      "pageTitle": "注册 · 东方财富证券资金管理部",
+      "title": "注册账号",
+      "description": " ",
+      "buttonText": "继续",
+      "emailPlaceholder": "邮箱（18.cn）",
+      "loginActionLinkText": "登录",
+      "loginActionText": "已有账号？"
+    }
+  },
+  "signup-password": {
+    "signup-password": {
+      "pageTitle": "注册 · 东方财富证券资金管理部",
+      "title": "设置密码",
+      "description": " ",
+      "buttonText": "注册",
+      "passwordPlaceholder": "密码"
+    }
+  },
+  "passkeys": {
+    "passkey-enrollment": {
+      "description": " "
+    },
+    "passkey-enrollment-local": {
+      "description": " "
     }
   },
   "reset-password": {

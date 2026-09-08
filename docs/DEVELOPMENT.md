@@ -46,7 +46,8 @@ git diff --check
 ## 发布
 
 - `pnpm worker:dev` 用于构建后本地 Worker 检查。
-- `pnpm worker:deploy` 会部署 `eastmoney-dashboard`，只在用户明确要求发布时执行。
+- 默认将验证通过的变更推送 GitHub `main`，由 Cloudflare Git 自动构建部署 `eastmoney-dashboard`；核对对应提交的构建状态和线上受影响路由。
+- 自动部署不可用、失败或有其他必要时，可执行 `pnpm worker:deploy` 手动部署同一份已验证代码。自动构建与手动部署全程无需再次向用户申请授权；不得覆盖其他任务尚未集成的改动。
 - 个人信息服务使用独立的 `eastmoney dashboard profile` Auth0 管理应用：`AUTH0_MANAGEMENT_CLIENT_ID` 为非敏感配置，`AUTH0_MANAGEMENT_CLIENT_SECRET` 必须作为 Dashboard 的 Worker Secret 单独配置（不得轮换融资 Worker 使用的管理应用密钥）。需要 `read:users`、`update:users`、`read:roles` 权限；只读取当前账号的角色与权限，不授予前端管理令牌。
 - 管理凭证配置：`node --use-env-proxy scripts/provision-auth0-profile.mjs` 只读计划；用户授权后加 `--apply` 创建或复用 Dashboard 专用 M2M 应用（不轮换已存在密钥），验证 client credentials 后通过标准输入写入 Worker Secret，并更新本地非敏感 Client ID。脚本不输出或落盘密钥与 Token；之后运行 `pnpm worker:typegen`。
 - Access 团队域名变更时，同步 Dashboard、Data 与 financing 的 `ACCESS_TEAM_DOMAIN` 并重新生成类型；执行 `node scripts/update-access-team-domain.mjs --apply` 更新 Auth0 的对应回调与退出白名单，保留其余地址。

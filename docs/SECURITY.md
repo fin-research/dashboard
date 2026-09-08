@@ -26,7 +26,7 @@
 - Auth0 的 `eastmoney-email` 连接只允许邮箱注册，Pre Registration Action 限制为 `18.cn`；新账号验证邮箱后登录，迁移的既有账号保留原验证状态。
 - Cloudflare Access 使用团队 `hasbai.cloudflareaccess.com` 和独立 eastmoney 应用。Worker 校验 RS256 签名、issuer、audience、有效期与人员邮箱，不信任单独的邮箱头，也不接受服务身份执行用户操作。
 - 新注册账号未验证邮箱时，Post Login Action 暂停登录并跳转公开 `/auth/verify-email`，提示检查邮件；不向 Access 回调发送 `access_denied`，也不签发身份声明。页面不接收或显示邮箱／账号 ID，不消费 Auth0 附带的 `state`；验证后发起全新登录，直接调用旧事务 `/continue` 仍被拒绝。原迁移账号的 UUID、账号 ID 与原邮箱绑定例外保持不变。
-- `/auth/login` 是统一登录／注册入口，返回地址只接受安全的本站路径。退出清理站点 Cookie，再退出 Auth0 和 Access。
+- `/auth/login` 是统一登录／注册入口，返回地址只接受安全的本站路径。退出清理站点 Cookie，再退出 Auth0 和 Access，最后回到本站首页；两层退出目标由服务端生成，不采用请求中的 `returnTo`，退出响应禁止缓存。
 - 浏览器登录与退出使用 `auth.hasbai.xyz`；`AUTH0_DOMAIN` 继续指向原租户域名，仅用于服务端管理 API。新注册用户在 Auth0 Forms 中必填姓名、部门，保存成功后再进入原邮箱验证流程；资料字段不授予角色或自动关联融资人员，原有账号不强制补填。
 - `src/hooks.server.ts` 统一保护所有非 GET/HEAD/OPTIONS 操作及 `/profile*`、`/api/profile*`、`/trading-research*`、`/credit-assistant`、`/api/credit*` 和 `/api/economic-indicators`。其他页面和只读接口保持公开。Dashboard 对有效登录账号不检查角色或业务权限。
 - `worker/entry.ts` 对绕过 SvelteKit 的授信问答 HTTP 入口执行相同验证；WebSocket 和 GET 也受保护。

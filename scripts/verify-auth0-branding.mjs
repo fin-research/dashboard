@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { AUTH0_DOMAIN, management } from './lib/auth0-management.mjs';
 
 // Read-only HTTP smoke: no credentials, signup submissions, cookies or transaction
@@ -33,12 +34,24 @@ for (const screen of ['login', 'signup']) {
   assert.ok(heading, 'Missing login / signup header');
   const headingText = heading.replace(/<[^>]*>/g, '').replace(/\s+/g, '').trim();
   assert.equal(headingText, screen === 'login' ? '工作台' : '注册账号', 'Default description must remain hidden');
+  if (screen === 'login' && url.pathname === '/u/login/identifier') {
+    assert.ok(html.includes('使用通行密钥登录'), 'Expected passkey login button');
+    assert.match(html, /autocomplete="[^"]*\bwebauthn\b[^"]*"/i, 'Expected passkey autofill');
+  }
   assert.ok(/#2f6fd6/i.test(html), "Expected brand blue");
   assert.ok(/#f6f8fb/i.test(html), "Expected project background");
   console.log(JSON.stringify({ screen, origin: url.origin, path: url.pathname, status: 200,
     locale: 'zh-CN', brandColor: true, background: true }));
 }
-if (domain !== AUTH0_DOMAIN) {
+const expectedText = JSON.parse(await readFile(new URL('../auth0/branding/zh-CN.json', import.meta.url), 'utf8'));
+for (const [prompt, screens] of Object.entries(expectedText)) {
+  const current = management('get', `prompts/${prompt}/custom-text/zh-CN`);
+  for (const [screen, values] of Object.entries(screens)) {
+    for (const [key, value] of Object.entries(values)) assert.equal(current[screen]?.[key], value, `${prompt}/${screen}/${key}`);
+  }
+}
+console.log(JSON.stringify({ customTextVerified: true, prompts: Object.keys(expectedText) }));
+if (domain !== AUTH0_DOMAIN && !process.argv.includes('--branding-only')) {
   const form = management('get', 'forms').find((item) => item.name === 'eastmoney signup profile');
   assert.ok(form, 'Missing signup profile Form');
   const current = management('get', `forms/${form.id}`);

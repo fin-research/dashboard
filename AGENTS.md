@@ -55,7 +55,7 @@
 - Neon migration：`pnpm bond:db:migrate`
 - 融资择时 Neon migration：`pnpm financing-model:db:migrate`
 - 台账回填盘点：`pnpm bond:db:backfill`；只有显式增加 `--apply` 才写入
-- 部署：`pnpm worker:deploy`；仅在用户明确授权部署时执行
+- 部署：验证通过后推送 GitHub `main`，由 Cloudflare Git 自动构建部署；必要时可执行 `pnpm worker:deploy` 手动部署。两种方式均无需再次向用户申请授权；部署后核对线上版本和受影响路由。
 
 ## Context Routing
 

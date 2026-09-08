@@ -50,8 +50,13 @@ try {
     assert.equal(destination.origin, `https://${vars.AUTH0_LOGIN_DOMAIN}`);
     assert.equal(destination.pathname, '/v2/logout');
     assert.equal(destination.searchParams.get('client_id'), vars.AUTH0_CLIENT_ID);
-    assert.equal(destination.searchParams.get('returnTo'), `https://${vars.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/logout`);
+    const accessLogout = new URL(destination.searchParams.get('returnTo'));
+    assert.equal(accessLogout.origin, `https://${vars.ACCESS_TEAM_DOMAIN}`);
+    assert.equal(accessLogout.pathname, '/cdn-cgi/access/logout');
+    assert.equal(accessLogout.searchParams.get('returnTo'), `${origin}/`);
+    assert.equal(response.headers.get('cache-control'), 'no-store, private');
     assert.match(response.headers.get('set-cookie'), /CF_Authorization=;/);
+    assert.match(response.headers.get('set-cookie'), /financing_session=;/);
     checks++;
   }
   for (const path of ['/profile', '/trading-research', '/trading-research/credit']) {

@@ -5,10 +5,17 @@
 ## 中文主题
 
 - `branding/theme.json` 映射 `DESIGN.md`：品牌蓝 `#2f6fd6`、冷灰 `#f6f8fb`、白色卡片、8px 控件和 10px 卡片圆角。
-- `branding/zh-CN.json` 管理登录、注册和密码重置的中文文案；其余错误及验证文案由 Auth0 内置中文翻译提供。
-- 登录和注册的 `description` 使用单个空格隐藏默认说明；不能改为空字符串，否则 Auth0 会恢复“登录／注册以继续使用”的默认文案。
+- `branding/zh-CN.json` 管理登录、注册和密码重置的中文文案，包括 Identifier First 的 `login-id` / `login-password`、`signup-id` / `signup-password` 以及 `passkeys` prompt 下的两个 Passkey 注册提示；其余错误及验证文案由 Auth0 内置中文翻译提供。Management API 的 prompt 名为 `passkeys`，其 screen 名分别为 `passkey-enrollment`、`passkey-enrollment-local`。
+- 上述登录、注册和 Passkey 注册提示的 `description` 使用单个空格隐藏默认说明；不能改为空字符串，否则 Auth0 会恢复“登录／注册以继续使用”的默认文案。启用 Passkey 后使用 `login-id`，只修改 `login` 不会影响该页面。
 - 仅启用 `zh-CN`，确保英文浏览器也显示中文。主题和语言是 Auth0 租户级配置。
 - `node --use-env-proxy scripts/publish-auth0-branding.mjs` 输出计划；加 `--apply` 发布并回读验证。发布前在系统临时目录保存不含密钥的配置备份，输出备份目录。
+- 仅更新文案时增加 `--text-only`，保留线上主题和语言设置；仍先读取、逐屏合并现有文案再 PUT。
+
+## Passkey 与退出
+
+- Passkey 使用 Auth0 原生 Identifier First 流程；连接的 Passkey Authentication UI 支持“按钮与自动填充”。浏览器可在邮箱输入框建议已保存的密钥，用户仍需选择账号并完成设备验证。
+- `/auth/logout` 清理本站 Cookie，依次跳转 Auth0 `/v2/logout`、Access 团队 `/cdn-cgi/access/logout`，最后回到本站 `/`。两层 `returnTo` 分别使用 `URLSearchParams` 编码，最终首页只从本站 origin 派生，不接受请求的返回地址。
+- 可用 `node --use-env-proxy scripts/verify-auth0-branding.mjs --login-domain=auth.hasbai.xyz --branding-only` 检查实际登录／注册 HTML、Passkey 按钮与自动填充属性，以及全部中文覆盖配置；此选项跳过无关的注册资料 Form 检查。
 
 ## 两步注册
 
@@ -33,10 +40,10 @@
 
 1. Auth0 Custom Domain `auth.hasbai.xyz` 使用 Auth0-managed certificate。DNS-only CNAME 为 `hasbai-cd-j8r0mxglxwb2knim.edge.tenants.eu.auth0.com`；保留该记录用于证书续期。
 2. `node --use-env-proxy scripts/publish-auth0-signup.mjs --login-domain=auth.hasbai.xyz` 查看计划，加 `--apply` 发布 Form、资料 Action、绑定，最后发布注册标记 Action。脚本保留其他绑定，拒绝覆盖不认识的草稿。
-3. Dashboard `AUTH0_LOGIN_DOMAIN` 控制浏览器退出域名，管理服务继续使用 `AUTH0_DOMAIN`。变更后运行 `pnpm worker:typegen`、正式检查和构建；获得本任务发布授权后发布 Worker。
+3. Dashboard `AUTH0_LOGIN_DOMAIN` 控制浏览器退出域名，管理服务继续使用 `AUTH0_DOMAIN`。变更后运行 `pnpm worker:typegen`、正式检查和构建，再推送 GitHub 触发自动部署；必要时手动部署 Worker，两种方式均无需再次申请授权。
 4. 提供 `CLOUDFLARE_ACCESS_API_TOKEN` 后运行 `node --use-env-proxy scripts/configure-auth0-login-domain.mjs` 查看 Access OIDC 修改计划，加 `--apply` 切换授权、token、JWKS 地址。复用现有客户端密钥、PKCE、claims、scopes 和回调白名单。
 5. `node --use-env-proxy scripts/verify-auth0-branding.mjs --login-domain=auth.hasbai.xyz` 检查实际登录／注册 HTML 的中文及配色，并回读 Form 字段和 Action 绑定。它不提交登录、注册或发送邮件，也不打印 Cookie／事务 URL；这是 HTTP 和配置检查，不是浏览器视觉验收。
-6. `node scripts/verify-profile-routes.mjs` 在生产构建上验证退出域名、本站 Cookie 清理和固定 Access 退出目标；上游为模拟实现。
+6. `node scripts/verify-profile-routes.mjs` 在生产构建上验证退出域名、本站 Cookie 清理、固定 Access 退出目标及最终首页；上游为模拟实现。
 
 ## 参考
 
