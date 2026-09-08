@@ -93,6 +93,8 @@
 .tr-shell--workspace .tr-credit-calendar-event :is(strong, span) { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 
 /* Intrinsic card widths also work when the app is shown in a narrow panel. */
+.tr-shell--workspace .tr-view-stack { grid-template-columns: minmax(0, 1fr); }
+.tr-shell--workspace .tr-view-stack > section { min-width: 0; }
 .tr-shell--workspace .tr-metric-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
 }
