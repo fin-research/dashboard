@@ -145,7 +145,7 @@
 
 :where(.financing-scope) .financing-panel th,
 :where(.financing-scope) .financing-panel td {
-	padding: 0.625rem 0.75rem;
+	padding: 0.625rem 0.5rem;
 	border-bottom: 1px solid #e7ebf1;
 	text-align: left;
 	vertical-align: top;
