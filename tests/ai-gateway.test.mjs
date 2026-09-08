@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import {
   AI_GATEWAY_REASONING_EFFORT_BY_TASK,
-  AiGatewayFallbackError,
+  AiGatewayRetryError,
   AiGatewayResponseError,
   generateAiGatewayObject,
 } from "../src/lib/server/ai-gateway.ts";
@@ -62,7 +62,7 @@ async function withoutAiLogs(run) {
   }
 }
 
-test("direct Responses call uses the custom-opencode provider-specific URL", async () => {
+test("direct Responses call uses the custom-codex provider-specific URL", async () => {
   const calls = [];
   const fetcher = async (url, init) => {
     calls.push({ url: String(url), init });
@@ -87,7 +87,7 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
   assert.equal(calls.length, 1);
   assert.equal(
     calls[0].url,
-    "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-opencode/responses",
+    "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-codex/responses",
   );
   assert.equal(calls[0].init.method, "POST");
   assert.ok(calls[0].init.signal instanceof AbortSignal);
@@ -100,7 +100,7 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
   assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
     prompt_version: "test-v1",
     ai_model: "gpt-5.6-luna",
-    ai_provider: "custom-opencode",
+    ai_provider: "custom-codex",
     ai_provider_attempt: "primary",
   });
   assert.deepEqual(JSON.parse(calls[0].init.body), {
@@ -128,7 +128,7 @@ test("direct Responses call uses the custom-opencode provider-specific URL", asy
     input: [{ role: "user", content: "test" }],
   });
   assert.equal(Object.hasOwn(JSON.parse(calls[0].init.body), "include"), false);
-  assert.match(logs[0], /"provider":"custom-opencode"/);
+  assert.match(logs[0], /"provider":"custom-codex"/);
   assert.match(logs[0], /"task_type":"summary"/);
   assert.match(logs[0], /"reasoning_effort":"low"/);
   assert.match(logs[0], /"requested_reasoning_summary":"auto"/);
@@ -230,7 +230,7 @@ test("policy commentary enables Responses web search with max reasoning effort",
   assert.deepEqual(body.tools, [{ type: "web_search" }]);
 });
 
-test("retryable primary failure falls back once to direct custom-codex", async () => {
+test("retryable primary failure retries once to direct custom-codex", async () => {
   const calls = [];
   const fetcher = async (url, init) => {
     calls.push({ url: String(url), init });
@@ -258,7 +258,7 @@ test("retryable primary failure falls back once to direct custom-codex", async (
   assert.deepEqual(
     calls.map((call) => call.url),
     [
-      "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-opencode/responses",
+      "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-codex/responses",
       "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-codex/responses",
     ],
   );
@@ -267,11 +267,11 @@ test("retryable primary failure falls back once to direct custom-codex", async (
       (call) => JSON.parse(new Headers(call.init.headers).get("cf-aig-metadata"))
         .ai_provider_attempt,
     ),
-    ["primary", "fallback"],
+    ["primary", "retry"],
   );
 });
 
-test("business schema failure on the primary triggers custom-codex", async () => {
+test("business schema failure retries the same Codex provider", async () => {
   let calls = 0;
   const fetcher = async () => {
     calls += 1;
@@ -317,7 +317,7 @@ test("provider response bodies are bounded before parsing", async () => {
   assert.equal(calls, 2);
 });
 
-test("non-retryable primary 4xx is not masked by fallback", async () => {
+test("non-retryable primary 4xx is not masked by retry", async () => {
   let calls = 0;
   const fetcher = async () => {
     calls += 1;
@@ -338,7 +338,7 @@ test("non-retryable primary 4xx is not masked by fallback", async () => {
     ),
     (error) => {
       assert.ok(error instanceof AiGatewayResponseError);
-      assert.equal(error.provider, "custom-opencode");
+      assert.equal(error.provider, "custom-codex");
       assert.equal(error.status, 400);
       assert.equal(error.gatewayLogId, "log-bad-request");
       assert.equal(error.retryable, false);
@@ -368,13 +368,13 @@ test("local configuration errors are rejected before a provider call", async () 
 });
 
 test("final failure preserves both provider attempts and log ids", async () => {
-  const fetcher = async (url) => {
-    const fallback = String(url).includes("custom-codex");
+  const fetcher = async (_url, init) => {
+    const retry = JSON.parse(new Headers(init.headers).get("cf-aig-metadata")).ai_provider_attempt === "retry";
     return new Response(
-      JSON.stringify({ error: { message: fallback ? "fallback down" : "primary down" } }),
+      JSON.stringify({ error: { message: retry ? "retry down" : "primary down" } }),
       {
-        status: fallback ? 502 : 503,
-        headers: { "cf-aig-log-id": fallback ? "log-fallback" : "log-primary" },
+        status: retry ? 502 : 503,
+        headers: { "cf-aig-log-id": retry ? "log-retry" : "log-primary" },
       },
     );
   };
@@ -392,20 +392,36 @@ test("final failure preserves both provider attempts and log ids", async () => {
         fetcher,
       ),
       (error) => {
-        assert.ok(error instanceof AiGatewayFallbackError);
+        assert.ok(error instanceof AiGatewayRetryError);
         assert.deepEqual(
           error.failures.map((failure) => [failure.provider, failure.gatewayLogId]),
           [
-            ["custom-opencode", "log-primary"],
-            ["custom-codex", "log-fallback"],
+            ["custom-codex", "log-primary"],
+            ["custom-codex", "log-retry"],
           ],
         );
         assert.match(error.message, /log-primary/);
-        assert.match(error.message, /log-fallback/);
+        assert.match(error.message, /log-retry/);
         return true;
       },
     );
   } finally {
     console.warn = originalWarn;
+  }
+});
+
+
+test("every task type routes directly to Codex with its configured reasoning effort", async () => {
+  for (const [taskType, effort] of Object.entries(AI_GATEWAY_REASONING_EFFORT_BY_TASK)) {
+    const calls = [];
+    await withoutAiLogs(() => generateAiGatewayObject(credentials,
+      [{ role: "user", content: "test" }], z.object({ ok: z.boolean() }).strict(), "probe",
+      { ...options, taskType }, async (url, init) => {
+        calls.push({ url: String(url), init });
+        return responsesOutput({ ok: true });
+      }));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-codex/responses");
+    assert.equal(JSON.parse(calls[0].init.body).reasoning.effort, effort);
   }
 });

@@ -56,7 +56,7 @@ Local credit Excel ──────→ local parser → Neon credit
 - `src/lib/server/market-briefing.ts` 通过 `DATA` Service Binding 分别从 `/data/stock-summary`、`/data/news` 和新闻详情取材；新闻详情保持最多 5 个并发，在 Dashboard Worker 组装提示词并生成今日聚焦。
 - `src/lib/server/market-report.ts` 负责完整定稿的按日 R2 读取与手动覆盖，读取和写入都经同一快照 Schema 校验，不查询 Data API。
 - `src/lib/server/data-news.ts` 通过 `DATA` Service Binding 有界读取并校验单篇研报正文，供研报详情和政策点评生成复用。
-- `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器，使用 provider-specific Responses API 固定执行 `custom-opencode` → `custom-codex` 顺序 fallback。
+- `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器，使用 provider-specific Responses API 固定调用 `custom-codex`；可重试失败时仅重试同一 Provider 一次，授信问答保持单次尝试。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - `src/lib/server/profile.ts` 使用已验证 Access JWT 的 `eastmoney_user_id` 定位 Auth0 账号；个人信息 `/profile` 与 `/api/profile` 不依赖融资业务人员关联，不读写 Neon `financing`。权限仅展示 Auth0 已分配值，实际融资授权继续由融资工作台判断。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。

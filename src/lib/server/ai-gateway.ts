@@ -5,8 +5,7 @@ const MAX_CREDIT_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAX_AI_GATEWAY_TIMEOUT_MS = 300_000;
 
 export const AI_GATEWAY_MODEL = "gpt-5.6-luna" as const;
-export const AI_GATEWAY_PRIMARY_PROVIDER = "custom-opencode" as const;
-export const AI_GATEWAY_FALLBACK_PROVIDER = "custom-codex" as const;
+export const AI_GATEWAY_PROVIDER = "custom-codex" as const;
 export const AI_GATEWAY_REASONING_EFFORT_BY_TASK = {
   generation: "high",
   market_briefing: "max",
@@ -80,12 +79,12 @@ export class AiGatewayResponseError extends Error {
   }
 }
 
-export class AiGatewayFallbackError extends Error {
+export class AiGatewayRetryError extends Error {
   readonly failures: readonly AiGatewayAttemptFailure[];
 
   constructor(failures: readonly AiGatewayAttemptFailure[]) {
     super(
-      "AI Gateway providers failed: " +
+      "AI Gateway attempts failed: " +
         failures
           .map(
             (failure) =>
@@ -95,7 +94,7 @@ export class AiGatewayFallbackError extends Error {
           )
           .join("; "),
     );
-    this.name = "AiGatewayFallbackError";
+    this.name = "AiGatewayRetryError";
     this.failures = failures;
   }
 }
@@ -158,7 +157,7 @@ export async function generateAiGatewayObject<OUTPUT>(
 
   const primary = await attemptProvider(
     normalizedCredentials,
-    options.taskType === "credit_answer" ? AI_GATEWAY_FALLBACK_PROVIDER : AI_GATEWAY_PRIMARY_PROVIDER,
+    AI_GATEWAY_PROVIDER,
     "primary",
     messages,
     schema,
@@ -169,13 +168,13 @@ export async function generateAiGatewayObject<OUTPUT>(
     fetcher,
   );
   if (primary.ok) return primary.value;
-  // Credit answers explicitly use the user's codex provider; never silently change it.
+  // Keep the existing single-attempt budget for credit answers.
   if (options.taskType === "credit_answer") throw primary.error;
   if (!primary.error.retryable) throw primary.error;
 
   console.warn(
     JSON.stringify({
-      event: "ai_gateway_fallback_started",
+      event: "ai_gateway_retry_started",
       provider: primary.error.provider,
       status: primary.error.status,
       gateway_log_id: primary.error.gatewayLogId,
@@ -183,10 +182,10 @@ export async function generateAiGatewayObject<OUTPUT>(
     }),
   );
 
-  const fallback = await attemptProvider(
+  const retry = await attemptProvider(
     normalizedCredentials,
-    AI_GATEWAY_FALLBACK_PROVIDER,
-    "fallback",
+    AI_GATEWAY_PROVIDER,
+    "retry",
     messages,
     schema,
     requestSchema,
@@ -195,17 +194,17 @@ export async function generateAiGatewayObject<OUTPUT>(
     options,
     fetcher,
   );
-  if (fallback.ok) return fallback.value;
-  throw new AiGatewayFallbackError([
+  if (retry.ok) return retry.value;
+  throw new AiGatewayRetryError([
     primary.error.toFailure(),
-    fallback.error.toFailure(),
+    retry.error.toFailure(),
   ]);
 }
 
 async function attemptProvider<OUTPUT>(
   credentials: AiGatewayCredentials,
   provider: string,
-  attempt: "primary" | "fallback",
+  attempt: "primary" | "retry",
   messages: AiGatewayMessage[],
   schema: z.ZodType<OUTPUT>,
   requestSchema: unknown,
@@ -253,7 +252,7 @@ async function attemptProvider<OUTPUT>(
 async function runProvider<OUTPUT>(
   credentials: AiGatewayCredentials,
   provider: string,
-  attempt: "primary" | "fallback",
+  attempt: "primary" | "retry",
   messages: AiGatewayMessage[],
   schema: z.ZodType<OUTPUT>,
   requestSchema: unknown,

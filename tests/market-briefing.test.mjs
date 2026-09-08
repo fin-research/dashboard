@@ -100,7 +100,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
   };
   globalThis.fetch = async (url, init) => {
     const target = String(url);
-    if (target.includes("/custom-opencode/responses")) {
+    if (target.includes("/custom-codex/responses")) {
       aiCalls.push({ url: target, init });
       return Response.json(
         {
@@ -144,7 +144,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(dataCalls.length, 3);
     assert.equal(
       aiCalls[0].url,
-      "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-opencode/responses",
+      "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-codex/responses",
     );
     const headers = new Headers(aiCalls[0].init.headers);
     assert.equal(headers.get("cf-aig-authorization"), "Bearer test-token");
@@ -154,7 +154,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
       prompt_version: "market-briefing-v5-web-search",
       tags: "market-briefing,manual-generation,web-search",
       ai_model: "gpt-5.6-luna",
-      ai_provider: "custom-opencode",
+      ai_provider: "custom-codex",
       ai_provider_attempt: "primary",
     });
     const query = JSON.parse(aiCalls[0].init.body);
