@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package financing.debtimport.v1;
+
+enum DebtTable {
+  DEBT_TABLE_UNSPECIFIED = 0;
+  DEBT_TABLE_DEBT = 1;
+  DEBT_TABLE_BOND = 2;
+  DEBT_TABLE_INCOME_CERTIFICATE = 3;
+  DEBT_TABLE_INCOME_RIGHT = 4;
+  DEBT_TABLE_REFINANCING = 5;
+  DEBT_TABLE_SWAP_FACILITY = 6;
+}
+
+message DebtImportPayload {
+  uint32 version = 1;
+  string as_of_date = 2;
+  double total_yi = 3;
+  repeated bytes debt_batches = 4;
+  repeated bytes cashflow_batches = 5;
+  repeated bytes balance_batches = 6;
+  uint32 debt_count = 7;
+  uint32 cashflow_count = 8;
+  uint32 balance_count = 9;
+}
+
+message DebtRecordBatch {
+  repeated DebtRecord records = 1;
+}
+
+message CashflowRecordBatch {
+  repeated CashflowRecord records = 1;
+}
+
+message BalanceRecordBatch {
+  repeated BalanceRecord records = 1;
+}
+
+message DebtRecord {
+  string source_key = 1;
+  DebtTable table = 2;
+  string debt_type = 3;
+  optional string subtype = 4;
+  string name = 5;
+  optional string legacy_name = 6;
+  optional string counterparty = 7;
+  double amount = 8;
+  double interest_payable = 9;
+  optional double annual_rate = 10;
+  optional string issue_date = 11;
+  optional string maturity_date = 12;
+  optional string activated_at = 13;
+  optional string settled_at = 14;
+  optional string closed_at = 15;
+
+  optional string issuance_method = 16;
+  optional string bookbuilding_date = 17;
+  optional string interest_basis = 18;
+  optional string issuance_target = 19;
+  optional string market = 20;
+  optional string receiving_account = 21;
+  optional string trustee = 22;
+  optional string bookrunner = 23;
+  optional string liquidation_submission_status = 24;
+  optional string liquidation_registration_status = 25;
+  optional string return_type = 26;
+  optional string subscription_date = 27;
+  optional string redemption_date = 28;
+  optional bool early_maturity = 29;
+  optional int32 interest_basis_days = 30;
+  optional bool is_extended = 31;
+  optional string repayment_account = 32;
+  optional string average_repo_balance_description = 33;
+  optional double repo_weighted_average_rate = 34;
+}
+
+message CashflowRecord {
+  string source_key = 1;
+  string cashflow_type = 2;
+  string due_date = 3;
+  optional double amount = 4;
+  optional double paid_amount = 5;
+  optional string paid_at = 6;
+  optional string accrual_start_date = 7;
+  optional string accrual_end_date = 8;
+  optional string note = 9;
+  uint32 source_sequence = 10;
+}
+
+message BalanceRecord {
+  string as_of_date = 1;
+  string debt_type = 2;
+  string subtype = 3;
+  double amount = 4;
+}

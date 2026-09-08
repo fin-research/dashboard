@@ -62,3 +62,13 @@ git diff --check
 - UI 规则变化更新 `DESIGN.md`。
 - 业务口径变化更新 `docs/DOMAIN.md`。
 - 数据、接口或安全边界变化只更新对应专题，不把细节重新堆回 `AGENTS.md`。
+
+## 融资模块维护
+
+融资代码、测试、迁移与脚本全部由本仓库维护，不再向旧 financing 仓库提交功能。默认 `pnpm test` 同时运行两组测试；专项可使用 `pnpm test:financing`。生产构建仍用同一版本的 SvelteKit、Svelte、Tailwind、ECharts 与 pg。
+
+迁移：`pnpm financing:db:init -- --schema-only`；Excel 盘点：`pnpm financing:db:import -- --dry-run`；SQLite 盘点：`pnpm financing:db:migrate:sqlite -- --dry-run`；提醒盘点：`pnpm financing:reminders:send -- --dry-run`；Protobuf：`pnpm financing:proto:generate`。凭证与原始 Excel 留在未跟踪本地文件中，导入时显式指定源路径，不把旧 checkout 作为运行依赖。
+
+`node scripts/provision-financing-management.mjs` 验证原融资 M2M 应用与权限；`--apply` 将原凭据安全写入 Dashboard 的专用 Secret，不创建或轮换原凭据。部署与切换顺序、性能指标见 [合并记录](FINANCING_MERGE.md)。
+
+浏览器关键表单交互、200% 缩放和甘特图大字号视觉回归仍作为专项验收；未执行时不得写成已通过。仓库内已覆盖 Excel 映射/勾稽、提醒周期、项目建档和构建后路由测试，旧待办中的对应“缺少单元测试”不再重复列为待办。

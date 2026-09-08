@@ -32,3 +32,9 @@ pnpm dev
 - [交易研究工作台数据范围与接入口径](docs/TRADING_RESEARCH_WORKBENCH.md)
 - [安全边界](docs/SECURITY.md)
 - [开发与验证](docs/DEVELOPMENT.md)
+
+## 融资工作台与管理中心
+
+融资业务已合并到 Dashboard，继续从 `/financing` 进入仪表盘、项目、SOP、负债周报和数据后台。人员及 Auth0 角色权限由 `/management/people` 管理；全站个人信息入口为 `/profile`。业务数据仍使用原 Neon `financing` schema 与原 R2 周报快照。
+
+开发前按 [文档分流](docs/INDEX.md) 选择目标模块；公共 UI、认证、数据库和发布规则统一维护，旧 financing 仓库仅保留历史。

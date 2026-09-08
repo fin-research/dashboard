@@ -45,3 +45,28 @@
 - Data/API 错误可对外返回用于排查的结构化安全诊断：接口路径、HTTP 状态、错误码、数据源、
   处理阶段，以及限长后的字段路径、收到类型和标量值。不得返回堆栈、Cookie、token、签名
   URL、连接串、完整正文或大段原始响应；详细堆栈仍只进入服务端日志。
+
+## 融资与管理模块的额外授权
+
+中央 Access 校验由 `src/lib/server/access.ts` 统一执行。`locals.user` 保存全站身份，`locals.financingUser` 保存明确关联、启用的融资人员。融资 middleware 仅对 `/financing/*` 和人员相关管理路由执行；通过 `route-contract.ts` 把新路由映射到原 named action 权限表，未登记 mutation 拒绝。
+
+Profile 使用既有低权限 `AUTH0_MANAGEMENT_CLIENT_ID/SECRET`；人员管理使用 `FINANCING_AUTH0_MANAGEMENT_CLIENT_ID/SECRET`，复用原融资 M2M 应用而不扩大个人资料应用权限。两个 Secret 不能互换，不能进入客户端或日志。
+
+### 融资授权
+
+- Auth0 RBAC 是三种融资角色和七类权限的管理来源。角色名为 `financing:admin`、`financing:handler`、`financing:reviewer`，在应用中仍使用原 admin/handler/reviewer 代码和原权限代码。
+- 角色授权使用 `https://eastmoney.hasbai.xyz/financing` API 的 permissions，忽略其他 API 的同名权限。账号必须且只能关联一种融资角色。
+- `people` 保存人员主档和 Auth0 账号关联；人员启用是进入融资业务的额外条件。人员页面同步 Auth0 的角色与账号状态，角色／权限维护调用 Auth0 后读取确认结果。
+- SvelteKit 非安全方法继续按“路由 + named action”映射权限，未登记 mutation 默认拒绝。本人任务更新继续同时校验 personId 与负责人，SQL 保留负责人条件。
+- 不允许停用／删除当前人员或移除其登录权限，并至少保留一个启用管理员、一个可维护权限配置的启用角色。移除融资登录只移除融资角色和人员关联，不删除全站 Auth0 账号。
+- 融资人员停用使用人员状态与 `app_metadata.financing_enabled`；它不自动封禁其他应用。Auth0 全局 blocked 仍阻止融资访问。
+
+
+### 融资授权缓存和数据后台
+
+- 只读请求可复用最多 60 秒的身份判断，缓存键仍为凭证 SHA-256，不保存明文 Cookie/JWT。写请求、`/data/token` 和 `/data/api/*` 强制实时查询 Auth0。
+- 数据后台通过同源 `/financing/data/api/*` 使用原有表和字段白名单。客户端不再取得 Neon Auth JWT，禁止任意表、任意 SQL、无主键批量修改和只读字段写入；乐观版本条件继续保留。
+- Worker 在单请求同一个 Hyperdrive Client 的事务中设置已验证身份的事务上下文 `request.financing.user_id`，然后 `SET LOCAL ROLE authenticated`。所有设置在事务结束时消失；Auth0 路径不依赖旧 Neon JWT 扩展的会话初始化。
+- PostgreSQL RLS 同时检查人员启用、Auth0 账号状态、data_manage 和最长 60 秒的已确认授权有效期；过期授权拒绝读取和写入。数据写入继续由原审计触发器记录 personId、邮箱和变更前后值。
+- 导入、数据编辑和令牌／代理入口保留 data_manage 检查，POST/PATCH/DELETE 额外校验 Origin。
+- 生产账号迁移采用带原 scrypt 参数的批量导入；上线前核对全部 ID、邮箱、角色与权限。只有新认证和业务访问可用后才移除旧 Neon Auth。

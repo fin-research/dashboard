@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Component } from "svelte";
+  import type { Component, Snippet } from "svelte";
 
   type MetricTone =
     | "primary"
@@ -22,6 +22,7 @@
     detailPrefix = "",
     detailSuffix = "",
     detailTone = "",
+    details,
     tone = "primary",
     iconComponent: IconComponent,
     iconProps = {},
@@ -36,6 +37,7 @@
     detailPrefix?: string;
     detailSuffix?: string;
     detailTone?: string;
+    details?: Snippet;
     tone?: MetricTone;
     iconComponent?: Component<any>;
     iconProps?: Record<string, unknown>;
@@ -63,7 +65,9 @@
       <strong>{value}</strong>
       {#if unit}<span>{unit}</span>{/if}
     </div>
-    {#if detail !== undefined && detail !== ""}
+    {#if details}
+      <div class="research-metric-card__detail">{@render details()}</div>
+    {:else if detail !== undefined && detail !== ""}
       <p class="research-metric-card__detail">
         {detailPrefix}{#if detailTone}<b class={detailTone}>{detail}</b>{:else}<span
             >{detail}</span

@@ -6,6 +6,7 @@ import { dashboardAccessFailure, dashboardIdentity, requireSameOrigin } from '..
 export { BondLedgerImportWorkflow } from "./bond-ledger-workflow.ts";
 export { EconomicIndicatorSyncWorkflow } from "./economic-indicator-workflow.ts";
 export { CreditAgent } from "./credit-agent.ts";
+export { DebtImportWorkflow } from './financing-debt-import.ts';
 
 const worker: ExportedHandler<Cloudflare.Env> = {
   async fetch(request, env, context) {
@@ -22,6 +23,12 @@ const worker: ExportedHandler<Cloudflare.Env> = {
   },
   scheduled(controller, env, context) {
     controller.noRetry();
+    if (controller.cron === '0 * * * *') {
+      context.waitUntil(import('../src/lib/server/financing/reminder-scheduler.js')
+        .then(({ runScheduledReminderCheck }) => runScheduledReminderCheck({ scheduledTime: controller.scheduledTime, env }))
+        .then(summary => { console.log(JSON.stringify(summary)); }));
+      return;
+    }
     context.waitUntil(
       runEconomicIndicatorScheduledSync(env, controller.scheduledTime),
     );

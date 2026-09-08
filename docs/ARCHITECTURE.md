@@ -66,26 +66,6 @@ Local credit Excel ──────→ local parser → Neon credit
 
 ## 核心数据流
 
-### 市场点评
-
-当天浏览器在一次加载中并发请求 OMO、CFETS、国债、期货、两融、行业、股票收评、一级发行、今日成交和收藏报价；每个请求只选择实际使用字段并校验最小 DTO。单个资源失败时使用该资源的空结构完成共享报告，只在依赖模块和文字段落标记数据缺失，不阻断其他已成功模块。今日成交与收藏报价的代码合并去重后只批量请求一次债券基础信息，代码集合来自当次响应，不是硬编码清单；基础信息只返回连接、展示和结构化类型筛选所需字段。公募公司债使用 `bondType` 与 `bondOfferingType` 判断，不按债券简称字母猜测。`src/market-report-resources.ts` 加工出唯一规范报告，视觉版与文字版共用，不重复请求。历史日期优先一次 GET 完整 R2 定稿；仅当返回 `REPORT_NOT_FINALIZED` 时按所选日期重放可按日期查询的原始资源并在页面提示未定稿，期货最新、今日成交和收藏报价不支持历史回放，不得以当前值冒充历史值。只有手动 PUT 才上传已裁剪的规范数据与今日聚焦并写 R2；完整文字版始终由前端生成，不进入定稿。Data GraphQL 镜像相同原始资源，但市场点评仍使用分段 REST，以隔离失败和 Worker CPU。
-
-### 市场热点
-
-`ingest` 写入的 D1 `article` / `keyword` → Worker 读取证据 → AI Gateway → 追加 `hotspot_snapshot` → 页面读取最近快照。
-
-### 二级池
-
-浏览器上传 Excel → Worker 写入 `bond-ledger/.pending/<uuid>.xlsx` → 创建 Workflow → Worker 内解析 → Neon 单事务更新 → 覆盖 `bond-ledger/YYYY-MM-DD.xlsx` 并删除临时对象 → 页面按日期区间查询数据库生成周报。`/secondary-bond-pool` 与工作台同名子路径使用运营周报组件；原 `/bond` 组件及工作台旧子路径继续存在但不进入导航。
-
-### 资金日报
-
-历史资金日报页的上传模态框上传完整 HTML → Worker 校验文件名日期、大小、编码和 HTML 文档头 → R2 `fund-reports/YYYY-MM-DD.html`。`/fund-report` 枚举固定前缀并按日期倒序展示历史列表；日期页只解析确定性的对象 key，不接受任意 R2 路径。
-
-### 融资择时模型
-
-quant pipeline → 本地结构化结果 → Neon `financing_model.model_run` 标量列、原生数组及有序明细表 → dashboard 重建最新运行。人工结论通过 PATCH 增量更新同一条 `model_run` 的当前结论列；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳为单段逻辑汇总及 4–5 家逐机构观点后追加保存。人工编辑逻辑汇总时保留原逐机构观点和检索证据，并追加新快照。
-
 ### 交易研究工作台
 
 授信链路：本地 Excel → `scripts/import-credit-workbook.ts` 解析“授信一览表”和“授信周报” → Neon `credit.institution` / `credit.item`；浏览器 `/trading-research/credit` → `/api/credit` → Hyperdrive → Neon。读取、周报比较、日历事件和自动保存的服务端确认结果均来自数据库。
@@ -105,3 +85,13 @@ quant pipeline → 本地结构化结果 → Neon `financing_model.model_run` �
 - 路由 handler 保持轻薄；可复用校验和业务逻辑放入 `src/lib`。
 - Workflow 代码留在 `worker/`，避免 Cloudflare runtime 类型污染浏览器 TypeScript 环境。
 - 新增报告口径先扩展共享派生层和测试，再接入视觉或文字消费者。
+
+具体页面规则和接口见 [模块索引](INDEX.md)，不在公共文档重复维护。
+
+## 融资模块合并
+
+Dashboard 是唯一 UI/API Worker。融资领域位于 `src/lib/financing/`（浏览器安全代码）、`src/lib/server/financing/`（查询、授权、审计）、`src/routes/financing/`（路由）和 `src/charts/financing/`（报表图表）。管理页面位于 `src/routes/management/`。共享 UI 只由既有 `WorkbenchShell`、`MetricCard`、`ModuleCard`、`PanelHeading`、`ChartHost`、`GlobalMessages` 维护。
+
+融资身份查询、提醒查询、报表生成和数据库连接均不能放进全站根 layout。仅融资业务导航执行融资授权与集合查询；重型导入解析器留在浏览器 Web Worker，报表动作客户端按路由加载。Finance 的 CSS 限定 `.financing-scope`，其颜色与表面映射 Dashboard 令牌，不能在导航后污染门户和报告。
+
+自定义 Worker 同时导出 DebtImportWorkflow，继续使用既有 Workflow 名称和台账原子导入。两个 cron 按表达式分流；从旧 Worker 切换时停止旧 cron，防止重复扫描。迁移不会改变 Quant、Data、Ingest 或其他上游接口。

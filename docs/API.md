@@ -41,87 +41,6 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 
 ## Dashboard Worker `/api/*`
 
-### 个人信息与登录
-
-- `GET /auth/verify-email`：公开的注册邮箱验证提示页，返回 200、`no-store, private` 和 `Referrer-Policy: no-referrer`。提示用户检查邮件，完成验证后从 `/auth/login?returnTo=%2Fprofile` 开始新登录；查询中的邮箱、错误文本和 Auth0 事务状态均不反射到页面。
-- `GET /auth/session`：返回当前 Access 会话；匿名用户的 `user` 为 `null`，供页面跳转和上传前检查。所有身份响应禁止缓存。
-- `GET /profile`：需登录，展示个人资料、邮箱、密码重置入口、只读角色权限和原有浏览器个性化设置。
-- `GET /api/profile`：仅返回当前账号的姓名、邮箱、邮箱验证状态、已分配角色与权限；不返回管理令牌、身份提供方凭证或内部 metadata。
-- `POST /api/profile`：JSON 请求体上限 4 KiB，严格只接受 `action=name` 与 `name`（1–50 字），或 `action=email`、`email`（18.cn 邮箱）与 `confirmed=true`，或 `action=password`。不得指定用户 ID、角色、权限或自定义字段。
-- 姓名更新回传服务端确认的姓名；邮箱更新清除验证状态、请求验证邮件并回传 `logout=true`，前端完成统一退出；密码操作只向当前账号请求 Auth0 密码重置邮件。
-- 同源浏览器请求收到 HTTP 401 时统一整页跳转 `/auth/login`，保留当前安全页面路径、查询和锚点；403 保持权限错误。SvelteKit 页面数据请求返回框架的登录重定向协议，直接页面请求返回 303。登录接口及 Cloudflare 路径不能作为回跳目标。
-- Auth0 上游管理凭证失效映射为 503，不冒充当前用户未登录。
-
-### 市场点评
-
-- `GET /api/market-report?date=YYYY-MM-DD`：读取并校验该日期完整 R2 定稿。无定稿返回 404 `REPORT_NOT_FINALIZED`，浏览器据此回退到 Data REST 原始资源重新生成。
-- `PUT /api/market-report?date=YYYY-MM-DD`：仅在用户手动保存时，同源接收浏览器已加工并经 Schema 裁剪的规范报告与今日聚焦，覆盖当天对象；完整文字版不得写入 R2，原始上游响应不得写入 R2，序列化快照上限为 512 KiB。
-
-当天普通加载不调用 GET，也不读取 R2；选择早于上海当天的历史日期时优先读取完整定稿，仅 `REPORT_NOT_FINALIZED` 触发原始资源回退。
-保存成功后的定稿时间由 PUT 响应更新当前页面状态。
-
-### 市场热点
-
-- `GET /api/rag/hotspots`：返回最近快照；无快照为 404；不接受范围参数。
-- `POST /api/rag/hotspots`：生成并追加快照，成功为 201。
-- 滚动请求：`{"mode":"rolling","rollingCount":20}`，数量必须为 8–100 的整数。
-- 日期请求：`{"mode":"range","startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}`。
-
-### 政策跟踪
-
-- `GET /api/policies?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&category=...`：读取 ingest Workflow 已聚合的政策时间轴，包含 `important` / `related` / `general` 重要性、原始政策资讯、已关联研报和一对一点评；不调用 AI。
-- `GET /api/policies/articles?q=...`：按标题、机构或摘要检索可关联 article。
-- `PUT /api/policies/{id}/articles`：人工确认完整研报 ID 集合；未选择的现有自动关系记为人工排除，后续 Workflow 不覆盖。
-- `POST /api/policies/{id}/commentary`：用户手动触发。Worker 通过 `DATA` Service Binding 以最多 5 路并发读取已关联研报正文（可为空），与政策资讯一起调用启用 Responses `web_search` 的 AI Gateway，并保存使用政策点评专用 `max` effort 生成的政策点评初版，成功为 201。
-- `PUT /api/policies/{id}/commentary`：保存标准化点评字段的人工修订。
-- `GET /api/news/{id}`：按 DM `sentiment_id` 读取已聚合政策资讯的标题、时间、DM 原文、政策原文链接与关联政策；对应统一新闻资讯页面 `/news/{id}`。
-- `GET /api/articles/{id}`：读取研报 D1 元数据、已关联政策，并通过 `DATA` Service Binding 读取正文；对应独立页面 `/articles/{id}`。
-- `GET /api/commentaries/{id}`：按点评 ID 读取标准化点评与对应政策；对应独立页面 `/commentaries/{id}`。
-
-### 今日聚焦
-
-- `POST /api/market-briefing?date=YYYY-MM-DD`：日期缺省时使用上海时区当天。
-- 无效日期为 400；上游、模型或配置错误按路由映射为 5xx。
-- Dashboard Worker 通过 `DATA` Service Binding 读取股票收评和 DM 新闻；详情最多 5 个并发，避免同一 invocation 的外连等待槽被耗尽。
-- 模型通过 provider-specific Responses API 调用，启用 `web_search`、使用今日聚焦专用 `max` reasoning effort，并将 AI Gateway 请求超时设为 300 秒；联网证据仅用于补充、核验给定材料未充分解释的关键行情和驱动。
-
-### 资金日报
-
-- `POST /api/fund-report`：上传单个 UTF-8 HTML，文件名末尾必须为 `YYYYMMDD.html` 或 `YYYY-MM-DD.html`；成功为 201。
-- 请求体为原始 HTML 文件，`X-Fund-Report-Filename` 传 URL 编码的原文件名，`X-Fund-Report-Size` 传文件字节数。
-- Worker 将文件保存为 R2 `fund-reports/YYYY-MM-DD.html`；同日报告再次上传会覆盖并在响应中返回 `replaced: true`。
-- `GET /management`：兼容旧入口，303 跳转 `/fund-report?upload=1`；目标页先检查登录，再打开上传模态框。
-- `GET /fund-report`：提供上传按钮，登录后打开模态框，成功后定向刷新历史列表；以 `Cache-Control: no-store` 返回按日期倒序排列的历史资金日报列表。
-- `GET /fund-report/YYYY-MM-DD.html`：从 R2 返回 HTML；无该日报为 404。
-
-### 二级池台账
-
-- `GET /api/bond-ledger`：数据库报表日和文件状态清单。
-- `GET ?start=YYYY-MM-DD&end=YYYY-MM-DD`：区间周报。
-- `GET ?date=YYYY-MM-DD`：下载该日报表对应的原始 Excel。
-- `GET ?workflow=<id>`：查询导入 Workflow 状态。
-- `POST`：上传 Excel 到 `bond-ledger/.pending/` 并启动 Workflow，返回 202；导入成功后覆盖 `bond-ledger/YYYY-MM-DD.xlsx` 并删除临时对象。
-- `DELETE ?date=YYYY-MM-DD`：删除该日数据库业务数据，保留 R2 归档。
-
-### 融资择时模型
-
-- `GET /api/financing-model`：返回最新 quant 模型快照、当前有效整体结论、最近卖方观点和最近 100 条可选模型运行版本；模型快照包含实际 LCR/NSFR、六类 SHAP 驱动结构、Top 因子贡献、四种品种相对各自同类债中位数的预测偏离、完整训练样本区间与样本外验证指标；无模型运行返回 404。
-- `GET /api/financing-model?run=<uuid>`：读取指定运行并同时返回可选版本清单；模型基础字段保持不变，当前整体结论可由 PATCH 增量更新。
-- `PATCH /api/financing-model/conclusion`：增量更新目标 `model_run` 的当前整体结论；请求含 `runId`、`verdict`、`preferredWindow`、`narrative`，不修改模型基础结论。
-- `GET /api/financing-model/decisions`：读取历史择时决策记录；日期、历史分位和发行建议来自对应模型运行，按模型日期倒序返回。
-- `POST /api/financing-model/decisions`：按 `runId` 新增或覆盖一条人工记录；`decisionAction` 必填，`outcome` 可在结果形成后补录，不设置状态字段。
-- `POST /api/financing-model/sell-side`：按 `runId` 使用 AI Search 与 AI Gateway 生成并追加卖方逻辑汇总及 4–5 家逐机构观点，成功为 201。
-- `PATCH /api/financing-model/sell-side`：追加人工卖方逻辑汇总修订；请求含 `runId`、`logicSummary`，保留原检索口径与来源证据。
-
-### 授信管理
-
-- `GET /api/credit`：读取最新授信报告日。
-- `GET /api/credit?date=YYYY-MM-DD`：读取指定报告日；无该日期记录返回 404，无数据库连接返回 503，无效日期返回 400。
-- 响应同时返回一览表口径 `summary`、周报名单口径 `weeklySummary`、上一报告日汇总、机构和分项、本周结构化授信事件 `weeklyNews`、截至所选报表日近六个月的新增/续作/扩额批复 `recentApprovals`、使用额度变动及日历事件。
-- 周环比基准是小于当前日期的上一可用报告日，不要求恰好相隔七天。本周事件包括新增、续作、扩额、到期和撤销；续作与扩额同时发生时只记为扩额。新增但使用额为零的机构不进入使用额度变动。
-- `PATCH /api/credit`：以 `(reportDate, institutionName)` 定位一条机构记录，`changes.institution` 仅传发生变化的主体字段，`changes.items` 仅传发生变化的分项及字段；主体与分项在同一事务内更新并重算响应。同字段并发修改以后提交者为准，不同字段自然合并；空增量或非法字段返回 400，记录不存在返回 404。
-- GET 与 PATCH 均使用 `Cache-Control: no-store`。Excel 解析仍只由本地命令执行，浏览器不上传源文件。
-
 ## 通用约定
 
 - JSON 错误使用 `{ "error": "可公开信息" }`；服务端日志可记录诊断信息，但不得包含 Secret 或完整敏感输入。
@@ -130,3 +49,13 @@ Data 错误响应保留安全诊断字段，前端错误消息展示接口路径
 - 日期参数使用严格 `YYYY-MM-DD`；起止日期必须同时提供且起始不晚于结束。
 - route handler 只做解析、校验、错误映射和服务调用；业务逻辑放入 `src/lib`。
 - 兼容跳转 `/bond-ledger` 固定以 308 指向 `/bond`。
+
+具体页面规则和接口见 [模块索引](INDEX.md)，不在公共文档重复维护。
+
+## 融资与管理路由
+
+`/financing/*` 属于 Dashboard 的真实路由子树，SvelteKit 全局 base 仍为空；URL 使用 `src/lib/financing/app-paths.ts`。人员与融资资料使用 `/management/people`、`/management/financing-profile`，兼容路径保持重定向。
+
+页面 load 仅返回所需数据，通用预取使用 tap，固定工作台导航允许 hover。普通 mutation 返回单个确认实体或删除 ID，增强表单使用 `update({ reset: false, invalidateAll: false })`；身份与提醒只按 dependencies 定向失效。负债周报的显式生成按新快照版本刷新，具体例外见模块文档。
+
+内部数据接口保持 `/financing/data/token`、`/financing/data/api/*`、`/financing/data/import`、`/financing/data/import/[id]`。Auth0 模式不向浏览器返回 Neon JWT。字段、表、主键与分页仍使用原白名单；请求身份在事务内设置并执行 RLS。

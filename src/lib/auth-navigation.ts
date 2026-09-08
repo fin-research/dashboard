@@ -1,4 +1,4 @@
-const PRIVATE_PAGES = ['/profile', '/trading-research', '/credit-workbench', '/credit-assistant'];
+const PRIVATE_PAGES = ['/profile', '/management', '/financing', '/trading-research', '/credit-workbench', '/credit-assistant'];
 const PRIVATE_APIS = ['/api/profile', '/api/credit-assistant', '/api/credit', '/api/economic-indicators'];
 
 function matches(path: string, prefixes: string[]): boolean {

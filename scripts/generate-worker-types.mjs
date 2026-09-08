@@ -33,4 +33,7 @@ const withoutBuildImport = generated.replace(
   /Workflow<Parameters<import\("\.\/worker\/entry"\)\.EconomicIndicatorSyncWorkflow\['run'\]>\[0\]\['payload'\]>/,
   'Workflow<import("./src/lib/server/economic-indicator-sync").EconomicIndicatorSyncParams>',
 );
-await writeFile(declarationUrl, withoutBuildImport.replaceAll('import("./worker/entry").CreditAgent', 'import("agents").Agent<Cloudflare.Env>'));
+await writeFile(declarationUrl, withoutBuildImport
+  .replace(/Workflow<Parameters<import\("\.\/worker\/entry"\)\.DebtImportWorkflow\['run'\]>\[0\]\['payload'\]>/,
+    'Workflow<import("./src/lib/financing/debt-import-types").DebtImportWorkflowParams>')
+  .replaceAll('import("./worker/entry").CreditAgent', 'import("agents").Agent<Cloudflare.Env>'));

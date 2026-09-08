@@ -1,3 +1,4 @@
+<a class="profile-entry" href="/management" aria-label="管理中心" title="管理中心"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg></a>
 <a class="profile-entry" href="/profile" aria-label="个人信息" title="个人信息">
   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></svg>
 </a>

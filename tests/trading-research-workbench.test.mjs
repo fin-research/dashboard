@@ -112,7 +112,7 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
         "utf8",
       ),
       readFile(new URL("../src/charts/bond-ledger.ts", import.meta.url), "utf8"),
-      readFile(new URL("../DESIGN.md", import.meta.url), "utf8"),
+      Promise.all([readFile(new URL("../DESIGN.md", import.meta.url), "utf8"), readFile(new URL("../docs/modules/secondary-bond-pool.md", import.meta.url), "utf8")]).then(parts => parts.join("\n")),
     ]);
 
   assert.match(page, /LAST_COMPLETE_WEEK = previousBusinessWeekRange\(currentReportDate\(\)\)/);
@@ -169,7 +169,7 @@ test("版式报告统一使用 1080px A4 画布且工作台 main 不增加报告
         new URL("../src/lib/trading-research/CreditView.svelte", import.meta.url),
         "utf8",
       ),
-      readFile(new URL("../DESIGN.md", import.meta.url), "utf8"),
+      Promise.all([readFile(new URL("../DESIGN.md", import.meta.url), "utf8"), readFile(new URL("../docs/modules/secondary-bond-pool.md", import.meta.url), "utf8")]).then(parts => parts.join("\n")),
     ]);
 
   assert.match(layoutStyles, /\.layout-report\s*\{[\s\S]*max-width:\s*1080px/);
@@ -451,7 +451,7 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
     readFile(new URL("../src/lib/pages/BondLedgerPage.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/trading-research/workbench.css", import.meta.url), "utf8"),
-    readFile(new URL("../DESIGN.md", import.meta.url), "utf8"),
+    Promise.all([readFile(new URL("../DESIGN.md", import.meta.url), "utf8"), readFile(new URL("../docs/modules/secondary-bond-pool.md", import.meta.url), "utf8")]).then(parts => parts.join("\n")),
     ...viewUrls.map((url) => readFile(new URL(url, import.meta.url), "utf8")),
   ]);
 

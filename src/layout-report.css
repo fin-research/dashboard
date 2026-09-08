@@ -78,6 +78,13 @@
     box-shadow: none !important;
   }
 
+  /* Liability reports already scale each of their six fixed A4 pages. */
+  body:has(.layout-report) .layout-report--liability {
+    width: 210mm !important;
+    padding: 0 !important;
+    zoom: 1;
+  }
+
   body:has(.layout-report) .layout-report,
   body:has(.layout-report) .layout-report * {
     -webkit-print-color-adjust: exact !important;

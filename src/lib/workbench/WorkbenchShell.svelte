@@ -10,11 +10,13 @@
   import "../trading-research/workbench.css";
 
   let { title, homeHref, views, activeViewId, activeLabel = "", children, chat = false, canvas = false,
+    class: className = '', actions, account, status,
     integrated = false, layoutReport = false, reportKind = null }: {
     title: string; homeHref: string;
+    class?: string; actions?: Snippet; account?: Snippet; status?: Snippet;
     views: ReadonlyArray<{ id: string; label: string; icon: WorkbenchIconName; href: string }>;
     activeViewId: string; activeLabel?: string; children: Snippet; chat?: boolean; canvas?: boolean;
-    integrated?: boolean; layoutReport?: boolean; reportKind?: "secondary" | "financing" | null;
+    integrated?: boolean; layoutReport?: boolean; reportKind?: "secondary" | "financing" | "liability" | null;
   } = $props();
   let desktopCollapsed = $state(false);
   let mobileDrawerOpen = $state(false);
@@ -46,7 +48,7 @@
 <div
   class:tr-shell--collapsed={desktopCollapsed}
   class:tr-shell--mobile-open={mobileDrawerOpen}
-  class="tr-workbench tr-shell"
+  class={`tr-workbench tr-shell ${className}`}
 >
   <a class="tr-skip-link" href="#tr-workbench-main">跳至工作台内容</a>
 
@@ -86,13 +88,13 @@
       </div>
     </div>
     <div class="tr-topbar__meta">
-      <AuthMenu />
-      <div id="tr-topbar-actions" class="tr-topbar__actions"></div>
+      {#if account}{@render account()}{:else}<AuthMenu />{/if}
+      <div id="tr-topbar-actions" class="tr-topbar__actions">{#if actions}{@render actions()}{/if}</div>
     </div>
   </header>
 
   <aside id="tr-workbench-drawer" class="tr-drawer" aria-label={`${title}导航`}>
-    <nav class="tr-drawer__nav" aria-label="业务模块">
+    <nav class="tr-drawer__nav" aria-label="业务模块" data-sveltekit-preload-data="hover">
       {#each views as view}
         <a
           class:active={activeViewId === view.id}
@@ -117,6 +119,7 @@
   ></button>
 
   <section class="tr-workspace">
+    {#if status}{@render status()}{/if}
     <main
       id="tr-workbench-main"
       class:tr-chat-page={chat}
@@ -125,6 +128,7 @@
       class:layout-report={layoutReport}
       class:layout-report--secondary={reportKind === "secondary"}
       class:layout-report--financing={reportKind === "financing"}
+      class:layout-report--liability={reportKind === "liability"}
       class:secondary-weekly-report={reportKind === "secondary"}
       class:secondary-weekly-report--embedded={reportKind === "secondary"}
       bind:this={mainRegion}

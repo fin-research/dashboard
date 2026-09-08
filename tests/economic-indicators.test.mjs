@@ -265,7 +265,8 @@ test("经济指标数据库、增量 Cron 和本地全量回填受静态契约�
   assert.match(worker, /EconomicIndicatorSyncWorkflow/);
   assert.match(worker, /scheduled\(controller, env, context\)/);
   assert.match(worker, /controller\.noRetry\(\)/);
-  assert.match(wrangler, /"crons": \["0 16 \* \* \*"\]/);
+  assert.ok(JSON.parse(wrangler).triggers.crons.includes('0 16 * * *'));
+  assert.equal(JSON.parse(wrangler).triggers.crons.filter(cron => cron === '0 16 * * *').length, 1);
   assert.match(wrangler, /"binding": "ECONOMIC_INDICATOR_SYNC"/);
   assert.match(wrangler, /"name": "economic-indicator-sync"/);
   assert.match(client, /fetch\("\/api\/economic-indicators"/);

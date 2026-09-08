@@ -2,6 +2,7 @@ import { redirect, type Handle } from '@sveltejs/kit';
 import { AccessError } from '$lib/server/access';
 import { loginUrl } from '$lib/auth-navigation';
 import { dashboardAccessFailure, dashboardIdentity, requireSameOrigin } from '$lib/server/dashboard-access';
+import { financingRouteId } from '$lib/financing/route-contract';
 
 export const handle: Handle = async ({ event, resolve }) => {
   event.locals.user = null;
@@ -18,7 +19,11 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
     return dashboardAccessFailure(event.request, error);
   }
-  const response = await resolve(event);
+  // Financing authorization and its database connection only run for financing routes.
+  // Dashboard's Access identity remains separate from the linked business person.
+  const response = financingRouteId(event.route.id) !== null
+    ? await (await import('$lib/server/financing/handle')).handle({ event, resolve })
+    : await resolve(event);
   if (response.status === 401) {
     if (event.isDataRequest) redirect(303, loginUrl(event.url.pathname + event.url.search));
     return dashboardAccessFailure(event.request, new AccessError(401, '请先登录'));

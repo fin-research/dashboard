@@ -8,7 +8,7 @@
     "dev": "node --env-file-if-exists=.env.local ./node_modules/vite/bin/vite.js --mode dev --host 127.0.0.1 --port 8765",
     "build": "pnpm typecheck && pnpm worker:typecheck && vite build",
     "preview": "pnpm build && wrangler dev",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test tests/*.test.mjs tests/financing/*.test.mjs",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "worker:dev": "pnpm build && wrangler dev",
     "worker:deploy": "pnpm build && wrangler deploy",
@@ -24,7 +24,14 @@
     "db:sync:remote": "node scripts/sync-remote-d1.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "prepare": "svelte-kit sync"
+    "prepare": "svelte-kit sync",
+    "test:financing": "node --test tests/financing/*.test.mjs",
+    "financing:db:init": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/init-database.mjs",
+    "financing:db:import": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/import-debts.mjs",
+    "financing:db:migrate:sqlite": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/migrate-sqlite-to-postgres.mjs",
+    "financing:reminders:send": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/send-reminders.mjs",
+    "financing:proto:generate": "protoc -I proto/financing --es_out=src/lib/financing/generated --es_opt=target=js+dts,import_extension=js proto/financing/debt_import.proto",
+    "verify:routes": "node scripts/verify-profile-routes.mjs && node scripts/verify-financing-routes.mjs"
   },
   "dependencies": {
     "@sveltejs/adapter-cloudflare": "^7.2.9",
@@ -38,7 +45,13 @@
     "pg": "^8.23.0",
     "svelte": "5.56.8",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@bufbuild/protobuf": "^2.14.1",
+    "@lucide/svelte": "^1.27.0",
+    "@noble/hashes": "^2.3.0",
+    "@tanstack/svelte-table": "9.1.2",
+    "brotli-wasm": "^3.0.1",
+    "resend": "^6.18.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260823.1",
@@ -53,6 +66,11 @@
     "tailwindcss": "4.3.3",
     "typescript": "^5.9.0",
     "vite": "^7.0.0",
-    "wrangler": "4.125.0"
+    "wrangler": "4.125.0",
+    "@bufbuild/protoc-gen-es": "^2.14.1",
+    "@electric-sql/pglite": "^0.3.12",
+    "better-sqlite3": "^13.0.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "tsx": "^4.23.1"
   }
 }

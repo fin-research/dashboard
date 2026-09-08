@@ -1,0 +1,884 @@
+:where(.financing-scope) .financing-metric-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	grid-template-rows: repeat(2, minmax(10rem, auto));
+	gap: 1rem;
+	margin: 1rem 0;
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	grid-template-columns: 3.75rem minmax(0, 1fr);
+	align-items: center;
+	gap: 1rem;
+	min-width: 0;
+	min-height: 10rem;
+	padding: 1.125rem;
+	border: 1px solid #dfe5ee;
+	border-radius: 0.75rem;
+	background: #fff;
+	box-shadow: 0 0.25rem 1rem rgb(15 23 42 / 5%);
+	transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+:where(.financing-scope)  {
+	border-color: var(--metric-border);
+	box-shadow: 0 0.5rem 1.5rem rgb(15 23 42 / 8%);
+}
+
+:where(.financing-scope) .regulatory-region {
+	display: grid;
+	min-width: 0;
+	min-height: 10rem;
+	height: 100%;
+}
+
+:where(.financing-scope) .regulatory-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	grid-template-rows: repeat(2, minmax(0, 1fr));
+	gap: 1px;
+	border: 1px solid #e7ebf1;
+	border-radius: 0.75rem;
+	overflow: hidden;
+	background: #e7ebf1;
+}
+
+:where(.financing-scope) .regulatory-cell {
+	display: grid;
+	align-content: center;
+	gap: 0.1875rem;
+	min-width: 0;
+	padding: 0.5rem 0.625rem;
+	background: #fff;
+}
+
+:where(.financing-scope) .regulatory-title {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+:where(.financing-scope) .regulatory-title > span:first-child {
+	min-width: 0;
+	font-size: 0.75rem;
+	font-weight: bold;
+	line-height: 1.3;
+	color: #344054;
+}
+
+:where(.financing-scope) .regulatory-cell > strong {
+	font-size: clamp(1.125rem, 1.6vw, 1.5rem);
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.02em;
+	color: #0f172a;
+}
+
+:where(.financing-scope) .regulatory-cell > strong.financing-muted-value {
+	color: #64748b;
+}
+
+:where(.financing-scope) .regulatory-details {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.125rem 0.75rem;
+	font-size: 0.75rem;
+	line-height: 1.45;
+	color: #64748b;
+}
+
+:where(.financing-scope) .regulatory-details span {
+	white-space: nowrap;
+}
+
+:where(.financing-scope) .regulatory-details b {
+	margin-left: 0.1875rem;
+	font-weight: bold;
+	font-variant-numeric: tabular-nums;
+}
+
+:where(.financing-scope) .regulatory-details b.good { color: #067647; }
+:where(.financing-scope) .regulatory-details b.warning { color: #b54708; }
+:where(.financing-scope) .regulatory-details b.danger { color: #b42318; }
+:where(.financing-scope) .regulatory-details b.muted { color: #667085; }
+
+:where(.financing-scope) .regulatory-title .financing-status-light {
+	width: 0.625rem;
+	height: 0.625rem;
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	width: 3.75rem;
+	height: 3.75rem;
+	place-items: center;
+	border-radius: 0.75rem;
+	color: var(--metric-color);
+	background: var(--metric-bg);
+}
+
+:where(.financing-scope)  {
+	min-width: 0;
+}
+
+:where(.financing-scope)  {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: bold;
+	line-height: 1.4;
+	color: #344054;
+}
+
+:where(.financing-scope)  {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+:where(.financing-scope) .financing-status-light {
+	flex: 0 0 auto;
+	width: 0.75rem;
+	height: 0.75rem;
+	border: 2px solid #fff;
+	border-radius: 50%;
+	box-shadow: 0 0 0 1px rgb(15 23 42 / 8%), 0 0 0.625rem currentColor;
+}
+
+:where(.financing-scope) .financing-status-light.good { color: #079455; background: #12b76a; }
+:where(.financing-scope) .financing-status-light.warning { color: #dc6803; background: #f79009; }
+:where(.financing-scope) .financing-status-light.danger { color: #d92d20; background: #f04438; }
+:where(.financing-scope) .financing-status-light.muted { color: #98a2b3; background: #98a2b3; }
+
+:where(.financing-scope)  {
+	display: block;
+	margin: 0.5rem 0;
+	font-size: clamp(1.5rem, 2vw, 2rem);
+	line-height: 1.15;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.035em;
+	color: #0f172a;
+}
+
+:where(.financing-scope)  {
+	color: #64748b;
+}
+
+:where(.financing-scope)  {
+	margin: 0;
+	font-size: 1rem;
+	line-height: 1.5;
+	color: #64748b;
+}
+
+:where(.financing-scope)  {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 0.875rem;
+}
+
+:where(.financing-scope)  {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 0.875rem;
+}
+
+:where(.financing-scope)  {
+	white-space: nowrap;
+}
+
+:where(.financing-scope)  {
+	margin-left: 0.1875rem;
+	font-weight: bold;
+	font-variant-numeric: tabular-nums;
+}
+
+:where(.financing-scope)  { color: #067647; }
+:where(.financing-scope)  { color: #b54708; }
+:where(.financing-scope)  { color: #b42318; }
+:where(.financing-scope)  { color: #667085; }
+
+:where(.financing-scope)  {
+	white-space: nowrap;
+}
+
+:where(.financing-scope)  {
+	margin-left: 0.1875rem;
+	font-weight: bold;
+	font-variant-numeric: tabular-nums;
+	color: #475467;
+}
+
+:where(.financing-scope)  {
+	color: #b42318;
+}
+
+:where(.financing-scope)  {
+	color: #067647;
+}
+
+:where(.financing-scope)  { --metric-color: #175cd3; --metric-bg: #eff4ff; --metric-border: #b2ccff; }
+:where(.financing-scope)  { --metric-color: #087f8c; --metric-bg: #ecfdff; --metric-border: #a5f0fc; }
+:where(.financing-scope)  { --metric-color: #6938ef; --metric-bg: #f4f3ff; --metric-border: #d9d6fe; }
+:where(.financing-scope)  { --metric-color: #c4320a; --metric-bg: #fff4ed; --metric-border: #f9dbaf; }
+:where(.financing-scope)  { --metric-color: #7a5af8; --metric-bg: #f9f5ff; --metric-border: #e9d7fe; }
+:where(.financing-scope)  { --metric-color: #026aa2; --metric-bg: #f0f9ff; --metric-border: #b9e6fe; }
+:where(.financing-scope)  { --metric-color: #b42318; --metric-bg: #fef3f2; --metric-border: #fecdca; }
+:where(.financing-scope)  { --metric-color: #b54708; --metric-bg: #fffaeb; --metric-border: #fedf89; }
+:where(.financing-scope)  { --metric-color: #3538cd; --metric-bg: #eef4ff; --metric-border: #c7d7fe; }
+
+:where(.financing-scope) .overview-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1rem;
+	margin-bottom: 1rem;
+}
+
+:where(.financing-scope) .financing-panel {
+	min-width: 0;
+	overflow: hidden;
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 1.2fr);
+	align-items: center;
+	gap: 1.25rem;
+	padding: 1.25rem;
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	width: min(13.5rem, 100%);
+	aspect-ratio: 1;
+	place-items: center;
+	justify-self: center;
+	border-radius: 50%;
+	box-shadow: inset 0 0 0 1px rgb(255 255 255 / 60%), 0 0.5rem 1.5rem rgb(15 23 42 / 8%);
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	width: 61%;
+	aspect-ratio: 1;
+	place-items: center;
+	align-content: center;
+	border: 1px solid #eef2f7;
+	border-radius: 50%;
+	background: #fff;
+}
+
+:where(.financing-scope)  {
+	font-size: 1.5rem;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.035em;
+}
+
+:where(.financing-scope)  {
+	font-size: 0.75rem;
+	color: #64748b;
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	gap: 0.125rem;
+	font-size: 1rem;
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	grid-template-columns: 0.625rem minmax(0, 1fr) auto 3.25rem;
+	align-items: center;
+	gap: 0.625rem;
+	min-width: 0;
+	padding: 0.4375rem 0.5rem;
+	border-radius: 0.375rem;
+	white-space: nowrap;
+}
+
+:where(.financing-scope)  {
+	background: #f8fafc;
+}
+
+:where(.financing-scope)  {
+	width: 0.625rem;
+	height: 0.625rem;
+	border-radius: 0.1875rem;
+}
+
+:where(.financing-scope)  {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+:where(.financing-scope)  {
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+}
+
+:where(.financing-scope)  {
+	font-size: 1rem;
+	color: #64748b;
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	grid-template-columns: 2.75rem minmax(0, 1fr);
+	gap: 0.5rem;
+	padding: 1.25rem 1.125rem 1rem 0.75rem;
+}
+
+:where(.financing-scope)  {
+	display: flex;
+	height: 14rem;
+	flex-direction: column;
+	justify-content: space-between;
+	padding-top: 0.0625rem;
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	color: #98a2b3;
+}
+
+:where(.financing-scope)  {
+	position: relative;
+	height: 14rem;
+	border-bottom: 1px solid #d8dee8;
+	background-image: repeating-linear-gradient(to bottom, #e7ebf1 0 1px, transparent 1px 25%);
+}
+
+:where(.financing-scope)  {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: clamp(0.25rem, 1.2vw, 1rem);
+}
+
+:where(.financing-scope)  {
+	height: 100%;
+	align-items: end;
+	padding: 0 0.375rem;
+}
+
+:where(.financing-scope)  {
+	position: relative;
+	height: 100%;
+}
+
+:where(.financing-scope)  {
+	position: absolute;
+	right: 0;
+	bottom: calc(max(var(--bar-height), 0.375rem) + 0.375rem);
+	left: 0;
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	text-align: center;
+	color: #667085;
+}
+
+:where(.financing-scope)  {
+	position: absolute;
+	right: 18%;
+	bottom: 0;
+	left: 18%;
+	height: max(var(--bar-height), 0.375rem);
+	border-radius: 0.375rem 0.375rem 0.125rem 0.125rem;
+	background: linear-gradient(180deg, #5b8def, #2563eb);
+	box-shadow: 0 0.25rem 0.625rem rgb(37 99 235 / 18%);
+}
+
+:where(.financing-scope)  {
+	background: linear-gradient(180deg, #fdb54a, #f79009);
+	box-shadow: 0 0.25rem 0.625rem rgb(247 144 9 / 20%);
+}
+
+:where(.financing-scope)  {
+	background: linear-gradient(180deg, #f97066, #e92d20);
+	box-shadow: 0 0.25rem 0.625rem rgb(217 45 32 / 20%);
+}
+
+:where(.financing-scope)  {
+	padding: 0.5rem 0.375rem 0;
+}
+
+:where(.financing-scope)  {
+	font-size: 0.75rem;
+	font-variant-numeric: tabular-nums;
+	text-align: center;
+	color: #667085;
+}
+
+:where(.financing-scope) .dashboard-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1.35fr) minmax(22rem, 0.65fr);
+	align-items: stretch;
+	gap: 1rem;
+}
+
+:where(.financing-scope) .financing-panel table {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+}
+
+:where(.financing-scope) .financing-panel th,
+:where(.financing-scope) .financing-panel td {
+	padding: 0.625rem 0.75rem;
+	border-bottom: 1px solid #e7ebf1;
+	text-align: left;
+	vertical-align: top;
+	font-variant-numeric: tabular-nums;
+	overflow-wrap: anywhere;
+}
+
+:where(.financing-scope) .financing-panel th {
+	font-size: 0.75rem;
+	font-weight: bold;
+	letter-spacing: 0.02em;
+	color: #526071;
+	background: #f5f7fa;
+}
+
+:where(.financing-scope) .financing-panel td {
+	font-size: 1rem;
+	color: #334155;
+}
+
+:where(.financing-scope) .financing-panel tbody tr:hover {
+	background: #f8fbff;
+}
+
+:where(.financing-scope) .financing-panel td a {
+	font-weight: bold;
+	color: #1d4ed8;
+}
+
+:where(.financing-scope) .financing-panel td small {
+	display: block;
+	margin-top: 0.125rem;
+	font-size: 0.75rem;
+	color: #64748b;
+}
+
+:where(.financing-scope) .financing-panel tfoot th {
+	border-bottom: 0;
+	font-size: 1rem;
+	color: #1e3a8a;
+	background: #eff6ff;
+}
+
+:where(.financing-scope) .project-panel th:first-child { width: 28%; }
+:where(.financing-scope) .project-panel th:nth-child(2) { width: 18%; }
+:where(.financing-scope) .project-panel th:nth-child(n + 3) { width: 18%; }
+:where(.financing-scope) .issuance-panel th:first-child { width: 34%; }
+
+:where(.financing-scope) .limit-card th:first-child { width: 22%; }
+
+:where(.financing-scope) .limit-card td > strong {
+	color: #1e293b;
+}
+
+:where(.financing-scope) .limit-card .negative,
+:where(.financing-scope) .limit-card .negative > strong {
+	color: #b91c1c;
+}
+
+:where(.financing-scope) .limit-card tfoot th {
+	color: #1e3a8a;
+	background: #eff6ff;
+}
+
+:where(.financing-scope) .project-panel {
+	display: flex;
+	flex-direction: column;
+}
+
+:where(.financing-scope) .project-panel table {
+	flex: 1 1 auto;
+}
+
+:where(.financing-scope)  {
+	display: block;
+	width: 100%;
+	height: 0.3125rem;
+	margin-top: 0.375rem;
+	overflow: hidden;
+	border-radius: 999rem;
+	background: #e2e8f0;
+}
+
+:where(.financing-scope)  {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, #60a5fa, #2563eb);
+}
+
+:where(.financing-scope)  {
+	background: #dc2626;
+}
+
+:where(.financing-scope) .parameter-reminder {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	margin: 1rem 0;
+	padding: 0.75rem 1rem;
+	border: 1px solid #fde68a;
+	border-left: 0.25rem solid #f59e0b;
+	border-radius: 0.5rem;
+	color: #854d0e;
+	background: #fffbeb;
+}
+
+:where(.financing-scope) .parameter-reminder a {
+	margin-left: auto;
+	font-weight: bold;
+	color: #92400e;
+}
+
+:where(.financing-scope) .calendar-card {
+	overflow: visible;
+}
+
+:where(.financing-scope) .calendar-card > header {
+	border-radius: 0.75rem 0.75rem 0 0;
+}
+
+:where(.financing-scope) .calendar-filter {
+	display: flex;
+	min-width: 0;
+}
+
+:where(.financing-scope) .calendar-wrap {
+	position: relative;
+}
+
+:where(.financing-scope) .calendar-grid {
+	display: grid;
+	grid-template-columns: repeat(var(--cols, 7), minmax(0, 1fr));
+	border-radius: 0 0 0.75rem 0.75rem;
+	overflow: hidden;
+	background: #e7ebf1;
+	gap: 1px;
+}
+
+:where(.financing-scope) .weekday {
+	padding: 0.625rem;
+	text-align: center;
+	font-size: 0.75rem;
+	font-weight: bold;
+	letter-spacing: 0.06em;
+	color: #526071;
+	background: #f5f7fa;
+}
+
+:where(.financing-scope) .calendar-cell {
+	position: relative;
+	min-height: 8.25rem;
+	padding: 0.5rem;
+	background: #fff;
+}
+
+:where(.financing-scope) .calendar-cell.other {
+	color: #94a3b8;
+	background: #fafbfc;
+}
+
+:where(.financing-scope) .calendar-cell.today {
+	background: #f8fbff;
+	box-shadow: inset 0 0 0 2px #93c5fd;
+}
+
+:where(.financing-scope) .day-number {
+	display: grid;
+	width: 1.75rem;
+	height: 1.75rem;
+	place-items: center;
+	font-size: 0.75rem;
+	font-weight: bold;
+	color: #475569;
+}
+
+:where(.financing-scope) .today .day-number {
+	border-radius: 50%;
+	color: #fff;
+	background: #2563eb;
+	box-shadow: 0 0.25rem 0.625rem rgb(37 99 235 / 20%);
+}
+
+:where(.financing-scope) .calendar-events {
+	display: grid;
+	gap: 0.25rem;
+}
+
+:where(.financing-scope) .calendar-events a {
+	display: block;
+	padding: 0.3125rem 0.4375rem;
+	border: 1px solid;
+	border-left-width: 0.1875rem;
+	border-radius: 0.3125rem;
+	font-size: 0.75rem;
+	font-weight: bold;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+	transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+:where(.financing-scope) .calendar-events a:hover {
+	transform: translateY(-0.0625rem);
+	box-shadow: 0 0.25rem 0.625rem rgb(15 23 42 / 9%);
+}
+
+:where(.financing-scope) .calendar-events a.blue { border-color: #bfdbfe; border-left-color: #2563eb; color: #1e40af; background: #eff6ff; }
+:where(.financing-scope) .calendar-events a.teal { border-color: #99f6e4; border-left-color: #0d9488; color: #115e59; background: #f0fdfa; }
+:where(.financing-scope) .calendar-events a.orange { border-color: #fde68a; border-left-color: #f59e0b; color: #92400e; background: #fffbeb; }
+:where(.financing-scope) .calendar-events a.violet { border-color: #ddd6fe; border-left-color: #7c3aed; color: #5b21b6; background: #f5f3ff; }
+
+:where(.financing-scope) .calendar-expand {
+	position: absolute;
+	z-index: 6;
+	top: 50%;
+	right: 0.5rem;
+	display: grid;
+	width: 2rem;
+	height: 2.5rem;
+	place-items: center;
+	transform: translateY(-50%);
+	border: 1px solid #d0d5dd;
+	border-radius: 999rem;
+	color: #175cd3;
+	background: rgb(255 255 255 / 95%);
+	box-shadow: 0 0.25rem 0.75rem rgb(16 24 40 / 14%);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 180ms ease, transform 180ms ease;
+	cursor: pointer;
+}
+
+:where(.financing-scope) .calendar-wrap:hover .calendar-expand,
+:where(.financing-scope) .calendar-expand:focus-visible {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+:where(.financing-scope) .calendar-expand:hover {
+	transform: translateY(-50%) scale(1.06);
+	color: #1d4ed8;
+	background: #eff4ff;
+}
+
+:where(.financing-scope) .simulator-form {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.875rem;
+	padding: 1rem 1.125rem;
+	background: #fbfcfe;
+}
+
+:where(.financing-scope) .simulator-form label {
+	display: grid;
+	gap: 0.375rem;
+}
+
+:where(.financing-scope) .simulator-form label span {
+	font-size: 0.75rem;
+	font-weight: bold;
+	color: #526071;
+}
+
+:where(.financing-scope) .simulator-form input,
+:where(.financing-scope) .simulator-form select {
+	min-height: 2.75rem;
+	padding: 0 0.75rem;
+	border: 1px solid #cbd5e1;
+	border-radius: 0.5rem;
+	color: #1e293b;
+	background: #fff;
+	transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+:where(.financing-scope) .simulator-form input:hover,
+:where(.financing-scope) .simulator-form select:hover {
+	border-color: #94a3b8;
+}
+
+:where(.financing-scope) .simulation-results {
+	display: grid;
+	gap: 0.75rem;
+	padding: 0 1.125rem 1.125rem;
+	background: #fbfcfe;
+}
+
+:where(.financing-scope) .simulation-results > div {
+	display: flex;
+	gap: 0.625rem;
+	padding: 0.875rem;
+	border: 1px solid #dfe5ee;
+	border-radius: 0.5rem;
+	color: #526071;
+	background: #fff;
+}
+
+:where(.financing-scope) .simulation-results > div.pass { border-color: #a7f3d0; color: #047857; background: #ecfdf5; }
+:where(.financing-scope) .simulation-results > div.fail { border-color: #fecaca; color: #b91c1c; background: #fef2f2; }
+:where(.financing-scope) .simulation-results strong { display: block; margin-bottom: 0.125rem; color: currentColor; }
+:where(.financing-scope) .simulation-results span { font-size: 0.75rem; line-height: 1.5; }
+
+:where(.financing-scope) .reminder-list {
+	display: grid;
+}
+
+:where(.financing-scope) .reminder-item {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: start;
+	gap: 0.625rem;
+	padding: 0.75rem 1.125rem;
+	border-bottom: 1px solid #eef1f5;
+	transition: background 180ms ease;
+}
+
+:where(.financing-scope) .reminder-item:last-child {
+	border-bottom: 0;
+}
+
+:where(.financing-scope) .reminder-item:hover,
+:where(.financing-scope) .reminder-item:focus-visible {
+	background: #f8faff;
+}
+
+:where(.financing-scope) .reminder-dot {
+	width: 0.625rem;
+	height: 0.625rem;
+	margin-top: 0.4375rem;
+	border: 2px solid #84adff;
+	border-radius: 50%;
+	background: #dbe8ff;
+}
+
+:where(.financing-scope) .reminder-dot.warning {
+	border-color: #fdb022;
+	background: #fef0c7;
+}
+
+:where(.financing-scope) .reminder-dot.danger {
+	border-color: #f97066;
+	background: #fee4e2;
+}
+
+:where(.financing-scope) .reminder-copy {
+	display: grid;
+	min-width: 0;
+	gap: 0.125rem;
+}
+
+:where(.financing-scope) .reminder-copy > strong {
+	overflow: hidden;
+	font-size: 1rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: #1d2939;
+}
+
+:where(.financing-scope) .reminder-copy > span {
+	overflow: hidden;
+	font-size: 1rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: #475467;
+}
+
+:where(.financing-scope) .reminder-copy small {
+	font-size: 0.75rem;
+	color: #667085;
+}
+
+:where(.financing-scope) .reminder-due {
+	margin-top: 0.125rem;
+	padding: 0.1875rem 0.5rem;
+	border-radius: 999rem;
+	font-size: 0.75rem;
+	font-weight: bold;
+	white-space: nowrap;
+	color: #175cd3;
+	background: #eff4ff;
+}
+
+:where(.financing-scope) .reminder-due.warning {
+	color: #b54708;
+	background: #fff7ed;
+}
+
+:where(.financing-scope) .reminder-due.danger {
+	color: #b42318;
+	background: #fef3f2;
+}
+
+:where(.financing-scope) .reminder-empty {
+	margin: 0;
+	padding: 1.75rem 1rem;
+	text-align: center;
+	color: #667085;
+}
+
+@media (hover: none) {
+	:where(.financing-scope) .calendar-expand {
+		opacity: 1;
+		pointer-events: auto;
+	}
+}
+
+@media (max-width: 75rem) {
+	:where(.financing-scope) .dashboard-grid { grid-template-columns: minmax(0, 1.2fr) minmax(20rem, 0.8fr); }
+}
+
+@media (max-width: 64rem) {
+	:where(.financing-scope) .financing-metric-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-rows: none;
+	}
+	:where(.financing-scope) .overview-row,
+	:where(.financing-scope) .dashboard-grid { grid-template-columns: 1fr; }
+	:where(.financing-scope) .calendar-card > header { flex-wrap: wrap; }
+	:where(.financing-scope) .calendar-filter { width: 100%; }
+	:where(.financing-scope) .simulator-form,
+	:where(.financing-scope) .simulation-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 51.25rem) {
+	:where(.financing-scope)  { grid-template-columns: 1fr; }
+	:where(.financing-scope) .financing-metric-grid { grid-template-columns: 1fr; }
+	:where(.financing-scope) .financing-panel th,
+	:where(.financing-scope) .financing-panel td { padding: 0.5rem; font-size: 0.75rem; }
+	:where(.financing-scope) .calendar-cell { min-height: 5rem; padding: 0.25rem; }
+	:where(.financing-scope) .reminder-item { padding: 0.625rem 0.875rem; }
+}
+
+@media (max-width: 35rem) {
+	:where(.financing-scope)  { grid-template-columns: 3.25rem minmax(0, 1fr); }
+	:where(.financing-scope) .regulatory-grid { grid-template-columns: 1fr; grid-template-rows: repeat(4, auto); }
+	:where(.financing-scope)  { width: 3.25rem; height: 3.25rem; }
+	:where(.financing-scope)  { grid-template-columns: 2.25rem minmax(0, 1fr); padding-inline: 0.5rem; }
+	:where(.financing-scope)  { gap: 0.125rem; }
+	:where(.financing-scope)  { right: 23%; left: 23%; }
+	:where(.financing-scope) .parameter-reminder { align-items: flex-start; flex-wrap: wrap; }
+	:where(.financing-scope) .parameter-reminder a { width: 100%; margin-left: 1.625rem; }
+	:where(.financing-scope) .simulator-form,
+	:where(.financing-scope) .simulation-results { grid-template-columns: 1fr; }
+	:where(.financing-scope) .calendar-grid { grid-template-columns: 1fr; gap: 0; }
+	:where(.financing-scope) .weekday { display: none; }
+	:where(.financing-scope) .calendar-cell,
+	:where(.financing-scope) .calendar-cell.other { display: grid; min-height: auto; grid-template-columns: 2.5rem minmax(0, 1fr); border-bottom: 1px solid #e7ebf1; background: #fff; }
+	:where(.financing-scope) .day-number { grid-row: 1; }
+	:where(.financing-scope) .calendar-events { grid-column: 2; }
+	:where(.financing-scope) .reminder-item { grid-template-columns: auto minmax(0, 1fr); }
+	:where(.financing-scope) .reminder-due { grid-column: 2; justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:where(.financing-scope) * { transition: none !important; }
+}

@@ -2,8 +2,13 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ES2022"],
-    "types": ["@cloudflare/workers-types", "node"],
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "@cloudflare/workers-types",
+      "node"
+    ],
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
@@ -12,7 +17,9 @@
     "noEmit": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": true
   },
   "include": [
     "worker/bond-ledger-workflow.ts",
@@ -20,6 +27,7 @@
     "worker/economic-indicator-workflow.ts",
     "worker-configuration.d.ts",
     "worker/credit-agent.ts",
-    "worker/credit-assistant-http.ts"
+    "worker/credit-assistant-http.ts",
+    "worker/financing-debt-import.ts"
   ]
 }

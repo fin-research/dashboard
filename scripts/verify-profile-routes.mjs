@@ -81,7 +81,7 @@ try {
   assert.equal(denied.status, 401);
   assert.equal((await denied.json()).code, 'LOGIN_REQUIRED');
   assert.equal(storage.size, 0); checks++;
-  const legacy = await respond('/management');
+  const legacy = await respond('/management?upload=1', { authenticated: true });
   assert.equal(legacy.headers.get('location'), '/fund-report?upload=1'); checks++;
   const history = await respond('/fund-report');
   assert.equal(history.status, 200);
