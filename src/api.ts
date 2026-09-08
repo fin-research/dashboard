@@ -69,9 +69,10 @@ async function getJson<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url.startsWith("/data/") ? url.replace("/data/", "/api/market-resources/") : url, {
+    response = await fetch(url, {
       method,
       signal,
+      credentials: "same-origin",
       headers: {
         Accept: "application/json",
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),

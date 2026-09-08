@@ -10,7 +10,8 @@ export const ROUTE_PERMISSIONS: Record<string, Methods> = {
   '/auth/session': { GET: 'public' }, '/auth/verify-email': { GET: 'public' },
   '/market-briefing': { GET: 'research.market_report:read' },
   '/market-briefing/text': { GET: 'research.market_report:read' },
-  '/api/market-resources/[resource]': { GET: 'research.market_report:read' },
+  // Compatibility for already-open reports; current clients read Access-protected /data directly.
+  '/api/market-resources/[resource]': { GET: 'login' },
   '/api/market-report': { GET: 'research.market_report:read', PUT: 'research.market_report:update' },
   '/api/market-briefing': { POST: 'research.market_report:generate' },
   '/market-hotspots': { GET: 'research.hotspot:read' },

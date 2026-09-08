@@ -4,7 +4,7 @@
 
 ## 外部数据服务 `/data/*`
 
-浏览器或 Dashboard Worker 通过同源 `/data/*` 访问独立 Data Worker：
+市场点评浏览器携带同源 Access 会话直接请求独立 Data Worker 的 `/data/*`；服务端通过私有 DATA binding 读取。行情 REST 资源 GET/HEAD 由 Data 校验 Access JWT，不逐资源查询 Auth0 Management API。旧 `/api/market-resources/*` 保留为验证 Access 登录的限定兼容通道。
 
 除基础配置和 Choice 外，所有 REST 资源都支持 `fields=a,b` 顶层字段投影；未知字段为
 422。列表资源直接返回 JSON array，不再读取 `data`、`list` 等上游 envelope。响应必须

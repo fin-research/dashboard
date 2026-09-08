@@ -56,7 +56,7 @@ function marginRows() {
 
 function directResponse(target) {
   const url = new URL(String(target), "https://example.test");
-  if (url.pathname === "/api/market-resources/industry") {
+  if (url.pathname === "/data/industry") {
     return Response.json({
       dataDate: "2026-08-25",
       equities: snapshot().equities,
@@ -66,14 +66,14 @@ function directResponse(target) {
       tradingDates: ["2026-08-22", "2026-08-25"],
     });
   }
-  if (url.pathname === "/api/market-resources/stock-summary") {
+  if (url.pathname === "/data/stock-summary") {
     return Response.json({
       title: "A股收评",
       time: "2026-08-25T15:00:00+08:00",
       paragraphs: snapshot().stock_paragraphs,
     });
   }
-  if (url.pathname === "/api/market-resources/omo") {
+  if (url.pathname === "/data/omo") {
     return Response.json({
       data: [{
         operationDate: "2026-08-25",
@@ -84,23 +84,23 @@ function directResponse(target) {
       }],
     });
   }
-  if (url.pathname === "/api/market-resources/cfets") {
+  if (url.pathname === "/data/cfets") {
     return Response.json(
       url.searchParams.get("source") === "DR"
         ? [{ bondCode: "DR007" }]
         : [],
     );
   }
-  if (url.pathname === "/api/market-resources/bond-top-case") {
+  if (url.pathname === "/data/bond-top-case") {
     return Response.json([]);
   }
-  if (url.pathname === "/api/market-resources/futures-latest") {
+  if (url.pathname === "/data/futures-latest") {
     return Response.json([{ contractCode: "TL9999" }]);
   }
-  if (url.pathname === "/api/market-resources/margin") {
+  if (url.pathname === "/data/margin") {
     return Response.json(marginRows());
   }
-  if (url.pathname === "/api/market-resources/primary-issues") {
+  if (url.pathname === "/data/primary-issues") {
     assert.equal(
       url.searchParams.get("startDate"),
       url.searchParams.get("date") === "2026-08-31"
@@ -109,7 +109,7 @@ function directResponse(target) {
     );
     return Response.json([]);
   }
-  if (url.pathname === "/api/market-resources/today-trades") {
+  if (url.pathname === "/data/today-trades") {
     return Response.json([
         {
           bondUniCode: "123",
@@ -119,7 +119,7 @@ function directResponse(target) {
         },
     ]);
   }
-  if (url.pathname === "/api/market-resources/favorite-quotes") {
+  if (url.pathname === "/data/favorite-quotes") {
     return Response.json([
         {
           bondUniCode: "123",
@@ -131,7 +131,7 @@ function directResponse(target) {
         },
     ]);
   }
-  if (url.pathname === "/api/market-resources/bond-infos") {
+  if (url.pathname === "/data/bond-infos") {
     assert.equal(url.searchParams.get("codes"), "123");
     assert.equal(
       url.searchParams.get("fields"),
@@ -166,13 +166,15 @@ test("浏览器一次拉取原始资源并加工为视觉与文字共享报告",
   );
   const dataUrls = calls
     .map((call) => String(call.url))
-    .filter((url) => url.startsWith("/api/market-resources/"));
+    .filter((url) => url.startsWith("/data/"));
   assert.equal(dataUrls.length, 12);
-  assert.equal(dataUrls.filter((url) => url.startsWith("/api/market-resources/cfets?")).length, 2);
-  assert.equal(dataUrls.filter((url) => url.startsWith("/api/market-resources/bond-infos?")).length, 1);
+  assert.ok(calls.every((call) => !String(call.url).startsWith('/api/market-resources/')));
+  assert.ok(calls.every((call) => call.init.credentials === 'same-origin'));
+  assert.equal(dataUrls.filter((url) => url.startsWith("/data/cfets?")).length, 2);
+  assert.equal(dataUrls.filter((url) => url.startsWith("/data/bond-infos?")).length, 1);
   assert.ok(dataUrls.every((url) => url.includes("fields=")));
-  assert.ok(dataUrls.every((url) => !url.includes("/api/market-resources/market-report/")));
-  assert.ok(dataUrls.every((url) => !url.includes("/api/market-resources/graphql")));
+  assert.ok(dataUrls.every((url) => !url.includes("/data/market-report/")));
+  assert.ok(dataUrls.every((url) => !url.includes("/data/graphql")));
   assert.equal(
     calls.filter((call) => String(call.url) === "/api/market-report?date=2026-08-25").length,
     0,
@@ -272,10 +274,10 @@ test("历史日期没有定稿时回退原始 Data 重新生成", async (context
     "2026-09-01",
   );
   assert.equal(calls[0], "/api/market-report?date=2026-08-31");
-  assert.equal(calls.filter((url) => url.startsWith("/api/market-resources/")).length, 8);
-  assert.ok(calls.every((url) => !url.startsWith("/api/market-resources/futures-latest")));
-  assert.ok(calls.every((url) => !url.startsWith("/api/market-resources/today-trades")));
-  assert.ok(calls.every((url) => !url.startsWith("/api/market-resources/favorite-quotes")));
+  assert.equal(calls.filter((url) => url.startsWith("/data/")).length, 8);
+  assert.ok(calls.every((url) => !url.startsWith("/data/futures-latest")));
+  assert.ok(calls.every((url) => !url.startsWith("/data/today-trades")));
+  assert.ok(calls.every((url) => !url.startsWith("/data/favorite-quotes")));
   assert.equal(report.report_date, "2026-08-31");
   assert.equal(report.finalized_at, null);
   assert.deepEqual(
@@ -312,7 +314,7 @@ test("当日 A股收评尚未发布时保留其他模块并返回空股市段落
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url) => {
     const target = String(url);
-    if (target.startsWith("/api/market-resources/stock-summary?")) {
+    if (target.startsWith("/data/stock-summary?")) {
       return Response.json({
         detail: "东方财富尚未发布 2026-08-25 A股收评",
         error: {
@@ -341,7 +343,7 @@ test("A股收评的其他错误只降级对应资源", async (context) => {
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url) => {
     const target = String(url);
-    if (target.startsWith("/api/market-resources/stock-summary?")) {
+    if (target.startsWith("/data/stock-summary?")) {
       return Response.json({
         detail: "东方财富页面结构异常",
         error: {
@@ -405,7 +407,7 @@ test("原始 Data 单资源错误时其余市场模块继续生成", async (cont
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url) =>
-    String(url).startsWith("/api/market-resources/industry?")
+    String(url).startsWith("/data/industry?")
       ? Response.json({
           detail: "Choice 数据源不可用",
           error: {
@@ -441,7 +443,7 @@ test("债券基础信息 503 仅使依赖债券信息的模块缺失", async (co
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url) =>
-    String(url).startsWith("/api/market-resources/bond-infos?")
+    String(url).startsWith("/data/bond-infos?")
       ? Response.json({
           detail: "DM returned invalid JSON (HTTP 200)",
           error: {
