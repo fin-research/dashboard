@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { financingPersonView } from '../../identity.ts';
 import { randomUUID } from 'node:crypto';
 import { getDatabase } from './db.js';
 
@@ -32,7 +33,7 @@ function serialize(value) {
 
 export function auditRequestMeta(event) {
 	return {
-		actor: event.locals.financingUser ?? null,
+		actor: financingPersonView(event.locals.user) ?? null,
 		requestIp: event.getClientAddress?.() ?? null,
 		userAgent: event.request.headers.get('user-agent')
 	};

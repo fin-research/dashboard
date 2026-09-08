@@ -48,8 +48,8 @@ git diff --check
 - `pnpm worker:dev` 用于构建后本地 Worker 检查。
 - 默认将验证通过的变更推送 GitHub `main`，由 Cloudflare Git 自动构建部署 `eastmoney-dashboard`；核对对应提交的构建状态和线上受影响路由。
 - 自动部署不可用、失败或有其他必要时，可执行 `pnpm worker:deploy` 手动部署同一份已验证代码。自动构建与手动部署全程无需再次向用户申请授权；不得覆盖其他任务尚未集成的改动。
-- 个人信息服务使用独立的 `eastmoney dashboard profile` Auth0 管理应用：`AUTH0_MANAGEMENT_CLIENT_ID` 为非敏感配置，`AUTH0_MANAGEMENT_CLIENT_SECRET` 必须作为 Dashboard 的 Worker Secret 单独配置（不得轮换融资 Worker 使用的管理应用密钥）。需要 `read:users`、`update:users`、`read:roles` 权限；只读取当前账号的角色与权限，不授予前端管理令牌。
-- 管理凭证配置：`node --use-env-proxy scripts/provision-auth0-profile.mjs` 只读计划；用户授权后加 `--apply` 创建或复用 Dashboard 专用 M2M 应用（不轮换已存在密钥），验证 client credentials 后通过标准输入写入 Worker Secret，并更新本地非敏感 Client ID。脚本不输出或落盘密钥与 Token；之后运行 `pnpm worker:typegen`。
+- 全站与融资业务共用 `AUTH0_MANAGEMENT_CLIENT_ID`、`AUTH0_MANAGEMENT_CLIENT_SECRET`。管理应用保留 `read:users`、`create:users`、`update:users`、`read:roles`、`update:roles`；个人资料 endpoint 仍严格限制当前账号和输入字段。
+- 管理凭据验证：`node --use-env-proxy scripts/provision-auth0-management.mjs`。完成测试和构建后，`--apply` 用临时 0600 文件把既有 Secret 附到新 Worker version，再将该版本切为 100%；Client ID、Secret 和代码一起生效，临时文件在 finally 删除。不得先用 `secret put` 覆盖活动 Secret，造成新旧 Client ID 不匹配。原两个 provisioning 命令仅兼容转发到统一脚本。
 - Access 团队域名变更时，同步 Dashboard、Data 与 financing 的 `ACCESS_TEAM_DOMAIN` 并重新生成类型；执行 `node scripts/update-access-team-domain.mjs --apply` 更新 Auth0 的对应回调与退出白名单，保留其余地址。
 - Auth0 中文主题、两步注册和自定义登录域名的配置与检查见 `auth0/README.md`。浏览器域名为 `AUTH0_LOGIN_DOMAIN`，服务端管理 API 保持 `AUTH0_DOMAIN`；二者不能一起替换。
 - 注册验证提示：Action 源码为 `auth0/actions/eastmoney-login.cjs`，公开页面为 `/auth/verify-email`。必须先发布 Dashboard 并确认提示页 200，再执行 `node --use-env-proxy scripts/publish-auth0-login.mjs --apply`；脚本保留已有 Action Secret、依赖和绑定，拒绝覆盖其他未发布草稿。发布后回读生效版本与 post-login 绑定。
@@ -69,6 +69,6 @@ git diff --check
 
 迁移：`pnpm financing:db:init -- --schema-only`；Excel 盘点：`pnpm financing:db:import -- --dry-run`；SQLite 盘点：`pnpm financing:db:migrate:sqlite -- --dry-run`；提醒盘点：`pnpm financing:reminders:send -- --dry-run`；Protobuf：`pnpm financing:proto:generate`。凭证与原始 Excel 留在未跟踪本地文件中，导入时显式指定源路径，不把旧 checkout 作为运行依赖。
 
-`node scripts/provision-financing-management.mjs` 验证原融资 M2M 应用与权限；`--apply` 将原凭据安全写入 Dashboard 的专用 Secret，不创建或轮换原凭据。部署与切换顺序、性能指标见 [合并记录](FINANCING_MERGE.md)。
+统一凭据版本上线并确认后，删除 Dashboard 已无调用方的 `FINANCING_AUTH0_MANAGEMENT_CLIENT_SECRET`。此后 Git 自动构建沿用统一 Secret；常规代码发布无需重复执行凭据切换脚本。合并切换历史见 [合并记录](FINANCING_MERGE.md)。
 
 浏览器关键表单交互、200% 缩放和甘特图大字号视觉回归仍作为专项验收；未执行时不得写成已通过。仓库内已覆盖 Excel 映射/勾稽、提醒周期、项目建档和构建后路由测试，旧待办中的对应“缺少单元测试”不再重复列为待办。

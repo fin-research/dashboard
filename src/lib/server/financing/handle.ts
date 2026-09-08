@@ -1,17 +1,14 @@
 import { error as httpError, redirect } from '@sveltejs/kit';
 import type { Handle } from '@sveltejs/kit';
-import { appCookiePath, appRoot, withBase } from '$lib/financing/app-paths';
+import { appRoot, withBase } from '$lib/financing/app-paths';
 import { invalidateCachedSession } from '$lib/server/financing/auth-cache.js';
 import { closeDatabase } from '$lib/server/financing/db.js';
-import { getRolePermissionCodes } from '$lib/server/financing/role-permissions.js';
 import { actionNameFromUrl, isAuthorizedRequest, isSafeRequestMethod } from '$lib/server/financing/request-authorization.js';
 import {
-	getSessionUser,
-	NeonAuthApiError,
-	SESSION_COOKIE
+	authorizeFinancing,
+	NeonAuthApiError
 } from '$lib/server/financing/auth.js';
 import { accessToken } from '$lib/server/access';
-import { usesAuth0 } from '$lib/server/financing/auth-provider.js';
 import { financingRouteId } from '$lib/financing/route-contract';
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -25,17 +22,16 @@ export const handle: Handle = async ({ event, resolve }) => {
     if (legacyTarget) throw redirect(307, legacyTarget + event.url.search);
 		const isStaticAsset = event.url.pathname.startsWith(withBase('/_app/'));
 		const isPublic = routeId === '/login' || isStaticAsset;
-		const sessionToken = isStaticAsset ? null : usesAuth0() ? accessToken(event.request) : event.cookies.get(SESSION_COOKIE);
+		const sessionToken = isStaticAsset ? null : accessToken(event.request);
 		const safeRequest = isSafeRequestMethod(event.request.method);
 		if (sessionToken && !safeRequest) await invalidateCachedSession(event, sessionToken);
 		const authStartedAt = performance.now();
 		try {
-			event.locals.financingUser = isStaticAsset
-				? null
-				: await getSessionUser(event, sessionToken, {
-					requireDataApiJwt: routeId === '/data/token',
-					useSessionCache: safeRequest && routeId !== '/data/token' && routeId !== '/data/api/[...path]'
-				});
+      if (event.locals.user && !isStaticAsset) {
+        event.locals.user.financing = await authorizeFinancing(event, {
+          useSessionCache: safeRequest && routeId !== '/data/token' && routeId !== '/data/api/[...path]'
+        }) ?? undefined;
+      }
 		} catch (authError) {
 			if (authError instanceof NeonAuthApiError && authError.code === 'PERSON_ACCESS_DENIED') throw httpError(403, authError.message);
 			if (authError instanceof NeonAuthApiError && authError.status === 503) {
@@ -45,27 +41,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 			throw authError;
 		}
 		const authDurationMs = performance.now() - authStartedAt;
-		if (!usesAuth0() && sessionToken && !event.locals.financingUser) {
-			event.cookies.delete(SESSION_COOKIE, { path: appCookiePath });
-		}
-		if (!isPublic && !event.locals.financingUser) {
-			const redirectTo = `${event.url.pathname}${event.url.search}`;
-			if (usesAuth0()) {
-				if (routeId?.startsWith('/data/') || !safeRequest) throw httpError(401, '登录已失效，请重新登录');
-				throw redirect(303, `/auth/login?returnTo=${encodeURIComponent(redirectTo)}`);
-			}
-			throw redirect(303, `${withBase('/login')}?redirectTo=${encodeURIComponent(redirectTo)}`);
-		}
-		if (event.locals.financingUser) {
-			event.locals.permissions = usesAuth0() ? event.locals.financingUser.permissions ?? [] : await getRolePermissionCodes(event.locals.financingUser.role);
-		}
+    if (!isPublic && !event.locals.user) throw httpError(401, '登录已失效，请重新登录');
+    if (!isPublic && !event.locals.user?.financing) throw httpError(403, '当前账号未关联融资人员或未获授权');
+    event.locals.permissions = event.locals.user?.financing?.permissions ?? [];
 
 		const actionName = actionNameFromUrl(event.url);
 		if (!isPublic && !isAuthorizedRequest(event.locals.permissions, routeId, event.request.method, actionName)) {
 			return new Response('当前账号无权执行该操作', { status: 403 });
 		}
 
-		if (routeId === '/login' && event.locals.financingUser && event.request.method === 'GET') {
+		if (routeId === '/login' && event.locals.user?.financing && event.request.method === 'GET') {
 			throw redirect(303, appRoot);
 		}
 

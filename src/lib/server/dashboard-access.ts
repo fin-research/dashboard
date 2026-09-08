@@ -1,5 +1,6 @@
 import { AccessError, accessFailure, accessToken, requireHuman, verifyAccess } from './access.ts';
 import { apiRequiresLogin, pageRequiresLogin, safeReturnTo } from '../auth-navigation.ts';
+import type { SiteIdentity } from '../identity';
 export { safeReturnTo } from '../auth-navigation.ts';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -14,7 +15,7 @@ export function dashboardRequiresLogin(request: Request): boolean {
     || path === '/auth/login';
 }
 
-export async function dashboardIdentity(request: Request, env: Env) {
+export async function dashboardIdentity(request: Request, env: Env): Promise<SiteIdentity | null> {
   const required = dashboardRequiresLogin(request);
   const sessionRequest = new URL(request.url).pathname === '/auth/session';
   // Public reports and assets do not depend on the identity provider or vary by user.
@@ -29,7 +30,8 @@ export async function dashboardIdentity(request: Request, env: Env) {
     const custom = payload.custom ?? payload.oidc_fields;
     const fields = custom && typeof custom === 'object' ? custom as Record<string, unknown> : {};
     const subject = payload.eastmoney_user_id ?? fields.eastmoney_user_id;
-    return { ...user, auth0Id: typeof subject === 'string' && /^auth0\|[^\s]{1,249}$/.test(subject) ? subject : null };
+    return { ...user, auth0Id: typeof subject === 'string' && /^auth0\|[^\s]{1,249}$/.test(subject) ? subject : null,
+      issuedAt: Number(payload.iat), expiresAt: Number(payload.exp) };
   } catch (error) {
     if (!required) return null;
     throw error;

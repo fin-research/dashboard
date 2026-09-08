@@ -5,7 +5,7 @@ import { hasPermission } from '$lib/financing/permissions.js';
 import { compileDataAdminQuery } from '$lib/server/financing/data-admin-query';
 
 const handle: RequestHandler = async (event) => {
-  if (!event.locals.financingUser) throw error(401, '请先登录');
+  if (!event.locals.user?.financing) throw error(401, '请先登录');
   if (!hasPermission(event.locals.permissions, 'data_manage')) throw error(403, '当前账号无权使用数据后台');
   if (event.request.method !== 'GET' && event.request.headers.get('Origin') !== event.url.origin) throw error(403, '仅允许从本站提交操作');
   let body: unknown;
@@ -29,7 +29,7 @@ const handle: RequestHandler = async (event) => {
   try {
     const result = await getDatabase().transaction(async (db: ReturnType<typeof getDatabase>) => {
       // LOCAL settings are scoped to this transaction and disappear on commit/rollback.
-      await db.query("SELECT set_config('request.financing.user_id', $1, true)", [event.locals.financingUser!.id]);
+      await db.query("SELECT set_config('request.financing.user_id', $1, true)", [event.locals.user!.auth0Id]);
       await db.query('SET LOCAL ROLE authenticated');
       const rows = (await db.query(query.sql, query.values)).rows.map((item) => item.row);
       const total = query.countSql ? Number((await db.query(query.countSql, query.countValues)).rows[0]?.total ?? 0) : rows.length;

@@ -13,8 +13,8 @@ export function usesAuth0() {
 export function auth0Client(event = getRequestEvent()) {
   const config = event.platform?.env ?? env;
   event.locals.auth0Management ??= createAuth0ManagementClient({
-    domain: config.AUTH0_DOMAIN, clientId: config.FINANCING_AUTH0_MANAGEMENT_CLIENT_ID,
-    clientSecret: config.FINANCING_AUTH0_MANAGEMENT_CLIENT_SECRET,
+    domain: config.AUTH0_DOMAIN, clientId: config.AUTH0_MANAGEMENT_CLIENT_ID,
+    clientSecret: config.AUTH0_MANAGEMENT_CLIENT_SECRET,
     roleIds: JSON.parse(config.AUTH0_ROLE_IDS || '{}'), fetchImpl: event.fetch,
   });
   return event.locals.auth0Management;

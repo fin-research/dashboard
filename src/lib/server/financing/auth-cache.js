@@ -1,6 +1,8 @@
 // @ts-nocheck
 
-const CACHE_NAME = 'financing-auth-session-v1';
+// This caches only a business authorization decision. Central Access verification
+// must succeed before it is read; cached identity fields never replace locals.user.
+const CACHE_NAME = 'financing-authorization-v2';
 const CACHE_TTL_SECONDS = 60;
 const VALID_ROLES = new Set(['admin', 'handler', 'reviewer']);
 

@@ -42,9 +42,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		projectSources: projectData.projects,
 		today,
 		viewContext: {
-			role: locals.financingUser?.role ?? 'reviewer',
-			personId: locals.financingUser?.personId ?? null,
-			personName: locals.financingUser?.personName ?? null,
+			role: locals.user?.financing?.role ?? 'reviewer',
+			personId: locals.user?.financing?.personId ?? null,
+			personName: locals.user?.financing?.personName ?? null,
 			defaultOwnProjects: false
 		}
 	};

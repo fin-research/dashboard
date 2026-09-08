@@ -28,11 +28,13 @@ for (const name of (await readdir(new URL('../financing-migrations/', import.met
 const account = { user_id: 'auth0|route-admin', email: 'route-admin@18.cn', name: '合并回归人员', email_verified: true, identities: [{ connection: 'eastmoney-email' }] };
 await db.query(`INSERT INTO financing.people (id,name,email,role,active,auth0_user_id,auth0_account_active) VALUES ($1,$2,$3,'admin',TRUE,$4,TRUE)`, ['person-route-admin', account.name, account.email, account.user_id]);
 let opened = 0, closed = 0, queries = 0, active = 0, peak = 0;
+const databaseSubjects = [];
 const originals = { connect: Client.prototype.connect, query: Client.prototype.query, end: Client.prototype.end, fetch: globalThis.fetch };
 Client.prototype.connect = async function () { opened++; active++; peak = Math.max(peak, active); };
 Client.prototype.end = async function () { closed++; active--; };
 Client.prototype.query = async function (sql, params = []) {
   queries++;
+  if (sql.includes("set_config('request.financing.user_id'")) databaseSubjects.push(params[0]);
   const result = await db.query(sql, params);
   return { ...result, rowCount: result.affectedRows ?? result.rows.length };
 };
@@ -55,7 +57,12 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.href === `https://${vars.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
   assert.equal(url.origin, `https://${vars.AUTH0_DOMAIN}`, 'Unexpected external network request');
   auth0Requests++;
-  if (url.pathname === '/oauth/token') return Response.json({ access_token: 'fixture-management-token', expires_in: 60 });
+  if (url.pathname === '/oauth/token') {
+    const credentials = input instanceof Request ? await input.clone().json() : JSON.parse(init.body);
+    assert.equal(credentials.client_id, vars.AUTH0_MANAGEMENT_CLIENT_ID);
+    assert.equal(credentials.client_secret, 'fixture-profile-secret');
+    return Response.json({ access_token: 'fixture-management-token', expires_in: 60 });
+  }
   if (/\/permissions$/.test(url.pathname)) return Response.json(permissionObjects());
   if (/\/roles$/.test(url.pathname)) return Response.json([{ id: roleIds.admin }]);
   if (/\/roles\/[^/]+\/users$/.test(url.pathname)) return Response.json(url.pathname.includes(roleIds.admin) ? [account] : []);
@@ -65,7 +72,7 @@ globalThis.fetch = async (input, init = {}) => {
   return Response.json(account);
 };
 const env = { ...vars, HYPERDRIVE: { connectionString: 'postgres://fixture:fixture@localhost/fixture' },
-  AUTH0_MANAGEMENT_CLIENT_SECRET: 'fixture-profile-secret', FINANCING_AUTH0_MANAGEMENT_CLIENT_SECRET: 'fixture-financing-secret',
+  AUTH0_MANAGEMENT_CLIENT_SECRET: 'fixture-profile-secret',
   LIABILITY_REPORT_SNAPSHOTS: { async get() { return null; } },
   EASTMONEY: { async list() { return { objects: [], truncated: false }; } },
 };
@@ -92,6 +99,8 @@ try {
     assert.equal((await respond(path, { token: unlinkedToken })).status, 200, path);
     assert.equal(queries, before, `${path}: unexpected financing query`); checks++;
   }
+  const session = await respond('/auth/session', { headers: { Accept: 'application/json' } });
+  assert.deepEqual((await session.json()).user, { id: 'access-' + account.user_id, email: account.email, auth0Id: account.user_id }); checks++;
   assert.equal((await respond('/financing', { token: unlinkedToken })).status, 403); checks++;
   await db.query('UPDATE financing.people SET avatar_data_url = $1 WHERE id = $2', ['data:image/png;base64,aGVsbG8=', 'person-route-admin']);
   const avatar = await respond('/financing/avatar?v=fixture');
@@ -121,6 +130,11 @@ try {
     assert.equal(response.status, 403, path); checks++;
   }
   currentPermissions = [...PERMISSION_CODES];
+  const dataRead = await respond('/financing/data/api/financial_monthly_data', { headers: { Accept: 'application/json' } });
+  assert.equal(dataRead.status, 200, await dataRead.clone().text());
+  assert.deepEqual(databaseSubjects, [account.user_id]);
+  assert.notEqual((await db.query('SELECT current_user AS role')).rows[0].role, 'authenticated');
+  assert.equal((await db.query("SELECT nullif(current_setting('request.financing.user_id',true), '') AS subject")).rows[0].subject, null); checks++;
   const sop = (await db.query('SELECT id FROM financing.sop_templates WHERE is_active ORDER BY id LIMIT 1')).rows[0];
   assert.ok(sop);
   const creation = await respond('/financing/projects?/createProject', {
@@ -132,6 +146,21 @@ try {
   const project = (await db.query("SELECT id, planned_issue_date FROM financing.projects WHERE name = '路由回归项目'")).rows[0];
   assert.equal(project?.planned_issue_date, '2026-10-09');
   assert.equal((await respond(`/financing/projects/${project.id}`)).status, 200); checks += 2;
+  const task = (await db.query('SELECT id FROM financing.project_tasks WHERE project_id=$1 ORDER BY id LIMIT 1', [project.id])).rows[0];
+  assert.ok(task);
+  await db.query("INSERT INTO financing.people(id,name,role,active) VALUES ('other-person','其他经办','handler',TRUE)");
+  await db.query('UPDATE financing.project_tasks SET assignee_id=$1 WHERE id=$2', ['other-person', task.id]);
+  currentPermissions = ['own_task_update'];
+  const otherTask = await respond(`/financing/projects/${project.id}?/updateOwnTaskStatus`, {
+    method: 'POST', headers: { Accept: 'application/json', 'X-SvelteKit-Action': 'true' },
+    body: new URLSearchParams({ taskId: task.id, status: 'in_progress' }),
+  });
+  assert.equal(otherTask.status, 200);
+  const ownTaskResult = await otherTask.json();
+  assert.equal(ownTaskResult.type, 'failure');
+  assert.equal(ownTaskResult.status, 403);
+  assert.notEqual((await db.query('SELECT status FROM financing.project_tasks WHERE id=$1', [task.id])).rows[0].status, 'in_progress'); checks++;
+  currentPermissions = [...PERMISSION_CODES];
   const denied = await respond('/management/people?/createPerson', { method: 'POST', headers: { Origin: 'https://other.test' } });
   assert.equal(denied.status, 403); checks++;
   assert.equal(opened, closed);

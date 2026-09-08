@@ -5,10 +5,10 @@ import { getDatabase } from '$lib/server/financing/db.js';
 const AVATAR_DATA = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/;
 
 export const GET: RequestHandler = async ({ locals, request }) => {
-	if (!locals.financingUser) throw error(401, '登录已失效');
-	if (!locals.financingUser.hasAvatar) throw error(404, '未设置头像');
+	if (!locals.user?.financing) throw error(401, '登录已失效');
+	if (!locals.user.financing.hasAvatar) throw error(404, '未设置头像');
 
-	const etag = `"avatar-${locals.financingUser.personId}-${locals.financingUser.avatarVersion}"`;
+	const etag = `"avatar-${locals.user.financing.personId}-${locals.user.financing.avatarVersion}"`;
 	if (request.headers.get('if-none-match') === etag) {
 		return new Response(null, {
 			status: 304,
@@ -19,7 +19,7 @@ export const GET: RequestHandler = async ({ locals, request }) => {
 	const row = await getDatabase().prepare(`
 		SELECT avatar_data_url AS avatarDataUrl
 		FROM people WHERE id = ? AND active = TRUE
-	`).get(locals.financingUser.personId) as { avatarDataUrl?: string } | undefined;
+	`).get(locals.user.financing.personId) as { avatarDataUrl?: string } | undefined;
 	const match = String(row?.avatarDataUrl ?? '').match(AVATAR_DATA);
 	if (!match?.[1] || !match[2]) throw error(404, '未设置头像');
 	const body = Buffer.from(match[2], 'base64');

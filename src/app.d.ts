@@ -3,17 +3,7 @@
 declare global {
   namespace App {
     interface Locals {
-      user: { id: string; email: string; auth0Id: string | null } | null;
-      financingUser: {
-        id: string;
-        email: string | null;
-        role: 'admin' | 'handler' | 'reviewer';
-        personId: string;
-        personName: string;
-        permissions?: string[];
-        hasAvatar: boolean;
-        avatarVersion: string;
-      } | null;
+      user: import('$lib/identity').SiteIdentity | null;
       database: import('$lib/server/financing/db.js').PostgresDatabase | null;
       dataApiJwt: string | null;
       authCacheStatus: 'hit' | 'miss' | 'bypass';

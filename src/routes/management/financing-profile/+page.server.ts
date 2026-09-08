@@ -61,8 +61,8 @@ function authMessage(authError: NeonAuthApiError, operation: 'profile' | 'passwo
 
 export const actions: Actions = {
 	updateProfile: async (event) => {
-		if (!event.locals.financingUser) return fail(401, { section: 'profile', message: '登录已失效，请重新登录' });
-		const before = await currentProfile(event.locals.financingUser.personId);
+		if (!event.locals.user?.financing) return fail(401, { section: 'profile', message: '登录已失效，请重新登录' });
+		const before = await currentProfile(event.locals.user.financing.personId);
 		if (!before?.neonAuthUserId) return fail(404, { section: 'profile', message: '未找到当前 Neon Auth 账号' });
 
 		const data = await event.request.formData();
@@ -141,7 +141,7 @@ export const actions: Actions = {
 	},
 
 	updatePassword: async (event) => {
-		if (!event.locals.financingUser) return fail(401, { section: 'password', message: '登录已失效，请重新登录' });
+		if (!event.locals.user?.financing) return fail(401, { section: 'password', message: '登录已失效，请重新登录' });
 		if (usesAuth0()) {
 			try {
 				await requestAuth0PasswordReset(event);
@@ -150,7 +150,7 @@ export const actions: Actions = {
 				return fail(503, { section: 'password', message: '密码重置请求失败，请稍后重试' });
 			}
 		}
-		const profile = await currentProfile(event.locals.financingUser.personId);
+		const profile = await currentProfile(event.locals.user.financing.personId);
 		if (!profile?.neonAuthUserId) return fail(404, { section: 'password', message: '未找到当前 Neon Auth 账号' });
 
 		const data = await event.request.formData();

@@ -48,9 +48,9 @@
 
 ## 融资与管理模块的额外授权
 
-中央 Access 校验由 `src/lib/server/access.ts` 统一执行。`locals.user` 保存全站身份，`locals.financingUser` 保存明确关联、启用的融资人员。融资 middleware 仅对 `/financing/*` 和人员相关管理路由执行；通过 `route-contract.ts` 把新路由映射到原 named action 权限表，未登记 mutation 拒绝。
+中央 Access 校验由 `src/lib/server/access.ts` 统一执行。全站只使用中央验证后的 `locals.user`；融资 middleware 把明确关联、启用的人员及角色权限补充到 `locals.user.financing`，不重复解析或验证 JWT，也不创建第二份身份。融资 middleware 仅对 `/financing/*` 和人员相关管理路由执行；通过 `route-contract.ts` 把新路由映射到原 named action 权限表，未登记 mutation 拒绝。
 
-Profile 使用既有低权限 `AUTH0_MANAGEMENT_CLIENT_ID/SECRET`；人员管理使用 `FINANCING_AUTH0_MANAGEMENT_CLIENT_ID/SECRET`，复用原融资 M2M 应用而不扩大个人资料应用权限。两个 Secret 不能互换，不能进入客户端或日志。
+Profile 与人员管理统一读取 `AUTH0_MANAGEMENT_CLIENT_ID` 和唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`，复用已有完整管理权限的 M2M 应用。用户业务权限仍由各接口独立校验，统一管理凭据不会向用户授予额外权限。Secret 和管理 token 不进入客户端、日志或持久化文件。
 
 ### 融资授权
 
@@ -70,3 +70,5 @@ Profile 使用既有低权限 `AUTH0_MANAGEMENT_CLIENT_ID/SECRET`；人员管理
 - PostgreSQL RLS 同时检查人员启用、Auth0 账号状态、data_manage 和最长 60 秒的已确认授权有效期；过期授权拒绝读取和写入。数据写入继续由原审计触发器记录 personId、邮箱和变更前后值。
 - 导入、数据编辑和令牌／代理入口保留 data_manage 检查，POST/PATCH/DELETE 额外校验 Origin。
 - 生产账号迁移采用带原 scrypt 参数的批量导入；上线前核对全部 ID、邮箱、角色与权限。只有新认证和业务访问可用后才移除旧 Neon Auth。
+
+中央身份的 `id` 保持原 Access subject，`auth0Id` 来自已验证的 Auth0 声明；融资关联、Auth0 API 和 RLS 均使用该 `auth0Id`，不能误用 Access subject 或按邮箱猜测关联。只读请求可缓存人员授权判断，但缓存不能改写中央身份字段。`/auth/session` 保持原公开 DTO，不暴露授权细节或认证时间元数据。

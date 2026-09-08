@@ -20,7 +20,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     return dashboardAccessFailure(event.request, error);
   }
   // Financing authorization and its database connection only run for financing routes.
-  // Dashboard's Access identity remains separate from the linked business person.
+  // Business permissions enrich the same centrally verified identity.
   const response = financingRouteId(event.route.id) !== null
     ? await (await import('$lib/server/financing/handle')).handle({ event, resolve })
     : await resolve(event);

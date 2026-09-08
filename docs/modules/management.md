@@ -17,7 +17,7 @@
 
 - `people` 是责任人、业务角色和系统访问的统一主档。
 - 业务角色为 `admin`、`handler`、`reviewer`。登录账号由可选的 `auth0_user_id` 明确关联 Auth0；原 `people.id` 和业务归属保持不变。
-- 登录标识为唯一邮箱；个人设置可改显示姓名、头像和密码，邮箱由管理员维护。
+- 登录标识为唯一邮箱；全站个人信息页维护姓名、邮箱和密码重置，融资人员资料页维护业务姓名与头像。
 - 停用人员不能登录或作为有效业务人员；系统必须至少保留一个启用中的管理员。
 - 角色权限按 `project_manage`、`own_task_update`、`sop_manage`、`people_manage`、`data_manage`、`report_generate`、`permission_manage` 七类配置；内部测试初始状态为三种角色全量授权。
 - 人员和登录账号由具有“人员与账号”权限的角色维护；不能停用或删除当前用户，且系统必须保留至少一个启用中的管理员账号。
@@ -32,6 +32,12 @@
 
 `/management` 为 Dashboard 管理中心，`?upload=1` 保留旧资金日报上传书签。全站个人信息、邮箱、密码和显示偏好由 `/profile` 管理。`/management/people` 承接原融资人员、Auth0 账号关联、启停、角色和七类权限管理；`/management/financing-profile` 仅在页面展示融资人员名称和头像维护，登录密码入口跳往 `/profile`。
 
-旧 `/financing/people`、`/financing/settings` 使用 307 跳转到对应管理页，保留查询与 POST body。人员主档仍为 `financing.people`，不能按邮箱自动关联。管理中心与个人信息只需中央 Access 登录；人员管理及融资人员资料额外经过原融资身份和权限校验。用户无融资关联时仍能使用其他 Dashboard 模块。
+旧 `/financing/people`、`/financing/settings` 使用 307 跳转到对应管理页，保留查询与 POST body。人员主档仍为 `financing.people`，不能按邮箱自动关联。管理中心与个人信息只需中央 Access 登录；人员管理及融资人员资料在同一中央身份上额外检查融资人员关联和权限。用户无融资关联时仍能使用其他 Dashboard 模块。
 
 管理页的 `+layout.server.ts` 使用 `financing:identity` 和 `financing:permissions` 依赖，账号修改仍只返回服务端确认的增量。
+
+## 身份与管理凭据
+
+全站唯一身份对象为 `locals.user`。普通登录校验在中央入口完成；融资和人员管理按需填充 `user.financing`，保留人员启用、明确 Auth0 ID 关联、角色、权限和负责人条件。用于页面或审计的扁平人员 DTO 只是同一身份的投影，不承担认证。
+
+所有管理请求共用 `AUTH0_MANAGEMENT_CLIENT_ID` 和 `AUTH0_MANAGEMENT_CLIENT_SECRET`。运行时权限边界见 [SECURITY](../SECURITY.md)，原子切换与冗余 Secret 清理见 [DEVELOPMENT](../DEVELOPMENT.md)。

@@ -12,7 +12,7 @@ function actionAudit(event: Parameters<typeof auditRequestMeta>[0], action: stri
 	return {
 		action,
 		detail,
-		actor: event.locals.financingUser?.email ?? '系统',
+		actor: event.locals.user?.email ?? '系统',
 		createdAt: new Date().toISOString()
 	};
 }
@@ -239,10 +239,10 @@ export const actions: Actions = {
 	},
 	updateOwnTaskStatus: async (event) => {
 		const { request, params } = event;
-		if (!['admin', 'handler', 'reviewer'].includes(event.locals.financingUser?.role ?? '')) {
+		if (!['admin', 'handler', 'reviewer'].includes(event.locals.user?.financing?.role ?? '')) {
 			return fail(403, { message: '当前角色无权更新任务节点' });
 		}
-		const personId = event.locals.financingUser?.personId;
+		const personId = event.locals.user?.financing?.personId;
 		if (!personId) return fail(401, { message: '当前账号未关联人员主档，无法更新任务节点' });
 		const projectId = await resolveProjectId(params.id);
 		if (!projectId) return fail(404, { message: '项目不存在' });

@@ -31,7 +31,7 @@
 - 市场点评仍按单一上游映射 REST 资源读取，在 `src/market-report-resources.ts` 加工为视觉版与文字版共享的完整契约；公开资源通道只验证资源、字段和查询范围，不聚合整份报告。Data GraphQL 仅是同资源薄镜像，不作为整份报告主链路；不得新增 GraphQL 市场报告业务字段。
 - Data REST 列表按顶层 JSON array 消费，每次请求必须用 `fields` 只选择实际使用字段，并以 `src/data-contracts.ts` 的 Zod Schema 校验响应。债券基础信息代码只能从当次成交与收藏报价动态派生，不得硬编码债券清单；公募公司债筛选使用结构化 `bondType` 与 `bondOfferingType`，不得按名称字母猜测。
 - Dashboard Worker 服务端访问 Data Worker 必须优先使用 `DATA` Service Binding；不得从同一 Cloudflare zone 通过全局公网 `fetch` 回环。新闻详情扇出必须保持有界并发。
-- 身份由 Auth0 与 Cloudflare Access 统一管理。所有写入、AI 和交易研究工作台入口均须通过中央 Access 校验；普通研究模块只检查有效登录；融资与人员管理模块额外检查明确关联的启用人员及 Auth0 角色权限。独立 Worker HTTP 入口同样需要保护。
+- 身份由 Auth0 与 Cloudflare Access 统一管理，服务端仅使用 `locals.user`；融资人员和权限按需附加到 `user.financing`。Auth0 管理请求共用唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`。所有写入、AI 和交易研究工作台入口均须通过中央 Access 校验；普通研究模块只检查有效登录；融资与人员管理模块额外检查明确关联的启用人员及 Auth0 角色权限。独立 Worker HTTP 入口同样需要保护。
 - 一级发行视觉与文字输出必须共用 `src/primary-issues.ts`；文字报告不得读取 Python 归档文本。
 - 热点首次访问只读最近成功快照；只有用户手动生成才调用模型并追加 `hotspot_snapshot`。旧快照的证据范围以快照自身为准。
 - 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。

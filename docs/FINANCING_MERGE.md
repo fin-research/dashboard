@@ -32,14 +32,14 @@ Cloudflare 当前文档列出的 Worker 上限为未压缩 64 MiB、全局初始
 
 `/financing` 保持融资入口；人员与角色权限转入 `/management/people`；融资人员资料转入 `/management/financing-profile`，登录邮箱、密码和偏好统一由 `/profile` 维护。两个旧路径使用保留 POST body 的 307 重定向。
 
-融资身份与全站身份分开，原人员关联、角色权限、RLS、本人任务边界、单请求单连接和增量保存均保留。Auth0 管理凭据使用融资专用 Secret，个人资料应用不扩大权限。
+融资身份与全站身份统一，原人员关联、角色权限、RLS、本人任务边界、单请求单连接和增量保存均保留。Auth0 管理凭据使用统一 `AUTH0_MANAGEMENT_CLIENT_SECRET`；融资人员和权限属于中央身份上的业务授权，不再独立认证。
 
 `date` 保留业务自然日；无 offset 的源 timestamp 以 UTC+8 解释，有 offset 的 timestamp 保留实际时刻和微秒精度，页面固定上海时区。禁止修改全局 pg 类型解析器，也不批量改写既有生产时间戳。
 
 ## 发布顺序与回退
 
 1. 完成 Dashboard 全套验证、构建后路由检查及旧仓库历史验证。
-2. `node scripts/provision-financing-management.mjs --apply` 复用原融资 M2M 凭据，写入 Dashboard 专用 Secret，不轮换原 Secret。
+2. `node --use-env-proxy scripts/provision-auth0-management.mjs --apply` 复用已有完整权限的 M2M 凭据，通过 Worker version 原子切换统一 Client ID 与 Secret；旧专用 Secret 在新版本生效后移除。
 3. `node --use-env-proxy scripts/cutover-financing.mjs` 只读检查路由、cron、Workflow 与活跃导入。无活跃导入后，`--stop-old-cron` 停止旧小时任务。
 4. 将通过验证的 Dashboard 推入 main 并部署；确认 Workflow 归属与两个 cron。随后 `--switch-route` 删除旧 `/financing/*` 分流，让该路径由 Dashboard 主路由承接。
 5. 历史融资配置保持空 routes、空 cron、关闭 workers.dev 与 preview URLs，Workflow binding 指向 Dashboard；提交该归档配置，防止旧构建重新取得业务所有权。保留原源码、Git 历史、原始文件和数据库。
@@ -51,3 +51,7 @@ Cloudflare 当前文档列出的 Worker 上限为未压缩 64 MiB、全局初始
 Dashboard 371 项单元及契约测试；构建后 19 项个人信息路由检查、28 项融资与管理路由检查。后者使用本地 PGlite 执行全部融资 migration 和实际 SQL、模拟签名 JWKS/Auth0/R2，覆盖页面读取、旧路径跳转、未登录/未关联/无权限/跨源拒绝，以及真实 action 创建项目和读取详情、版本化头像的私有缓存；15 个已开启连接均关闭，单请求峰值为 1。融资 Cron 保留原调度失败重试语义。
 
 旧仓库 99 项测试、Svelte 检查通过。未执行真实邮件发送、生产 Excel 写入、浏览器手工操作或截图验收；此次合并不需要生产数据库 migration。公共规范和模块文档分流见 [文档索引](INDEX.md)。
+
+## 身份与凭据统一后的补充验证
+
+中央 Access JWT 只验证一次，融资模块只加载人员与授权。统一凭据不修改现有人员 ID、Auth0 用户角色、RLS 或数据库结构。补充回归验证同一 Auth0 subject 进入 RLS、事务身份在提交后清除、未分配给自己的任务更新被拒绝，以及个人资料与融资管理均使用唯一管理 Secret。

@@ -42,7 +42,7 @@ if (mode === 'stop-old-cron') {
 if (mode === 'switch-route') {
   if (schedule.schedules.length || workflow.script_name !== 'eastmoney-dashboard') throw new Error('Dashboard Workflow or Cron transfer is incomplete');
   const settings = await api(`accounts/${account}/workers/scripts/eastmoney-dashboard/settings`);
-  for (const name of ['DEBT_IMPORT_WORKFLOW', 'FINANCING_AUTH0_MANAGEMENT_CLIENT_SECRET', 'LIABILITY_REPORT_SNAPSHOTS']) {
+  for (const name of ['DEBT_IMPORT_WORKFLOW', 'AUTH0_MANAGEMENT_CLIENT_SECRET', 'LIABILITY_REPORT_SNAPSHOTS']) {
     if (!settings.bindings.some(binding => binding.name === name)) throw new Error(`Dashboard binding ${name} missing`);
   }
   const schedules = await api(`accounts/${account}/workers/scripts/eastmoney-dashboard/schedules`);

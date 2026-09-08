@@ -162,7 +162,7 @@ test('Data API token requests bypass the Neon Auth session cookie cache', async 
 	assert.equal(session.jwt, 'short-lived-jwt');
 	assert.equal(new URL(requests[0]).searchParams.get('disableCookieCache'), 'true');
 	const hooksSource = fs.readFileSync(new URL('../../src/lib/server/financing/handle.ts', import.meta.url), 'utf8');
-	assert.match(hooksSource, /requireDataApiJwt:\s*routeId === '\/data\/token'/);
+	assert.match(hooksSource, /useSessionCache: safeRequest && routeId !== '\/data\/token' && routeId !== '\/data\/api\/\[\.\.\.path\]'/);
 });
 
 test('short-lived Worker auth cache hashes opaque tokens and can be invalidated', async () => {

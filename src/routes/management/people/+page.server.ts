@@ -138,7 +138,7 @@ export const actions: Actions = {
 		const message = validationMessage(fields, Boolean(before.accountId));
 		if (message) return fail(400, { message });
 		if (await duplicatePerson(db, fields.name, fields.email, id)) return fail(409, { message: '姓名或邮箱已存在，请直接编辑现有人员' });
-		if (before.accountId && !fields.accountEnabled && event.locals.financingUser?.personId === id) return fail(400, { message: '不能移除当前登录权限' });
+		if (before.accountId && !fields.accountEnabled && event.locals.user?.financing?.personId === id) return fail(400, { message: '不能移除当前登录权限' });
 		if (before.accountRole === 'admin' && (!fields.accountEnabled || fields.role !== 'admin' || (usesAuth0() && fields.email !== normalizeEmail(before.email))) && await activeAdminCount(db) <= 1) return fail(400, { message: '至少保留一个启用中的管理员账号' });
 		let accountId: string | null = before.accountId;
 		let created = false;
@@ -173,7 +173,7 @@ export const actions: Actions = {
 		}
 		return await peopleSuccess(
 			`已更新 ${fields.name} 的人员、角色与 统一账号 账号关联`,
-			{ personId: id, refreshIdentity: event.locals.financingUser?.personId === id }
+			{ personId: id, refreshIdentity: event.locals.user?.financing?.personId === id }
 		);
 	},
 
@@ -184,7 +184,7 @@ export const actions: Actions = {
 		const db = getDatabase();
 		const before = await identityState(db, id);
 		if (!before) return fail(404, { message: '未找到该人员' });
-		if (!active && event.locals.financingUser?.personId === id) return fail(400, { message: '不能停用当前登录人员' });
+		if (!active && event.locals.user?.financing?.personId === id) return fail(400, { message: '不能停用当前登录人员' });
 		if (!active && before.accountRole === 'admin' && await activeAdminCount(db) <= 1) return fail(400, { message: '至少保留一个启用中的管理员账号' });
 		try {
 			if (before.accountId) await (active ? unbanManagedUser(event, before.accountId) : banManagedUser(event, before.accountId));
@@ -207,7 +207,7 @@ export const actions: Actions = {
 		const db = getDatabase();
 		const before = await identityState(db, id);
 		if (!before) return fail(404, { message: '未找到该人员' });
-		if (event.locals.financingUser?.personId === id) return fail(400, { message: '不能删除当前登录人员' });
+		if (event.locals.user?.financing?.personId === id) return fail(400, { message: '不能删除当前登录人员' });
 		if (before.accountRole === 'admin' && await activeAdminCount(db) <= 1) return fail(400, { message: '至少保留一个启用中的管理员账号' });
 		try {
 			if (before.accountId) await removeManagedUser(event, before.accountId);
@@ -259,7 +259,7 @@ export const actions: Actions = {
 				SET granted = (permission_code = ANY(?::text[])),
 					updated_by_person_id = ?, updated_at = CURRENT_TIMESTAMP
 				WHERE role = ?
-			`).bind(permissions, event.locals.financingUser?.personId ?? null, role),
+			`).bind(permissions, event.locals.user?.financing?.personId ?? null, role),
 			prepareAudit({
 				...auditRequestMeta(event), db,
 				action: 'role_permission.update', entityType: 'role_permission', entityId: role,

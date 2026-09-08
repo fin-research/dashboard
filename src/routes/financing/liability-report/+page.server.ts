@@ -1,3 +1,4 @@
+import { financingPersonView } from '$lib/identity';
 import type { PageServerLoad } from './$types';
 import { getDatabase } from '$lib/server/financing/db.js';
 import { fail } from '@sveltejs/kit';
@@ -64,7 +65,7 @@ export const actions = {
 			const result = await saveLiabilityWeeklyReportSnapshot({
 				database: getDatabase(event),
 				env: event.platform?.env,
-				actor: event.locals.financingUser,
+				actor: financingPersonView(event.locals.user),
 					databasePayload: payload.database,
 					sources: payload.external,
 				expectedAsOfDate: String(data.get('asOfDate') ?? '')

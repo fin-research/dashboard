@@ -1,3 +1,4 @@
+import { financingPersonView } from '$lib/identity';
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { withBase } from '$lib/financing/app-paths';
@@ -7,7 +8,7 @@ import { usesAuth0 } from '$lib/server/financing/auth-provider.js';
 
 export const actions: Actions = {
 	default: async (event) => {
-		const user = event.locals.financingUser;
+		const user = financingPersonView(event.locals.user);
 		const token = event.cookies.get(SESSION_COOKIE);
 		if (user) {
 			await recordAudit({

@@ -92,6 +92,8 @@ Local credit Excel ──────→ local parser → Neon credit
 
 Dashboard 是唯一 UI/API Worker。融资领域位于 `src/lib/financing/`（浏览器安全代码）、`src/lib/server/financing/`（查询、授权、审计）、`src/routes/financing/`（路由）和 `src/charts/financing/`（报表图表）。管理页面位于 `src/routes/management/`。共享 UI 只由既有 `WorkbenchShell`、`MetricCard`、`ModuleCard`、`PanelHeading`、`ChartHost`、`GlobalMessages` 维护。
 
-融资身份查询、提醒查询、报表生成和数据库连接均不能放进全站根 layout。仅融资业务导航执行融资授权与集合查询；重型导入解析器留在浏览器 Web Worker，报表动作客户端按路由加载。Finance 的 CSS 限定 `.financing-scope`，其颜色与表面映射 Dashboard 令牌，不能在导航后污染门户和报告。
+融资人员授权查询、提醒查询、报表生成和数据库连接均不能放进全站根 layout。仅融资业务导航执行融资授权与集合查询；重型导入解析器留在浏览器 Web Worker，报表动作客户端按路由加载。Finance 的 CSS 限定 `.financing-scope`，其颜色与表面映射 Dashboard 令牌，不能在导航后污染门户和报告。
 
 自定义 Worker 同时导出 DebtImportWorkflow，继续使用既有 Workflow 名称和台账原子导入。两个 cron 按表达式分流；从旧 Worker 切换时停止旧 cron，防止重复扫描。迁移不会改变 Quant、Data、Ingest 或其他上游接口。
+
+中央认证生成唯一 `locals.user`；融资领域仅补充 `user.financing` 授权。`src/lib/identity.ts` 定义身份及客户端 DTO，基础 subject、邮箱和认证有效期不被业务缓存替换。

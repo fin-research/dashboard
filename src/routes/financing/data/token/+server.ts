@@ -7,7 +7,7 @@ import { usesAuth0 } from '$lib/server/financing/auth-provider.js';
 import { withBase } from '$lib/financing/app-paths';
 
 export const GET: RequestHandler = async (event) => {
-	if (!event.locals.financingUser) throw error(401, '登录已失效');
+	if (!event.locals.user?.financing) throw error(401, '登录已失效');
 	if (!hasPermission(event.locals.permissions, 'data_manage')) throw error(403, '当前角色无权使用数据后台');
 	if (usesAuth0()) return json({ transport: 'worker', dataApiUrl: new URL(withBase('/data/api'), event.url).toString() },
 		{ headers: { 'cache-control': 'no-store, private', vary: 'Cookie' } });
