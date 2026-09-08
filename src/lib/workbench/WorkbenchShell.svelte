@@ -36,7 +36,7 @@
 
   afterNavigate(({ from, to, type }) => {
     mobileDrawerOpen = false;
-    if (type !== "popstate" && from?.url.pathname !== to?.url.pathname) {
+    if (type !== "popstate" && from?.url?.pathname !== to?.url?.pathname) {
       workspaceRegion?.scrollTo({ top: 0, left: 0 });
     }
     if (keyboardNavigation) requestAnimationFrame(() => mainRegion?.focus({ preventScroll: true }));

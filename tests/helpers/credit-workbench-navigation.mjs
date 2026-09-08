@@ -4,6 +4,7 @@ import { installDom, loadComponent } from "./svelte-dom.mjs";
 const window = installDom();
 const { mount, unmount, flushSync, tick } = await import("svelte");
 let reportRequests = 0;
+globalThis.domAfterNavigations = [];
 globalThis.fetch = async url => {
   if (String(url) === "/auth/session") return Response.json({ user: null, account: null });
   if (String(url).startsWith("/api/credit-assistant/")) return Response.json({ turns: [], running: false, progress: "", error: null, startedAt: 0 });
@@ -23,6 +24,16 @@ const Host = await loadComponent("tests/helpers/CreditWorkspaceHost.svelte", `<s
   views={[{id:"overview",label:"总览",icon:"overview",href:"/trading-research"}]}><p>交易研究内容</p></WorkbenchShell>{/if}`);
 const app = mount(Host, { target: document.body });
 flushSync();
+const afterNavigation = globalThis.domAfterNavigations[0];
+assert.equal(typeof afterNavigation, 'function');
+const workspace = document.querySelector('.tr-workspace');
+let scrollResets = 0;
+workspace.scrollTo = () => { scrollResets++; };
+assert.doesNotThrow(() => afterNavigation({ from: { url: null }, to: { url: null }, type: 'enter' }));
+afterNavigation({ from: { url: null }, to: { url: new URL('http://localhost/credit-workbench/assistant') }, type: 'goto' });
+assert.equal(scrollResets, 1, 'a resolved navigation resets the business scroller even when its source URL is unavailable');
+afterNavigation({ from: { url: null }, to: { url: new URL('http://localhost/credit-workbench') }, type: 'popstate' });
+assert.equal(scrollResets, 1, 'history navigation preserves scroll position');
 assert.equal(document.querySelector(".tr-breadcrumb a").textContent, "授信工作台");
 assert.deepEqual([...document.querySelectorAll(".tr-drawer__nav a")].map(a => [a.textContent.trim(), a.getAttribute("href")]), [
   ["授信一览表", "/credit-workbench"], ["授信日历", "/credit-workbench/calendar"],
@@ -42,6 +53,7 @@ for (const [view, label] of [["weekly", "授信周报"], ["overview", "授信一
   flushSync(() => app.navigate(view));
   assert.equal(document.querySelector(".tr-credit-view"), reportView, "report tabs must preserve their loaded data and editor instance");
   assert.equal(document.querySelector("h1").textContent, label);
+  assert.equal(document.querySelector('.tr-shell').classList.contains('tr-shell--workspace'), view !== 'weekly', 'approved reports opt out of workspace refinements');
   assert.equal(document.querySelectorAll("#tr-topbar-actions .tr-credit-toolbar").length, 1);
 }
 await tick();

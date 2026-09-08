@@ -58,7 +58,7 @@ export async function componentUrl(file, sourceOverride) {
     else if (specifier === "$app/navigation") {
       resolved = new URL(".svelte-kit/dom-tests/app-navigation.mjs", root);
       await mkdir(new URL(".", resolved), { recursive: true });
-      await writeFile(resolved, "export function afterNavigate() {} export async function goto(url, options) { globalThis.domNavigations?.push({url, options}); }");
+      await writeFile(resolved, "export function afterNavigate(callback) { globalThis.domAfterNavigations?.push(callback); } export async function goto(url, options) { globalThis.domNavigations?.push({url, options}); }");
     } else if (specifier.startsWith("$lib/")) resolved = new URL("src/lib/" + specifier.slice(5), root);
     else if (specifier.startsWith(".")) resolved = new URL(specifier, url);
     else resolved = new URL(import.meta.resolve(specifier));
