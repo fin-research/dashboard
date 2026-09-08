@@ -23,6 +23,8 @@
   let width = 1;
   let height = 1;
   let mounted = false;
+  let layoutGeneration = 0;
+  let useListFallback = false;
   let lastSignature = "";
   let frame: number | null = null;
 
@@ -36,6 +38,8 @@
   });
 
   onDestroy(() => {
+    mounted = false;
+    layoutGeneration += 1;
     observer?.disconnect();
     layout?.stop();
     if (frame !== null) cancelAnimationFrame(frame);
@@ -58,6 +62,8 @@
   }
 
   function runLayout(): void {
+    const generation = ++layoutGeneration;
+    useListFallback = false;
     const bounds = host.getBoundingClientRect();
     width = Math.max(280, Math.floor(bounds.width));
     height = Math.max(260, Math.floor(bounds.height));
@@ -83,9 +89,12 @@
       };
     });
 
-    layout = cloud<CloudWord>()
+    function placeWords(attempt = 0): void {
+      layout?.stop();
+      const scale = 0.85 ** attempt;
+      layout = cloud<CloudWord>()
       .size([width, height])
-      .words(words)
+      .words(words.map((word) => ({ ...word, size: Math.max(18, word.size * scale) })))
       .padding(() => clamp(width / 120, 5, 13))
       .rotate(0)
       .font(getComputedStyle(host).fontFamily)
@@ -93,10 +102,18 @@
       .fontSize((word) => word.size)
       .spiral("archimedean")
       .random(seededRandom(`${width}:${height}:${lastSignature}`))
-      .on("end", (words) => {
-        placedWords = words;
+      .on("end", (result) => {
+        if (!mounted || generation !== layoutGeneration) return;
+        if (result.length < words.length && attempt < 7) {
+          placeWords(attempt + 1);
+          return;
+        }
+        useListFallback = result.length < words.length;
+        placedWords = result;
       });
-    layout.start();
+      layout.start();
+    }
+    placeWords();
   }
 
   function selectWord(word: CloudWord): void {
@@ -139,12 +156,22 @@
 </script>
 
 <div bind:this={host} class="cloud-host" aria-label="当日市场热点词云">
-  {#if placedWords.length === 0}
+  {#if useListFallback}
+    <div class="cloud-list" aria-label="完整热点列表">
+      {#each items as word, index (word.keyword)}
+        <button class="btn btn-ghost" type="button" aria-pressed={selectedKeyword === word.keyword}
+          aria-label={`${word.keyword}，热度 ${word.heat}，点击查看解释`} onclick={() => onSelect(word)}>
+          <strong style:color={wordColor(index, { ...word, text: word.keyword, size: 18 })}>{word.keyword}</strong>
+          <span>热度 {word.heat}</span>
+        </button>
+      {/each}
+    </div>
+  {:else if placedWords.length === 0}
     <div class="cloud-layout-status" role="status">正在排布热点词云…</div>
   {:else}
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      role="img"
+      role="group"
       aria-label="词语字号表示相对热度；点击词语查看详细解释"
       preserveAspectRatio="xMidYMid meet"
     >
@@ -154,6 +181,7 @@
             class:selected={selectedKeyword === word.keyword}
             class="cloud-word"
             role="button"
+            aria-pressed={selectedKeyword === word.keyword}
             tabindex="0"
             aria-label={`${word.keyword}，热度 ${word.heat}，点击查看解释`}
             transform={`translate(${word.x ?? 0} ${word.y ?? 0}) rotate(${word.rotate ?? 0})`}
@@ -183,6 +211,11 @@
     min-height: 260px;
     overflow: hidden;
   }
+
+  .cloud-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); align-content: start; gap: 12px; height: 100%; padding: 8px; overflow-y: auto; }
+  .cloud-list button { display: grid; justify-items: start; min-height: 64px; white-space: normal; text-align: left; }
+  .cloud-list strong { min-width: 0; font-size: 1rem; overflow-wrap: anywhere; }
+  .cloud-list span { color: var(--text-3); font-size: .875rem; font-weight: normal; }
 
   svg {
     display: block;
