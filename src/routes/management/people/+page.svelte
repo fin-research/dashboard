@@ -150,5 +150,12 @@ const save: SubmitFunction = () => {
   .permission-item code { font-size: .8125rem; }
   .empty-copy { padding: 1rem 0; color: var(--muted); }
   @media (max-width: 1100px) { .permission-workspace { grid-template-columns: 1fr; } .permission-workspace :global(.role-catalog) { position: static; } .role-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); } }
-  @media (max-width: 720px) { .authorization-state { grid-template-columns: auto 1fr; } .authorization-state > a { grid-column: 1 / -1; } .permission-save { width: 100%; } .permission-actions { position: static; } }
+  @media (max-width: 720px) {
+    .authorization-state { grid-template-columns: 24px minmax(0, 1fr); grid-auto-flow: row; }
+    .authorization-state > :global(svg) { grid-column: 1; grid-row: 1; align-self: start; }
+    .authorization-state > div { grid-column: 2; grid-row: 1; min-width: 0; }
+    .authorization-state > a { grid-column: 2; grid-row: 2; justify-self: start; white-space: nowrap; }
+    .permission-save { width: 100%; }
+    .permission-actions { position: static; }
+  }
 </style>
