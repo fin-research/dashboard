@@ -16,14 +16,15 @@ async function database(t, legacy = false) {
   for (const name of ['0001_financing_postgres.sql','0007_detach_projects_from_debt.sql','0015_income_certificate_dates_and_names.sql','0028_client_master.sql','0031_bank_client_identity.sql']) {
     await db.exec(fs.readFileSync(new URL(`../financing-migrations/${name}`, import.meta.url),'utf8'));
   }
-  for (const name of fs.readdirSync(new URL('../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
-    if (!legacy || name < '0005') await db.exec(fs.readFileSync(new URL(`../credit-migrations/${name}`,import.meta.url),'utf8'));
-  }
   await db.exec(`INSERT INTO public.client(name,fullname,type,subtype) VALUES
     ('招商银行','招商银行股份有限公司','银行','股份行'),('中银理财','中银理财有限责任公司','理财子',NULL),('乙银行',NULL,'银行','城商行');
     INSERT INTO public.client_alias(alias,match_kind,client_id,notes) VALUES
     ('^银行-申万宏源证券资产管理有限公司\\(代“申万宏源招行凭证一号单一资产管理计划','pattern',1,'实际投资人'),
+    (public.normalize_client_name('银行-申万宏源证券资产管理有限公司（代“申万宏源招行凭证一号单一资产管理计划”）'),'exact',1,'实际投资人'),
     (public.normalize_client_name('银行-信银理财有限责任公司（代中银理财之乐赢稳健和信一年定开5期净值型人民币理财产品）'),'exact',2,'用户确认');`);
+  for (const name of fs.readdirSync(new URL('../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
+    if (!legacy || name < '0005') await db.exec(fs.readFileSync(new URL(`../credit-migrations/${name}`,import.meta.url),'utf8'));
+  }
   return db;
 }
 
@@ -244,4 +245,66 @@ test('bank asset migration separates existing identities and aliases without cha
     [{name:'明确资管',client_id:asset.id,amount:200000000},{name:'未标注资管',client_id:3,amount:100000000}]);
   assert.equal((await db.query("SELECT client_id FROM public.client_alias WHERE alias='乙银行(资管)'")).rows[0].client_id,asset.id);
   await assert.rejects(db.query("INSERT INTO credit.institution_client(institution_name,client_id,notes) VALUES ('重复主体',3,'重复')"),/unique/);
+});
+
+test('generic client matching covers prefixes, legal suffixes, bank variants and geography without alias rows', async t => {
+  const db=await database(t);
+  await db.query(`INSERT INTO public.client(name,fullname,type) VALUES
+    ('浙江萧山农商行','浙江萧山农村商业银行股份有限公司','银行'),
+    ('衡阳农商行','湖南衡阳农村商业银行股份有限公司','银行'),
+    ('长春农商行','长春农村商业银行股份有限公司','银行'),
+    ('中国进出口银行','中国进出口银行','银行'),
+    ('上海农商行','上海农村商业银行股份有限公司','银行'),
+    ('江西百胜智能科技','江西百胜智能科技股份有限公司','营业部客户')`);
+  for(const [raw,name] of [
+    ['银行-萧山农商银行','浙江萧山农商行'],['浙江省萧山农村商业银行','浙江萧山农商行'],
+    ['湖南衡阳农商行','衡阳农商行'],['衡阳农商银行','衡阳农商行'],
+    ['长春农商行(被吉林农商行吸收合并)','长春农商行'],['进出口行','中国进出口银行'],
+    ['营业部大客户江西百胜智能科技股份有限公司','江西百胜智能科技']]){
+    assert.equal((await db.query('SELECT c.name FROM public.client c WHERE c.id=public.resolve_client($1)',[raw])).rows[0]?.name,name);
+  }
+  await db.query(`INSERT INTO public.client(name,fullname,type) VALUES
+    ('浙江永安农商行','浙江永安农村商业银行股份有限公司','银行'),
+    ('福建永安农商行','福建永安农村商业银行股份有限公司','银行')`);
+  for(const raw of ['永安农商银行','湖南永安农商银行','农商银行','银行']) assert.equal((await db.query('SELECT public.resolve_client($1) id',[raw])).rows[0].id,null);
+  assert.equal((await db.query("SELECT c.name FROM public.client c WHERE c.id=public.resolve_client('福建省永安农商银行')")).rows[0].name,'福建永安农商行');
+});
+
+test('wealth product matching is generic but conflicting owners still require an exact exception', async t => {
+  const db=await database(t);
+  for(const name of ['信银理财','光大理财','宁银理财','建信理财']) {
+    await db.query("INSERT INTO public.client(name,type) VALUES ($1,'理财子')",[name]);
+    for(const raw of [`银行-${name}有限责任公司（代“${name}全新99号理财产品”）`,`${name}有限责任公司代${name}全新产品`]) {
+      assert.equal((await db.query('SELECT c.name FROM public.client c WHERE c.id=public.resolve_client($1)',[raw])).rows[0].name,name);
+    }
+  }
+  const cross='银行-信银理财有限责任公司（代中银理财之乐赢稳健和信一年定开5期净值型人民币理财产品）';
+  assert.equal((await db.query('SELECT public.resolve_client_by_rules($1) id',[cross])).rows[0].id,null);
+  assert.equal((await db.query('SELECT public.resolve_client($1) id',[cross])).rows[0].id,2);
+  assert.equal((await db.query("SELECT public.resolve_client('银行-信银理财有限责任公司代中银理财未经确认的新产品') id")).rows[0].id,null);
+});
+
+test('known product names resolve through account-holder text without guessing unknown products', async t => {
+  const db=await database(t);
+  for(const name of ['国泰君安私客臻享18号单一资产管理计划','外贸信托-稳进慧盈A款12期集合资金信托计划','上汽颀臻颀瑞8号私募证券投资基金']) await db.query("INSERT INTO public.client(name,type) VALUES ($1,'营业部客户')",[name]);
+  for(const [raw,name] of [
+    ['机构投资者-上海国泰君安证券资产管理有限公司代国泰君安私客臻享18号单一资产管理计划','国泰君安私客臻享18号单一资产管理计划'],
+    ['营业部大客户-中国对外经济贸易信托有限公司(代表“外贸信托-稳进慧盈A款12期集合资金信托计划”)','外贸信托-稳进慧盈A款12期集合资金信托计划'],
+    ['营业部大客户-上汽颀臻(上海)资产管理有限公司上汽颀臻颀瑞8号私募证券投资基金','上汽颀臻颀瑞8号私募证券投资基金']]) assert.equal((await db.query('SELECT c.name FROM public.client c WHERE c.id=public.resolve_client($1)',[raw])).rows[0].name,name);
+  assert.equal((await db.query("SELECT public.resolve_client('机构投资者-上海国泰君安证券资产管理有限公司代未知999号单一资产管理计划') id")).rows[0].id,null);
+});
+
+test('alias migration removes redundant exact and regex rules, keeps ownership exceptions, and drops obsolete columns', async t => {
+  const db=await database(t,true);
+  for(const name of ['0005_static_clients_and_usage_totals.sql','0006_bank_asset_management_clients.sql']) await db.exec(fs.readFileSync(new URL(`../credit-migrations/${name}`,import.meta.url),'utf8'));
+  await db.query(`INSERT INTO public.client_alias(alias,match_kind,client_id,notes) VALUES
+    ('招商银行','exact',1,'重复名称'),('银行-招商银行股份有限公司','exact',1,'重复前缀'),
+    ('^银行-中银理财.*','pattern',2,'旧正则'),('特殊主体','exact',3,'保留特殊')`);
+  await institution(db,'2026-09-04','招商银行');
+  await db.exec(fs.readFileSync(new URL('../credit-migrations/0007_simplify_client_aliases.sql',import.meta.url),'utf8'));
+  const aliases=(await db.query('SELECT alias FROM public.client_alias ORDER BY alias')).rows.map(r=>r.alias);
+  assert.equal(aliases.length,3);assert.ok(aliases.includes('特殊主体'));assert.ok(aliases.every(a=>!a.startsWith('^')));
+  assert.deepEqual((await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='client_alias' ORDER BY column_name")).rows.map(r=>r.column_name),['alias','client_id']);
+  assert.equal((await db.query("SELECT public.resolve_client('银行-招商银行股份有限公司') id")).rows[0].id,1);
+  assert.equal((await db.query("SELECT public.resolve_client('银行-特殊主体') id")).rows[0].id,3);
 });

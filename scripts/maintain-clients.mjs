@@ -7,7 +7,7 @@ if (!inputPath) throw new Error('用法：node scripts/maintain-clients.mjs <客
 const name = z.string().trim().min(1).max(500);
 const schema = z.object({
   clients: z.array(z.object({ name, fullname: name.nullable(), type: z.enum(['银行','理财子','券商','基金','营业部客户','其它']), subtype: name.nullable() })),
-  aliases: z.array(z.object({ alias: name, matchKind: z.enum(['exact','pattern']), clientName: name, notes: name }).strict()),
+  aliases: z.array(z.object({ alias: name, clientName: name }).strict()),
   creditMappings: z.array(z.object({ institutionName: name, clientName: name, notes: name }).strict())
 });
 const manifest = schema.parse(JSON.parse(fs.readFileSync(inputPath, 'utf8')));
@@ -25,12 +25,17 @@ try {
   await database.query(`INSERT INTO public.client (name,fullname,type,subtype)
     SELECT name,fullname,type,subtype FROM jsonb_to_recordset($1::jsonb) AS x(name text,fullname text,type text,subtype text)
     ON CONFLICT(name) DO UPDATE SET fullname=EXCLUDED.fullname,type=EXCLUDED.type,subtype=EXCLUDED.subtype`, [JSON.stringify(manifest.clients)]);
-  await database.query(`INSERT INTO public.client_alias(alias,match_kind,client_id,notes)
-    SELECT CASE WHEN x."matchKind"='exact' THEN public.normalize_client_name(x.alias) ELSE x.alias END,
-      x."matchKind",c.id,x.notes
-    FROM jsonb_to_recordset($1::jsonb) AS x(alias text,"matchKind" text,"clientName" text,notes text)
+  // An explicit override back to a generic result removes the old exception.
+  await database.query(`DELETE FROM public.client_alias a
+    USING jsonb_to_recordset($1::jsonb) AS x(alias text,"clientName" text),public.client c
+    WHERE c.name=x."clientName" AND a.alias=public.client_match_key(x.alias)
+      AND public.resolve_client_by_rules(x.alias)=c.id`, [JSON.stringify(manifest.aliases)]);
+  await database.query(`INSERT INTO public.client_alias(alias,client_id)
+    SELECT public.client_match_key(x.alias),c.id
+    FROM jsonb_to_recordset($1::jsonb) AS x(alias text,"clientName" text)
     JOIN public.client c ON c.name=x."clientName"
-    ON CONFLICT(alias,match_kind) DO UPDATE SET client_id=EXCLUDED.client_id,notes=EXCLUDED.notes`, [JSON.stringify(manifest.aliases)]);
+    WHERE public.resolve_client_by_rules(x.alias) IS DISTINCT FROM c.id
+    ON CONFLICT(alias) DO UPDATE SET client_id=EXCLUDED.client_id`, [JSON.stringify(manifest.aliases)]);
   await database.query(`INSERT INTO credit.institution_client(institution_name,client_id,notes)
     SELECT x."institutionName",c.id,x.notes
     FROM jsonb_to_recordset($1::jsonb) AS x("institutionName" text,"clientName" text,notes text)
@@ -42,6 +47,7 @@ try {
     WHERE d.client_id IS NULL AND d.counterparty=n.counterparty AND n.client_id IS NOT NULL`);
   const {rows} = await database.query(`SELECT
     (SELECT count(*) FROM public.client) AS clients,
+    (SELECT count(*) FROM public.client_alias) AS client_aliases,
     (SELECT count(*) FROM financing.debt WHERE client_id IS NOT NULL) AS linked_debts,
     (SELECT count(*) FROM financing.debt WHERE client_id IS NULL) AS unlinked_debts,
     (SELECT count(*) FROM credit.institution_client) AS credit_links,
