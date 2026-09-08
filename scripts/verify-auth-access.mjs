@@ -4,8 +4,13 @@ import { AuthTestError, SITE_ORIGIN, createHttpSession, loginTestAccount, readAu
 // GET only. Missing-record probes verify the authorization/validation boundary
 // without querying paid Choice data, generating AI, or mutating business state.
 export const ACCESS_PROBES = [
-  ['research.market_report:read', '/market-briefing', [200]],
-  ['research.market_report:read', '/market-briefing/text', [200]],
+  ['public', '/market-briefing', [200]],
+  ['public', '/market-briefing/text', [200]],
+  ['public', '/api/market-report', [400]],
+  ['public', '/api/market-resources/unknown', [400]],
+  ['public', '/data/omo', [422]],
+  ['public', '/data/news?pageSize=invalid', [422]],
+  ['public', '/data/margin?date=invalid', [422]],
   ['research.hotspot:read', '/trading-research/market-hotspots', [200]],
   ['research.policy:read', '/trading-research/policy-tracking', [200]],
   ['research.article:read', '/news/auth-test-missing-record', [200]],
@@ -24,9 +29,13 @@ export const ACCESS_PROBES = [
   ['financing.report:read', '/financing/liability-report', [200]],
   ['account.profile:read', '/api/profile', [200]],
   ['auth.permission:read', '/management/people', [200]],
-  ['data.resource:read', '/data/health', [200]],
-  ['data.graphql:read', '/data/graphql?query=%7B__typename%7D', [200]],
-  ['data.choice:read', '/data/choice/css', [422]],
+  ['public', '/data/health', [200]],
+  ['public', '/data/graphql', [200]],
+  ['login', '/data/choice/css', [422]],
+  ['login', '/data/choice/csd', [422]],
+  ['login', '/data/choice/ctr', [422]],
+  ['login', '/data/choice/edb', [422]],
+  ['login', '/data/camel', [404]],
 ];
 
 function denied(response) {
@@ -43,9 +52,9 @@ async function main() {
   const config = await readAuthTestConfig();
   const anonymous = createHttpSession();
   const failures = [];
-  for (const [scope, path] of ACCESS_PROBES) {
+  for (const [scope, path, expected] of ACCESS_PROBES) {
     const response = await anonymous.request(SITE_ORIGIN + path, { headers: { Accept: path.startsWith('/api/') || path.startsWith('/data/') ? 'application/json' : 'text/html' }, followRedirects: false });
-    const passed = denied(response);
+    const passed = scope === 'public' ? expected.includes(response.status) : denied(response);
     console.log(JSON.stringify({ identity: 'anonymous', scope, path: new URL(path, SITE_ORIGIN).pathname, status: response.status, passed }));
     if (!passed) failures.push(`anonymous ${scope}`);
   }
@@ -54,7 +63,7 @@ async function main() {
   for (const [scope, path, expected] of ACCESS_PROBES) {
     await pause(1500);
     const response = await session.request(SITE_ORIGIN + path, { headers: { Accept: path.startsWith('/api/') || path.startsWith('/data/') ? 'application/json' : 'text/html' }, followRedirects: false });
-    const permitted = permissions.has(scope);
+    const permitted = ['public', 'login'].includes(scope) || permissions.has(scope);
     const passed = permitted ? expected.includes(response.status) : response.status === 403;
     let failureDetail;
     if (!passed && response.headers.get('content-type')?.includes('json')) {

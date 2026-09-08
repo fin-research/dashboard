@@ -1,8 +1,8 @@
-/** Public navigation is limited to the portal and authentication bootstrap. */
+/** Public navigation includes the portal, market reports and authentication bootstrap. */
 export function pageRequiresLogin(path: string): boolean {
   try {
     const normalized = decodeURIComponent(path).replace(/\/__data\.json$/, '').replace(/\/$/, '') || '/';
-    return !['/', '/auth/verify-email', '/auth/logout', '/auth/session'].includes(normalized)
+    return !['/', '/market-briefing', '/market-briefing/text', '/auth/verify-email', '/auth/logout', '/auth/session'].includes(normalized)
       && !normalized.startsWith('/_app/');
   } catch { return true; }
 }

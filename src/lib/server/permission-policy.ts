@@ -8,11 +8,11 @@ export const ROUTE_PERMISSIONS: Record<string, Methods> = {
   '/': { GET: 'public' },
   '/auth/login': { GET: 'login' }, '/auth/logout': { GET: 'public', POST: 'public' },
   '/auth/session': { GET: 'public' }, '/auth/verify-email': { GET: 'public' },
-  '/market-briefing': { GET: 'research.market_report:read' },
-  '/market-briefing/text': { GET: 'research.market_report:read' },
-  // Compatibility for already-open reports; current clients read Access-protected /data directly.
-  '/api/market-resources/[resource]': { GET: 'login' },
-  '/api/market-report': { GET: 'research.market_report:read', PUT: 'research.market_report:update' },
+  '/market-briefing': { GET: 'public' },
+  '/market-briefing/text': { GET: 'public' },
+  // Compatibility for already-open reports; current clients read public /data resources directly.
+  '/api/market-resources/[resource]': { GET: 'public' },
+  '/api/market-report': { GET: 'public', PUT: 'research.market_report:update' },
   '/api/market-briefing': { POST: 'research.market_report:generate' },
   '/market-hotspots': { GET: 'research.hotspot:read' },
   '/api/rag/hotspots': { GET: 'research.hotspot:read', POST: 'research.hotspot:generate' },
@@ -84,8 +84,8 @@ export function requestPolicy(request: Request, routeId: string | null): Policy 
   let value: Methods[string];
   if (routeId === '/data/[...path]') {
     if (!['GET', 'POST'].includes(method)) throw new AccessError(403, '数据操作未登记');
-    value = /^\/data\/choice(?:\/|$)/.test(path) ? 'data.choice:read'
-      : /^\/data\/camel(?:\/|$)/.test(path) ? 'data.camel:read'
+    value = /^\/data\/choice(?:\/|$)/.test(path) ? 'login'
+      : /^\/data\/camel(?:\/|$)/.test(path) ? 'login'
       : path === '/data/graphql' ? 'data.graphql:read' : method === 'GET' ? 'data.resource:read' : undefined;
   } else {
     const methods = ROUTE_PERMISSIONS[routeId ?? ''];

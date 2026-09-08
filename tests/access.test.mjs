@@ -5,9 +5,9 @@ import { publicMarketRequest } from '../src/lib/server/public-market-resources.t
 
 const request = (path, method = 'GET', headers = {}) => new Request(`https://eastmoney.hasbai.xyz${path}`, { method, headers });
 
-test('only portal and authentication bootstrap stay public; business reads and writes require login', () => {
-  for (const path of ['/', '/auth/session', '/auth/verify-email']) assert.equal(dashboardRequiresLogin(request(path)), false, path);
-  for (const path of ['/market-briefing', '/market-hotspots', '/fund-report', '/api/rag/hotspots', '/api/market-report', '/trading-research', '/trading-research/credit', '/credit-workbench', '/credit-workbench/calendar', '/credit-workbench/weekly', '/credit-workbench/assistant', '/credit%2dworkbench/__data.json', '/trading%2dresearch/__data.json', '/api/credit', '/api/economic-indicators', '/api/credit-assistant/chat', '/credit-assistant']) assert.equal(dashboardRequiresLogin(request(path)), true, path);
+test('portal, market reports and authentication bootstrap stay public; internal business and writes require login', () => {
+  for (const path of ['/', '/market-briefing', '/market-briefing/text', '/auth/session', '/auth/verify-email']) assert.equal(dashboardRequiresLogin(request(path)), false, path);
+  for (const path of ['/market-briefing/unknown', '/market-hotspots', '/fund-report', '/api/rag/hotspots', '/api/market-report', '/trading-research', '/trading-research/credit', '/credit-workbench', '/credit-workbench/calendar', '/credit-workbench/weekly', '/credit-workbench/assistant', '/credit%2dworkbench/__data.json', '/trading%2dresearch/__data.json', '/api/credit', '/api/economic-indicators', '/api/credit-assistant/chat', '/credit-assistant']) assert.equal(dashboardRequiresLogin(request(path)), true, path);
   for (const method of ['POST', 'PATCH', 'PUT', 'DELETE']) assert.equal(dashboardRequiresLogin(request('/api/market-report', method)), true);
   assert.equal(dashboardRequiresLogin(request('/api/market-briefing', 'POST')), true);
 });

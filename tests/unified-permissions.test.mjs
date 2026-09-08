@@ -29,13 +29,13 @@ test('every application route and named mutation is registered in the one permis
 });
 
 test('read and write policies are distinct, and unknown routes/actions and ambiguous action names fail closed', () => {
-  assert.equal(requestPolicy(request('/market-briefing'), '/market-briefing').public, undefined);
-  assert.deepEqual(requestPolicy(request('/api/market-resources/omo'), '/api/market-resources/[resource]'), { login: true });
+  assert.equal(requestPolicy(request('/market-briefing'), '/market-briefing').public, true);
+  assert.deepEqual(requestPolicy(request('/api/market-resources/omo'), '/api/market-resources/[resource]'), { public: true });
   assert.equal(requestPolicy(request('/financing/projects'), '/financing/projects').permission, 'financing.project:read');
   assert.equal(requestPolicy(request('/financing/projects?/createProject','POST'), '/financing/projects').permission, 'financing.project:create');
   assert.equal(requestPolicy(request('/api/credit-assistant/session','DELETE'), '/api/credit-assistant/session').permission, 'credit.assistant:delete');
   assert.equal(requestPolicy(request('/data/graphql','POST'), '/data/[...path]').permission, 'data.graphql:read');
-  assert.equal(requestPolicy(request('/data/choice/css','POST'), '/data/[...path]').permission, 'data.choice:read');
+  assert.equal(requestPolicy(request('/data/choice/css','POST'), '/data/[...path]').login, true);
   assert.equal(requestPolicy(request('/financing/data/api/rpc/liability_weekly_report_data','POST'), '/financing/data/api/[...path]').permission, 'financing.report:read');
   assert.throws(() => requestPolicy(request('/unregistered'), null), { status: 403 });
   assert.throws(() => requestPolicy(request('/financing/projects?/deleteEverything','POST'), '/financing/projects'), { status: 403 });
@@ -77,10 +77,10 @@ test('central authorization validates Auth0 accounts, opens beta to roleless use
     const noManagement = async () => { throw new Error('market reads must not query Auth0 Management API'); };
     const marketRequest = request('/api/market-resources/omo','GET',{Cookie:'CF_Authorization='+token});
     const market = await authorizeRequest(marketRequest, env, '/api/market-resources/[resource]', noManagement);
-    assert.equal(market.user.id, 'access-person');
+    assert.equal(market.user, null);
     assert.equal(market.directory, undefined);
     assert.deepEqual(market.permissions, []);
-    await assert.rejects(authorizeRequest(request('/api/market-resources/omo'), env, '/api/market-resources/[resource]', noManagement), {status:401});
+    assert.equal((await authorizeRequest(request('/api/market-resources/omo'), env, '/api/market-resources/[resource]', noManagement)).user, null);
     await assert.rejects(authorizeRequest(request('/api/market-resources/omo','POST',{Cookie:'CF_Authorization='+token}), env, '/api/market-resources/[resource]', noManagement), {status:403});
   } finally { globalThis.fetch=originalFetch; Object.assign(Client.prototype,original); }
 });

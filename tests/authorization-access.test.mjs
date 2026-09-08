@@ -53,8 +53,8 @@ test('anonymous and test@18.cn cover all registered routes and actions through c
       { id: '/trading-research/[view]', path: '/trading-research/secondary-bond-pool', method: 'GET', scope: 'bond.ledger:read' },
       { id: '/data/[...path]', path: '/data/news', method: 'GET', scope: 'data.resource:read' },
       { id: '/data/[...path]', path: '/data/graphql', method: 'POST', scope: 'data.graphql:read' },
-      { id: '/data/[...path]', path: '/data/choice/css', method: 'GET', scope: 'data.choice:read' },
-      { id: '/data/[...path]', path: '/data/camel', method: 'GET', scope: 'data.camel:read' },
+      { id: '/data/[...path]', path: '/data/choice/css', method: 'GET', scope: 'login' },
+      { id: '/data/[...path]', path: '/data/camel', method: 'GET', scope: 'login' },
       { id: '/financing/data/api/[...path]', path: '/financing/data/api/rpc/liability_weekly_report_data', method: 'POST', scope: 'financing.report:read' },
     );
     for (const { id, path, method, scope } of cases) {

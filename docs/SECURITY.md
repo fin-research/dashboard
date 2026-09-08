@@ -14,7 +14,7 @@
 
 - 浏览器不得取得 Provider 密钥、数据库连接字符串、D1/R2 binding、完整二级池 Excel 数据缓存或授信源 Excel。本地授信导入不得上传文件到 Worker、R2 或浏览器接口。
 - `$lib/server` 模块不得被客户端代码导入。
-- Dashboard Worker 到同一 zone 的 Data Worker 使用 `DATA` Service Binding；服务端代码不得以公开 hostname 做 Worker-to-Worker 回环请求。市场点评浏览器携带有效 Access 会话直接请求 `/data/*` 行情资源，由 Data 校验 JWT；旧 `/api/market-resources/*` 仅作为相同登录边界的限定兼容通道。
+- Dashboard Worker 到同一 zone 的 Data Worker 使用 `DATA` Service Binding；服务端代码不得以公开 hostname 做 Worker-to-Worker 回环请求。市场点评浏览器直接请求公开 `/data/*` 行情资源；旧 `/api/market-resources/*` 使用同一公开只读边界，保留资源与参数白名单。
 - 生成式 AI 输出必须经 Zod Schema 或明确的文本协议校验后进入业务层。
 - 融资择时卖方观点先调用固定 AI Search MCP 公共端点，仅把限长、去重后的证据交给 AI Gateway；机构、标题、日期和源 key 由检索元数据回填，不接受模型自由生成。
 - R2 对象 key 和下载文件必须先由数据库记录解析，不能接受任意用户路径直读存储桶。
@@ -30,7 +30,7 @@
 - `src/hooks.server.ts` 对全部业务页面和 API 执行统一身份与权限检查，具体规则见下文。
 - `worker/entry.ts` 对绕过 SvelteKit 的授信问答 HTTP 入口执行相同验证；WebSocket 和 GET 也受保护。
 - 写入同时验证 Origin，文件上传继续保留类型、大小、日期、内容校验，数据库写入继续使用参数化查询和事务。登录不能替代业务输入校验。
-- 旧报告资源兼容通道在验证 Access 登录后，只允许报告使用的资源、字段、日期范围和有界条数，不能转发任意 URL、路径、GraphQL 或 Choice 指标。通过私有 DATA binding 读取后流式返回，客户端继续执行原有 Zod 契约校验。
+- 公开只读的旧报告资源兼容通道只允许报告使用的资源、字段、日期范围和有界条数，不能转发任意 URL、路径、GraphQL 或 Choice 指标。通过私有 DATA binding 读取后流式返回，客户端继续执行原有 Zod 契约校验。
 - 个人资料只使用签名已验证 JWT 中的 `eastmoney_user_id`（兼容 `custom` / `oidc_fields`），绝不通过邮箱查找并关联 Auth0 用户。每次读写再次核对 Auth0 当前账号、连接、停用状态和邮箱；旧邮箱对应的 Access 会话不得继续修改资料。
 - `/api/profile` 严格白名单输入，用户不能传入目标 ID、角色、权限、`app_metadata` 或密码。邮箱变更必须明确确认，仅限 18.cn，设置 `email_verified=false` 与 `verify_email=true` 后退出登录；密码只使用 Auth0 邮件重置流程。管理 API 的 Secret 仅驻留服务端，外部请求禁止跟随重定向，响应与请求均限制读取大小。
 - 前端路由守卫与上传前登录检查属于交互保护；服务端 Access 与 Origin 校验仍是授权边界。浏览器同源 HTTP 401 统一跳转登录，禁止把 403 或上游管理凭证失效误判为当前用户登录失效。
@@ -47,11 +47,11 @@
 
 ## 全站授权入口
 
-除 Access 登录即允许的行情原始资源读取及其旧兼容通道外，所有业务页面、只读 API、写入 API 和 named actions 由 `src/lib/server/authorization.ts` 检查。`src/hooks.server.ts` 是 SvelteKit 的唯一检查入口；全局服务端 layout 依赖 pathname，使纯客户端页面之间的导航也经过入口检查。门户、身份流程和静态资源以明确规则公开，其余业务只读接口同样执行应用权限检查。
+除公开的市场点评页面、定稿 GET/HEAD 及限定行情兼容通道外，所有业务页面、只读 API、写入 API 和 named actions 由 `src/lib/server/authorization.ts` 检查。`src/hooks.server.ts` 是 SvelteKit 的唯一检查入口；全局服务端 layout 依赖 pathname，使纯客户端页面之间的导航也经过入口检查。门户、市场点评读取、身份流程和静态资源以明确规则公开，其余业务只读接口同样执行应用权限检查。
 
 `src/lib/permissions.ts` 是权限代码及说明的唯一来源，`src/lib/server/permission-policy.ts` 按真实路由 ID、HTTP 方法、named action 分配权限。未知路由、未登记操作和含多个 action 的请求失败关闭。GET/HEAD 也校验读取权限；写入检查 Origin，前端可见性不能代替服务端校验。
 
-独立授信问答 HTTP 入口调用同一授权函数，保留原客户保密材料边界。Data Worker 的行情原始资源 GET/HEAD 只验证 Access 登录；其余公网用户请求通过私有 `AUTHORIZATION` binding 调用 Dashboard `Authorization` entrypoint；Data 不维护第二套权限目录或授权矩阵，不信任自报身份或权限头。服务绑定和明确允许的 Access 服务身份用于机器任务，不代表用户角色。Ingest 的 HTTP 入口仅公开 health，其工作由 Cron/Workflow 执行；Quant、Choice 无新增用户权限入口。
+独立授信问答 HTTP 入口调用同一授权函数，保留原客户保密材料边界。Data Worker 的 DM、东方财富网及固定行业快照 GET/HEAD 公开只读；Choice 通用查询与 CAMEL 校验 Access 登录。GraphQL 在 Choice 字段执行前校验，公开字段不依赖身份服务。旧私有 `AUTHORIZATION` binding 保留兼容，当前 Data 请求不调用角色授权；不能信任自报身份或权限头。服务绑定和明确允许的 Access 服务身份用于机器任务，不代表用户角色。Ingest 的 HTTP 入口仅公开 health，其工作由 Cron/Workflow 执行；Quant、Choice 无新增用户权限入口。
 
 全站身份仍只有 `locals.user`：`id` 是 Access subject，`auth0Id` 来自已验证的 `eastmoney_user_id`，`authorization` 为统一授权结果。业务负责人只用 Auth0 ID；不能用 Access subject、姓名或邮箱推断关联。每次应用权限请求查询 Auth0 当前账号、连接、验证状态及角色；账号停用、邮箱变更和撤销角色不受应用身份缓存影响。仅管理服务 token 可按有效期缓存，人员目录与角色列表只在单请求内复用。
 
