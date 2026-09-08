@@ -6,7 +6,7 @@
 }
 
 .tr-shell--workspace[data-workspace-tone="teal"] {
-  --workspace-accent: var(--tr-green);
+  --workspace-accent: color-mix(in srgb, var(--tr-green) 92%, var(--tr-text));
   --workspace-soft: var(--tr-green-soft);
 }
 
@@ -78,6 +78,9 @@
 
 /* Labels remain emphasized; entered values use normal body weight. */
 .tr-shell--workspace :is(.input, .select, .textarea) { font-weight: normal; }
+.tr-shell--workspace .btn-success {
+  --btn-fg: color-mix(in srgb, var(--color-success-content) 80%, var(--text-1));
+}
 .tr-shell--workspace :is(a, button, input, select, textarea, summary, main, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-deep);
   outline-offset: 3px;
