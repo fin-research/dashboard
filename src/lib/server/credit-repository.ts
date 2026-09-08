@@ -19,6 +19,8 @@ import type { CreditInstitutionUpdateInput } from "../credit/update.ts";
 import type { DatabaseClient } from "./postgres.ts";
 import { creditCustomerSchema, type CreditCustomer } from "../credit-assistant/types.ts";
 
+import { compareCreditInstitutionOrder } from "../credit/presentation.ts";
+
 const AMOUNT_TOLERANCE = 0.0001;
 
 /** Only the latest complete ledger snapshot can authorize disclosure. The database-time
@@ -28,8 +30,8 @@ export async function findCreditCustomers(client: DatabaseClient, query: string,
   if (!name || name.length > 200) return [];
   await client.query("BEGIN READ ONLY");
   try {
-    const result = await client.query<{ name: string; confidentialityStatus: string; reportDate: string }>(
-      `SELECT institution_name AS name, confidentiality_status::text AS "confidentialityStatus",
+    const result = await client.query<{ name: string; confidentialityStatus: boolean; reportDate: string }>(
+      `SELECT institution_name AS name, confidentiality_status AS "confidentialityStatus",
               to_char(report_date, 'YYYY-MM-DD') AS "reportDate", CURRENT_TIMESTAMP::text AS "checkedAt"
        FROM credit.institution
        WHERE report_date = (SELECT max(report_date) FROM credit.institution)
@@ -62,6 +64,7 @@ export interface PersistCreditImportResult {
   weeklyTotalUsed: number;
   weeklyTotalAvailable: number;
   replaced: boolean;
+  warnings: string[];
 }
 
 export class CreditDatabaseError extends Error {
@@ -92,32 +95,40 @@ export async function persistCreditWorkbook(
       "SELECT 1 FROM credit.institution WHERE report_date = $1::date LIMIT 1",
       [parsed.reportDate],
     );
-    await client.query(`CREATE TEMP TABLE preserved_credit_clients ON COMMIT DROP AS
-      SELECT * FROM credit.institution_client WHERE report_date=$1::date`, [parsed.reportDate]);
     await client.query(
       "DELETE FROM credit.institution WHERE report_date = $1::date",
       [parsed.reportDate],
     );
     await insertInstitutions(client, parsed);
     await insertItems(client, parsed);
-    await client.query(`DELETE FROM credit.institution_client m
-      WHERE EXISTS (SELECT 1 FROM preserved_credit_clients p WHERE p.report_date=m.report_date AND p.institution_name=m.institution_name)`);
-    await client.query(`INSERT INTO credit.institution_client
-      SELECT p.* FROM preserved_credit_clients p JOIN credit.institution i USING(report_date,institution_name)`);
     await client.query("SELECT credit.refresh_institution_events()");
+    const totals = await client.query(`SELECT count(*)::integer AS approved_count,
+      coalesce(sum(total_limit),0)::float8 AS total_limit,
+      coalesce(sum(effective_total_used),0)::float8 AS total_used,
+      coalesce(sum(total_limit-effective_total_used),0)::float8 AS total_available
+      FROM credit.institution_usage WHERE report_date=$1::date AND status='approved'`, [parsed.reportDate]);
+    const reconciliation = await client.query(`SELECT institution_name,item_type::text,
+      imported_used_amount::float8,financing_used_amount::float8,difference::float8,status
+      FROM credit.usage_reconciliation WHERE report_date=$1::date AND status<>'matched'
+      ORDER BY institution_name,item_type`, [parsed.reportDate]);
+    const warnings = [...(parsed.warnings ?? []), ...reconciliation.rows.map(row => row.status === 'unlinked'
+      ? `${row.institution_name}：客户关联缺失，${creditItemLabels[row.item_type as CreditItemType]}已用无法计算，请维护客户关联`
+      : `${row.institution_name}：${creditItemLabels[row.item_type as CreditItemType]}原表${row.imported_used_amount ?? 0}亿元，融资台账${row.financing_used_amount}亿元，差额${row.difference}亿元；使用融资台账金额`)];
+    const summary = totals.rows[0]!;
     await client.query("COMMIT");
     return {
       reportDate: parsed.reportDate,
       institutionCount: parsed.institutions.length,
-      approvedCount: parsed.approvedCount,
-      totalLimit: parsed.totalLimit,
-      totalUsed: parsed.totalUsed,
-      totalAvailable: parsed.totalAvailable,
-      weeklyApprovedCount: parsed.weeklyApprovedCount,
-      weeklyTotalLimit: parsed.weeklyTotalLimit,
-      weeklyTotalUsed: parsed.weeklyTotalUsed,
-      weeklyTotalAvailable: parsed.weeklyTotalAvailable,
+      approvedCount: numberValue(summary.approved_count),
+      totalLimit: numberValue(summary.total_limit),
+      totalUsed: numberValue(summary.total_used),
+      totalAvailable: numberValue(summary.total_available),
+      weeklyApprovedCount: numberValue(summary.approved_count),
+      weeklyTotalLimit: numberValue(summary.total_limit),
+      weeklyTotalUsed: numberValue(summary.total_used),
+      weeklyTotalAvailable: numberValue(summary.total_available),
       replaced: Boolean(existing.rowCount),
+      warnings,
     };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -149,18 +160,16 @@ export async function loadCreditReport(
   const institutionResult = await client.query<InstitutionRow>(
     `SELECT
          to_char(report_date, 'YYYY-MM-DD') AS report_date,
-         source_row,
          institution_type,
          institution_name,
-         confidentiality_status::text AS confidentiality_status,
+         confidentiality_status,
          status::text AS status,
-         included_in_weekly_report,
          total_limit::double precision,
          effective_total_used::double precision AS total_used,
          imported_total_used::double precision,
          (SELECT coalesce(jsonb_agg(jsonb_build_object('id', c.id::text, 'name', c.name)), '[]'::jsonb)
           FROM credit.institution_client m JOIN public.client c ON c.id=m.client_id
-          WHERE m.report_date=credit.institution_usage.report_date AND m.institution_name=credit.institution_usage.institution_name) AS clients,
+          WHERE m.institution_name=credit.institution_usage.institution_name) AS clients,
          to_char(effective_date, 'YYYY-MM-DD') AS effective_date,
          to_char(expiry_date, 'YYYY-MM-DD') AS expiry_date,
          bank_office,
@@ -172,7 +181,7 @@ export async function loadCreditReport(
          to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS updated_at
        FROM credit.institution_usage
        WHERE report_date = ANY($1::date[])
-       ORDER BY report_date, source_row`,
+       ORDER BY report_date, institution_type, institution_name`,
     [reportDates],
   );
   const itemResult = await client.query<ItemRow>(
@@ -195,7 +204,6 @@ export async function loadCreditReport(
     `SELECT
          to_char(report_date, 'YYYY-MM-DD') AS report_date,
          to_char(previous_report_date, 'YYYY-MM-DD') AS previous_report_date,
-         source_row,
          institution_name,
          institution_type,
          event_type,
@@ -216,7 +224,7 @@ export async function loadCreditReport(
             AND report_date <= $1::date
             AND event_type = ANY($2::text[])
           )
-       ORDER BY report_date DESC, source_row, institution_name`,
+       ORDER BY report_date DESC, institution_type, institution_name`,
     [reportDate, ["new", "renewal", "increase"]],
   );
 
@@ -233,10 +241,10 @@ export async function loadCreditReport(
     ? institutionsByDate.get(previousDate) ?? []
     : [];
   const currentWeeklyInstitutions = currentInstitutions.filter(
-    (institution) => institution.includedInWeeklyReport,
+    (institution) => institution.status !== "revoked",
   );
   const previousWeeklyInstitutions = previousInstitutions.filter(
-    (institution) => institution.includedInWeeklyReport,
+    (institution) => institution.status !== "revoked",
   );
   const eventViews = eventResult.rows.map(toInstitutionEventView);
   const weeklyNews = eventViews.filter((event) => event.reportDate === reportDate);
@@ -271,7 +279,7 @@ export async function loadCreditReport(
           expiredInstitutionCount: 0,
         }
       : null,
-    institutions: currentInstitutions,
+    institutions: currentInstitutions.sort(compareCreditInstitutionOrder),
     weeklyNews,
     recentApprovals,
     limitChanges: weeklyNews
@@ -318,18 +326,13 @@ export async function saveCreditInstitution(
            END,
            confidentiality_status = CASE
              WHEN patch.data ? 'confidentialityStatus'
-               THEN (patch.data ->> 'confidentialityStatus')::credit.confidentiality_status
+               THEN (patch.data ->> 'confidentialityStatus')::boolean
              ELSE institution.confidentiality_status
            END,
            status = CASE
              WHEN patch.data ? 'status'
                THEN (patch.data ->> 'status')::credit.credit_status
              ELSE institution.status
-           END,
-           included_in_weekly_report = CASE
-             WHEN patch.data ? 'includedInWeeklyReport'
-               THEN (patch.data ->> 'includedInWeeklyReport')::boolean
-             ELSE institution.included_in_weekly_report
            END,
            total_limit = CASE
              WHEN patch.data ? 'totalLimit'
@@ -666,12 +669,10 @@ async function insertInstitutions(
   parsed: ParsedCreditWorkbook,
 ): Promise<void> {
   const rows = parsed.institutions.map((institution) => ({
-    source_row: institution.sourceRow,
     institution_type: institution.institutionType,
     institution_name: institution.institutionName,
     confidentiality_status: institution.confidentialityStatus,
     status: institution.status,
-    included_in_weekly_report: institution.includedInWeeklyReport,
     total_limit: institution.totalLimit,
     total_used: institution.totalUsed,
     effective_date: institution.effectiveDate,
@@ -685,30 +686,27 @@ async function insertInstitutions(
   }));
   await client.query(
     `INSERT INTO credit.institution (
-       report_date, institution_name, source_row,
+       report_date, institution_name,
        institution_type, confidentiality_status, status,
-       included_in_weekly_report, total_limit,
+       total_limit,
        total_used, effective_date, expiry_date,
        bank_office, applying_department, handler, notes,
        bond_preference, usage_details
      )
      SELECT
-       $1::date, row.institution_name, row.source_row,
+       $1::date, row.institution_name,
        row.institution_type,
-       row.confidentiality_status::credit.confidentiality_status,
+       row.confidentiality_status::boolean,
        row.status::credit.credit_status,
-       row.included_in_weekly_report,
        row.total_limit, row.total_used,
        row.effective_date, row.expiry_date, row.bank_office,
        row.applying_department, row.handler, row.notes,
        row.bond_preference, row.usage_details
      FROM jsonb_to_recordset($2::jsonb) AS row(
-       source_row integer,
        institution_type text,
        institution_name text,
-       confidentiality_status text,
+       confidentiality_status boolean,
        status text,
-       included_in_weekly_report boolean,
        total_limit numeric,
        total_used numeric,
        effective_date date,
@@ -765,12 +763,10 @@ function toInstitutionView(
   const totalUsed = nullableNumber(row.total_used);
   return {
     reportDate: row.report_date,
-    sourceRow: row.source_row,
     institutionType: row.institution_type,
     institutionName: row.institution_name,
     confidentialityStatus: row.confidentiality_status,
     status: row.status,
-    includedInWeeklyReport: row.included_in_weekly_report,
     totalLimit,
     totalUsed,
     importedTotalUsed: nullableNumber(row.imported_total_used),
@@ -882,7 +878,7 @@ function toSummary(
   );
   return {
     reportDate,
-    institutionCount: institutions.length,
+    institutionCount: institutions.filter((institution) => institution.status !== "revoked").length,
     approvedCount: approved.length,
     totalLimit,
     totalUsed,
@@ -1077,12 +1073,10 @@ function sumAmounts(values: Array<number | null>): number {
 
 interface InstitutionRow extends QueryResultRow {
   report_date: string;
-  source_row: number;
   institution_type: string;
   institution_name: string;
   confidentiality_status: CreditInstitutionView["confidentialityStatus"];
   status: CreditInstitutionView["status"];
-  included_in_weekly_report: boolean;
   total_limit: number | null;
   total_used: number | null;
   imported_total_used?: number | null;
@@ -1113,7 +1107,6 @@ interface ItemRow extends QueryResultRow {
 interface InstitutionEventRow extends QueryResultRow {
   report_date: string;
   previous_report_date: string;
-  source_row: number;
   institution_name: string;
   institution_type: string;
   event_type: CreditEventType;

@@ -19,13 +19,15 @@ export type CreditBlock = z.infer<typeof blockSchema>;
 export type CreditCorpus = z.infer<typeof corpusSchema>;
 export const creditCustomerSchema = z.object({
   name: z.string().min(1).max(200),
-  confidentialityStatus: z.enum(["signed", "not_signed", "unknown"]),
+  confidentialityStatus: z.boolean(),
   reportDate: z.string(),
 });
 export type CreditCustomer = z.infer<typeof creditCustomerSchema>;
 export const creditCustomerSelectionSchema = z.object({ institutionName: z.string().trim().min(1).max(200) }).strict();
 export const creditQuestionSchema = creditCustomerSelectionSchema.extend({ question: z.string().trim().min(1).max(3000) });
-export const confidentialityLabels = { signed: "已签署保密协议", not_signed: "未签署保密协议", unknown: "保密协议未标记" };
+export function confidentialityLabel(signed: boolean): string {
+  return signed === true ? "已签署保密协议" : "未签署保密协议";
+}
 export const citationSchema = z.object({ sourceId: z.string(), quote: z.string().min(2).max(1000) });
 export const calculationSchema = z.object({
   label: z.string().max(200), expression: z.string().max(300), resultUnit: z.string().max(40),

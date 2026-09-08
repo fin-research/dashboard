@@ -130,7 +130,7 @@ function commonDebt(row, records) {
 	const isBond = BOND_SUBTYPES.has(oldType);
 	const debtType = isBond ? '债券' : oldType;
 	const subtype = isBond ? oldType : oldType === '收益凭证' ? (categoryLevel2 ?? '固定收益凭证') : null;
-	const counterparty = oldType === '收益凭证'
+	let counterparty = oldType === '收益凭证'
 		? text(value(main, '投资者类型')) ?? text(oldCounterparty)
 		: oldType === '集团借款'
 			? text(value(main, '借款对象')) ?? text(oldCounterparty)
@@ -155,7 +155,12 @@ function commonDebt(row, records) {
 	const resolvedRate = oldType === '互换便利'
 		? rate(value(main, '综合融资利率')) ?? annualRate
 		: annualRate;
-	const name = displayName({ oldType, instrumentName: text(instrumentName), instrumentCode: text(instrumentCode), counterparty, issueDate, main });
+	const correctedGroupLoan = oldType === '集团借款' && issueDate === '2021-09-06'
+		&& maturityDate === '2021-09-14' && Number(outstandingAmount ?? principalAmount ?? 0) === 500000000
+		&& counterparty === '东方财富证券股份有限公司';
+	if (correctedGroupLoan) counterparty = '集团公司';
+	const name = correctedGroupLoan ? '集团借款·集团公司·2021-09-06'
+		: displayName({ oldType, instrumentName: text(instrumentName), instrumentCode: text(instrumentCode), counterparty, issueDate, main });
 	return {
 		sourceKey,
 		table: isBond ? 'bond'

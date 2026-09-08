@@ -31,7 +31,7 @@ try {
     FROM jsonb_to_recordset($1::jsonb) AS x(alias text,"matchKind" text,"clientName" text,notes text)
     JOIN public.client c ON c.name=x."clientName"
     ON CONFLICT(alias,match_kind) DO UPDATE SET client_id=EXCLUDED.client_id,notes=EXCLUDED.notes`, [JSON.stringify(manifest.aliases)]);
-  await database.query(`INSERT INTO credit.client_mapping(institution_name,client_id,yield_certificate,interbank_lending,notes)
+  await database.query(`INSERT INTO credit.institution_client(institution_name,client_id,yield_certificate,interbank_lending,notes)
     SELECT x."institutionName",c.id,x."yieldCertificate",x."interbankLending",x.notes
     FROM jsonb_to_recordset($1::jsonb) AS x("institutionName" text,"clientName" text,"yieldCertificate" boolean,"interbankLending" boolean,notes text)
     JOIN public.client c ON c.name=x."clientName"
@@ -40,10 +40,6 @@ try {
       FROM (SELECT DISTINCT counterparty FROM financing.debt WHERE client_id IS NULL) names)
     UPDATE financing.debt d SET client_id=n.client_id FROM names n
     WHERE d.client_id IS NULL AND d.counterparty=n.counterparty AND n.client_id IS NOT NULL`);
-  await database.query(`INSERT INTO credit.institution_client(report_date,institution_name,client_id,yield_certificate,interbank_lending)
-    SELECT i.report_date,i.institution_name,m.client_id,m.yield_certificate,m.interbank_lending
-    FROM credit.institution i JOIN credit.client_mapping m USING(institution_name)
-    ON CONFLICT(report_date,institution_name,client_id) DO NOTHING`);
   const {rows} = await database.query(`SELECT
     (SELECT count(*) FROM public.client) AS clients,
     (SELECT count(*) FROM financing.debt WHERE client_id IS NOT NULL) AS linked_debts,

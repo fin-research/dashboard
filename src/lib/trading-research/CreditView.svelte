@@ -19,6 +19,7 @@
     type CreditStatus,
     type CreditWeeklyNewsItem,
   } from "../credit/types.ts";
+  import { compareCreditInstitutionOrder, matchesCreditStatus } from "../credit/presentation.ts";
   import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
   import type {
     CreditInstitutionChanges,
@@ -40,7 +41,6 @@
     text: string;
   };
   type SortKey =
-    | "sourceRow"
     | "institutionName"
     | "institutionType"
     | "status"
@@ -59,7 +59,7 @@
   let loading = $state(true);
   let errorMessage = $state("");
   let query = $state("");
-  let statusFilter = $state<CreditStatus | "all">("all");
+  let statusFilter = $state<CreditStatus | "active" | "all">("active");
   let riskFilter = $state("all");
   let expandedInstitution = $state<string | null>(null);
   let editor = $state<CreditInstitutionView | null>(null);
@@ -72,7 +72,7 @@
   let saveInFlight = false;
   let pendingInstitutionChanges: CreditInstitutionChanges = {};
   let pendingItemChanges = new Map<CreditItemType, CreditItemChanges>();
-  let sortKey = $state<SortKey>("sourceRow");
+  let sortKey = $state<SortKey>("institutionType");
   let sortDirection = $state<"ascending" | "descending">("ascending");
   let calendarFilter = $state<CalendarFilter>("all");
   let calendarMonth = $state("");
@@ -97,7 +97,7 @@
             .toLocaleLowerCase("zh-CN")
             .includes(normalizedQuery);
         const matchesStatus =
-          statusFilter === "all" || institution.status === statusFilter;
+          matchesCreditStatus(institution.status, statusFilter);
         const matchesRisk =
           riskFilter === "all" ||
           (riskFilter === "attention" && (institution.utilization ?? 0) >= 60) ||
@@ -122,13 +122,9 @@
     const institutions = (report?.institutions ?? [])
       .filter(
         (institution) =>
-          institution.includedInWeeklyReport && institution.status === "approved",
+          institution.status !== "revoked",
       )
-      .sort(
-        (left, right) =>
-          left.institutionType.localeCompare(right.institutionType, "zh-CN") ||
-          left.institutionName.localeCompare(right.institutionName, "zh-CN"),
-      );
+      .sort(compareCreditInstitutionOrder);
     for (const institution of institutions) {
       const group = groups.get(institution.institutionType) ?? [];
       group.push(institution);
@@ -409,19 +405,8 @@
 
   function setEditorConfidentiality(event: Event): void {
     if (!editor) return;
-    editor.confidentialityStatus = (event.currentTarget as HTMLSelectElement)
-      .value as CreditInstitutionView["confidentialityStatus"];
+    editor.confidentialityStatus = (event.currentTarget as HTMLInputElement).checked;
     queueInstitutionChange("confidentialityStatus", editor.confidentialityStatus);
-    scheduleEditorSave(true);
-  }
-
-  function setEditorWeekly(event: Event): void {
-    if (!editor) return;
-    editor.includedInWeeklyReport = (event.currentTarget as HTMLInputElement).checked;
-    queueInstitutionChange(
-      "includedInWeeklyReport",
-      editor.includedInWeeklyReport,
-    );
     scheduleEditorSave(true);
   }
 
@@ -525,6 +510,10 @@
     left: CreditInstitutionView,
     right: CreditInstitutionView,
   ): number {
+    if (sortKey === "institutionType") {
+      const result = compareCreditInstitutionOrder(left, right);
+      return sortDirection === "ascending" ? result : -result;
+    }
     const leftValue = sortValue(left, sortKey);
     const rightValue = sortValue(right, sortKey);
     if (leftValue == null && rightValue == null) return 0;
@@ -733,6 +722,7 @@
           <label>
             <span class="sr-only">授信状态</span>
             <select bind:value={statusFilter}>
+              <option value="active">未撤销</option>
               <option value="all">全部状态</option>
               <option value="approved">已获批</option>
               <option value="applying">申请中</option>
@@ -755,7 +745,7 @@
           <caption class="sr-only">授信一览表</caption>
           <thead>
             <tr>
-              <th aria-sort={ariaSort("sourceRow")}><button class="tr-sort-button" type="button" onclick={() => toggleSort("sourceRow")}>序号<span aria-hidden="true">{sortIndicator("sourceRow")}</span></button></th>
+              <th>序号</th>
               <th aria-sort={ariaSort("institutionName")}><button class="tr-sort-button" type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span></button></th>
               <th aria-sort={ariaSort("institutionType")}><button class="tr-sort-button" type="button" onclick={() => toggleSort("institutionType")}>机构性质<span aria-hidden="true">{sortIndicator("institutionType")}</span></button></th>
               <th aria-sort={ariaSort("status")}><button class="tr-sort-button" type="button" onclick={() => toggleSort("status")}>状态<span aria-hidden="true">{sortIndicator("status")}</span></button></th>
@@ -794,8 +784,7 @@
                       <div class="tr-credit-editor-grid">
                         <label><span>机构性质</span><input value={editor.institutionType} oninput={(event) => setEditorText("institutionType", event)} onblur={() => void flushEditor()} /></label>
                         <label><span>授信状态</span><select value={editor.status} onchange={setEditorStatus}><option value="approved">已获批</option><option value="applying">申请中</option><option value="revoked">已撤销</option></select></label>
-                        <label><span>保密协议</span><select value={editor.confidentialityStatus} onchange={setEditorConfidentiality}><option value="signed">已签署</option><option value="not_signed">未签署</option><option value="unknown">未标记</option></select></label>
-                        <label class="tr-credit-checkbox"><input type="checkbox" checked={editor.includedInWeeklyReport} onchange={setEditorWeekly} /><span>纳入周报名单</span></label>
+                        <label class="tr-credit-checkbox"><input type="checkbox" checked={editor.confidentialityStatus} onchange={setEditorConfidentiality} /><span>已签署保密协议</span></label>
                         <label><span>授信总额（亿元）</span><input type="number" step="0.000001" min="0" value={editor.totalLimit ?? ""} oninput={(event) => setEditorAmount("totalLimit", event)} onblur={() => void flushEditor()} /></label>
                         <label><span>已用额度（亿元）</span><input readonly value={formatAmount(editor.totalUsed)} /></label>
                         <label><span>可用额度（亿元）</span><input readonly value={formatAmount(editor.totalLimit == null || editor.totalUsed == null ? null : editor.totalLimit - editor.totalUsed)} /></label>

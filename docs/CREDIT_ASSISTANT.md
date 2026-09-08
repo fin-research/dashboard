@@ -119,3 +119,5 @@ node scripts/evaluate-credit-assistant.mjs --base-url=https://eastmoney.hasbai.x
 典型问题至少覆盖：索取审计报告、不同报告期的指标和比例计算、2025 年 30.90 亿元增资来源、50 亿元取得借款现金流的来源与用途、材料未披露的问题、错误金额前提、连续追问。
 
 当前 Dashboard 已连接 Cloudflare Git，推送 `main` 会触发自动构建和发布；不要再手动执行部署。新增 `credit-agent-v1` SQLite Durable Object migration 随 Git 发布执行，不另改 D1 或 Neon schema。独立手动部署仍需明确授权。默认不做浏览器截图验收。
+
+保密协议字段 `confidentiality_status` 与 API `confidentialityStatus` 统一为布尔值，只有明确的 `true` 允许提供受限材料。未签署、未知以及旧会话中的遗留字符串均不能作为授权；请求时仍回查最新数据库状态。

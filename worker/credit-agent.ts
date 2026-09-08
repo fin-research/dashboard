@@ -19,7 +19,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
     if (!this.state.customer) return { ...this.initialState, turns: [],
       error: this.state.turns.length || this.state.pendingQuestion ? "旧对话尚未绑定客户，请新建对话并选择机构。" : null };
     const customer = verifiedCustomer ?? await this.customer(this.state.customer.name)
-      ?? { ...this.state.customer, confidentialityStatus: "unknown" as const };
+      ?? { ...this.state.customer, confidentialityStatus: false as const };
     if (!this.state.turns.length) return { ...this.state, customer };
     const corpus = await loadCreditCorpus(this.env.CREDIT);
     return discloseCreditSession(this.state, corpus, customer);
@@ -102,9 +102,9 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
       const latestCustomer = await this.customer(customer.name);
       const latestCorpus = await loadCreditCorpus(this.env.CREDIT);
       const answer = creditAnswerForTurn(canProvideCreditAnswer(generated, latestCorpus, latestCustomer)
-        ? generated : creditNdaRefusal(latestCorpus, latestCustomer ?? { ...customer, confidentialityStatus: "unknown" }), payload.id);
+        ? generated : creditNdaRefusal(latestCorpus, latestCustomer ?? { ...customer, confidentialityStatus: false }), payload.id);
       this.setState({ ...this.state, turns: [...this.state.turns, { id: payload.id, question: payload.question, answer, createdAt: answer.createdAt }],
-        customer: latestCustomer ?? { ...customer, confidentialityStatus: "unknown" }, running: false, progress: "", error: null, pendingQuestion: "" });
+        customer: latestCustomer ?? { ...customer, confidentialityStatus: false }, running: false, progress: "", error: null, pendingQuestion: "" });
     } catch (error) {
       console.error(JSON.stringify({ event: "credit_answer_failed", error_type: error instanceof Error ? error.name : "unknown",
         ...(error instanceof AiGatewayResponseError ? { provider: error.provider, status: error.status, gateway_log_id: error.gatewayLogId,

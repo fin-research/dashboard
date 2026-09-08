@@ -20,7 +20,7 @@ export const creditItemLabels: Record<CreditItemType, string> = {
 
 export const creditStatuses = ["approved", "applying", "revoked"] as const;
 export type CreditStatus = (typeof creditStatuses)[number];
-export type ConfidentialityStatus = "signed" | "not_signed" | "unknown";
+export type ConfidentialityStatus = boolean;
 
 export interface ParsedCreditItem {
   type: CreditItemType;
@@ -31,12 +31,10 @@ export interface ParsedCreditItem {
 }
 
 export interface ParsedCreditInstitution {
-  sourceRow: number;
   institutionType: string;
   institutionName: string;
   confidentialityStatus: ConfidentialityStatus;
   status: CreditStatus;
-  includedInWeeklyReport: boolean;
   totalLimit: number | null;
   totalUsed: number | null;
   totalRemaining: number | null;
@@ -74,9 +72,8 @@ export interface CreditItemView extends ParsedCreditItem {
 }
 
 export interface CreditInstitutionView
-  extends Omit<ParsedCreditInstitution, "sourceRow"> {
+  extends ParsedCreditInstitution {
   reportDate: string;
-  sourceRow: number;
   updatedAt: string;
   items: CreditItemView[];
   importedTotalUsed?: number | null;

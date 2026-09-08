@@ -16,7 +16,7 @@ const opened = new Map(blocks.map(b => [b.id, b]));
 const calculation = { label: "元换算亿元", expression: "a/100000000", resultUnit: "亿元", decimals: 2,
   inputs: [{ name: "a", value: "3090000000", unit: "元", sourceId: "a-1", quote: "吸收投资收到的现金 3,090,000,000.00" }] };
 const draft = { status: "complete", paragraphs: [{ text: "2025年吸收投资收到现金30.90亿元。", citations: [{ sourceId: "calc-1", quote: "30.90" }] }], gaps: [], attachments: [doc.id] };
-const customer = { name: "测试银行", confidentialityStatus: "signed", reportDate: "2026-09-07" };
+const customer = { name: "测试银行", confidentialityStatus: true, reportDate: "2026-09-07" };
 const credentials = { accountId: "test", gatewayId: "default", token: "test-token" };
 
 test("calculation retains exact decimal result and source inputs", () => {

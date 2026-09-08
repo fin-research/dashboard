@@ -18,7 +18,7 @@ import {
   saveCreditInstitution,
 } from "../src/lib/server/credit-repository.ts";
 
-test("授信 Excel 同时保留一览表全口径和周报名单口径", () => {
+test("授信 Excel 一览表与周报使用相同口径且不依赖旧周报名单", () => {
   const parsed = parseCreditWorkbook(workbookBuffer(), {
     reportDate: "2026-08-21",
     originalFileName: "授信周报.xlsx",
@@ -29,12 +29,10 @@ test("授信 Excel 同时保留一览表全口径和周报名单口径", () => {
   assert.equal(parsed.totalLimit, 12);
   assert.equal(parsed.totalUsed, 4);
   assert.equal(parsed.totalAvailable, 8);
-  assert.equal(parsed.weeklyApprovedCount, 1);
-  assert.equal(parsed.weeklyTotalLimit, 10);
-  assert.equal(parsed.weeklyTotalUsed, 3);
-  assert.equal(parsed.weeklyTotalAvailable, 7);
-  assert.equal(parsed.institutions[0].includedInWeeklyReport, true);
-  assert.equal(parsed.institutions[1].includedInWeeklyReport, false);
+  assert.equal(parsed.weeklyApprovedCount, 2);
+  assert.equal(parsed.weeklyTotalLimit, 12);
+  assert.equal(parsed.weeklyTotalUsed, 4);
+  assert.equal(parsed.weeklyTotalAvailable, 8);
   assert.deepEqual(parsed.warnings, []);
 });
 
@@ -230,6 +228,7 @@ test("同日报表导入替换机构与分项并刷新独立授信事件表", as
   const client = {
     async query(sql, parameters) {
       calls.push({ sql, parameters });
+      if (/AS approved_count/.test(sql)) return { rows: [{ approved_count: 2, total_limit: 12, total_used: 4, total_available: 8 }], rowCount: 1 };
       return /SELECT 1 FROM credit\.institution/.test(sql)
         ? { rows: [{ "?column?": 1 }], rowCount: 1 }
         : { rows: [], rowCount: 0 };
@@ -498,12 +497,10 @@ function creditRow(
 function institution(name, total, used, bondLimit, bondUsed, overrides = {}) {
   return {
     reportDate: "2026-08-21",
-    sourceRow: 4,
     institutionType: "银行",
     institutionName: name,
-    confidentialityStatus: "signed",
+    confidentialityStatus: true,
     status: "approved",
-    includedInWeeklyReport: true,
     totalLimit: total,
     totalUsed: used,
     totalRemaining: total - used,
@@ -533,12 +530,10 @@ function institution(name, total, used, bondLimit, bondUsed, overrides = {}) {
 function institutionRow(overrides = {}) {
   return {
     report_date: "2026-08-21",
-    source_row: 4,
     institution_type: "银行",
     institution_name: "甲银行",
-    confidentiality_status: "signed",
+    confidentiality_status: true,
     status: "approved",
-    included_in_weekly_report: true,
     total_limit: 10,
     total_used: 3,
     total_remaining: 7,
@@ -559,7 +554,6 @@ function institutionEventRow(overrides = {}) {
   return {
     report_date: "2026-08-21",
     previous_report_date: "2026-08-14",
-    source_row: 4,
     institution_name: "甲银行",
     institution_type: "银行",
     event_type: "new",
@@ -576,3 +570,31 @@ function institutionEventRow(overrides = {}) {
     ...overrides,
   };
 }
+
+test('授信总已用按分项重算并警告原表差额，保密协议仅明确签署为 true', () => {
+  const workbook = syntheticWorkbook();
+  const sheet = workbook.Sheets['授信一览表'];
+  sheet.H4.v = 3.0245;
+  sheet.D4.v = 'not_signed';
+  sheet.D5.v = 'unknown';
+  delete workbook.Sheets['授信周报'];
+  workbook.SheetNames = ['授信一览表'];
+  const parsed = parseCreditWorkbook(write(workbook, { type: 'buffer', bookType: 'xlsx' }), {
+    reportDate: '2026-08-21', originalFileName: '授信.xlsx',
+  });
+  assert.equal(parsed.institutions[0].totalUsed, 3);
+  assert.equal(parsed.institutions[0].totalRemaining, 7);
+  assert.equal(parsed.institutions[0].confidentialityStatus, false);
+  assert.equal(parsed.institutions[1].confidentialityStatus, false);
+  assert.match(parsed.warnings.join('\n'), /甲银行.*原表3.0245亿元，分项合计3亿元，差额0.0245亿元/);
+  assert.equal('sourceRow' in parsed.institutions[0], false);
+  assert.equal('includedInWeeklyReport' in parsed.institutions[0], false);
+});
+
+test('授信布尔协议契约拒绝字符串及已删除的周报标记', () => {
+  const check = institution => creditInstitutionUpdateSchema.safeParse({ reportDate: '2026-08-21', institutionName: '甲', changes: { institution } }).success;
+  assert.equal(check({ confidentialityStatus: true }), true);
+  assert.equal(check({ confidentialityStatus: false }), true);
+  for (const value of ['signed', 'not_signed', 'unknown', 'false']) assert.equal(check({ confidentialityStatus: value }), false);
+  assert.equal(check({ includedInWeeklyReport: false }), false);
+});

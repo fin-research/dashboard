@@ -11,7 +11,7 @@ import {
 } from "./types.ts";
 
 const SOURCE_SHEET = "授信一览表" as const;
-const AMOUNT_TOLERANCE = 0.01;
+const AMOUNT_TOLERANCE = 0.000001;
 
 const itemColumns: Record<CreditItemType, {
   limit: number | null;
@@ -55,7 +55,6 @@ export function parseCreditWorkbook(
     blankrows: true,
   }) as unknown[][];
   validateHeaders(rows);
-  const weeklyReport = parseWeeklyReport(workbook.Sheets["授信周报"]);
 
   const warnings: string[] = [];
   const institutions: ParsedCreditInstitution[] = [];
@@ -80,8 +79,10 @@ export function parseCreditWorkbook(
     const sourceRow = rowIndex + 1;
     const items = creditItemTypes.map((type) => parseItem(row, type));
     const totalLimit = finiteNumber(row[6]);
-    const totalUsed = finiteNumber(row[7]);
-    const totalRemaining = finiteNumber(row[8]) ?? subtractAmounts(totalLimit, totalUsed);
+    const reportedTotalUsed = finiteNumber(row[7]);
+    const totalUsed = sumAmounts(items.map((item) => item.usedAmount));
+    const reportedRemaining = finiteNumber(row[8]);
+    const totalRemaining = subtractAmounts(totalLimit, totalUsed);
     const status = parseStatus(row[4], row[5]);
     const effectiveDate = excelDate(row[26]);
     const expiryDate = excelDate(row[27]);
@@ -96,25 +97,22 @@ export function parseCreditWorkbook(
     }
     if (
       totalLimit != null &&
-      totalUsed != null &&
-      totalRemaining != null &&
-      Math.abs(totalLimit - totalUsed - totalRemaining) > AMOUNT_TOLERANCE
+      reportedTotalUsed != null &&
+      reportedRemaining != null &&
+      Math.abs(totalLimit - reportedTotalUsed - reportedRemaining) > AMOUNT_TOLERANCE
     ) {
       warnings.push(`第${sourceRow}行“${institutionName}”总额、已用和剩余不勾稽`);
     }
-    const itemUsed = items.reduce((sum, item) => sum + (item.usedAmount ?? 0), 0);
-    if (totalUsed != null && Math.abs(totalUsed - itemUsed) > AMOUNT_TOLERANCE) {
-      warnings.push(`第${sourceRow}行“${institutionName}”总已用与分项已用不勾稽`);
+    if (reportedTotalUsed != null && Math.abs(reportedTotalUsed - totalUsed) > AMOUNT_TOLERANCE) {
+      warnings.push(`第${sourceRow}行“${institutionName}”总已用与分项已用不一致：原表${reportedTotalUsed}亿元，分项合计${totalUsed}亿元，差额${sumAmounts([reportedTotalUsed, -totalUsed])}亿元；按分项合计导入`);
     }
 
     if (institutionType === "未分类") unclassifiedCount += 1;
     institutions.push({
-      sourceRow,
       institutionType,
       institutionName,
       confidentialityStatus: parseConfidentiality(row[3]),
       status,
-      includedInWeeklyReport: weeklyReport.institutionNames.has(institutionName),
       totalLimit,
       totalUsed,
       totalRemaining,
@@ -143,22 +141,6 @@ export function parseCreditWorkbook(
   const totalAvailable = sumAmounts(
     approved.map((institution) => availableAmount(institution.totalLimit, institution.totalUsed)),
   );
-  const weeklyApproved = approved.filter((institution) => institution.includedInWeeklyReport);
-  const weeklyTotalLimit = sumAmounts(
-    weeklyApproved.map((institution) => institution.totalLimit),
-  );
-  const weeklyTotalUsed = sumAmounts(
-    weeklyApproved.map((institution) => institution.totalUsed),
-  );
-  const weeklyTotalAvailable = sumAmounts(
-    weeklyApproved.map((institution) => availableAmount(institution.totalLimit, institution.totalUsed)),
-  );
-  reconcileWeeklyReport(
-    weeklyReport,
-    weeklyTotalLimit,
-    weeklyTotalAvailable,
-    warnings,
-  );
 
   return {
     reportDate: options.reportDate,
@@ -169,10 +151,10 @@ export function parseCreditWorkbook(
     totalLimit,
     totalUsed,
     totalAvailable,
-    weeklyApprovedCount: weeklyApproved.length,
-    weeklyTotalLimit,
-    weeklyTotalUsed,
-    weeklyTotalAvailable,
+    weeklyApprovedCount: approved.length,
+    weeklyTotalLimit: totalLimit,
+    weeklyTotalUsed: totalUsed,
+    weeklyTotalAvailable: totalAvailable,
     warnings,
   };
 }
@@ -210,55 +192,6 @@ function validateHeaders(rows: unknown[][]): void {
   }
 }
 
-function parseWeeklyReport(reportSheet: ReturnType<typeof read>["Sheets"][string] | undefined): {
-  institutionNames: Set<string>;
-  totalLimit: number | null;
-  totalAvailable: number | null;
-} {
-  if (!reportSheet) throw new CreditWorkbookParseError("缺少“授信周报”Sheet");
-  const rows = utils.sheet_to_json<unknown[]>(reportSheet, {
-    header: 1,
-    raw: true,
-    defval: null,
-    blankrows: true,
-  }) as unknown[][];
-  const appendixHeader = rows.findIndex(
-    (row) => cleanText(row[1]) === "银行性质" && cleanText(row[2]) === "银行名称",
-  );
-  if (appendixHeader < 0) {
-    throw new CreditWorkbookParseError("授信周报缺少附表银行名单");
-  }
-  return {
-    institutionNames: new Set(
-      rows
-        .slice(appendixHeader + 2)
-        .map((row) => cleanText(row[2]))
-        .filter((name): name is string => Boolean(name)),
-    ),
-    totalLimit: finiteNumber(rows[2]?.[3]),
-    totalAvailable: finiteNumber(rows[3]?.[3]),
-  };
-}
-
-function reconcileWeeklyReport(
-  weeklyReport: ReturnType<typeof parseWeeklyReport>,
-  totalLimit: number,
-  totalAvailable: number,
-  warnings: string[],
-): void {
-  const weeklyTotal = weeklyReport.totalLimit;
-  const weeklyAvailable = weeklyReport.totalAvailable;
-  if (weeklyTotal != null && Math.abs(weeklyTotal - totalLimit) > AMOUNT_TOLERANCE) {
-    warnings.push("授信周报授信总额与授信一览表已获批口径不一致");
-  }
-  if (
-    weeklyAvailable != null &&
-    Math.abs(weeklyAvailable - totalAvailable) > AMOUNT_TOLERANCE
-  ) {
-    warnings.push("授信周报可用余额与授信一览表已获批口径不一致");
-  }
-}
-
 function parseStatus(approved: unknown, applying: unknown): CreditStatus {
   if (truthyFlag(approved)) return "approved";
   if (truthyFlag(applying)) return "applying";
@@ -267,9 +200,7 @@ function parseStatus(approved: unknown, applying: unknown): CreditStatus {
 
 function parseConfidentiality(value: unknown): ConfidentialityStatus {
   const text = cleanText(value);
-  if (text === "是") return "signed";
-  if (text === "否") return "not_signed";
-  return "unknown";
+  return value === true || value === 1 || text === "是" || text === "已签署" || text === "signed";
 }
 
 function truthyFlag(value: unknown): boolean {

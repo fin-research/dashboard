@@ -8,7 +8,7 @@ import { creditItemTypes } from '../src/lib/credit/types.ts';
 import { importDebtWorkbook } from '../src/lib/server/financing/debt-importer.js';
 import { transformWorkbook } from '../scripts/financing/lib/debt-transform.mjs';
 
-async function database(t) {
+async function database(t, legacy = false) {
   const db = new PGlite();
   const query = db.query.bind(db);
   db.query = async (...args) => { const result = await query(...args); return {...result,rowCount: result.rows.length || result.affectedRows || 0}; };
@@ -17,7 +17,7 @@ async function database(t) {
     await db.exec(fs.readFileSync(new URL(`../financing-migrations/${name}`, import.meta.url),'utf8'));
   }
   for (const name of fs.readdirSync(new URL('../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
-    await db.exec(fs.readFileSync(new URL(`../credit-migrations/${name}`,import.meta.url),'utf8'));
+    if (!legacy || name < '0005') await db.exec(fs.readFileSync(new URL(`../credit-migrations/${name}`,import.meta.url),'utf8'));
   }
   await db.exec(`INSERT INTO public.client(name,fullname,type,subtype) VALUES
     ('招商银行','招商银行股份有限公司','银行','股份行'),('中银理财','中银理财有限责任公司','理财子',NULL),('乙银行',NULL,'银行','城商行');
@@ -28,8 +28,8 @@ async function database(t) {
 }
 
 async function institution(db, date='2026-09-04', name='合并授信') {
-  await db.query(`INSERT INTO credit.institution(report_date,source_row,institution_name,institution_type,confidentiality_status,status,included_in_weekly_report,total_limit,total_used)
-    VALUES ($1,4,$2,'银行','unknown','approved',true,20,10)`,[date,name]);
+  await db.query(`INSERT INTO credit.institution(report_date,institution_name,institution_type,confidentiality_status,status,total_limit,total_used)
+    VALUES ($1,$2,'银行',false,'approved',20,10)`,[date,name]);
   for (const type of creditItemTypes) await db.query(`INSERT INTO credit.item(report_date,institution_name,item_type,limit_amount,used_amount)
     VALUES ($1,$2,$3,20,$4)`,[date,name,type,type==='yield_certificate'?8:type==='other'?2:0]);
 }
@@ -51,9 +51,9 @@ test('customer matching keeps actual investors, supports prefixes, and never gue
   await assert.rejects(db.query('DELETE FROM public.client WHERE id=2'),/foreign key/);
 });
 
-test('dated combined credit sums clients once, excludes matured/future/closed debt, and preserves original usage',async t=>{
+test('static combined credit sums clients once, excludes matured/future/closed debt, and preserves original usage',async t=>{
   const db=await database(t);
-  await db.exec(`INSERT INTO credit.client_mapping(institution_name,client_id,notes) VALUES ('合并授信',1,'明确合并'),('合并授信',2,'明确合并')`);
+  await db.exec(`INSERT INTO credit.institution_client(institution_name,client_id,notes) VALUES ('合并授信',1,'明确合并'),('合并授信',2,'明确合并')`);
   await institution(db);
   await db.exec(`INSERT INTO financing.income_certificate(debt_type,subtype,name,client_id,amount,issue_date,activated_at,maturity_date) VALUES
     ('收益凭证','固定收益凭证','存续甲',1,100000000,'2026-08-01','2026-08-01','2027-08-01'),
@@ -72,7 +72,7 @@ test('dated combined credit sums clients once, excludes matured/future/closed de
   assert.equal(row.items.find(i=>i.type==='yield_certificate').importedUsedAmount,8);
   assert.equal((await db.query("SELECT total_used FROM credit.institution")).rows[0].total_used,'10.000000');
   await institution(db,'2026-09-04','重复授信');
-  await assert.rejects(db.query(`INSERT INTO credit.institution_client(report_date,institution_name,client_id) VALUES ('2026-09-04','重复授信',1)`),/unique/);
+  await assert.rejects(db.query(`INSERT INTO credit.institution_client(institution_name,client_id,notes) VALUES ('重复授信',1,'重复测试')`),/unique/);
   const unknown=(await loadCreditReport(db)).institutions.find(i=>i.institutionName==='重复授信');
   assert.equal(unknown.totalUsed,null);
   assert.equal(unknown.availableAmount,null);
@@ -81,7 +81,7 @@ test('dated combined credit sums clients once, excludes matured/future/closed de
   assert.equal((await loadCreditReport(db)).institutions[0].totalUsed,12);
 });
 
-test('credit import keeps dated manual mappings and automatically links clear new customers',async t=>{
+test('credit import keeps static manual mappings and automatically links clear new customers',async t=>{
   const db=await database(t);
   await institution(db,'2026-09-04','乙银行');
   assert.equal((await db.query('SELECT client_id FROM credit.institution_client')).rows[0].client_id,3);
@@ -134,4 +134,77 @@ test('note cleanup removes only empty note records and parsing never recreates t
   assert.deepEqual((await db.query('SELECT name FROM financing.debt')).rows.map(r=>r.name),['正常客户']);
   const parsed={debts:[[1,'note','集团借款',null,null,null,null,null,'截至目前集团共发行3次可转债：',0,0]],cashflows:[],balances:[],records:[],recordGroups:[],fields:[],definitions:[],cells:[],snapshot:{asOfDate:'2026-09-04',totalYi:0}};
   assert.equal(transformWorkbook(parsed).debts.length,0);
+});
+
+test('item changes, deletion and direct header updates always preserve the item sum', async t => {
+  const db = await database(t);
+  await institution(db, '2026-08-21', '乙银行');
+  const total = async () => Number((await db.query('SELECT total_used FROM credit.institution')).rows[0].total_used);
+  assert.equal(await total(), 10);
+  await db.query("UPDATE credit.institution SET total_used=99");
+  assert.equal(await total(), 10);
+  await db.query("UPDATE credit.item SET used_amount=0.0245 WHERE item_type='other'");
+  assert.equal(await total(), 8.0245);
+  await db.query("DELETE FROM credit.item WHERE item_type='yield_certificate'");
+  assert.equal(await total(), 0.0245);
+  await db.query("INSERT INTO credit.item(report_date,institution_name,item_type,used_amount) VALUES ('2026-08-21','乙银行','yield_certificate',45)");
+  assert.equal(await total(), 45.0245);
+  // A static manual ownership edit affects all report dates and survives a reimport.
+  await institution(db, '2026-08-28', '乙银行');
+  assert.equal((await db.query('SELECT count(*) n FROM credit.institution_client')).rows[0].n, 1);
+  const report = await loadCreditReport(db, '2026-08-21');
+  assert.equal(report.institutions[0].totalUsed, 0.0245);
+  assert.equal(report.summary.totalUsed, report.weeklySummary.totalUsed);
+});
+
+test('one bank can allocate certificates and lending to separate static credit subjects without double counting', async t => {
+  const db = await database(t);
+  await db.query(`INSERT INTO credit.institution_client(institution_name,client_id,yield_certificate,interbank_lending,notes) VALUES
+    ('乙银行（金市）',3,false,true,'拆借主体'),('乙银行（资管）',3,true,false,'凭证主体')`);
+  for (const name of ['乙银行（金市）', '乙银行（资管）']) await institution(db, '2026-09-04', name);
+  await db.query(`INSERT INTO financing.debt(debt_type,name,client_id,amount,activated_at,maturity_date) VALUES
+    ('收益凭证','凭证',3,100000000,'2026-08-01','2027-08-01'),('同业拆借','拆借',3,200000000,'2026-08-01','2027-08-01')`);
+  const report = await loadCreditReport(db);
+  const usage = name => report.institutions.find(i=>i.institutionName===name).items.filter(i=>i.usageSource==='financing').map(i=>i.usedAmount);
+  assert.deepEqual(usage('乙银行（金市）'), [0,2]);
+  assert.deepEqual(usage('乙银行（资管）'), [1,0]);
+  assert.equal(report.summary.totalUsed, 7); // 3 financing + 2 other per subject.
+});
+
+test('confirmed 2021 group-loan typo is normalized before incremental identity matching', async t => {
+  const db = await database(t);
+  await db.query("INSERT INTO public.client(name,type) VALUES ('集团公司','其它')");
+  const raw={debts:[[1,'group','集团借款',null,null,null,null,null,'东方财富证券股份有限公司',500000000,500000000,'CNY',null,'2021-09-06','2021-09-14','matured']],cashflows:[],balances:[],records:[],recordGroups:[],fields:[],definitions:[],cells:[],snapshot:{asOfDate:'2021-09-14',totalYi:0}};
+  const payload=transformWorkbook(raw);
+  assert.equal(payload.debts[0].counterparty,'集团公司');
+  assert.equal(payload.debts[0].name,'集团借款·集团公司·2021-09-06');
+  await db.query(`INSERT INTO financing.debt(id,debt_type,name,counterparty,amount,issue_date,maturity_date)
+    VALUES (9445,'集团借款','集团借款·东方财富证券股份有限公司·2021-09-06','东方财富证券股份有限公司',500000000,'2021-09-06','2021-09-14')`);
+  await db.exec(fs.readFileSync(new URL('../financing-migrations/0030_correct_group_loan_counterparty.sql',import.meta.url),'utf8'));
+  const result=await importDebtWorkbook(db,payload);
+  assert.equal(result.insertedDebtCount,0);
+  assert.equal(result.skippedDebtCount,1);
+  assert.equal((await db.query('SELECT counterparty FROM financing.debt WHERE id=9445')).rows[0].counterparty,'集团公司');
+});
+
+test('nonempty migration converts all NDA states, consolidates dates and applies the confirmed historical amounts', async t => {
+  const db=await database(t,true);
+  await db.query(`INSERT INTO credit.client_mapping(institution_name,client_id,notes) VALUES ('浦发银行',1,'测试'),('北京农商行',2,'测试'),('昆山农商行',3,'测试')`);
+  await db.query(`INSERT INTO credit.institution(report_date,source_row,institution_name,institution_type,confidentiality_status,status,included_in_weekly_report,total_limit,total_used) VALUES
+    ('2026-08-28',4,'浦发银行','股份行','signed','approved',false,100,87.5),
+    ('2026-08-21',5,'北京农商行','农商行','not_signed','approved',true,20,9.0245),
+    ('2026-08-21',6,'昆山农商行','农商行','unknown','approved',false,10,0),
+    ('2026-08-28',5,'北京农商行','农商行','not_signed','approved',true,20,9)`);
+  await db.query(`INSERT INTO credit.item(report_date,institution_name,item_type,used_amount)
+    SELECT i.report_date,i.institution_name,t::credit.item_type,
+      CASE WHEN institution_name='浦发银行' THEN CASE t WHEN 'yield_certificate' THEN 65 WHEN 'bond_investment' THEN 7.5 WHEN 'interbank_lending' THEN 5 WHEN 'other' THEN 10 ELSE 0 END
+        WHEN institution_name='北京农商行' THEN CASE t WHEN 'yield_certificate' THEN 5 WHEN 'bond_investment' THEN 4 ELSE 0 END
+        ELSE CASE t WHEN 'bond_investment' THEN 0.5 ELSE 0 END END
+    FROM credit.institution i CROSS JOIN unnest($1::text[]) t`,[creditItemTypes]);
+  await db.exec(fs.readFileSync(new URL('../credit-migrations/0005_static_clients_and_usage_totals.sql',import.meta.url),'utf8'));
+  const rows=(await db.query("SELECT institution_name,confidentiality_status,total_used::float8 FROM credit.institution WHERE (report_date='2026-08-21') OR institution_name='浦发银行' ORDER BY institution_name")).rows;
+  assert.deepEqual(rows.map(r=>[r.institution_name,r.confidentiality_status,r.total_used]),[['北京农商行',false,9.0245],['昆山农商行',false,0.5],['浦发银行',true,67.5]]);
+  assert.equal((await db.query('SELECT count(*) n FROM credit.institution_client')).rows[0].n,3);
+  assert.equal((await db.query("SELECT count(*) n FROM information_schema.columns WHERE table_schema='credit' AND (column_name IN ('source_row','included_in_weekly_report') OR (table_name='institution_client' AND column_name='report_date'))")).rows[0].n,0);
+  assert.equal((await db.query("SELECT to_regclass('credit.client_mapping') old_table")).rows[0].old_table,null);
 });

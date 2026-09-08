@@ -50,7 +50,7 @@ const client = new Client({
 try {
   await client.connect();
   const result = await persistCreditWorkbook(client, input);
-  console.log(JSON.stringify({ mode: "import", ...result, warnings: parsed.warnings }, null, 2));
+  console.log(JSON.stringify({ mode: "import", ...result }, null, 2));
 } finally {
   await client.end().catch(() => undefined);
 }

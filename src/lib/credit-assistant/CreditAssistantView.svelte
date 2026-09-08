@@ -3,7 +3,7 @@
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
   import { portal } from "../portal";
   import { globalMessages } from "../global-messages";
-  import { customerAnswerText, creditCustomerSchema, confidentialityLabels, type CreditAnswer, type CreditCustomer, type CreditSession } from "./types";
+  import { customerAnswerText, creditCustomerSchema, confidentialityLabel, type CreditAnswer, type CreditCustomer, type CreditSession } from "./types";
 
   let session = $state<CreditSession>({ turns: [], running: false, progress: "", error: null, startedAt: 0 });
   let question = $state("");
@@ -320,7 +320,7 @@
               {#each customers as customer, index (customer.name)}
                 <li role="option" aria-selected={index === activeCustomer} id={`credit-customer-${index}`}>
                   <button type="button" tabindex="-1" onpointerdown={event => event.preventDefault()} onclick={() => void selectCustomer(customer)}>
-                    <span>{customer.name}</span><span>{confidentialityLabels[customer.confidentialityStatus]}</span>
+                    <span>{customer.name}</span><span>{confidentialityLabel(customer.confidentialityStatus)}</span>
                   </button>
                 </li>
               {/each}
@@ -331,7 +331,7 @@
           </div>
         {/if}
       </div>
-      <span class="customer-status" aria-live="polite">{selecting ? "正在核对机构…" : selectedCustomer ? confidentialityLabels[selectedCustomer.confidentialityStatus] : "请选择机构"}</span>
+      <span class="customer-status" aria-live="polite">{selecting ? "正在核对机构…" : selectedCustomer ? confidentialityLabel(selectedCustomer.confidentialityStatus) : "请选择机构"}</span>
     </div>
     <form class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>

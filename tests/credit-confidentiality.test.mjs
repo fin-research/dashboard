@@ -7,9 +7,9 @@ import { isPublicCreditDocument, canProvideCreditDocument, creditCorpusForCustom
   canProvideCreditAnswer, creditHistoryForCustomer, discloseCreditSession, canDownloadCreditDocument,
   creditAnswerForTurn, CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
 
-const unsigned = { name: "未签银行", confidentialityStatus: "not_signed", reportDate: "2026-09-07" };
-const signed = { name: "已签银行", confidentialityStatus: "signed", reportDate: "2026-09-07" };
-const unknown = { ...unsigned, confidentialityStatus: "unknown" };
+const unsigned = { name: "未签银行", confidentialityStatus: false, reportDate: "2026-09-07" };
+const signed = { name: "已签银行", confidentialityStatus: true, reportDate: "2026-09-07" };
+const unknown = { ...unsigned, confidentialityStatus: false };
 const documents = [
   { id: "a".repeat(24), title: "2025年度报告.pdf", relativePath: "定期报告/2025年度/2025年度报告.pdf" },
   { id: "b".repeat(24), title: "风险控制指标监管报表专项审计报告2025.pdf", relativePath: "风控与监管指标/2025年/风险控制指标监管报表专项审计报告2025.pdf" },
@@ -42,7 +42,7 @@ test("only canonical 定期报告 paths are public, regardless of audited labels
 
 test("client cannot submit a forged NDA flag or omit customer selection", () => {
   assert.equal(creditQuestionSchema.safeParse({ question: "报告" }).success, false);
-  assert.equal(creditQuestionSchema.safeParse({ question: "报告", institutionName: unsigned.name, confidentialityStatus: "signed" }).success, false);
+  assert.equal(creditQuestionSchema.safeParse({ question: "报告", institutionName: unsigned.name, confidentialityStatus: true }).success, false);
   assert.equal(creditCustomerSelectionSchema.safeParse({ institutionName: unsigned.name, signed: true }).success, false);
 });
 
@@ -127,7 +127,7 @@ test("signed institutions receive restricted attachments; revocation, reclassifi
   const answer = await answerCreditQuestion({ question: "机密罚单", customer: signed, corpus, credentials, history: [], generate: modelAnswer(attachmentDraft(documents[1].id)) });
   assert.equal(answer.files[0].id, documents[1].id);
   const session = { customer: signed, turns: [turn(answer)], running: false, progress: "", error: null, startedAt: 0 };
-  const revoked = { ...signed, confidentialityStatus: "not_signed" };
+  const revoked = { ...signed, confidentialityStatus: false };
   assert.equal(canProvideCreditAnswer(answer, corpus, revoked), false);
   assert.deepEqual(creditHistoryForCustomer(session.turns, corpus, revoked), []);
   const visible = discloseCreditSession(session, corpus, revoked);

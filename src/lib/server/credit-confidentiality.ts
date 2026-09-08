@@ -13,7 +13,7 @@ export function isPublicCreditDocument(doc: CreditDocument): boolean {
 }
 
 export function canProvideCreditDocument(doc: CreditDocument | undefined, customer: CreditCustomer | null): boolean {
-  return !!doc && (isPublicCreditDocument(doc) || customer?.confidentialityStatus === "signed");
+  return !!doc && (isPublicCreditDocument(doc) || customer?.confidentialityStatus === true);
 }
 
 export function creditCorpusForCustomer(corpus: CreditCorpus, customer: CreditCustomer | null): CreditCorpus {
@@ -51,7 +51,7 @@ export function discloseCreditSession(session: CreditSession, corpus: CreditCorp
 
 export function canDownloadCreditDocument(doc: CreditDocument, session: CreditSession | null, turnId: string | null): boolean {
   if (isPublicCreditDocument(doc)) return true;
-  if (session?.customer?.confidentialityStatus !== "signed" || !turnId) return false;
+  if (session?.customer?.confidentialityStatus !== true || !turnId) return false;
   const answer = session.turns.find(t => t.id === turnId)?.answer;
   return !!answer && answer.disclosure?.policyVersion === 1 && !answer.disclosure.blocked
     && answer.disclosure.institutionName === session.customer.name

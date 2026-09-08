@@ -34,8 +34,8 @@ const corpus = { version: "credit-document-v2", builtAt: "2026-09-07", documents
 const origin = "https://test.example";
 
 function setup() {
-  const customers = new Map([["银行甲", { name: "银行甲", confidentialityStatus: "signed", reportDate: "2026-09-07" }],
-    ["银行乙", { name: "银行乙", confidentialityStatus: "not_signed", reportDate: "2026-09-07" }]]);
+  const customers = new Map([["银行甲", { name: "银行甲", confidentialityStatus: true, reportDate: "2026-09-07" }],
+    ["银行乙", { name: "银行乙", confidentialityStatus: false, reportDate: "2026-09-07" }]]);
   let unavailable = false;
   globalThis.creditTestClient = { query: async (sql, values) => {
     if (unavailable) throw new Error("database unavailable");
@@ -71,7 +71,7 @@ test("HTTP selection, submit, signed private download and live revocation", asyn
   const app = setup();
   assert.equal((await app.request("session", { question: "材料" })).status, 400);
   assert.equal((await app.request("session/institution", { institutionName: "不存在" })).status, 404);
-  assert.equal((await app.request("session/institution", { institutionName: "银行甲", confidentialityStatus: "signed" })).status, 400);
+  assert.equal((await app.request("session/institution", { institutionName: "银行甲", confidentialityStatus: true })).status, 400);
   assert.equal((await app.request("session/institution", { institutionName: "银行甲" })).status, 200);
   const submission = await app.request("session", { institutionName: "银行甲", question: "请提供保密审计报告.pdf" });
   assert.equal(submission.status, 202);
@@ -86,7 +86,7 @@ test("HTTP selection, submit, signed private download and live revocation", asyn
   assert.equal((await app.request(path, null, "GET", { headers: { range: "bytes=0-3" } })).status, 206);
   assert.equal((await app.request("files/" + privateDoc.id)).status, 403);
   assert.equal((await app.request("session/institution", { institutionName: "银行乙" })).status, 409);
-  app.customers.set("银行甲", { ...app.customers.get("银行甲"), confidentialityStatus: "not_signed" });
+  app.customers.set("银行甲", { ...app.customers.get("银行甲"), confidentialityStatus: false });
   const hidden = await (await app.request("session")).json();
   assert.equal(hidden.turns[0].answer.notice, CREDIT_NDA_REQUIRED);
   assert.deepEqual(hidden.turns[0].answer.files, []);
@@ -118,7 +118,7 @@ test("revocation during generation is checked before persisting a result", async
   const generate = globalThis.creditTestAnswer;
   globalThis.creditTestAnswer = async options => {
     const answer = await generate(options);
-    app.customers.set("银行甲", { ...app.customers.get("银行甲"), confidentialityStatus: "not_signed" });
+    app.customers.set("银行甲", { ...app.customers.get("银行甲"), confidentialityStatus: false });
     return answer;
   };
   const agent = [...app.sessions.values()].find(s => s.jobs.length);
