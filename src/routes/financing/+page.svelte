@@ -265,6 +265,13 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 			<label><span>规模（亿元）</span><input class="input" type="number" min="0.01" step="0.01" bind:value={simulationAmount} placeholder="0.00" /></label>
 			<label><span>期限</span><input class="input" bind:value={simulationTenor} placeholder="例如 3Y/5Y" /></label>
 		</div>
+		{#if simulationLimit}
+			<dl class="simulation-baseline" aria-label="当前品种额度，单位亿元">
+				<div><dt>可发行额度</dt><dd>{simulationLimit.limitYi.toFixed(2)} <span>亿元</span></dd></div>
+				<div><dt>已发行额度</dt><dd>{simulationLimit.issuedYi.toFixed(2)} <span>亿元</span></dd></div>
+				<div><dt>剩余可用额度</dt><dd>{simulationLimit.remainingYi.toFixed(2)} <span>亿元</span></dd></div>
+			</dl>
+		{/if}
 		<div class="simulation-results">
 			<div class:pass={simulationResult?.pass} class:fail={simulationResult && !simulationResult.pass}><Landmark size={18} /><span><strong>负债额度</strong>{simulationResult?.message ?? '输入发行规模后自动校验'}</span></div>
 		</div>

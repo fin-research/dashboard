@@ -139,6 +139,10 @@
 	white-space: nowrap;
 }
 
+:where(.financing-scope) .limit-card :is(th, td):first-child {
+	white-space: nowrap;
+}
+
 :where(.financing-scope) .financing-panel th,
 :where(.financing-scope) .financing-panel td {
 	padding: 0.625rem 0.75rem;
@@ -334,8 +338,7 @@
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 0.875rem;
-	padding: 1rem 1.125rem;
-	background: #fbfcfe;
+	padding: 0;
 }
 
 :where(.financing-scope) .simulator-form label {
@@ -357,19 +360,30 @@
 :where(.financing-scope) .simulation-results {
 	display: grid;
 	gap: 0.75rem;
-	padding: 0 1.125rem 1.125rem;
-	background: #fbfcfe;
+	margin-top: 1rem;
 }
+
+:where(.financing-scope) .simulation-baseline { display: grid; gap: .75rem; margin: 1.25rem 0 0; padding: 1rem; border-radius: var(--radius-control); background: var(--canvas); }
+:where(.financing-scope) .simulation-baseline > div { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+:where(.financing-scope) .simulation-baseline dt { color: var(--muted); font-size: .875rem; }
+:where(.financing-scope) .simulation-baseline dd { margin: 0; font-weight: bold; font-variant-numeric: tabular-nums; }
+:where(.financing-scope) .simulation-baseline dd span { font-size: .875rem; color: var(--muted); font-weight: normal; }
 
 :where(.financing-scope) .simulation-results > div {
 	display: flex;
+	min-height: 150px;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
 	gap: 0.625rem;
 	padding: 0.875rem;
 	border: 1px solid #dfe5ee;
 	border-radius: 0.5rem;
-	color: #526071;
-	background: #fff;
+	color: var(--brand-deep);
+	background: var(--brand-soft);
 }
+:where(.financing-scope) .simulation-results > div > svg { width: 28px; height: 28px; }
 
 :where(.financing-scope) .simulation-results > div.pass { border-color: #a7f3d0; color: #047857; background: #ecfdf5; }
 :where(.financing-scope) .simulation-results > div.fail { border-color: #fecaca; color: #b91c1c; background: #fef2f2; }
