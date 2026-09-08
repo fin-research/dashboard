@@ -1,16 +1,18 @@
 # 数据与存储
 
-Schema 和字段以 migration 与代码为事实来源。本文件只记录长期边界和一致性规则。
+Schema 和字段以 migration 与代码为事实来源。本文件只维护 Dashboard 的连接、事务、日期与导入规则；D1 共享读写、Neon schema/migration 所有方和 R2 桶归属只读 [共享数据库](../../eastmoney/docs/DATABASE.md)。具体表和业务对象见 [模块索引](INDEX.md)。
 
 ## R2
 
-Worker 只绑定私有 `eastmoney` R2 bucket，并通过固定小写前缀隔离对象：
+业务报告使用私有 `eastmoney` bucket；`EASTMONEY` 与 `LIABILITY_REPORT_SNAPSHOTS` 指向该桶，授信材料另用 `CREDIT` 指向 `credit` 桶。绑定事实以 [wrangler.jsonc](../wrangler.jsonc) 为准。报告对象使用固定前缀：
 
 - `bond-ledger/YYYY-MM-DD.xlsx`：二级池台账定稿。同日重新上传覆盖当天对象；上传解析阶段暂存于 `bond-ledger/.pending/<uuid>.xlsx`，Workflow 成功后归档并删除临时对象。页面统计不得通过下载 R2 文件重新计算。
 - `market-briefing/YYYY-MM-DD.json`：市场点评人工定稿快照，只包含规范报告字段、今日聚焦和定稿时间，不含原始上游响应；只有显式保存定稿才覆盖当天对象，当天普通加载不读写 R2，选择历史日期时读取并校验该日完整定稿。
 - `fund-reports/YYYY-MM-DD.html`：资金日报。同一天再次上传会替换该日报；读取路由不得接受任意对象 key。
 
 资金日报当前不需要 D1/Neon 索引：上传文件名已经提供日期，公开 URL 和 R2 key 都可由日期直接确定；历史列表只枚举 `fund-reports/` 固定前缀并过滤严格日期文件名。需要审批或同日报告的版本历史时再增加独立元数据模型。
+
+负债周报快照由 [负债周报模块](modules/liability-report.md) 维护 key、版本与读写规则。授信材料与会话存储按 [授信问答](CREDIT_ASSISTANT.md) 读取，不能套用台账上传流程。
 
 ## 变更检查
 
@@ -21,15 +23,7 @@ Worker 只绑定私有 `eastmoney` R2 bucket，并通过固定小写前缀隔离
 
 ## 统一 Worker 下的数据库边界
 
-| 领域 | Schema | Migration | 运行时边界 |
-|---|---|---|---|
-| 二级池 | `bond` | `postgres-migrations/` | 二级池 repository |
-| 授信 | `credit` | `credit-migrations/` | 授信 repository |
-| 融资模型 | `financing_model` | `financing-model-migrations/` | 模型 repository |
-| 全站权限 | `authorization` | `authorization-migrations/` | `permission-repository.ts`；Auth0 管理用户和角色 |
-| 融资业务 | `financing` | `financing-migrations/` | `src/lib/server/financing/` |
-| 客户主数据 | `public.client` / `public.client_alias` | `financing-migrations/0028*`、`0031*`；集成迁移 `credit-migrations/0006*`、`0007*` | [客户与领域关联](modules/clients.md) |
-| 公共经济观测 | `public.edb` | `edb-migrations/` | 增量同步写入，业务只读 |
+Schema 与 migration 的所有权表已集中到 [共享数据库](../../eastmoney/docs/DATABASE.md#neon-领域与迁移所有权)，不在本文件复制。
 
 同一个 Hyperdrive binding 不合并业务 schema。融资请求通过 `locals.database` 至多创建一个 Client，在 middleware 的 finally 中关闭；其他模块继续使用其既有 repository。日期字符串解析器只绑定融资 Client，禁止全局修改 pg 的 type parsers。数据库连接、临时身份与事务状态不能跨请求复用。
 

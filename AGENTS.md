@@ -6,7 +6,7 @@
 
 融资入口 `/financing`（仪表盘、负债周报、项目、SOP、台账）；管理中心 `/management`（角色权限配置）与全站个人信息 `/profile`。
 
-运行入口：门户 `/`，资金日报 `/fund-report`，个人信息 `/profile`（`/management?upload=1` 兼容资金日报上传），市场点评 `/market-briefing`，文字版 `/market-briefing/text`，交易研究工作台 `/trading-research`（含市场热点 `/trading-research/market-hotspots`、政策跟踪 `/trading-research/policy-tracking`），授信工作台 `/credit-workbench`（一览表、日历、周报、问答），新闻资讯 `/news/[id]`，研报详情 `/articles/[id]`，研究点评 `/commentaries/[id]`，融资择时模型 `/financing-model`，二级债券池运营周报 `/secondary-bond-pool`；旧二级池 `/bond` 作为隐藏深链保留。
+页面入口、兼容路由和模块范围只在 [docs/INDEX.md](docs/INDEX.md) 维护。
 
 ## Repository Structure
 
@@ -28,18 +28,18 @@
 
 - 修改前先搜索现有页面、组件、图表、派生函数和测试；优先复用，不建立平行实现。
 - UI 变更必须读取 `DESIGN.md`；保持既有桌面布局和移动端模块顺序，不自行引入新设计体系。
-- 公网 `/data/*` 由 Data Worker 管理并要求登录。市场点评浏览器携带同源 Access 会话直接读取 `/data/*` 行情 REST 资源，由 Data 校验 Access JWT，不逐资源查询 Auth0 Management API；Dashboard 服务端访问上游仍使用 `DATA` / `InternalData` 私有 Service Binding。
-- 市场点评仍按单一上游映射 REST 资源读取，在 `src/market-report-resources.ts` 加工为视觉版与文字版共享的完整契约；旧 `/api/market-resources/*` 仅兼容已打开的页面，验证 Access 登录后限制资源、字段和查询范围，不聚合整份报告。Data GraphQL 仅是同资源薄镜像，不作为整份报告主链路；不得新增 GraphQL 市场报告业务字段。
-- Data REST 列表按顶层 JSON array 消费，每次请求必须用 `fields` 只选择实际使用字段，并以 `src/data-contracts.ts` 的 Zod Schema 校验响应。债券基础信息代码只能从当次成交与收藏报价动态派生，不得硬编码债券清单；公募公司债筛选使用结构化 `bondType` 与 `bondOfferingType`，不得按名称字母猜测。
-- Dashboard Worker 服务端访问 Data Worker 必须优先使用 `DATA` Service Binding；不得从同一 Cloudflare zone 通过全局公网 `fetch` 回环。新闻详情扇出必须保持有界并发。
-- 身份由 Auth0 与 Cloudflare Access 统一管理，服务端仅使用 `locals.user`；应用权限统一附加到 `user.authorization`，人员、角色和成员关系只在 Auth0 管理。Auth0 管理请求共用唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`。除 Access 登录即允许的行情原始资源读取及其旧兼容通道外，全部业务页面与 API（含 GET/HEAD）由统一授权入口校验 `<domain>.<resource>:<action>`；未知路由和操作失败关闭。权限仅存于 `authorization.permission` / `authorization.role_permission`；内测使用显式 `AUTHORIZATION_MODE=beta-open`，仍须验证登录。融资负责人直接保存 Auth0 ID，不维护本地人员、角色或审计表。独立 Worker 与 Data 公网用户入口共用此授权。
+- 跨服务路由、DATA / InternalData 与身份所有权遵循 [共享架构](../eastmoney/docs/ARCHITECTURE.md)；只改页面时按模块索引读取，不预读其他仓库。
+- 市场点评 REST 编排与视觉/文字共用契约、旧资源兼容边界见 [市场点评模块](docs/modules/market-briefing.md)；业务加工留在 Dashboard。
+- Data 消费端使用 `src/data-contracts.ts` 的 Zod Schema 校验最小 DTO；字段投影与分页遵循 [Data API 契约](../data/docs/API.md)，不透传上游 envelope。债券动态代码与类型筛选见市场点评模块。
+- 新闻详情扇出保持有界并发，复用 `src/lib/server/data-news.ts` 和既有 DATA adapter。
+- 身份只使用 `locals.user`，权限只使用统一入口的 `user.authorization`；业务不得另建身份或授权系统。精确认证、路由豁免、失败关闭与模式规则见 [SECURITY](docs/SECURITY.md)。
 - 一级发行视觉与文字输出必须共用 `src/primary-issues.ts`；文字报告不得读取 Python 归档文本。
 - 热点首次访问只读最近成功快照；只有用户手动生成才调用模型并追加 `hotspot_snapshot`。旧快照的证据范围以快照自身为准。
 - 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。
-- D1 与 Neon migration 必须放入各自目录，不得混用。结构变化时检查写入方、读取方和回填脚本。
-- 所有生成式 AI 调用只通过 `src/lib/server/ai-gateway.ts` 使用 provider-specific AI Gateway URL；按项目组 `AI.md` 统一调用 `custom-codex/responses`，可重试失败时仅重试同一 Provider 一次（授信问答保持单次尝试），不得使用会进入 Universal 适配层的 AI binding `run()`。Schema 由 Zod 定义并在应用端校验，Gateway 鉴权只使用 Worker Secret `CF_AIG_TOKEN`，Provider 密钥由 Gateway BYOK `default` alias 管理。
-- 融资择时模型字段及其有序明细只由 quant pipeline 追加；dashboard 只增量更新 `model_run` 当前整体结论并追加 AI Search 卖方观点快照，不修改模型基础结论或其他模型字段。
-- 融资择时卖方观点固定调用 `https://search.hasbai.xyz/mcp` 的 `search` 工具，增加文本 `type = 研报` 过滤；检索参数和日期硬过滤遵循项目组 `AI.md`，不得读取 quant 旧 R2 研报脚本。
+- D1/Neon/R2 所有权及跨仓库 migration 协同遵循 [共享数据库](../eastmoney/docs/DATABASE.md)；本地连接、日期和导入一致性遵循 [DATABASE](docs/DATABASE.md)。
+- 生成式 AI 仅通过 `src/lib/server/ai-gateway.ts`；传输、重试与检索遵循 [共享 AI](../eastmoney/docs/AI.md)，业务 Prompt、Schema 和例外留在目标模块。
+- 融资模型的 Quant / Dashboard 写入分工见 [共享数据库](../eastmoney/docs/DATABASE.md#融资模型跨仓库写入)，页面契约见 [融资模型模块](docs/modules/financing-model.md)。
+- 卖方观点使用研究库检索，授信问答使用独立授信材料库；不得跨用其证据来源和权限。具体检索分别见融资模型模块与 [授信问答](docs/CREDIT_ASSISTANT.md)。
 - 不手动编辑生成文件 `worker-configuration.d.ts`；绑定变化使用 `pnpm worker:typegen`。
 - `pnpm dev` 不自动同步远程 D1。只有任务明确需要本地证据时才运行 `pnpm db:sync:remote`。
 - 保留用户已有改动，不做无关重构，不通过删除测试或关闭检查掩盖错误。
@@ -64,25 +64,14 @@
 
 ## Context Routing
 
-先按 [docs/INDEX.md](docs/INDEX.md) 的路径表读取目标模块，再叠加下表涉及的公共规则。公共规范只维护一份；融资和管理功能不再读取旧 financing 仓库文档。
+跨项目执行与并行工作树规则见 [项目组 AGENTS](../eastmoney/AGENTS.md)；未在上下文中时读取一次。只加载任务相关文档，跨模块仅加读受影响部分，不重复读取已有上下文。
 
-- `/financing` 总览、指标、日历 → `docs/modules/financing-overview.md`
-- `/financing/projects*` → `docs/modules/financing-projects.md`
-- `/financing/sop*`、每小时提醒 → `docs/modules/financing-sop.md`
-- `/financing/data*`、`/financing/debts*`、台账导入 → `docs/modules/financing-data.md`
-- `/financing/liability-report`、六页打印 → `docs/modules/liability-report.md`
-- `/management*`、`/profile`、人员与 Auth0 管理 → `docs/modules/management.md` + `docs/SECURITY.md`
+- 页面、API、业务或定时任务：先按 [docs/INDEX.md](docs/INDEX.md) 定位唯一模块文档与代码，再按任务叠加专题。
+- UI、组件、图表、响应式、打印：加读 [DESIGN](DESIGN.md)。
+- 本仓库分层：加读 [ARCHITECTURE](docs/ARCHITECTURE.md)；只有跨服务变化才加读共享架构。
+- SQL、日期、事务和导入：加读 [DATABASE](docs/DATABASE.md)；共享表/存储归属变化才加读共享数据库。
+- API / actions：加读 [API](docs/API.md)；身份与权限：加读 [SECURITY](docs/SECURITY.md)。
+- 测试、开发和交付：加读 [DEVELOPMENT](docs/DEVELOPMENT.md)。
+- AI 调用：加读 [共享 AI](../eastmoney/docs/AI.md) 与模块 Prompt/Schema；授信问答 `credit_answer` 例外由 [CREDIT_ASSISTANT](docs/CREDIT_ASSISTANT.md) 维护。
 
-
-不要默认读取全部文档。按任务选择：
-
-- UI、页面、组件、图表、响应式、导出 → `DESIGN.md`
-- 系统分层、数据流、模块依赖、新功能放置 → `docs/ARCHITECTURE.md`
-- 报告口径、热点、二级池业务规则 → `docs/DOMAIN.md`
-- D1、Neon、R2、migration、导入一致性 → `docs/DATABASE.md`
-- `/data/*` 或 `/api/*` 契约、状态码、参数 → `docs/API.md`
-- Secret、服务端边界、同源校验、日志 → `docs/SECURITY.md`
-- 授信问答、材料解析/OCR、R2 credit、AI Search credit、CreditAgent → `docs/CREDIT_ASSISTANT.md`；此业务按用户指定使用 `credit_answer`，固定 codex / gpt-5.6-luna / max。
-- 本地环境、测试、构建、调试、发布 → `docs/DEVELOPMENT.md`
-
-Do not load all documentation by default. Read only documentation relevant to the current task. If multiple areas are affected, read only the corresponding documents. Do not repeatedly read documents already available in the current context unless necessary.
+融资和管理功能不读取旧 Financing 文档作为当前规范。共享文档总入口为 [项目组索引](../eastmoney/docs/INDEX.md)。

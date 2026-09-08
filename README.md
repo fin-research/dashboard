@@ -23,15 +23,7 @@ pnpm dev
 
 ## 文档
 
-- [AI Agent 入口](AGENTS.md)
-- [UI/UX 规范](DESIGN.md)
-- [系统架构](docs/ARCHITECTURE.md)
-- [业务口径](docs/DOMAIN.md)
-- [数据与存储](docs/DATABASE.md)
-- [接口约定](docs/API.md)
-- [交易研究工作台数据范围与接入口径](docs/TRADING_RESEARCH_WORKBENCH.md)
-- [安全边界](docs/SECURITY.md)
-- [开发与验证](docs/DEVELOPMENT.md)
+开发从 [AGENTS](AGENTS.md) 进入，再按 [页面与模块索引](docs/INDEX.md) 阅读；UI 任务加读 [DESIGN](DESIGN.md)，本地运行与验证见 [DEVELOPMENT](docs/DEVELOPMENT.md)。跨项目架构、存储和 AI 规范集中在 [项目组 docs](../eastmoney/docs/INDEX.md)。
 
 ## 融资工作台与管理中心
 
