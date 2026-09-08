@@ -71,7 +71,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 </svelte:head>
 
 <nav class="back-nav" aria-label="返回 SOP 管理">
-	<a class="back-link" href={withBase('/sop')}><ArrowLeft size={16} /> 返回 SOP 管理</a>
+	<a class="btn btn-ghost back-link" href={withBase('/sop')}><ArrowLeft size={16} /> 返回 SOP 管理</a>
 </nav>
 
 <section class="summary-grid" aria-label="提醒发送汇总">
@@ -96,7 +96,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 <form class="filter-bar" method="get" aria-label="提醒历史筛选">
 	<label>
 		<span>状态</span>
-		<select name="status" value={data.filters.status}>
+		<select class="select" name="status" value={data.filters.status}>
 			<option value="">全部状态</option>
 			<option value="sent">已发送</option>
 			<option value="pending">待发送</option>
@@ -107,14 +107,14 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		<span>关键词</span>
 		<div>
 			<Search size={16} />
-			<input
+			<input class="input"
 				name="query"
 				value={data.filters.query}
 				placeholder="规则、目标、邮箱或失败原因"
 			/>
 		</div>
 	</label>
-	<button type="submit">查询</button>
+	<button class="btn" type="submit">查询</button>
 	<a href={withBase('/sop/reminders')}>清除</a>
 </form>
 
@@ -130,7 +130,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			{#each historyRows as row (row.id)}
 				<article class="history-row">
 					<div>
-						<span class={`status-pill ${row.status}`}>{statusLabel[row.status] ?? row.status}</span>
+						<span class={`badge status-pill ${row.status}`}>{statusLabel[row.status] ?? row.status}</span>
 						<strong>{row.deliveryDate}</strong>
 						<small>{row.periodLabel} · 计划 {scheduledTimeLabel(row.scheduledFor)}</small>
 						<small>记录 {row.sentAt ?? row.createdAt}</small>
@@ -161,7 +161,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		</div>
 		{#if hasMore}
 			<div class="load-more-row">
-				<button type="button" onclick={loadMore} disabled={loadingMore}>
+				<button class="btn" type="button" onclick={loadMore} disabled={loadingMore}>
 					{#if loadingMore}<LoaderCircle class="spin" size={16} />{/if}
 					{loadingMore ? '加载中…' : '加载更多'}
 				</button>
@@ -204,7 +204,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		align-items: center;
 		gap: 0.75rem;
 		padding: 1rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--border-color);
 		border-radius: 0.75rem;
 		background: #fff;
 	}
@@ -256,7 +256,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		gap: 0.75rem;
 		margin-bottom: 0.75rem;
 		padding: 0.875rem 1rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--border-color);
 		border-radius: 0.75rem;
 		background: #fff;
 	}
@@ -302,8 +302,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 
 	.query-field input {
 		width: 100%;
-		border: 0;
-		outline: 0;
 	}
 
 	.filter-bar button,
@@ -315,15 +313,9 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		font-weight: bold;
 	}
 
-	.filter-bar button {
-		border-color: var(--color-primary);
-		color: #fff;
-		background: var(--color-primary);
-	}
-
 	.history-panel {
 		overflow: hidden;
-		border: 1px solid var(--border);
+		border: 1px solid var(--border-color);
 		border-radius: 0.75rem;
 		background: #fff;
 	}
@@ -337,7 +329,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 
 	.table-head {
 		padding: 0.75rem 1rem;
-		border-bottom: 1px solid var(--border);
+		border-bottom: 1px solid var(--border-color);
 		font-size: 0.75rem;
 		font-weight: bold;
 		color: #667085;
@@ -363,16 +355,10 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 
 	.load-more-row button {
 		display: inline-flex;
-		min-height: 2.75rem;
 		align-items: center;
 		justify-content: center;
 		gap: 0.5rem;
 		padding-inline: 1.25rem;
-		border: 1px solid #d0d5dd;
-		border-radius: 0.5rem;
-		font-size: 1rem;
-		font-weight: bold;
-		background: #fff;
 	}
 
 	.history-row > div {

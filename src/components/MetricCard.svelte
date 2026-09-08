@@ -51,7 +51,7 @@
   class:research-metric-card--compact={compact}
   class:research-metric-card--report={variant === "report"}
   class:research-metric-card--icon-end={Boolean(IconComponent) && iconPosition === "end"}
-  class={`research-metric-card research-metric-card--${tone}`}
+  class={`card research-metric-card research-metric-card--${tone}`}
 >
   {#if IconComponent && iconPosition === "start"}
     <span class="research-metric-card__icon" aria-hidden="true">
@@ -88,6 +88,7 @@
     --metric-accent: var(--color-primary, #2f6fd6);
     --metric-soft: var(--color-primary-soft, #eaf1fd);
     display: flex;
+    flex-direction: row;
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -96,7 +97,7 @@
     justify-content: space-evenly;
     gap: 8px;
     padding: 8px clamp(8px, 0.8vw, 14px);
-    border: 1px solid var(--border, #d8e2f0);
+    border: 1px solid var(--border-color, #d8e2f0);
     border-radius: var(--radius-card, 10px);
     color: var(--text-1, #172033);
     background: color-mix(in srgb, var(--metric-accent) 5%, var(--bg-card, #ffffff));

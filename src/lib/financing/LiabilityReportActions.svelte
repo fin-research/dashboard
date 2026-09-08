@@ -144,7 +144,7 @@ let { permissions }: { permissions: string[] } = $props();
 					<div class="report-header-actions" aria-label="负债周报操作">
 						<form class="report-history-picker" method="GET" action={withBase('/liability-report')}>
 							<label for="report-history-date">报告日</label>
-							<input
+							<input class="input"
 								type="date"
 								id="report-history-date"
 								name="date"
@@ -153,14 +153,14 @@ let { permissions }: { permissions: string[] } = $props();
 								onchange={submitReportHistorySelection}
 							/>
 						</form>
-						<button class="header-action" type="button" disabled={!Boolean((page.data as any)?.hasSnapshot)} onclick={() => window.print()} aria-label="导出 PDF" title="导出 PDF">
+						<button class="btn header-action" type="button" disabled={!Boolean((page.data as any)?.hasSnapshot)} onclick={() => window.print()} aria-label="导出 PDF" title="导出 PDF">
 							<Printer size={17} /><span class="header-action-label">导出 PDF</span>
 						</button>
 						{#if hasPermission(permissions, 'financing.report:generate')}
 							<form bind:this={reportSnapshotForm} method="POST" action={withBase('/liability-report?/saveSnapshot')} use:enhance={enhanceReportSnapshotSaving}>
 								<input type="hidden" name="asOfDate" value={selectedLiabilityReportDate()} />
 								<input type="hidden" name="payload" value={reportSourcesPayload} />
-								<button class="header-action header-primary-action" type="button" disabled={reportGenerating} onclick={prepareReportSnapshot} aria-label={reportGenerating ? '正在生成本期周报' : '生成本期周报'} title="生成本期周报">
+								<button class="btn btn-primary header-action header-primary-action" type="button" disabled={reportGenerating} onclick={prepareReportSnapshot} aria-label={reportGenerating ? '正在生成本期周报' : '生成本期周报'} title="生成本期周报">
 									<LoaderCircle class={reportGenerating ? 'spinning' : ''} size={17} />
 									<span>{reportGenerating ? '生成中…' : '生成本期周报'}</span>
 								</button>

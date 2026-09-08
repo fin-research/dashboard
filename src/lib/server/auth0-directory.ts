@@ -35,7 +35,7 @@ export function createDirectory(config: Config, fetchImpl: typeof fetch = fetch)
       catch (error) { if (error && typeof error === 'object' && 'status' in error && error.status === 404) throw new AccessError(401, '账号已变更，请重新登录'); throw error; }
       if (profile.email.toLowerCase() !== identity.email.toLowerCase()) throw new AccessError(401, '账号信息已变更，请重新登录');
       if (!auth0ProfileCanLogin(profile)) throw new AccessError(403, '账号已停用或邮箱尚未验证');
-      return { name: profile.name || profile.email, roles: await userRoles(identity.auth0Id), picture: profile.picture ?? '' };
+      return { name: profile.name || profile.email, department: typeof profile.user_metadata?.department === 'string' ? profile.user_metadata.department.trim().slice(0, 100) : '', roles: await userRoles(identity.auth0Id), picture: profile.picture ?? '' };
     },
     people() {
       return peopleRequest ??= (async () => {

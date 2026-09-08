@@ -18,7 +18,7 @@
 
 <section
   class:module-card--report={variant === "report"}
-  class={`module-card tr-panel ${className}`.trim()}
+  class={`card card-border bg-base-100 module-card tr-panel ${className}`.trim()}
   aria-labelledby={labelledBy}
   {style}
 >
@@ -27,9 +27,10 @@
 
 <style>
   .module-card {
+    display: block;
     min-width: 0;
     padding: 18px;
-    border: 1px solid var(--tr-border, var(--border, #d8e2f0));
+    border: 1px solid var(--tr-border, var(--border-color, #d8e2f0));
     border-radius: var(--tr-radius-card, var(--radius-card, 10px));
     color: var(--tr-text, var(--text-1, #172033));
     background: var(--tr-surface, var(--surface, #ffffff));
@@ -49,6 +50,7 @@
 
   @media (max-width: 720px) {
     .module-card {
+    display: block;
       padding: 15px;
     }
 

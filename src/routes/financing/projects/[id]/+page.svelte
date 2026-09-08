@@ -234,7 +234,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						</div>
 						<label>
 							<span>状态</span>
-							<select name="status" value={task.status} aria-label={`${task.name}状态`} disabled={!canUpdateTaskStatus(task)}>
+							<select class="select" name="status" value={task.status} aria-label={`${task.name}状态`} disabled={!canUpdateTaskStatus(task)}>
 								{#each Object.entries(taskStatusLabels) as [value, label]}
 									<option {value}>{label}</option>
 								{/each}
@@ -242,7 +242,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						</label>
 						<label>
 							<span>负责人</span>
-							<select name="assigneeId" value={task.assigneeId ?? ''} aria-label={`${task.name}负责人`} disabled={!canManage}>
+							<select class="select" name="assigneeId" value={task.assigneeId ?? ''} aria-label={`${task.name}负责人`} disabled={!canManage}>
 								<option value="">待分配</option>
 								{#each data.people as person}
 									<option value={person.id}>{person.name}</option>
@@ -261,11 +261,11 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<form method="post" action="?/addTask" use:enhance={enhanceForm('add-task', { resetOnSuccess: true })} class="add-task">
 				<label>
 					<span>任务名称</span>
-					<input name="name" maxlength="120" required placeholder="例如：发行方案内部确认" />
+					<input class="input" name="name" maxlength="120" required placeholder="例如：发行方案内部确认" />
 				</label>
 				<label>
 					<span>负责人</span>
-					<select name="assigneeId">
+					<select class="select" name="assigneeId">
 						<option value="">待分配</option>
 						{#each data.people as person}
 							<option value={person.id}>{person.name}</option>
@@ -273,7 +273,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 					</select>
 				</label>
 				<div class="task-schedule"><ScheduleFields /></div>
-				<button type="submit" disabled={pendingAction !== ''}>
+				<button class="btn" type="submit" disabled={pendingAction !== ''}>
 					<Plus size={16} />
 					{pendingAction === 'add-task' ? '添加中…' : '添加节点'}
 				</button>
@@ -300,7 +300,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			>
 				<label>
 					<span>项目状态</span>
-					<select name="status" value={data.project.status} disabled={!canManageProject}>
+					<select class="select" name="status" value={data.project.status} disabled={!canManageProject}>
 						{#each Object.entries(statusLabels) as [value, label]}
 							<option {value}>{label}</option>
 						{/each}
@@ -308,7 +308,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 				</label>
 				<label>
 					<span>负责人</span>
-					<select name="ownerId" value={data.project.ownerId ?? ''} disabled={!canManageProject}>
+					<select class="select" name="ownerId" value={data.project.ownerId ?? ''} disabled={!canManageProject}>
 						<option value="">待分配</option>
 						{#each data.people as person}
 							<option value={person.id}>{person.name} · {person.roles?.map((role: { name: string }) => role.name).join('、') || '未分配角色'}</option>
@@ -317,7 +317,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 				</label>
 				<label>
 					<span>项目说明</span>
-					<textarea name="notes" rows="5" placeholder="补充项目背景、风险或执行说明" disabled={!canManageProject}>{data.project.notes ?? ''}</textarea>
+					<textarea class="textarea" name="notes" rows="5" placeholder="补充项目背景、风险或执行说明" disabled={!canManageProject}>{data.project.notes ?? ''}</textarea>
 				</label>
 			</form>
 			<dl class="metadata">
@@ -542,39 +542,17 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	input,
 	textarea {
 		width: 100%;
-		min-height: 2.75rem;
 		padding: 0.55rem 0.7rem;
-		border: 1px solid #d0d5dd;
-		border-radius: 0.5rem;
-		font-size: 1rem;
-		color: #344054;
-		background: #fff;
 	}
 	textarea {
 		resize: vertical;
 	}
 	button {
 		display: inline-flex;
-		min-height: 2.75rem;
 		align-items: center;
 		justify-content: center;
 		gap: 0.4rem;
 		padding: 0 0.75rem;
-		border: 1px solid #b8c7e0;
-		border-radius: 0.5rem;
-		font-size: 1rem;
-		font-weight: bold;
-		color: var(--color-primary);
-		background: #fff;
-		transition: 180ms ease;
-	}
-	button:hover {
-		border-color: var(--blue);
-		background: #f8faff;
-	}
-	button:disabled {
-		cursor: wait;
-		opacity: 0.65;
 	}
 	.add-task {
 		display: grid;
@@ -583,11 +561,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		gap: 0.75rem;
 		padding: 1rem;
 		background: #f8fafc;
-	}
-	.add-task button {
-		border-color: var(--blue);
-		color: #fff;
-		background: var(--blue);
 	}
 	.empty-state {
 		margin: 0;
@@ -682,11 +655,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		.task-schedule { grid-column: 1 / -1; }
 		.task-index {
 			display: none;
-		}
-	}
-	@media (prefers-reduced-motion: reduce) {
-		button {
-			transition: none;
 		}
 	}
 </style>

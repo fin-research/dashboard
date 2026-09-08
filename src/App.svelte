@@ -2,9 +2,6 @@
   import AuthMenu from '$lib/AuthMenu.svelte';
   import { onDestroy, onMount } from "svelte";
 
-  import "./app.css";
-  import "./styles.css";
-
   import {
     fetchReport,
     generateMarketBriefing,
@@ -311,18 +308,18 @@
         <div class="titlebar-actions">
           <AuthMenu />
           <div class="view-toggle" role="group" aria-label="报告展示方式">
-            <button
+            <button class="btn"
               id="visual-report-tab"
-              class:active={activeView === "visual"}
+              class:btn-active={activeView === "visual"}
               type="button"
               aria-pressed={activeView === "visual"}
               onclick={() => selectView("visual")}
             >
               可视化
             </button>
-            <button
+            <button class="btn"
               id="text-report-tab"
-              class:active={activeView === "text"}
+              class:btn-active={activeView === "text"}
               type="button"
               aria-pressed={activeView === "text"}
               onclick={() => selectView("text")}
@@ -332,7 +329,7 @@
           </div>
           <button
             class:is-loading={loading}
-            class="refresh-button"
+            class="btn refresh-button"
             type="button"
             disabled={loading}
             onclick={() => loadReport(true)}
@@ -345,7 +342,7 @@
           </button>
           <button
             class:is-exporting={exporting}
-            class="export-button"
+            class="btn btn-primary export-button"
             type="button"
             disabled={!data || loading || exporting}
             onclick={exportImage}
@@ -362,7 +359,7 @@
           <span class="sr-only">选择报告日期</span>
           <input
             bind:this={dateInput}
-            class="hero-date__input"
+            class="input hero-date__input"
             type="date"
             aria-label="选择报告日期"
             bind:value={selectedDate}
@@ -420,7 +417,7 @@
             <h2 id="focus-title">今日聚焦</h2>
             <button
               class:is-loading={briefingLoading}
-              class="focus-generate-button"
+              class="btn btn-primary focus-generate-button"
               type="button"
               disabled={briefingLoading}
               aria-label="根据当天新闻生成今日聚焦"
@@ -434,7 +431,7 @@
             </button>
             <button
               class:is-loading={savingFocus}
-              class="focus-save-button"
+              class="btn btn-primary focus-save-button"
               type="button"
               disabled={savingFocus}
               aria-label="保存当天市场点评定稿"

@@ -35,12 +35,27 @@ export async function componentUrl(file, sourceOverride) {
   const source = sourceOverride ?? await readFile(url, "utf8");
   let { js } = compile(source, { filename: url.pathname, generate: "client", dev: false });
   let code = js.code;
+  // Compile only the imported Lucide icons instead of loading its uncompiled
+  // Svelte barrel. DOM tests exercise the real component tree, including icons.
+  for (const match of [...code.matchAll(/import\s*\{([^}]+)\}\s*from\s*["']@lucide\/svelte["'];?/g)]) {
+    const packageRoot = new URL('.', import.meta.resolve('@lucide/svelte'));
+    const index = await readFile(new URL('icons/index.js', packageRoot), 'utf8');
+    const statements = [];
+    for (const name of match[1].split(',').map(name => name.trim())) {
+      const [exported, local = exported] = name.split(/\s+as\s+/);
+      const target = index.match(new RegExp(`export \\{ default as ${exported} \\} from './([^']+)';`))?.[1];
+      if (!target) throw new Error(`DOM test icon is not registered: ${exported}`);
+      statements.push(`import ${local} from '${await componentUrl(new URL('icons/' + target, packageRoot))}';`);
+    }
+    code = code.replace(match[0], statements.join('\n'));
+  }
   const imports = [...code.matchAll(/(?:from\s*|import\s*)["']([^"']+)["']/g)];
   for (const match of imports) {
     const specifier = match[1];
     if (specifier.endsWith(".css")) { code = code.replace(match[0], ""); continue; }
     let resolved;
-    if (specifier === "$app/navigation") {
+    if (specifier.startsWith('file:')) resolved = new URL(specifier);
+    else if (specifier === "$app/navigation") {
       resolved = new URL(".svelte-kit/dom-tests/app-navigation.mjs", root);
       await mkdir(new URL(".", resolved), { recursive: true });
       await writeFile(resolved, "export function afterNavigate() {} export async function goto(url, options) { globalThis.domNavigations?.push({url, options}); }");

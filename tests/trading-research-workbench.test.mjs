@@ -341,7 +341,7 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
   const shell = await readFile(new URL("../src/lib/workbench/WorkbenchShell.svelte", import.meta.url), "utf8");
   assert.match(shell, /class="tr-drawer"/);
   assert.match(shell, /aria-controls="tr-workbench-drawer"/);
-  assert.match(shell, /class="tr-sidebar-toggle"[\s\S]*?<WorkbenchIcon name="sidebar"/);
+  assert.match(shell, /class="btn btn-ghost btn-square tr-sidebar-toggle"[\s\S]*?<WorkbenchIcon name="sidebar"/);
   assert.match(shell, /class="tr-portal-link" href="\/"[\s\S]*?东方财富证券 · 资金管理部/);
   assert.match(shell, /class="tr-breadcrumb"[\s\S]*?homeHref[\s\S]*?activeView\?\.label/);
   assert.match(page, /title="交易研究工作台"/);
@@ -497,7 +497,7 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   assert.match(bond, /reportedYtdAnnualizedReturn/);
   assert.match(bond, /reportedYtdExTaxAnnualizedReturn/);
   assert.match(bond, /metricDeltas\.annualizedVolatility/);
-  assert.match(moduleCard, /class=\{`module-card tr-panel/);
+  assert.match(moduleCard, /class=\{`card card-border bg-base-100 module-card tr-panel/);
   assert.match(moduleCard, /border:\s*1px solid var\(--tr-border/);
   assert.match(moduleCard, /border-radius:\s*var\(--tr-radius-card/);
   assert.match(moduleCard, /box-shadow:\s*var\(/);

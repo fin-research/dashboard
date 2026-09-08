@@ -47,7 +47,7 @@
         <strong>{item.title}</strong>
         <span>{item.message}</span>
       </span>
-      <button
+      <button class="btn"
         type="button"
         aria-label={`关闭通知：${item.message}`}
         title="关闭通知"
@@ -149,27 +149,8 @@
   button {
     display: grid;
     width: 2.75rem;
-    height: 2.75rem;
     place-items: center;
     padding: 0;
-    border: 0;
-    border-radius: var(--radius-tag, 6px);
-    color: #667085;
-    background: transparent;
-    cursor: pointer;
-    transition:
-      color 180ms ease,
-      background 180ms ease;
-  }
-
-  button:hover {
-    color: #1d2939;
-    background: #f2f4f7;
-  }
-
-  button:focus-visible {
-    outline: 0.1875rem solid rgb(47 111 237 / 22%);
-    outline-offset: 0.125rem;
   }
 
   @media (max-width: 35rem) {
@@ -181,6 +162,7 @@
       grid-template-columns: 2.25rem minmax(0, 1fr) 2.75rem;
       gap: 0.625rem;
       padding-left: 0.625rem;
+    min-height: 4.25rem;
     }
 
     .message-icon {

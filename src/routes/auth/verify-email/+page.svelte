@@ -1,5 +1,4 @@
 <script lang="ts">
-  import '../../../styles.css';
   import ModuleCard from '../../../components/ModuleCard.svelte';
 </script>
 

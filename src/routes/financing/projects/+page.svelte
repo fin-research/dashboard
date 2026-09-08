@@ -224,7 +224,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 <section class="toolbar" aria-label="甘特图筛选">
 	<div class="search-field">
 		<Search size={15} />
-		<input aria-label="搜索项目" placeholder="搜索项目名称或编号" />
+		<input class="input" aria-label="搜索项目" placeholder="搜索项目名称或编号" />
 	</div>
 	<div class="select-group">
 		<Filter size={14} />
@@ -248,8 +248,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		/>
 	</div>
 	<div class="view-switcher" aria-label="时间视图">
-		<button class:active={view === 'month'} type="button" onclick={() => (view = 'month')}>月</button>
-		<button class:active={view === 'quarter'} type="button" onclick={() => (view = 'quarter')}
+		<button class="btn" class:btn-active={view === 'month'} type="button" onclick={() => (view = 'month')}>月</button>
+		<button class="btn" class:btn-active={view === 'quarter'} type="button" onclick={() => (view = 'quarter')}
 			>季</button
 		>
 	</div>
@@ -278,7 +278,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 			<div class:expanded={expandedProject === project.id} class="project-row">
 				<div class="project-info">
 					<button
-						class="expand-button"
+						class="btn btn-ghost expand-button"
 						type="button"
 						aria-label={`${expandedProject === project.id ? '收起' : '展开'} ${project.name}`}
 						onclick={() => (expandedProject = expandedProject === project.id ? null : project.id)}
@@ -305,7 +305,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					{#if canManage || canDelete}
 						<div class="project-row-actions">
               {#if canManage}
-							<button
+							<button class="btn"
 								type="button"
 								aria-label={`编辑 ${project.name}`}
 								title="编辑项目"
@@ -326,7 +326,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 								<input type="hidden" name="id" value={project.id} />
 								<button
 									type="submit"
-									class="danger-action"
+									class="btn btn-error danger-action"
 									aria-label={`删除 ${project.name}`}
 									title="删除项目"
 									disabled={actionState.status === 'pending'}
@@ -339,7 +339,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					{/if}
 				</div>
 				<div class="project-status">
-					<span class={`status-pill ${project.tone}`}>{project.status}</span>
+					<span class={`badge status-pill ${project.tone}`}>{project.status}</span>
 					<div class="progress-line">
 						<span style:width={`${project.progress}%`}></span>
 					</div>
@@ -404,7 +404,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 {#if canCreate}
 	<button
-		class="floating-create-button"
+		class="btn btn-primary floating-create-button"
 		type="button"
 		onclick={openNewProject}
 		aria-label="新建项目"
@@ -414,7 +414,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	</button>
 {/if}
 
-<dialog class="new-project-modal" bind:this={newProjectDialog}>
+<dialog class="modal" bind:this={newProjectDialog}>
+<div class="modal-box new-project-modal">
 	<form method="post" action="?/createProject" use:enhance={enhanceProjectAction('create', 'create')}>
 		<div class="modal-header">
 			<div>
@@ -422,16 +423,16 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				<h2>新建融资项目</h2>
 				<p>项目独立建档，不读取、不绑定也不修改现有负债。</p>
 			</div>
-			<button type="button" aria-label="关闭" onclick={() => newProjectDialog.close()}>×</button>
+			<button class="btn" type="button" aria-label="关闭" onclick={() => newProjectDialog.close()}>×</button>
 		</div>
 		<div class="form-grid">
 			<label class="wide">
 				<span>项目名称</span>
-				<input name="name" maxlength="160" required />
+				<input class="input" name="name" maxlength="160" required />
 			</label>
 			<label class="wide">
 				<span>融资品种 / SOP</span>
-				<select name="sopTemplateId" required disabled={projectOptionsStatus !== 'ready'}>
+				<select class="select" name="sopTemplateId" required disabled={projectOptionsStatus !== 'ready'}>
 					<option value="">
 						{projectOptionsStatus === 'loading' ? '正在加载选项…' : '请选择融资品种'}
 					</option>
@@ -442,11 +443,11 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 			</label>
 			<label>
 				<span>项目规模（亿元）</span>
-				<input name="amountYi" type="number" min="0" step="0.01" inputmode="decimal" />
+				<input class="input" name="amountYi" type="number" min="0" step="0.01" inputmode="decimal" />
 			</label>
 			<label>
 				<span>负责人</span>
-				<select name="ownerId" value={data.viewContext.personId ?? ''} disabled={projectOptionsStatus !== 'ready'}>
+				<select class="select" name="ownerId" value={data.viewContext.personId ?? ''} disabled={projectOptionsStatus !== 'ready'}>
 					<option value="">待分配</option>
 					{#each projectOptions.people as person}
 						<option value={person.id}>{person.name}</option>
@@ -455,11 +456,11 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 			</label>
 			<label>
 				<span>计划簿记</span>
-				<input name="plannedBookbuildingDate" type="date" bind:value={newProjectBookbuildingDate} required />
+				<input class="input" name="plannedBookbuildingDate" type="date" bind:value={newProjectBookbuildingDate} required />
 			</label>
 			<label class="wide">
 				<span>项目说明</span>
-				<textarea name="notes" rows="3" maxlength="4000"></textarea>
+				<textarea class="textarea" name="notes" rows="3" maxlength="4000"></textarea>
 			</label>
 		</div>
 		<div class="modal-note">
@@ -477,9 +478,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 			</span>
 		</div>
 		<div class="modal-actions">
-			<button type="button" disabled={actionState.status === 'pending'} onclick={() => newProjectDialog.close()}>取消</button>
+			<button class="btn" type="button" disabled={actionState.status === 'pending'} onclick={() => newProjectDialog.close()}>取消</button>
 			<button
-				class="primary-action"
+				class="btn btn-primary primary-action"
 				type="submit"
 				disabled={actionState.status === 'pending' || projectOptionsStatus !== 'ready' || projectOptions.projectSops.length === 0}
 			>
@@ -488,9 +489,11 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 			</button>
 		</div>
 	</form>
+</div>
 </dialog>
 
-<dialog class="new-project-modal" bind:this={editProjectDialog}>
+<dialog class="modal" bind:this={editProjectDialog}>
+<div class="modal-box new-project-modal">
 	{#if editingProject}
 		<form method="post" action="?/updateProject" use:autoSave use:enhance={enhanceProjectAction('edit')}>
 			<div class="modal-header">
@@ -499,21 +502,21 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					<h2>修改融资项目</h2>
 					<p>修改后会自动保存，不再需要逐项确认。</p>
 				</div>
-				<button type="button" aria-label="关闭" onclick={() => editProjectDialog.close()}>×</button>
+				<button class="btn" type="button" aria-label="关闭" onclick={() => editProjectDialog.close()}>×</button>
 			</div>
 			<input type="hidden" name="id" value={editingProject.id} />
 			<div class="form-grid">
 				<label class="wide">
 					<span>项目名称</span>
-					<input name="name" maxlength="160" required value={editingProject.name} />
+					<input class="input" name="name" maxlength="160" required value={editingProject.name} />
 				</label>
 				<label class="wide">
 					<span>融资品种</span>
-					<input value={editingProject.type} readonly />
+					<input class="input" value={editingProject.type} readonly />
 				</label>
 				<label>
 					<span>项目状态</span>
-					<select name="status" value={editingProject.rawStatus} required>
+					<select class="select" name="status" value={editingProject.rawStatus} required>
 						<option value="planning">规划中</option>
 						<option value="in_progress">执行中</option>
 						<option value="at_risk">存在风险</option>
@@ -523,7 +526,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				</label>
 				<label>
 					<span>负责人</span>
-					<select name="ownerId" value={editingProject.ownerId ?? ''}>
+					<select class="select" name="ownerId" value={editingProject.ownerId ?? ''}>
 						<option value="">待分配</option>
 						{#if projectOptionsStatus !== 'ready' && editingProject.ownerId}
 							<option value={editingProject.ownerId}>{editingProject.owner}</option>
@@ -535,48 +538,29 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				</label>
 				<label>
 					<span>计划簿记</span>
-					<input name="plannedBookbuildingDate" type="date" value={editingProject.plannedBookbuildingDate} required />
+					<input class="input" name="plannedBookbuildingDate" type="date" value={editingProject.plannedBookbuildingDate} required />
 				</label>
 				<label class="wide">
 					<span>项目说明</span>
-					<textarea name="notes" rows="4" maxlength="4000">{editingProject.notes}</textarea>
+					<textarea class="textarea" name="notes" rows="4" maxlength="4000">{editingProject.notes}</textarea>
 				</label>
 			</div>
 			<div class="modal-actions">
 				<p class="auto-save-status">修改后自动保存</p>
-				<button type="button" onclick={() => editProjectDialog.close()}>关闭</button>
+				<button class="btn" type="button" onclick={() => editProjectDialog.close()}>关闭</button>
 			</div>
 		</form>
 	{/if}
+</div>
 </dialog>
 
 <style>
 	.primary-action {
 		display: inline-flex;
-		min-height: 2.75rem;
 		align-items: center;
 		justify-content: center;
 		gap: 0.4375rem;
 		padding: 0 0.8125rem;
-		border: 1px solid var(--color-primary);
-		border-radius: 0.5rem;
-		font-size: 1rem;
-		font-weight: bold;
-		color: #fff;
-		background: var(--color-primary);
-		box-shadow: 0 1px 2px rgb(47 111 237 / 20%);
-		cursor: pointer;
-		transition: background 180ms ease;
-	}
-
-	.primary-action:hover {
-		background: #245fd3;
-	}
-
-	.primary-action:disabled,
-	.modal-actions button:disabled {
-		opacity: 0.6;
-		cursor: wait;
 	}
 
 	.spin {
@@ -593,7 +577,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
 		margin-bottom: 0.75rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--border-color);
 		border-radius: 0.625rem;
 		background: #fff;
 		box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
@@ -666,7 +650,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		gap: 0.625rem;
 		margin-bottom: 0.75rem;
 		padding: 0.5625rem 0.75rem;
-		border: 1px solid var(--border);
+		border: 1px solid var(--border-color);
 		border-radius: 0.625rem;
 		background: #fff;
 	}
@@ -685,11 +669,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.search-field input {
 		width: 100%;
-		border: 0;
-		outline: 0;
-		font-size: 0.75rem;
-		color: #344054;
-		background: transparent;
 	}
 
 	.select-group {
@@ -715,18 +694,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.view-switcher button {
 		min-width: 2rem;
-		border: 0;
-		border-radius: 0.3125rem;
-		font-size: 0.75rem;
-		color: #667085;
-		background: transparent;
-		cursor: pointer;
-	}
-
-	.view-switcher button.active {
-		color: var(--color-primary);
-		background: #fff;
-		box-shadow: 0 1px 2px rgb(16 24 40 / 10%);
 	}
 
 	.gantt-panel {
@@ -755,7 +722,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		display: flex;
 		align-items: center;
 		padding: 0 1rem;
-		border-right: 1px solid var(--border);
+		border-right: 1px solid var(--border-color);
 	}
 
 	.timeline-head {
@@ -771,7 +738,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.month-band {
 		height: 2rem;
-		border-bottom: 1px solid var(--border);
+		border-bottom: 1px solid var(--border-color);
 	}
 
 	.month-band span {
@@ -780,7 +747,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		height: 100%;
 		overflow: hidden;
 		padding-top: 0.5625rem;
-		border-right: 1px solid var(--border);
+		border-right: 1px solid var(--border-color);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
@@ -829,19 +796,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.expand-button {
 		display: grid;
 		width: 1.6875rem;
-		height: 1.875rem;
 		flex: 0 0 auto;
 		place-items: center;
-		border: 0;
-		border-radius: 0.3125rem;
-		color: #98a2b3;
-		background: transparent;
-		cursor: pointer;
-	}
-
-	.expand-button:hover {
-		color: var(--color-primary);
-		background: #edf4ff;
 	}
 
 	.project-info > div:nth-child(2) {
@@ -912,30 +868,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.project-row-actions button {
 		display: grid;
 		width: 2.75rem;
-		height: 2.75rem;
 		place-items: center;
-		border: 1px solid #d0d5dd;
-		border-radius: 0.4375rem;
-		color: #475467;
-		background: #fff;
-		cursor: pointer;
-	}
-
-	.project-row-actions button:hover {
-		border-color: #84adff;
-		color: var(--color-primary);
-		background: #eff4ff;
-	}
-
-	.project-row-actions button.danger-action:hover {
-		border-color: #fda29b;
-		color: #b42318;
-		background: #fef3f2;
-	}
-
-	.project-row-actions button:disabled {
-		cursor: wait;
-		opacity: 0.55;
 	}
 
 	.project-status {
@@ -978,7 +911,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	.status-pill.gray {
-		border-color: var(--border);
+		border-color: var(--border-color);
 		color: #475467;
 		background: #f9fafb;
 	}
@@ -1176,16 +1109,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.new-project-modal {
 		width: min(35rem, calc(100vw - 2rem));
 		padding: 0;
-		border: 0;
-		border-radius: 0.8125rem;
-		color: #1d2939;
-		background: #fff;
-		box-shadow: 0 1.5rem 3rem rgb(16 24 40 / 22%);
-	}
-
-	.new-project-modal::backdrop {
-		background: rgb(10 18 31 / 55%);
-		backdrop-filter: blur(2px);
 	}
 
 	.new-project-modal form {
@@ -1214,14 +1137,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.modal-header button {
 		display: grid;
 		width: 2.125rem;
-		height: 2.125rem;
 		place-items: center;
-		border: 0;
-		border-radius: 0.375rem;
-		font-size: 1.375rem;
-		color: #667085;
-		background: #f2f4f7;
-		cursor: pointer;
 	}
 
 	.form-grid {
@@ -1249,23 +1165,12 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.form-grid input,
 	.form-grid select,
 	.form-grid textarea {
-		min-height: 2.75rem;
 		padding: 0 0.625rem;
-		border: 1px solid #d0d5dd;
-		border-radius: 0.4375rem;
-		font-size: 1rem;
-		color: #344054;
-		background: #fff;
 	}
 
 	.form-grid textarea {
 		padding-block: 0.625rem;
 		resize: vertical;
-	}
-
-	.form-grid input[readonly] {
-		color: #667085;
-		background: #f9fafb;
 	}
 
 	.modal-note {
@@ -1288,14 +1193,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	.modal-actions > button:not(.primary-action) {
-		min-height: 2.75rem;
 		padding: 0 0.8125rem;
-		border: 1px solid #d0d5dd;
-		border-radius: 0.5rem;
-		font-size: 1rem;
-		color: #475467;
-		background: #fff;
-		cursor: pointer;
 	}
 
 	.auto-save-status {
@@ -1335,6 +1233,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 		.toolbar {
 			flex-wrap: wrap;
+		min-height: 3.375rem;
 		}
 
 		.search-field {
@@ -1355,6 +1254,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 		.gantt-head {
 			display: none;
+		min-height: 4.25rem;
 		}
 
 		.project-row {
@@ -1362,10 +1262,11 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 			min-width: 0;
 			grid-template-columns: minmax(0, 1fr) 6.625rem;
 			margin-bottom: 0.5625rem;
-			border: 1px solid var(--border);
+			border: 1px solid var(--border-color);
 			border-radius: 0.625rem;
 			background: #fff;
 			box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
+		min-height: 4.9375rem;
 		}
 
 		.project-info,
@@ -1403,6 +1304,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	@media (max-width: 35rem) {
 		.summary-strip > div {
 			padding: 0.625rem 0.75rem;
+		min-height: 4.625rem;
 		}
 
 		.select-group {

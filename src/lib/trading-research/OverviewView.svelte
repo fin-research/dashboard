@@ -228,9 +228,9 @@
   <ModuleCard labelledBy="overview-alerts-title">
     <PanelHeading id="overview-alerts-title" title="预警中心">
       <div class="tr-filter-chips" role="group" aria-label="预警筛选">
-        <button class:active={alertFilter === "all"} type="button" onclick={() => (alertFilter = "all")}>全部 {overviewAlerts.length}</button>
-        <button class:active={alertFilter === "pending"} type="button" onclick={() => (alertFilter = "pending")}>待处理 {overviewAlerts.length - acknowledgedAlertIds.length}</button>
-        <button class:active={alertFilter === "acknowledged"} type="button" onclick={() => (alertFilter = "acknowledged")}>已确认 {acknowledgedAlertIds.length}</button>
+        <button class="btn" class:btn-active={alertFilter === "all"} type="button" onclick={() => (alertFilter = "all")}>全部 {overviewAlerts.length}</button>
+        <button class="btn" class:btn-active={alertFilter === "pending"} type="button" onclick={() => (alertFilter = "pending")}>待处理 {overviewAlerts.length - acknowledgedAlertIds.length}</button>
+        <button class="btn" class:btn-active={alertFilter === "acknowledged"} type="button" onclick={() => (alertFilter = "acknowledged")}>已确认 {acknowledgedAlertIds.length}</button>
       </div>
     </PanelHeading>
     <div class="tr-alert-list">
@@ -244,7 +244,7 @@
               <time>{alert.eventAt}</time>
             </div>
             <p>{alert.text}</p>
-            <button class="tr-alert-action" type="button" onclick={() => toggleAlert(alert.id)}>
+            <button class="btn tr-alert-action" type="button" onclick={() => toggleAlert(alert.id)}>
               {acknowledgedAlertIds.includes(alert.id) ? "恢复待处理" : "确认已知"}
             </button>
           </div>

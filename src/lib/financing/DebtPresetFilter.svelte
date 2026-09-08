@@ -44,10 +44,10 @@
 	});
 </script>
 
-<section class="debt-filter" class:compact={compact} aria-label={ariaLabel}>
+<section class="card card-border bg-base-100 debt-filter" class:compact={compact} aria-label={ariaLabel}>
 	<label>
 		{#if !compact}<span>预设</span>{/if}
-		<select value={preset} onchange={(event) => applyPreset(event.currentTarget.value)}>
+		<select class="select" aria-label="预设筛选" value={preset} onchange={(event) => applyPreset(event.currentTarget.value)}>
 			{#each presets as item}
 				<option value={item.key}>{item.label}</option>
 			{/each}
@@ -66,15 +66,11 @@
 <style>
 	.debt-filter {
 		display: flex;
+		flex-direction: row;
 		min-height: 4rem;
 		align-items: center;
 		gap: 1rem;
 		padding: 0.6875rem 1rem;
-		border: 1px solid #dfe5ee;
-		border-left: 0.25rem solid #2563eb;
-		border-radius: 0.625rem;
-		background: linear-gradient(90deg, #f8fbff, #fff 35%);
-		box-shadow: 0 0.1875rem 0.75rem rgb(15 23 42 / 4%);
 	}
 
 	label {
@@ -84,44 +80,32 @@
 	}
 
 	label span {
-		font-size: 0.75rem;
-		font-weight: 700;
+		font-size: 0.875rem;
+		font-weight: bold;
 		letter-spacing: 0.02em;
-		color: #526071;
+		color: var(--muted);
 	}
 
 	select {
-		min-width: 13.5rem;
-		min-height: 2.5rem;
+		width: 13.5rem;
+		min-width: 0;
 		padding: 0 2rem 0 0.75rem;
-		border: 1px solid #cbd5e1;
-		border-radius: 0.5rem;
-		color: #1e293b;
-		background: #fff;
-		transition: border-color 160ms ease, box-shadow 160ms ease;
-	}
-
-	select:hover {
-		border-color: #94a3b8;
 	}
 
 	.debt-filter.compact {
 		min-height: 0;
 		padding: 0;
-		border: 0;
-		border-radius: 0;
-		background: none;
-		box-shadow: none;
 	}
 
 	.debt-filter.compact select {
-		min-width: 12rem;
+		width: 12rem;
 	}
 
 	@media (max-width: 64rem) {
 		.debt-filter {
 			align-items: stretch;
 			flex-wrap: wrap;
+		min-height: 4rem;
 		}
 	}
 

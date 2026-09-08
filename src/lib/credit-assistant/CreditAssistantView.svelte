@@ -231,7 +231,7 @@
 <div class="credit-chat" bind:this={chat}>
   <!-- Keep the component's root in place; only move its nested toolbar. -->
   <div class="chat-toolbar" use:portal={"#tr-topbar-actions"}>
-    <button class="chat-button chat-button--new" type="button" disabled={busy || loading} onclick={() => void newSession()}>
+    <button class="btn chat-button chat-button--new" type="button" disabled={busy || loading} onclick={() => void newSession()}>
       <WorkbenchIcon name="plus" /><span>{creating ? "正在新建…" : "新对话"}</span>
     </button>
   </div>
@@ -242,7 +242,7 @@
       <div class="chat-empty"><span class="chat-welcome-icon"><WorkbenchIcon name="chat" /></span><h2>有什么需要核实？</h2></div>
     {/if}
     {#if loadError}
-      <div class="chat-load-error" role="alert"><p>{loadError}</p><button class="chat-button" type="button" onclick={() => void refresh()}>重新连接</button></div>
+      <div class="chat-load-error" role="alert"><p>{loadError}</p><button class="btn chat-button" type="button" onclick={() => void refresh()}>重新连接</button></div>
     {/if}
     {#each session.turns as turn (turn.id)}
       <article class="chat-turn" aria-label="一轮对话">
@@ -286,7 +286,7 @@
                 {/each}
               </details>
             {/if}
-            <button class="chat-button chat-button--copy" type="button" onclick={() => void copy(turn.id)} aria-label="复制答复和资料来源"><WorkbenchIcon name="copy" /><span>复制答复</span></button>
+            <button class="btn chat-button chat-button--copy" type="button" onclick={() => void copy(turn.id)} aria-label="复制答复和资料来源"><WorkbenchIcon name="copy" /><span>复制答复</span></button>
           </div>
         </div>
       </article>
@@ -299,7 +299,7 @@
           {#if session.running || sending}
             <p class="chat-progress" role="status"><span class="loading-dot"></span>{sending ? "正在发送…" : session.progress || "正在核对材料…"}</p>
           {:else if session.error}
-            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<button class="chat-button" type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</button>{/if}</div>
+            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<button class="btn chat-button" type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</button>{/if}</div>
           {/if}
         </div>
       </article>
@@ -309,7 +309,7 @@
     <div class="customer-picker">
       <label for="credit-customer">客户名称</label>
       <div class="customer-search">
-        <input id="credit-customer" bind:this={customerInput} bind:value={customerName} oninput={searchCustomers} onkeydown={customerKeydown}
+        <input class="input" id="credit-customer" bind:this={customerInput} bind:value={customerName} oninput={searchCustomers} onkeydown={customerKeydown}
           onfocus={() => { if (customers.length) showCustomers = true; }} onblur={() => { showCustomers = false; }}
           type="text" role="combobox" aria-autocomplete="list" aria-expanded={showCustomers} aria-controls="credit-customers"
           aria-activedescendant={showCustomers && activeCustomer >= 0 && customers[activeCustomer] ? `credit-customer-${activeCustomer}` : undefined}
@@ -319,7 +319,7 @@
             <ul id="credit-customers" role="listbox" aria-label="匹配机构">
               {#each customers as customer, index (customer.name)}
                 <li role="option" aria-selected={index === activeCustomer} id={`credit-customer-${index}`}>
-                  <button type="button" tabindex="-1" onpointerdown={event => event.preventDefault()} onclick={() => void selectCustomer(customer)}>
+                  <button class="btn" type="button" tabindex="-1" onpointerdown={event => event.preventDefault()} onclick={() => void selectCustomer(customer)}>
                     <span>{customer.name}</span><span>{confidentialityLabel(customer.confidentialityStatus)}</span>
                   </button>
                 </li>
@@ -335,10 +335,10 @@
     </div>
     <form class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
-      <textarea id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} maxlength="3000" rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={loading || creating} aria-describedby="credit-composer-hint"></textarea>
+      <textarea class="textarea" id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} maxlength="3000" rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={loading || creating} aria-describedby="credit-composer-hint"></textarea>
       <div class="composer-actions">
         <span id="credit-composer-hint">Enter 发送<span class="keyboard-hint"> · Shift + Enter 换行</span></span>
-        <button class="chat-button chat-button--send" type="submit" disabled={!selectedCustomer || !question.trim() || busy || loading || !!loadError} aria-label={busy ? "正在处理消息" : "发送消息"} title={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
+        <button class="btn chat-button chat-button--send" type="submit" disabled={!selectedCustomer || !question.trim() || busy || loading || !!loadError} aria-label={busy ? "正在处理消息" : "发送消息"} title={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
       </div>
     </form>
   </div>
@@ -366,7 +366,7 @@
   .citation { margin-left: 4px; padding-block: 6px; font-size: .875rem; text-decoration: none; }
   .citation:hover { text-decoration: underline; }
   .file-attachments { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; list-style: none; margin: 16px 0; padding: 0; }
-  .file-attachment { display: flex; align-items: center; gap: 12px; min-height: 88px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); text-decoration: none; transition: border-color 160ms ease, background 160ms ease; }
+  .file-attachment { display: flex; align-items: center; gap: 12px; min-height: 88px; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface); text-decoration: none; transition: border-color 160ms ease, background 160ms ease; }
   .file-attachment:hover { border-color: var(--brand); background: var(--brand-soft); }
   .file-icon { flex-shrink: 0; display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-control); background: var(--bg-page); }
   .file-icon :global(svg) { width: 24px; height: 24px; }
@@ -382,7 +382,7 @@
   .answer-sources { margin: 12px 0 4px; color: var(--text-2); font-size: .875rem; }
   summary { width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--text-3); }
   summary:hover { color: var(--brand); }
-  .source { padding: 16px 0; border-top: 1px solid var(--border); scroll-margin-top: 24px; }
+  .source { padding: 16px 0; border-top: 1px solid var(--border-color); scroll-margin-top: 24px; }
   .source-kind { display: block; color: var(--text-3); margin-top: 4px; }
   blockquote { margin: 10px 0; padding: 4px 12px; border-left: 2px solid var(--border-strong); white-space: pre-wrap; }
   .chat-progress { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--text-3); font-size: .875rem; }
@@ -393,29 +393,23 @@
   .customer-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; max-width: 832px; margin: 0 auto 12px; font-size: .875rem; }
   .customer-picker label { font-weight: bold; color: var(--text-1); }
   .customer-search { position: relative; flex: 1; min-width: min(100%, 220px); }
-  .customer-search input { width: 100%; min-height: 44px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: 10px 12px; background: var(--surface); color: var(--text-1); font: inherit; }
-  .customer-search input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .customer-search input { width: 100%; padding: 10px 12px; }
   .customer-options { position: absolute; bottom: calc(100% + 8px); width: 100%; max-height: min(320px, 40dvh); overflow-y: auto; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); box-shadow: var(--shadow-card); }
   .customer-options ul { margin: 0; padding: 4px; list-style: none; }
-  .customer-options button { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 10px; border: 0; border-radius: var(--radius-control); background: transparent; text-align: left; color: var(--text-1); font: inherit; cursor: pointer; }
-  .customer-options button:hover, .customer-options [aria-selected="true"] button { background: var(--brand-soft); }
+  .customer-options button { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; width: 100%; padding: 10px; text-align: left; }
   .customer-options button span:last-child, .customer-status { color: var(--text-3); }
   .customer-options p { margin: 0; padding: 12px; color: var(--text-2); }
   .chat-composer { max-width: 832px; margin-inline: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 160ms ease; }
   .chat-composer:focus-within { border-color: var(--brand); }
-  textarea { display: block; width: 100%; min-height: 56px; max-height: 180px; padding: 0; border: 0; resize: none; background: transparent; color: var(--text-1); font: inherit; line-height: 1.75; outline: none; }
+  textarea { display: block; width: 100%; max-height: 180px; padding: 0; resize: none; min-height: 56px; }
   textarea::placeholder { color: var(--text-3); }
-  textarea:disabled { cursor: wait; }
   .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; }
   .composer-actions > span { color: var(--text-3); font-size: .875rem; }
-  .chat-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text-2); font-size: .875rem; font-weight: bold; cursor: pointer; transition: background 160ms ease, border-color 160ms ease, color 160ms ease; }
+  .chat-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; padding: 8px 14px; }
   .chat-button :global(svg) { width: 18px; height: 18px; }
-  .chat-button:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
-  .chat-button:disabled { opacity: .5; cursor: not-allowed; }
-  .chat-button--copy { padding-inline: 10px; margin-left: -10px; border-color: transparent; background: transparent; color: var(--text-3); font-weight: normal; }
-  .chat-button--send { flex-shrink: 0; width: 44px; padding: 0; border-color: var(--brand); background: var(--brand); color: var(--surface); }
+  .chat-button--copy { padding-inline: 10px; margin-left: -10px; }
+  .chat-button--send { flex-shrink: 0; width: 44px; padding: 0; }
   .chat-button--send :global(svg) { width: 22px; height: 22px; }
-  .chat-button--send:hover:not(:disabled) { border-color: var(--brand-deep); background: var(--brand-deep); color: var(--surface); }
   .chat-button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
   @media (max-width: 600px) {
     .chat-messages { padding: 24px 16px 12px; }

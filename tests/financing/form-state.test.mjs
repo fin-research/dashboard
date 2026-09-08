@@ -158,7 +158,7 @@ test('new financing projects use one bookbuilding date anchored to SOP issue day
 	]);
 
 	assert.doesNotMatch(page, /name="borrower"|name="startDate"|name="endDate"/);
-	assert.match(page, /<span>计划簿记<\/span>\s*<input name="plannedBookbuildingDate" type="date"/);
+	assert.match(page, /<span>计划簿记<\/span>\s*<input class="input" name="plannedBookbuildingDate" type="date"/);
 	assert.match(server, /const plannedBookbuildingDate = projectBookbuildingDate\(data\)/);
 	assert.match(server, /planned_start_date, planned_issue_date/);
 	assert.match(server, /resolveSopSchedule\(plannedBookbuildingDate, node/);

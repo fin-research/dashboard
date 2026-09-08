@@ -4,8 +4,6 @@
   import AuthMenu from "$lib/AuthMenu.svelte";
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
   import type { WorkbenchIconName } from "../trading-research/demo-data";
-  import "../../app.css";
-  import "../../styles.css";
   import "../../layout-report.css";
   import "../trading-research/workbench.css";
 
@@ -52,10 +50,10 @@
 >
   <a class="tr-skip-link" href="#tr-workbench-main">跳至工作台内容</a>
 
-  <header class="tr-topbar">
+  <header class="navbar tr-topbar">
     <div class="tr-topbar__title">
       <button
-        class="tr-sidebar-toggle"
+        class="btn btn-ghost btn-square tr-sidebar-toggle"
         type="button"
         aria-label={desktopCollapsed ? "展开侧边导航" : "折叠侧边导航"}
         aria-expanded={!desktopCollapsed}
@@ -65,7 +63,7 @@
         <WorkbenchIcon name="sidebar" />
       </button>
       <button
-        class="tr-mobile-menu"
+        class="btn btn-ghost btn-square tr-mobile-menu"
         type="button"
         aria-label={mobileDrawerOpen ? "关闭导航菜单" : "打开导航菜单"}
         aria-expanded={mobileDrawerOpen}
@@ -95,8 +93,9 @@
 
   <aside id="tr-workbench-drawer" class="tr-drawer" aria-label={`${title}导航`}>
     <nav class="tr-drawer__nav" aria-label="业务模块" data-sveltekit-preload-data="hover">
+      <ul class="menu tr-navigation-list">
       {#each views as view}
-        <a
+        <li><a
           class:active={activeViewId === view.id}
           href={view.href}
           aria-current={activeViewId === view.id ? "page" : undefined}
@@ -105,8 +104,9 @@
         >
           <span class="tr-nav-icon" aria-hidden="true"><WorkbenchIcon name={view.icon} /></span>
           <span class="tr-nav-label">{view.label}</span>
-        </a>
+        </a></li>
       {/each}
+      </ul>
     </nav>
   </aside>
 

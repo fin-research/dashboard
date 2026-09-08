@@ -81,3 +81,12 @@
 融资工作台和管理中心复用 `WorkbenchShell`；指标使用 `MetricCard`，模块容器使用 `ModuleCard`，标题使用 `PanelHeading`，图表通过 `ChartHost` 共用 registry，全站只挂载一个 `GlobalMessages`。融资页面的业务 CSS 限定 `.financing-scope` 并映射全局令牌，不再维护独立 Tailwind/daisyUI 主题或全局 html/body 规则。六页负债周报保留专用报告版式。
 
 公共交互统一为可访问 label、44px 控件、保留失败输入、模态框内滚动、危险操作确认与减少动效支持。融资项目/SOP 普通字段共用 650ms 防抖串行保存；这属于模块行为，细则由对应模块文档维护。页面特殊布局、字段顺序和图表口径见 [模块索引](docs/INDEX.md)。
+
+## daisyUI 基础组件
+
+- 全站 `app.css` 与 `styles.css` 只在根 layout 加载。daisyUI 使用唯一 `eastmoney` 主题，映射既有品牌色、白色卡片、冷灰背景及 6/8/10px 圆角。
+- 普通按钮及操作链接使用 `btn`，主操作 `btn-primary`，轻操作 `btn-ghost`；输入、选择、长文本、文件、复选和单选使用 `input/select/textarea/file-input/checkbox/radio`。菜单、标签、提示、表格、折叠区与弹窗使用对应 daisyUI 基础类。业务 CSS 只补布局和明确业务语义，不重新覆盖控件的边框、背景、字体和交互状态。
+- `--border` 保留给 daisyUI 的边框宽度；旧设计中的边框颜色统一为 `--border-color`（`--line` 为其别名）。不得用颜色覆盖 daisyUI 宽度令牌。`card/indicator/modal` 等名称保留给 daisyUI；专用市场快照和政策弹窗使用带业务前缀的类。
+- 原生 `<dialog class="modal">` 只负责视口遮罩与焦点管理；其首个容器为 `modal-box`，内容高度受视口约束并在内部滚动。报告表格、甘特时间轴和图表继续使用既有业务版式。
+- 首页以与业务入口同级的卡片展示“管理”。共享 `AuthMenu` 只显示“用户图标 姓名 / 部门”，进入 `/profile`；不再在各页增加管理图标或在融资顶栏另建角色/个人入口。部门读取 Auth0 已有资料，缺失时显示“未填写部门”。
+- 融资样式必须带完整业务子选择器；禁止只有 `:where(.financing-scope)` 的布局规则覆盖工作台根节点。全站字段、弹窗结构和该隔离边界由 `tests/daisyui-contract.test.mjs` 检查，管理和筛选交互由 DOM 回归覆盖。

@@ -124,22 +124,8 @@
 
 .ledger-range-trigger,
 .ledger-management-button {
-  min-height: 44px;
   gap: 7px;
   padding: 0 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-control);
-  color: var(--text-2);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.ledger-range-trigger:hover,
-.ledger-management-button:hover {
-  border-color: var(--brand);
-  background: var(--brand-soft);
 }
 
 .ledger-range-trigger svg,
@@ -182,12 +168,6 @@
   width: 44px;
   height: 44px;
   place-items: center;
-  border: 0;
-  border-radius: var(--radius-control);
-  color: var(--text-2);
-  background: #f3f6fa;
-  cursor: pointer;
-  font-size: 1.5rem;
 }
 
 .range-calendar-pair {
@@ -222,46 +202,15 @@
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 42px;
   place-items: center;
-  border: 0;
-  color: var(--text-2);
-  background: transparent;
-  cursor: pointer;
-  font-variant-numeric: tabular-nums;
-  font-weight: bold;
-}
-
-.calendar-grid button:hover:not(:disabled) {
-  background: var(--brand-soft);
-}
-
-.calendar-grid button.in-range {
-  background: color-mix(in srgb, var(--brand-soft) 78%, var(--surface));
-}
-
-.calendar-grid button.endpoint {
-  border-radius: 50%;
-  color: #fff;
-  background: var(--brand);
 }
 
 .calendar-grid button.outside {
   visibility: hidden;
 }
 
-.calendar-grid button:disabled {
-  cursor: default;
-}
-
-.ledger-management-button {
-  color: var(--brand-deep);
-}
-
 .ledger-actions .export-button {
-  min-height: 44px;
   padding-inline: 12px;
-  font-weight: bold;
 }
 
 .ledger-main {
@@ -344,7 +293,6 @@
 
 .ledger-account-filter input {
   width: 16px;
-  height: 16px;
   margin: 0;
   accent-color: var(--brand);
 }
@@ -585,35 +533,13 @@
 }
 
 .ledger-empty button {
-  min-height: 44px;
   padding: 0 16px;
-  border: 1px solid var(--brand);
-  border-radius: var(--radius-control);
-  color: #fff;
-  background: var(--brand);
-  cursor: pointer;
-  font-weight: bold;
 }
 
 .ledger-management-dialog {
-  position: fixed;
-  inset: 50% auto auto 50%;
-  width: min(780px, calc(100% - 32px));
-  max-height: calc(100dvh - 32px);
-  margin: 0;
+  width: min(780px, 100%);
+  max-width: 780px;
   padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  color: var(--text-2);
-  background: var(--surface);
-  box-shadow: 0 28px 80px rgba(23, 32, 51, 0.24);
-  transform: translate(-50%, -50%);
-}
-
-.ledger-management-dialog::backdrop {
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(3px);
 }
 
 .ledger-management-content {
@@ -635,10 +561,6 @@
   font-size: 1.25rem;
 }
 
-.ledger-management-dialog header button {
-  font-size: 1rem;
-}
-
 .ledger-management-dialog header svg {
   width: 20px;
   stroke-width: 2;
@@ -650,20 +572,8 @@
 }
 
 .ledger-upload-primary {
-  min-height: 44px;
   gap: 8px;
   padding: 0 14px;
-  border: 1px solid var(--brand);
-  border-radius: var(--radius-control);
-  color: #fff;
-  background: var(--brand);
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.ledger-upload-primary:disabled {
-  cursor: wait;
-  opacity: 0.65;
 }
 
 .ledger-management-toolbar > span {
@@ -689,23 +599,8 @@
 }
 
 .management-calendar .calendar-grid button {
-  min-height: 52px;
   align-content: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-inner);
-}
-
-.management-calendar .calendar-grid button.available {
-  border-color: var(--brand);
-  color: var(--text-1);
-  background: var(--surface);
-}
-
-.management-calendar .calendar-grid button.selected {
-  border-color: var(--brand);
-  color: #175cd3;
-  background: #eff4ff;
-  box-shadow: inset 0 0 0 1px var(--brand);
+  min-height: 52px;
 }
 
 .ledger-management-detail {
@@ -745,25 +640,7 @@
 }
 
 .ledger-management-actions button {
-  min-height: 40px;
   padding: 0 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-control);
-  color: var(--brand-deep);
-  background: var(--surface);
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.ledger-management-actions button.danger {
-  border-color: #fecdca;
-  color: #b42318;
-  background: #fef3f2;
-}
-
-.ledger-management-actions button:disabled {
-  cursor: wait;
-  opacity: 0.6;
 }
 
 .ledger-back:focus-visible,
@@ -790,6 +667,7 @@
   .ledger-masthead {
     align-items: flex-start;
     flex-direction: column;
+  min-height: 64px;
   }
 
   .ledger-actions {
@@ -861,6 +739,7 @@
   .ledger-panel-heading--transactions {
     align-items: flex-start;
     flex-wrap: wrap;
+  min-height: 58px;
   }
 
   .transaction-summary {
@@ -872,6 +751,7 @@
   .ledger-management-detail {
     align-items: stretch;
     flex-direction: column;
+  min-height: 70px;
   }
 
   .ledger-management-actions button {
@@ -908,10 +788,6 @@
 
   .ledger-management-toolbar > span {
     text-align: right;
-  }
-
-  .management-calendar .calendar-grid button {
-    min-height: 48px;
   }
 
   .management-calendar .calendar-weekdays,

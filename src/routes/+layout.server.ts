@@ -5,4 +5,5 @@ import type { LayoutServerLoad } from './$types';
 export const load: LayoutServerLoad = ({ locals, url }) => ({
   routePath: url.pathname,
   permissions: locals.permissions,
+  account: locals.user?.authorization ? { name: locals.user.authorization.name, department: locals.user.authorization.department ?? '' } : null,
 });

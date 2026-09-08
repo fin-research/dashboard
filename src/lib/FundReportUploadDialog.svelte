@@ -113,10 +113,11 @@
   }
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="fund-report-upload-title" oncancel={(event) => { if (uploading) event.preventDefault(); }}>
+<dialog class="modal" bind:this={dialog} aria-labelledby="fund-report-upload-title" oncancel={(event) => { if (uploading) event.preventDefault(); }}>
+<div class="modal-box upload-modal-box">
   <header class="dialog-heading">
     <h2 id="fund-report-upload-title">上传资金日报</h2>
-    <button class="close-button" type="button" aria-label="关闭上传窗口" disabled={uploading} onclick={() => dialog.close()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+    <button class="btn btn-ghost close-button" type="button" aria-label="关闭上传窗口" disabled={uploading} onclick={() => dialog.close()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
   </header>
       <form
         class="upload-form"
@@ -146,7 +147,7 @@
 
         <button
           class:selected={selectedFile !== null}
-          class="file-picker"
+          class="btn file-picker"
           type="button"
           disabled={uploading}
           onclick={chooseFile}
@@ -186,8 +187,8 @@
 
         <footer class="upload-actions">
           <span>{selectedFile ? `即将发布 ${fundReportFileName(selectedDate)}` : "选择文件后即可上传发布"}</span>
-          <button class="cancel-button" type="button" disabled={uploading} onclick={() => dialog.close()}>取消</button>
-          <button class="upload-button" type="submit" disabled={!selectedFile || uploading}>
+          <button class="btn btn-ghost cancel-button" type="button" disabled={uploading} onclick={() => dialog.close()}>取消</button>
+          <button class="btn btn-primary upload-button" type="submit" disabled={!selectedFile || uploading}>
             {#if uploading}<span class="button-spinner" aria-hidden="true"></span>{/if}
             <span>{uploading ? "正在上传" : "上传并发布"}</span>
           </button>
@@ -195,16 +196,16 @@
 
 
       </form>
+</div>
 </dialog>
 
 <style>
-  dialog { width: min(720px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-card); color: var(--text-1); background: var(--surface); box-shadow: var(--shadow-card); }
-  dialog::backdrop { background: rgb(15 23 42 / 40%); }
+  .upload-modal-box { width: min(720px, 100%); max-width: 720px; padding: 0; }
   .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
   .dialog-heading h2 { margin: 0; font-size: 1.25rem; }
-  .close-button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); cursor: pointer; }
+  .close-button { width: 44px; height: 44px; display: grid; place-items: center; }
   .close-button svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
-  .cancel-button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--text-2); background: var(--surface); font: inherit; cursor: pointer; }
+  .cancel-button { padding: 10px 16px; }
   .upload-note svg, .file-picker-icon svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .upload-form {
     display: grid;
@@ -250,7 +251,6 @@
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
-    border: 0;
   }
 
   .file-picker {
@@ -383,28 +383,11 @@
   .upload-button {
     display: inline-flex;
     min-width: 168px;
-    min-height: 46px;
     align-items: center;
     justify-content: center;
     gap: 8px;
     padding: 0 18px;
-    border: 1px solid var(--brand);
-    border-radius: var(--radius-control);
-    color: #fff;
-    background: var(--brand);
-    box-shadow: 0 5px 14px rgb(47 111 214 / 18%);
-    cursor: pointer;
-    font-weight: bold;
-    transition:
-      border-color 160ms ease,
-      background 160ms ease,
-      box-shadow 160ms ease;
-  }
-
-  .upload-button:hover:not(:disabled) {
-    border-color: var(--brand-deep);
-    background: var(--brand-deep);
-    box-shadow: 0 7px 18px rgb(47 111 214 / 24%);
+    min-height: 46px;
   }
 
   .upload-button:disabled,
@@ -422,8 +405,6 @@
     animation: spin 700ms linear infinite;
   }
 
-  button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
-
   @keyframes spin {
     to {
       transform: rotate(360deg);
@@ -431,7 +412,8 @@
   }
 
   @media (max-width: 720px) {
-    .file-picker { grid-template-columns: 48px minmax(0, 1fr); padding: 16px; }
+    .file-picker { grid-template-columns: 48px minmax(0, 1fr); padding: 16px;
+    min-height: 124px; }
     .file-picker-action { display: none; }
     .selected-file dl { grid-template-columns: 1fr; }
     .upload-actions { flex-wrap: wrap; }

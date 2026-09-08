@@ -10,4 +10,4 @@
   } = $props();
 </script>
 
-<span class={`tr-badge tr-badge--${tone}`}>{@render children()}</span>
+<span class={`badge badge-${tone === "neutral" ? "ghost" : tone} tr-badge tr-badge--${tone}`}>{@render children()}</span>

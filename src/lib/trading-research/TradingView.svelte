@@ -256,11 +256,11 @@
         <label class="tr-search-control">
           <span class="sr-only">搜索交易</span>
           <WorkbenchIcon name="search" />
-          <input bind:value={query} type="search" placeholder="编号、对手、业务类型" />
+          <input class="input" bind:value={query} type="search" placeholder="编号、对手、业务类型" />
         </label>
         <label>
           <span class="sr-only">业务品种</span>
-          <select bind:value={product}>
+          <select class="select" bind:value={product}>
             <option value="all">全部业务</option>
             <option value="同业拆借">同业拆借</option>
             <option value="质押式回购">质押式回购</option>
@@ -268,7 +268,7 @@
         </label>
         <label>
           <span class="sr-only">交易方向</span>
-          <select bind:value={direction}>
+          <select class="select" bind:value={direction}>
             <option value="all">全部方向</option>
             <option value="融入">融入</option>
             <option value="融出">融出</option>
@@ -276,7 +276,7 @@
         </label>
         <label>
           <span class="sr-only">交易状态</span>
-          <select bind:value={status}>
+          <select class="select" bind:value={status}>
             <option value="all">全部状态</option>
             <option value="已成交">已成交</option>
             <option value="待确认">待确认</option>
@@ -284,19 +284,19 @@
         </label>
         <label>
           <span class="sr-only">交易排序</span>
-          <select bind:value={sort}>
+          <select class="select" bind:value={sort}>
             <option value="time-asc">时间正序</option>
             <option value="time-desc">时间倒序</option>
             <option value="amount-desc">金额从高到低</option>
             <option value="rate-asc">利率从低到高</option>
           </select>
         </label>
-        <button class="tr-table-action" type="button" onclick={exportTrades}>导出当前结果</button>
+        <button class="btn tr-table-action" type="button" onclick={exportTrades}>导出当前结果</button>
         <span class="tr-result-count">共 {filteredTrades.length} 笔</span>
       </div>
     </PanelHeading>
     <div class="tr-table-scroll">
-      <table class="tr-data-table tr-trade-table">
+      <table class="table tr-data-table tr-trade-table">
         <caption class="sr-only">交易研究工作台交易记录</caption>
         <thead>
           <tr><th>交易编号</th><th>时间</th><th>方向</th><th>业务类型</th><th>交易对手</th><th class="is-numeric">金额（亿元）</th><th>期限</th><th class="is-numeric">利率</th><th>质押券</th><th>押券风控</th><th>状态</th></tr>
@@ -362,13 +362,13 @@
     <div class="tr-parser-grid">
       <div class="tr-parser-input">
         <label for="trade-parser-input">交易聊天记录</label>
-        <textarea
+        <textarea class="textarea"
           id="trade-parser-input"
           bind:value={tradeText}
           rows="8"
           placeholder="例如：融出1.5亿元14D质押式回购，利率1.82%，交易对手招商银行，质押券为国债"
         ></textarea>
-        <button class="tr-primary-action" type="button" onclick={parseTradeText}>规则解析</button>
+        <button class="btn btn-primary tr-primary-action" type="button" onclick={parseTradeText}>规则解析</button>
         <aside class="tr-collateral-checklist" aria-label="押券检查项">
           <strong>押券检查项</strong>
           <span>券种准入、评级与期限、折算率、估值覆盖、发行人集中度</span>
@@ -395,7 +395,7 @@
             <p>{parsedTicket.direction} · {parsedTicket.product} · {parsedTicket.amount} · {parsedTicket.term} · {parsedTicket.rate} · {parsedTicket.counterparty}</p>
           </div>
           <button
-            class="tr-secondary-action"
+            class="btn tr-secondary-action"
             type="button"
             onclick={() => (ticketConfirmed = true)}
           >{ticketConfirmed ? "已确认解析结果" : "确认解析结果"}</button>

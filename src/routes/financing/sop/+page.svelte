@@ -126,7 +126,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	<section class="workflow-grid">
 		<ModuleCard class="section-card">
 			<PanelHeading id="sop-heading-0" title="负债品种 SOP" controlsInline>{#if canCreateSop}
-					<button class="link-button" type="button" onclick={() => sopDialog?.showModal()}>
+					<button class="btn link-button" type="button" onclick={() => sopDialog?.showModal()}>
 						<Plus size={14} /> 新建
 					</button>
 				{/if}</PanelHeading>
@@ -137,7 +137,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 						<div class="sop-copy">
 							<div>
 								<strong>{sop.name}</strong>
-								<span class:inactive={!sop.isActive} class="status-badge">
+								<span class:inactive={!sop.isActive} class="badge badge-success status-badge">
 									{sop.isActive ? '启用' : '停用'}
 								</span>
 							</div>
@@ -157,9 +157,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 		<ModuleCard class="section-card">
 			<PanelHeading id="sop-heading-1" title="提醒规则" controlsInline><div class="header-actions">
-					<a class="link-button" href={withBase('/sop/reminders')}>发送历史</a>
+					<a class="btn btn-ghost link-button" href={withBase('/sop/reminders')}>发送历史</a>
 					{#if canCreateReminder}
-						<button class="link-button" type="button" onclick={() => reminderDialog?.showModal()}>
+						<button class="btn link-button" type="button" onclick={() => reminderDialog?.showModal()}>
 							<Plus size={14} /> 新建
 						</button>
 					{/if}
@@ -171,7 +171,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 						<div>
 							<div class="rule-title">
 								<strong>{rule.name}</strong>
-								<span class:inactive={!rule.isActive} class="status-badge">
+								<span class:inactive={!rule.isActive} class="badge badge-success status-badge">
 									{rule.isActive ? '启用' : '停用'}
 								</span>
 							</div>
@@ -195,7 +195,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					<p class="empty-state">尚未配置提醒规则。</p>
 				{/each}
 				{#if canCreateReminder}
-					<button class="add-rule" type="button" onclick={() => reminderDialog?.showModal()}>
+					<button class="btn add-rule" type="button" onclick={() => reminderDialog?.showModal()}>
 						<Plus size={15} />
 						添加提醒规则
 					</button>
@@ -206,7 +206,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	{#if canCreateSop}
 	<button
-		class="floating-create-button"
+		class="btn btn-primary floating-create-button"
 		type="button"
 		onclick={() => sopDialog?.showModal()}
 		aria-label="新建 SOP"
@@ -217,7 +217,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	{/if}
 
 	{#if canCreateReminder}
-	<dialog class="config-modal" bind:this={reminderDialog}>
+	<dialog class="modal" bind:this={reminderDialog}>
+<div class="modal-box config-modal">
 		<form method="post" action="?/createReminder" use:enhance={enhanceAction('reminder', '提醒规则已保存')}>
 			<div class="modal-header">
 				<div>
@@ -225,12 +226,12 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					<h2>配置邮件提醒</h2>
 					<p>一条规则可关联多个 SOP 节点，并配置多个提前提醒周期。</p>
 				</div>
-				<button type="button" aria-label="关闭" onclick={() => reminderDialog?.close()}>×</button>
+				<button class="btn" type="button" aria-label="关闭" onclick={() => reminderDialog?.close()}>×</button>
 			</div>
 			<div class="form-grid">
 				<label class="wide">
 					<span>规则名称</span>
-					<input name="name" required value="任务到期提醒" />
+					<input class="input" name="name" required value="任务到期提醒" />
 				</label>
 				<fieldset class="wide rule-fieldset node-selector">
 					<legend>关联 SOP 节点（可多选）</legend>
@@ -242,7 +243,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 								<div>
 									{#each sop.nodes as node}
 										<label>
-											<input type="checkbox" name="nodeIds" value={node.id} />
+											<input class="checkbox checkbox-primary" type="checkbox" name="nodeIds" value={node.id} />
 											<span>{node.name}</span>
 										</label>
 									{:else}
@@ -259,7 +260,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					<legend>提醒周期（可多选）</legend>
 					<div class="fieldset-heading">
 						<p>整天周期在对应日期 09:00（上海时间）提醒；包含小时的周期按节点到期日 00:00 倒推到实际整点。</p>
-						<button type="button" class="add-period" onclick={addReminderPeriod} disabled={reminderPeriods.length >= MAX_REMINDER_PERIODS}><Plus size={14} /> 添加周期</button>
+						<button type="button" class="btn add-period" onclick={addReminderPeriod} disabled={reminderPeriods.length >= MAX_REMINDER_PERIODS}><Plus size={14} /> 添加周期</button>
 					</div>
 					<div class="period-list">
 						{#each reminderPeriods as period, index (period.key)}
@@ -267,15 +268,15 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 								<span>第 {index + 1} 次</span>
 								<label>
 									<span>天</span>
-									<input name="periodDays" type="number" min="0" max="3650" step="1" required bind:value={period.days} />
+									<input class="input" name="periodDays" type="number" min="0" max="3650" step="1" required bind:value={period.days} />
 								</label>
 								<label>
 									<span>小时</span>
-									<input name="periodHours" type="number" min="0" max="23" step="1" required bind:value={period.hours} />
+									<input class="input" name="periodHours" type="number" min="0" max="23" step="1" required bind:value={period.hours} />
 								</label>
 								<button
 									type="button"
-									class="remove-period"
+									class="btn btn-error remove-period"
 									onclick={() => removeReminderPeriod(period.key)}
 									disabled={reminderPeriods.length === 1}
 									aria-label={`删除第 ${index + 1} 个提醒周期`}
@@ -287,7 +288,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				</fieldset>
 				<label class="wide">
 					<span>收件人</span>
-					<select name="recipientMode" bind:value={reminderRecipientMode}>
+					<select class="select" name="recipientMode" bind:value={reminderRecipientMode}>
 						<option value="assignee">任务负责人</option>
 						<option value="owner">项目负责人</option>
 						<option value="custom">指定邮箱</option>
@@ -296,22 +297,24 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				{#if reminderRecipientMode === 'custom'}
 					<label class="wide">
 						<span>指定邮箱</span>
-						<input name="recipients" type="text" required placeholder="多个邮箱使用逗号分隔" />
+						<input class="input" name="recipients" type="text" required placeholder="多个邮箱使用逗号分隔" />
 					</label>
 				{/if}
 			</div>
 			<div class="modal-actions">
-				<button type="button" onclick={() => reminderDialog?.close()}>取消</button>
-				<button class="primary-action" type="submit" disabled={actionState.status === 'pending'}>
+				<button class="btn" type="button" onclick={() => reminderDialog?.close()}>取消</button>
+				<button class="btn btn-primary primary-action" type="submit" disabled={actionState.status === 'pending'}>
 					{actionState.status === 'pending' && actionState.key === 'reminder' ? '保存中…' : '保存规则'}
 				</button>
 			</div>
 		</form>
-	</dialog>
+	</div>
+</dialog>
 	{/if}
 
 	{#if canCreateSop}
-	<dialog class="config-modal" bind:this={sopDialog}>
+	<dialog class="modal" bind:this={sopDialog}>
+<div class="modal-box config-modal">
 		<form method="post" action="?/createSop" use:enhance={enhanceAction('sop', 'SOP 模板已创建')}>
 			<div class="modal-header">
 				<div>
@@ -319,16 +322,16 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					<h2>新建负债品种 SOP</h2>
 					<p>{canManage ? '保存后再编排节点、默认角色和相对日期。' : '模板创建后，可由有权限的角色编排节点。'}</p>
 				</div>
-				<button type="button" aria-label="关闭" onclick={() => sopDialog?.close()}>×</button>
+				<button class="btn" type="button" aria-label="关闭" onclick={() => sopDialog?.close()}>×</button>
 			</div>
 			<div class="form-grid">
 				<label class="wide">
 					<span>SOP 名称</span>
-					<input name="name" required placeholder="例如：收益凭证发行 SOP" />
+					<input class="input" name="name" required placeholder="例如：收益凭证发行 SOP" />
 				</label>
 				<label class="wide">
 					<span>负债品种</span>
-					<select name="debtType" required>
+					<select class="select" name="debtType" required>
 						<option value="">请选择</option>
 						<option>收益凭证</option>
 						<option>公司债</option>
@@ -340,17 +343,18 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				</label>
 				<label class="wide">
 					<span>说明</span>
-					<textarea name="description" rows="3" placeholder="说明适用范围和关键控制要求"></textarea>
+					<textarea class="textarea" name="description" rows="3" placeholder="说明适用范围和关键控制要求"></textarea>
 				</label>
 			</div>
 			<div class="modal-actions">
-				<button type="button" onclick={() => sopDialog?.close()}>取消</button>
-				<button class="primary-action" type="submit" disabled={actionState.status === 'pending'}>
+				<button class="btn" type="button" onclick={() => sopDialog?.close()}>取消</button>
+				<button class="btn btn-primary primary-action" type="submit" disabled={actionState.status === 'pending'}>
 					{actionState.status === 'pending' && actionState.key === 'sop' ? '创建中…' : canManage ? '创建并配置节点' : '创建 SOP'}
 				</button>
 			</div>
 		</form>
-	</dialog>
+	</div>
+</dialog>
 	{/if}
 </div>
 
@@ -447,12 +451,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	.add-rule {
-		min-height: 3rem;
 		margin: 0.75rem;
-		border: 1px dashed #b9c5d6;
-		border-radius: 0.5rem;
-		color: var(--color-primary);
-		background: #f8faff;
+		min-height: 3rem;
 	}
 
 	.rule-fieldset {
@@ -532,8 +532,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.node-group input {
 		width: 1.125rem;
-		min-height: 1.125rem;
-		height: 1.125rem;
 		padding: 0;
 	}
 
@@ -550,19 +548,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.add-period {
 		display: inline-flex;
-		min-height: 2.75rem;
 		align-items: center;
 		gap: 0.375rem;
 		padding-inline: 0.75rem;
-		border: 1px solid #b9c5d6;
-		border-radius: 0.5rem;
-		color: var(--color-primary);
-		background: #fff;
-	}
-
-	.add-period:disabled {
-		cursor: not-allowed;
-		opacity: 0.5;
 	}
 
 	.period-row {
@@ -591,26 +579,13 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.period-row input {
 		width: 100%;
-		min-height: 2.75rem;
 		padding-inline: 0.75rem;
-		border: 1px solid var(--line);
-		border-radius: 0.5rem;
 	}
 
 	.remove-period {
 		display: grid;
 		width: 2.75rem;
-		height: 2.75rem;
 		place-items: center;
-		border: 1px solid #f0b9b4;
-		border-radius: 0.5rem;
-		color: #b42318;
-		background: #fff;
-	}
-
-	.remove-period:disabled {
-		cursor: not-allowed;
-		opacity: 0.4;
 	}
 
 	@media (max-width: 64rem) {
@@ -642,6 +617,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 		.add-rule {
 			margin-right: 4.75rem;
+		min-height: 3rem;
 		}
 	}
 </style>

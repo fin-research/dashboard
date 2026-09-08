@@ -329,9 +329,9 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<label class="secondary-action file-picker" class:disabled={Boolean(activeRun) || uploading}>
 				<FileSpreadsheet size={18} />
 				<span>选择文件</span>
-				<input id="debt-import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange={chooseFile} disabled={Boolean(activeRun) || uploading} />
+				<input class="file-input" id="debt-import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange={chooseFile} disabled={Boolean(activeRun) || uploading} />
 			</label>
-			<button class="primary-action" type="button" onclick={() => void uploadWorkbook()} disabled={!selectedFile || Boolean(activeRun) || uploading}>
+			<button class="btn btn-primary primary-action" type="button" onclick={() => void uploadWorkbook()} disabled={!selectedFile || Boolean(activeRun) || uploading}>
 				{#if uploading}<LoaderCircle class="spin" size={18} />{:else}<UploadCloud size={18} />{/if}
 				上传并导入
 			</button>
@@ -406,8 +406,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	.import-card { margin-bottom: 1rem; }
 	.file-picker { position: relative; cursor: pointer; }
 	.file-picker.disabled { cursor: not-allowed; opacity: .55; }
-	.file-picker input { position: absolute; inset: 0; cursor: pointer; opacity: 0; }
-	.file-picker.disabled input { cursor: not-allowed; }
+	.file-picker input { position: absolute; inset: 0; }
 	.import-body { display: grid; gap: .75rem; padding: 0 1.125rem 1.125rem; border-top: 1px solid var(--line); }
 	.selected-file { display: flex; min-width: 0; align-items: center; gap: .5rem; margin-top: 1rem; padding: .75rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--blue-soft); }
 	.selected-file strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

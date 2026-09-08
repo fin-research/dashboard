@@ -140,7 +140,7 @@
       <span class="text-report__dirty" role="status">已修改，待保存</span>
     {/if}
     <button
-      class="text-report__action"
+      class="btn text-report__action"
       type="button"
       aria-label="复制文字版报告"
       title="复制文字版报告"
@@ -153,7 +153,7 @@
     </button>
     <button
       class:text-report__saving={saving}
-      class="text-report__action"
+      class="btn text-report__action"
       type="button"
       disabled={saving}
       aria-label="保存市场点评定稿"

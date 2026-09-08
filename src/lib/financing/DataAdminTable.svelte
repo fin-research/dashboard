@@ -234,42 +234,42 @@
 
 {#snippet fieldEditor(field: FieldConfig)}
 	{#if field.type === 'select'}
-		<select aria-label={field.label} data-field={field.key} value={String(formValues[field.key] ?? '')} onchange={(event) => setField(field.key, event.currentTarget.value)}>
+		<select class="select" aria-label={field.label} data-field={field.key} value={String(formValues[field.key] ?? '')} onchange={(event) => setField(field.key, event.currentTarget.value)}>
 			{#if !field.required && !(field.options ?? []).some((choice) => choice.value === '')}<option value="">未设置</option>{/if}
 			{#each field.options ?? [] as choice}<option value={choice.value}>{choice.label}</option>{/each}
 		</select>
 	{:else if field.type === 'boolean'}
-		<input class="cell-checkbox" aria-label={field.label} data-field={field.key} type="checkbox" checked={Boolean(formValues[field.key])} onchange={(event) => setField(field.key, event.currentTarget.checked)} />
+		<input class="checkbox checkbox-primary cell-checkbox" aria-label={field.label} data-field={field.key} type="checkbox" checked={Boolean(formValues[field.key])} onchange={(event) => setField(field.key, event.currentTarget.checked)} />
 	{:else}
-		<input aria-label={field.label} data-field={field.key} type={field.type === 'textarea' ? 'text' : field.type ?? 'text'} value={String(formValues[field.key] ?? '')} min={field.min} max={field.max} step={field.step} oninput={(event) => setField(field.key, event.currentTarget.value)} />
+		<input class="input" aria-label={field.label} data-field={field.key} type={field.type === 'textarea' ? 'text' : field.type ?? 'text'} value={String(formValues[field.key] ?? '')} min={field.min} max={field.max} step={field.step} oninput={(event) => setField(field.key, event.currentTarget.value)} />
 	{/if}
 {/snippet}
 
 <section class="data-editor" aria-label="融资数据表">
 	<div class="entity-tabs" role="tablist" aria-label="数据表">
 		{#each DATA_ENTITIES as config}
-			<button type="button" role="tab" aria-selected={activeKey === config.key} class:active={activeKey === config.key} onclick={() => switchEntity(config)}>{config.label}</button>
+			<button class="btn" type="button" role="tab" aria-selected={activeKey === config.key} class:btn-active={activeKey === config.key} onclick={() => switchEntity(config)}>{config.label}</button>
 		{/each}
 	</div>
 
 	<div class="table-toolbar">
 		<form class="search-form" onsubmit={(event) => { event.preventDefault(); applySearch(); }}>
-			<label><span class="sr-only">搜索{activeConfig.label}</span><Search size={18} /><input bind:value={search} type="search" placeholder={`搜索${activeConfig.label}`} /></label>
-			<button type="submit">查询</button>
+			<label><span class="sr-only">搜索{activeConfig.label}</span><Search size={18} /><input class="input" bind:value={search} type="search" placeholder={`搜索${activeConfig.label}`} /></label>
+			<button class="btn" type="submit">查询</button>
 		</form>
 		<div class="table-meta">
 			<strong>{total.toLocaleString('zh-CN')} 条</strong>
-			<button type="button" class="icon-action" aria-label="刷新数据" title="刷新数据" onclick={() => void loadRows()} disabled={loading}><RefreshCw size={18} class={loading ? 'spin' : ''} /></button>
+			<button type="button" class="btn btn-ghost icon-action" aria-label="刷新数据" title="刷新数据" onclick={() => void loadRows()} disabled={loading}><RefreshCw size={18} class={loading ? 'spin' : ''} /></button>
 		</div>
 	</div>
 
 	<div class="table-shell" aria-busy={loading}>
-		<table>
+		<table class="table">
 			<thead>
 				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 					<tr>
 						{#each headerGroup.headers as header (header.id)}
-							<th scope="col"><button type="button" class="sort-button" onclick={() => toggleSort(header.column.id)}><FlexRender {header} />{#if sortKey === header.column.id}{#if sortDirection === 'asc'}<ChevronUp size={15} />{:else}<ChevronDown size={15} />{/if}{/if}</button></th>
+							<th scope="col"><button type="button" class="btn sort-button" onclick={() => toggleSort(header.column.id)}><FlexRender {header} />{#if sortKey === header.column.id}{#if sortDirection === 'asc'}<ChevronUp size={15} />{:else}<ChevronDown size={15} />{/if}{/if}</button></th>
 						{/each}
 						<th scope="col" class="action-column">操作</th>
 					</tr>
@@ -282,8 +282,8 @@
 							<td>{#if canEditField(field, 'create')}{@render fieldEditor(field)}{:else}—{/if}</td>
 						{/each}
 						<td class="row-actions"><div>
-							<button type="button" aria-label="保存新增行" title="保存" onclick={() => void saveRow()} disabled={savingKey === '__new__'}>{#if savingKey === '__new__'}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
-							<button type="button" aria-label="取消新增" title="取消" onclick={cancelEdit} disabled={savingKey === '__new__'}><X size={17} /></button>
+							<button class="btn" type="button" aria-label="保存新增行" title="保存" onclick={() => void saveRow()} disabled={savingKey === '__new__'}>{#if savingKey === '__new__'}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
+							<button class="btn" type="button" aria-label="取消新增" title="取消" onclick={cancelEdit} disabled={savingKey === '__new__'}><X size={17} /></button>
 						</div></td>
 					</tr>
 				{/if}
@@ -306,11 +306,11 @@
 							{/each}
 							<td class="row-actions"><div>
 								{#if editing}
-									<button type="button" aria-label="保存本行" title="保存" onclick={() => void saveRow()} disabled={savingKey === identityKey}>{#if savingKey === identityKey}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
-									<button type="button" aria-label="取消编辑" title="取消" onclick={cancelEdit} disabled={savingKey === identityKey}><X size={17} /></button>
+									<button class="btn" type="button" aria-label="保存本行" title="保存" onclick={() => void saveRow()} disabled={savingKey === identityKey}>{#if savingKey === identityKey}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
+									<button class="btn" type="button" aria-label="取消编辑" title="取消" onclick={cancelEdit} disabled={savingKey === identityKey}><X size={17} /></button>
 								{:else}
-									<button type="button" aria-label="编辑本行" title="编辑" onclick={() => void beginEdit(row.original)}><Pencil size={17} /></button>
-									{#if activeConfig.canDelete}<button type="button" class="danger" aria-label="删除本行" title="删除" onclick={() => void deleteRow(row.original)} disabled={savingKey === identityKey}><Trash2 size={17} /></button>{/if}
+									<button class="btn" type="button" aria-label="编辑本行" title="编辑" onclick={() => void beginEdit(row.original)}><Pencil size={17} /></button>
+									{#if activeConfig.canDelete}<button type="button" class="btn btn-error danger" aria-label="删除本行" title="删除" onclick={() => void deleteRow(row.original)} disabled={savingKey === identityKey}><Trash2 size={17} /></button>{/if}
 								{/if}
 							</div></td>
 						</tr>
@@ -321,29 +321,28 @@
 	</div>
 
 	<div class="pagination-bar">
-		<label>每页 <select value={pageSize} onchange={(event) => { pageSize = Number(event.currentTarget.value); page = 0; }}><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
+		<label>每页 <select class="select" value={pageSize} onchange={(event) => { pageSize = Number(event.currentTarget.value); page = 0; }}><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
 		<span>第 {page + 1} / {totalPages} 页</span>
-		<div><button type="button" aria-label="上一页" onclick={() => goTo(page - 1)} disabled={page === 0 || loading}><ChevronLeft size={18} /></button><button type="button" aria-label="下一页" onclick={() => goTo(page + 1)} disabled={page + 1 >= totalPages || loading}><ChevronRight size={18} /></button></div>
+		<div><button class="btn" type="button" aria-label="上一页" onclick={() => goTo(page - 1)} disabled={page === 0 || loading}><ChevronLeft size={18} /></button><button class="btn" type="button" aria-label="下一页" onclick={() => goTo(page + 1)} disabled={page + 1 >= totalPages || loading}><ChevronRight size={18} /></button></div>
 	</div>
 </section>
 
 {#if activeConfig.canCreate && !activeConfig.readOnly}
-	<button class="floating-create-button data-create" type="button" aria-label="新增一行" title="新增一行" onclick={() => void beginCreate()} disabled={loading || editorMode !== null}><Plus size={24} /></button>
+	<button class="btn btn-primary floating-create-button data-create" type="button" aria-label="新增一行" title="新增一行" onclick={() => void beginCreate()} disabled={loading || editorMode !== null}><Plus size={24} /></button>
 {/if}
 
 <style>
 	.data-editor { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: .625rem; background: var(--surface); box-shadow: var(--shadow); }
 	.entity-tabs { display: flex; gap: .25rem; overflow-x: auto; padding: .75rem 1rem 0; border-bottom: 1px solid var(--line); }
-	.entity-tabs button { min-height: 2.75rem; padding: .625rem .875rem; border: 0; border-bottom: .1875rem solid transparent; background: transparent; color: var(--muted); font: inherit; white-space: nowrap; cursor: pointer; }
-	.entity-tabs button.active { border-bottom-color: var(--blue); color: var(--blue); font-weight: 700; }
+	.entity-tabs button { padding: .625rem .875rem; white-space: nowrap; }
 	.table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 1rem; }
 	.search-form { display: flex; align-items: center; gap: .5rem; min-width: min(100%, 26rem); }
 	.search-form label { display: flex; flex: 1; align-items: center; gap: .5rem; min-height: 2.75rem; padding: 0 .75rem; border: 1px solid var(--line); border-radius: .5rem; background: #fff; }
 	.search-form label :global(svg) { display: block; flex: 0 0 auto; }
-	.search-form input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; }
-	.search-form button, .pagination-bar button, .icon-action, .row-actions button { min-width: 2.75rem; min-height: 2.75rem; border: 1px solid var(--line); border-radius: .5rem; background: #fff; color: var(--ink); font: inherit; cursor: pointer; }
-	.search-form button { padding-inline: .875rem; color: #fff; background: var(--blue); border-color: var(--blue); }
-	.icon-action, .pagination-bar button, .row-actions button, .data-create { display: inline-grid; place-items: center; padding: 0; line-height: 1; }
+	.search-form input { width: 100%; min-width: 0; }
+	.search-form button, .pagination-bar button, .icon-action, .row-actions button { min-width: 2.75rem; }
+	.search-form button { padding-inline: .875rem; }
+	.icon-action, .pagination-bar button, .row-actions button, .data-create { display: inline-grid; place-items: center; padding: 0; }
 	.icon-action :global(svg), .pagination-bar button :global(svg), .row-actions button :global(svg), .data-create :global(svg) { display: block; }
 	.table-meta { display: flex; align-items: center; gap: .75rem; white-space: nowrap; }
 	.table-shell { min-width: 0; max-width: 100%; overflow: auto; border-block: 1px solid var(--line); }
@@ -354,22 +353,19 @@
 	.editing-row { background: var(--blue-soft); }
 	.editable-cell { cursor: text; }
 	.editable-cell:hover { box-shadow: inset 0 0 0 1px #b2ccff; }
-	.sort-button { display: inline-flex; align-items: center; gap: .25rem; width: 100%; min-height: 2.25rem; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+	.sort-button { display: inline-flex; align-items: center; gap: .25rem; width: 100%; padding: 0; }
 	.action-column { position: sticky; right: 0; z-index: 3; min-width: 7rem; }
 	.row-actions { position: sticky; right: 0; z-index: 1; background: inherit; }
 	.row-actions > div { display: flex; align-items: center; justify-content: center; gap: .375rem; }
-	.row-actions button { min-width: 2.75rem; min-height: 2.75rem; }
-	.row-actions button.danger { color: var(--red); }
-	td input:not([type='checkbox']), td select { width: max(100%, 8rem); min-height: 2.5rem; border: 1px solid #84adff; border-radius: .375rem; background: #fff; padding: .375rem .5rem; color: var(--ink); font: inherit; }
-	td .cell-checkbox { display: block; width: 1.25rem; height: 1.25rem; margin: auto; }
+	.row-actions button { min-width: 2.75rem; }
+	td input:not([type='checkbox']), td select { width: max(100%, 8rem); padding: .375rem .5rem; }
+	td .cell-checkbox { display: block; width: 1.25rem; margin: auto; }
 	.empty-row { height: 8rem; text-align: center; color: var(--muted); }
 	.empty-row :global(svg) { display: inline-block; vertical-align: middle; margin-right: .375rem; }
 	.pagination-bar { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; padding: .75rem 1rem; }
 	.pagination-bar label, .pagination-bar > div { display: flex; align-items: center; gap: .5rem; }
-	.pagination-bar select { min-height: 2.75rem; border: 1px solid var(--line); border-radius: .5rem; background: #fff; padding-inline: .5rem; font: inherit; }
+	.pagination-bar select { padding-inline: .5rem; }
 	.data-create { z-index: 15; }
-	button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-	button:disabled { opacity: .55; cursor: not-allowed; }
 	:global(.spin) { animation: spin .8s linear infinite; }
 	@keyframes spin { to { transform: rotate(360deg); } }
 	@media (max-width: 64rem) { .table-toolbar { align-items: stretch; flex-direction: column; } .table-meta { justify-content: flex-end; } }

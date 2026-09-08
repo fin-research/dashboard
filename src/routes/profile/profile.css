@@ -1,7 +1,7 @@
 .profile-page { width: min(100%, 2100px); min-height: 100dvh; margin-inline: auto; padding: 12px 16px 40px; color: var(--text-1); background: var(--bg-page); }
 .profile-header { display: flex; min-height: 64px; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
 .profile-header h1 { margin: 0; font-size: 1.5rem; font-weight: bolder; }
-.profile-back { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--brand-deep); background: var(--surface); }
+.profile-back { display: grid; place-items: center; width: 44px; height: 44px; }
 .profile-back svg, .profile-avatar svg { width: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .logout-form { margin-left: auto; }
 .profile-content { width: min(100%, 1040px); margin: 28px auto 0; }
@@ -12,23 +12,17 @@
 .profile-summary > div > span, .profile-help { color: var(--muted); font-size: .875rem; line-height: 1.6; }
 .profile-tag { margin-left: auto; padding: 6px 10px; flex-shrink: 0; color: var(--brand-deep); background: var(--brand-soft); border-radius: var(--radius-tag); font-size: .875rem; }
 .profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-.profile-grid h2 { margin: 0 0 20px; font-size: 1.125rem; font-weight: bold; }
 .profile-grid h3 { margin: 20px 0 12px; font-size: 1rem; }
 .profile-form { display: grid; gap: 12px; }
 .profile-form > label { font-size: 1rem; }
-.profile-form > input { min-width: 0; min-height: 44px; width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); color: var(--text-1); background: var(--surface); font: inherit; }
+.profile-form > input { min-width: 0; width: 100%; padding: 10px 12px; }
 .profile-form fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
 .profile-form legend { margin-bottom: 12px; }
 .profile-help { margin: 0; overflow-wrap: anywhere; }
 .field-status { margin-left: 8px; font-size: .875rem; color: var(--muted); }
 .profile-choice { display: flex; align-items: center; min-height: 44px; gap: 10px; cursor: pointer; }
-.profile-choice input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--brand); }
+.profile-choice input { width: 20px; flex-shrink: 0; accent-color: var(--brand); }
 .profile-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
-.profile-button { display: inline-flex; min-height: 44px; justify-content: center; align-items: center; padding: 10px 16px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); color: var(--brand-deep); background: var(--surface); font: inherit; font-weight: bold; cursor: pointer; }
-.profile-button.primary { color: white; background: var(--brand); border-color: var(--brand); }
-.profile-button:hover { filter: brightness(.97); }
-.profile-button:disabled, .profile-form input:disabled { opacity: .6; cursor: not-allowed; }
-.profile-page :is(button, a, input):focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .profile-permissions { grid-column: 1 / -1; }
 .permission-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; margin: 0 0 16px; padding-left: 20px; }
 .permission-list li { padding: 4px 0; overflow-wrap: anywhere; }

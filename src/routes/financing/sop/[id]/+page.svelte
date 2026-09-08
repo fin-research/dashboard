@@ -278,7 +278,7 @@
 		<a href={withBase('/sop')}><ArrowLeft size={18} /> 返回 SOP 管理</a>
 		{#if canManage}
 			<form method="post" action="?/toggleTemplate" use:enhance={enhanceForm('toggle')}>
-				<button class:active={template.isActive} class="toggle-button" type="submit" disabled={pendingAction !== ''}>
+				<button class:active={template.isActive} class="btn btn-ghost toggle-button" type="submit" disabled={pendingAction !== ''}>
 					{pendingAction === 'toggle' ? '更新中…' : template.isActive ? '已启用 · 点击停用' : '已停用 · 点击启用'}
 				</button>
 			</form>
@@ -309,7 +309,7 @@
 								<strong>{index + 1}</strong>
 								<button
 									class:grabbed={keyboardGrabbedId === node.id}
-									class="drag-handle"
+									class="btn drag-handle"
 									type="button"
 									aria-label={`拖拽排序 ${node.name}，当前第 ${index + 1} 项`}
 									aria-pressed={keyboardGrabbedId === node.id}
@@ -334,11 +334,11 @@
 								<input type="hidden" name="nodeId" value={node.id} />
 								<label class="node-name">
 									<span>节点名称</span>
-									<input name="name" maxlength="120" required bind:value={node.name} disabled={!canManage} />
+									<input class="input" name="name" maxlength="120" required bind:value={node.name} disabled={!canManage} />
 								</label>
 								<label>
 									<span>默认角色</span>
-									<select name="ownerRole" bind:value={node.ownerRole} disabled={!canManage}>
+									<select class="select" name="ownerRole" bind:value={node.ownerRole} disabled={!canManage}>
 										<option value="">不指定</option>
 										{#each data.roles as role}<option value={role.code}>{role.label}</option>{/each}
 									</select>
@@ -348,7 +348,7 @@
 								</div>
 								<label class="node-description">
 									<span>节点说明</span>
-									<input name="description" bind:value={node.description} placeholder="可选：说明交付物或控制要求" disabled={!canManage} />
+									<input class="input" name="description" bind:value={node.description} placeholder="可选：说明交付物或控制要求" disabled={!canManage} />
 								</label>
 							</form>
 							{#if canDelete}
@@ -362,7 +362,7 @@
 								}}
 							>
 								<input type="hidden" name="nodeId" value={node.id} />
-								<button type="submit" aria-label={`删除 ${node.name}`} title="删除节点" disabled={pendingAction !== ''}>
+								<button class="btn" type="submit" aria-label={`删除 ${node.name}`} title="删除节点" disabled={pendingAction !== ''}>
 									<Trash2 size={16} />
 								</button>
 							</form>
@@ -386,15 +386,15 @@
 				<form method="post" action="?/updateTemplate" use:autoSave use:enhance={enhanceForm('template', { autoSave: true })} class="template-form">
 					<label>
 						<span>SOP 名称</span>
-						<input name="name" maxlength="120" required bind:value={template.name} disabled={!canManage} />
+						<input class="input" name="name" maxlength="120" required bind:value={template.name} disabled={!canManage} />
 					</label>
 					<label>
 						<span>负债品种</span>
-						<input name="debtType" maxlength="80" required bind:value={template.debtType} disabled={!canManage} />
+						<input class="input" name="debtType" maxlength="80" required bind:value={template.debtType} disabled={!canManage} />
 					</label>
 					<label>
 						<span>模板说明</span>
-						<textarea name="description" rows="6" placeholder="说明适用范围和关键控制要求" bind:value={template.description} disabled={!canManage}></textarea>
+						<textarea class="textarea" name="description" rows="6" placeholder="说明适用范围和关键控制要求" bind:value={template.description} disabled={!canManage}></textarea>
 					</label>
 				</form>
 			</section>
@@ -413,11 +413,12 @@
 	</div>
 
 	{#if canManage}
-		<button class="floating-create-button" type="button" onclick={openAddNode} aria-label="添加流程节点" title="添加流程节点">
+		<button class="btn btn-primary floating-create-button" type="button" onclick={openAddNode} aria-label="添加流程节点" title="添加流程节点">
 			<Plus size={23} />
 		</button>
 
-		<dialog class="config-modal" bind:this={addNodeDialog}>
+		<dialog class="modal" bind:this={addNodeDialog}>
+<div class="modal-box config-modal">
 		<form method="post" action="?/addNode" use:enhance={enhanceForm('add-node', { resetOnSuccess: true, closeOnSuccess: true })}>
 			<div class="modal-header">
 				<div>
@@ -425,16 +426,16 @@
 					<h2>添加流程节点</h2>
 					<p>新节点会添加到流程末尾，保存后可直接拖拽排序。</p>
 				</div>
-				<button type="button" aria-label="关闭" title="关闭" onclick={() => addNodeDialog?.close()}><X size={18} /></button>
+				<button class="btn" type="button" aria-label="关闭" title="关闭" onclick={() => addNodeDialog?.close()}><X size={18} /></button>
 			</div>
 			<div class="form-grid">
 				<label class="wide">
 					<span>节点名称</span>
-					<input bind:this={addNodeNameInput} name="name" maxlength="120" required placeholder="例如：发行结果确认" />
+					<input class="input" bind:this={addNodeNameInput} name="name" maxlength="120" required placeholder="例如：发行结果确认" />
 				</label>
 				<label>
 					<span>默认角色</span>
-					<select name="ownerRole">
+					<select class="select" name="ownerRole">
 						<option value="">不指定</option>
 						{#each data.roles as role}<option value={role.code}>{role.label}</option>{/each}
 					</select>
@@ -442,17 +443,18 @@
 				<div class="wide"><ScheduleFields relative endValue={0} /></div>
 				<label class="wide">
 					<span>节点说明</span>
-					<input name="description" placeholder="可选：说明交付物或控制要求" />
+					<input class="input" name="description" placeholder="可选：说明交付物或控制要求" />
 				</label>
 			</div>
 			<div class="modal-actions">
-				<button type="button" onclick={() => addNodeDialog?.close()}>取消</button>
-				<button class="primary-action" type="submit" disabled={pendingAction !== ''}>
+				<button class="btn" type="button" onclick={() => addNodeDialog?.close()}>取消</button>
+				<button class="btn btn-primary primary-action" type="submit" disabled={pendingAction !== ''}>
 					{pendingAction === 'add-node' ? '添加中…' : '添加节点'}
 				</button>
 			</div>
 		</form>
-		</dialog>
+		</div>
+</dialog>
 	{/if}
 </div>
 
@@ -476,18 +478,15 @@
 	.node-card.dragging { border-color: #84adff; background: #eff4ff; opacity: 0.75; }
 	.node-order { display: grid; align-content: start; justify-items: center; gap: 0.5rem; }
 	.node-order > strong { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border-radius: 999rem; font-size: 1rem; color: var(--color-primary); background: #edf4ff; }
-	.drag-handle { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 1px solid #d0d5dd; border-radius: 0.5rem; color: #667085; background: #fff; cursor: grab; touch-action: none; }
-	.drag-handle:active, .drag-handle.grabbed { color: var(--color-primary); background: #eff4ff; cursor: grabbing; }
-	.drag-handle:focus-visible { outline: 0.1875rem solid rgb(59 130 246 / 35%); outline-offset: 0.125rem; }
+	.drag-handle { display: grid; width: 2.75rem; place-items: center; touch-action: none; }
 	.node-form { display: grid; grid-template-columns: minmax(12rem, 1.3fr) minmax(10rem, 0.75fr); gap: 0.75rem; align-items: end; }
 	.node-description, .node-schedule { grid-column: 1 / -1; }
 	label { display: grid; gap: 0.3rem; }
 	label span { font-size: 0.75rem; font-weight: bold; color: var(--muted); }
-	input, select, textarea { width: 100%; min-height: 2.75rem; padding: 0.55rem 0.7rem; border: 1px solid #d0d5dd; border-radius: 0.5rem; font-size: 1rem; color: #344054; background: #fff; }
+	input, select, textarea { width: 100%; padding: 0.55rem 0.7rem; }
 	textarea { resize: vertical; }
-	button:disabled { cursor: wait; opacity: 0.6; }
 	.delete-form { align-self: end; margin-bottom: 0.1rem; }
-	.delete-form button { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 1px solid #d0d5dd; border-radius: 0.5rem; color: #b42318; background: #fff; }
+	.delete-form button { display: grid; width: 2.75rem; place-items: center; }
 	.template-form { display: grid; gap: 0.875rem; padding: 1rem; }
 	.guidance { padding: 1rem; }
 	.guidance ul { display: grid; gap: 0.65rem; margin: 0.75rem 0 0; padding-left: 1.25rem; }

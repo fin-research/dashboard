@@ -25,7 +25,7 @@ export async function authorizeRequest(request: Request, env: Env, routeId: stri
   const profile = await directory.current(user);
   const permissions = mode === 'beta-open' ? [...PERMISSION_CODES]
     : await withPostgres(env.AUTHORIZATION_DB?.connectionString, 'eastmoney-authorization', (db) => rolePermissions(db, profile.roles.map((role) => role.id)));
-  user.authorization = { name: profile.name, roles: profile.roles, permissions, mode, picture: profile.picture };
+  user.authorization = { name: profile.name, department: profile.department, roles: profile.roles, permissions, mode, picture: profile.picture };
   if (policy.permission && !hasPermission(permissions, policy.permission)) throw new AccessError(403, '当前角色无权执行该操作');
   return { user, permissions, directory };
 }

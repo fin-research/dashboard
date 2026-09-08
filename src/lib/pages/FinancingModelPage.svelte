@@ -2,9 +2,6 @@
   import { onMount } from "svelte";
 
   export let embedded = false;
-
-  import "../../app.css";
-  import "../../styles.css";
   import "../../layout-report.css";
 
   import {
@@ -514,7 +511,7 @@
           <path d="M4 6.5h12M6.5 3v3M13.5 3v3M4 4.5h12v12H4z" />
         </svg>
         <span>日期版本</span>
-        <select
+        <select class="select"
           aria-label="融资择时模型日期版本"
           value={selectedRunId}
           onchange={loadVersion}
@@ -558,7 +555,7 @@
     <section id="financing-model-report" class="error-state">
       <h2>模型数据暂不可用</h2>
       <p>{errorMessage}</p>
-      <button type="button" onclick={loadReport}>重新读取</button>
+      <button class="btn" type="button" onclick={loadReport}>重新读取</button>
     </section>
   {:else if report && snapshot}
     <section id="financing-model-report" class="report-stack">
@@ -589,7 +586,7 @@
         <ModuleCard class="conclusion-card" labelledBy="overall-conclusion-title">
             <PanelHeading id="overall-conclusion-title" title="整体结论" controlsInline>
               {#if !editingConclusion}
-                <button class="icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
+                <button class="btn btn-ghost icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                   </svg>
@@ -600,16 +597,16 @@
               <form onsubmit={(event) => { event.preventDefault(); saveConclusion(); }}>
                 <label>
                   <span>结论标题</span>
-                  <input bind:value={editVerdict} maxlength="120" required />
+                  <input class="input" bind:value={editVerdict} maxlength="120" required />
                 </label>
                 <label>
                   <span>结论正文</span>
-                  <textarea bind:value={editNarrative} maxlength="4000" rows="5" required></textarea>
+                  <textarea class="textarea" bind:value={editNarrative} maxlength="4000" rows="5" required></textarea>
                 </label>
                 <div class="editor-actions">
-                  <button class="text-button" type="button" onclick={useBaseConclusion}>恢复模型基础内容</button>
-                  <button class="secondary-button" type="button" onclick={() => (editingConclusion = false)}>取消</button>
-                  <button class="primary-button" type="submit" disabled={saving}>{saving ? "保存中" : "保存"}</button>
+                  <button class="btn text-button" type="button" onclick={useBaseConclusion}>恢复模型基础内容</button>
+                  <button class="btn secondary-button" type="button" onclick={() => (editingConclusion = false)}>取消</button>
+                  <button class="btn btn-primary primary-button" type="submit" disabled={saving}>{saving ? "保存中" : "保存"}</button>
                 </div>
               </form>
             {:else}
@@ -691,7 +688,7 @@
         <ModuleCard class="forecast-panel" labelledBy="window-title">
           <PanelHeading id="window-title" title="未来发行窗口">
             <button
-              class="window-details-toggle"
+              class="btn btn-ghost window-details-toggle"
               type="button"
               aria-label={futureWindowDetailsOpen ? "收起未来发行窗口明细" : "展开未来发行窗口明细"}
               aria-expanded={futureWindowDetailsOpen}
@@ -744,7 +741,7 @@
               <div>
                 <div class="validation-label">
                   <dt>{metric.label}</dt>
-                  <button class="info-tip" type="button" aria-label={`${metric.label}指标含义`} aria-describedby={`validation-tip-${index}`}>
+                  <button class="btn info-tip" type="button" aria-label={`${metric.label}指标含义`} aria-describedby={`validation-tip-${index}`}>
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <circle cx="10" cy="10" r="7.5" />
                       <path d="M10 9v5M10 6.3h.01" />
@@ -764,7 +761,7 @@
       <ModuleCard class="decision-history-section" labelledBy="decision-history-title">
         <PanelHeading id="decision-history-title" title="历史择时决策记录">
           {#if !editingDecision}
-            <button class="primary-button" type="button" onclick={() => openDecisionEditor()}>
+            <button class="btn btn-primary primary-button" type="button" onclick={() => openDecisionEditor()}>
               录入当前决策
             </button>
           {/if}
@@ -774,15 +771,15 @@
           <form class="decision-editor" onsubmit={(event) => { event.preventDefault(); saveDecision(); }}>
             <label>
               <span>决策操作</span>
-              <textarea bind:value={editDecisionAction} maxlength="1000" rows="3" required></textarea>
+              <textarea class="textarea" bind:value={editDecisionAction} maxlength="1000" rows="3" required></textarea>
             </label>
             <label>
               <span>结果</span>
-              <textarea bind:value={editDecisionOutcome} maxlength="2000" rows="3"></textarea>
+              <textarea class="textarea" bind:value={editDecisionOutcome} maxlength="2000" rows="3"></textarea>
             </label>
             <div class="editor-actions">
-              <button class="secondary-button" type="button" onclick={closeDecisionEditor}>取消</button>
-              <button class="primary-button" type="submit" disabled={savingDecision}>
+              <button class="btn secondary-button" type="button" onclick={closeDecisionEditor}>取消</button>
+              <button class="btn btn-primary primary-button" type="submit" disabled={savingDecision}>
                 {savingDecision ? "保存中" : "保存"}
               </button>
             </div>
@@ -814,7 +811,7 @@
                   <td>
                     <div class="decision-result-cell">
                       <span>{record.outcome || "—"}</span>
-                      <button class="icon-button" type="button" aria-label={`编辑${record.decisionDate}择时决策记录`} onclick={() => openDecisionEditor(record)}>
+                      <button class="btn btn-ghost icon-button" type="button" aria-label={`编辑${record.decisionDate}择时决策记录`} onclick={() => openDecisionEditor(record)}>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                           <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                         </svg>
@@ -836,13 +833,13 @@
         <PanelHeading id="sell-side-title" title="卖方观点">
           <div class="section-actions">
             {#if report.sellSide && !editingSellSide}
-              <button class="icon-button" type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
+              <button class="btn btn-ghost icon-button" type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                 </svg>
               </button>
             {/if}
-            <button class="primary-button research-button" type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}>
+            <button class="btn btn-primary primary-button research-button" type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}>
               {generatingResearch ? "生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
             </button>
           </div>
@@ -854,11 +851,11 @@
               <form onsubmit={(event) => { event.preventDefault(); saveSellSideSummary(); }}>
                 <label>
                   <span>卖方逻辑汇总</span>
-                  <textarea bind:value={editSellSideSummary} maxlength="4000" rows="6" required></textarea>
+                  <textarea class="textarea" bind:value={editSellSideSummary} maxlength="4000" rows="6" required></textarea>
                 </label>
                 <div class="editor-actions">
-                  <button class="secondary-button" type="button" onclick={() => (editingSellSide = false)}>取消</button>
-                  <button class="primary-button" type="submit" disabled={savingSellSide}>{savingSellSide ? "保存中" : "保存"}</button>
+                  <button class="btn secondary-button" type="button" onclick={() => (editingSellSide = false)}>取消</button>
+                  <button class="btn btn-primary primary-button" type="submit" disabled={savingSellSide}>{savingSellSide ? "保存中" : "保存"}</button>
                 </div>
               </form>
             {:else}
@@ -944,7 +941,7 @@
     justify-content: space-between;
     gap: 24px;
     padding: 4px 2px 12px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-color);
   }
 
   .model-title-block,
@@ -1046,19 +1043,6 @@
     min-width: 168px;
     height: 42px;
     padding: 0 28px 0 4px;
-    border: 0;
-    color: var(--text-1);
-    background: transparent;
-    cursor: pointer;
-    font: inherit;
-    font-variant-numeric: tabular-nums;
-    font-weight: bold;
-  }
-
-  .model-version-control select:disabled,
-  .primary-button:disabled {
-    cursor: wait;
-    opacity: 0.62;
   }
 
   .report-stack {
@@ -1068,7 +1052,7 @@
 
   .sell-side-summary-card,
   .sell-side-card {
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-inner);
     background: var(--surface);
   }
@@ -1086,14 +1070,7 @@
   }
 
   .text-button {
-    min-height: 44px;
     padding: 0 10px;
-    border: 0;
-    border-radius: var(--radius-control);
-    color: var(--color-primary);
-    background: transparent;
-    cursor: pointer;
-    font-weight: bold;
   }
 
   .icon-button {
@@ -1102,21 +1079,6 @@
     height: 44px;
     flex: 0 0 auto;
     place-items: center;
-    border: 0;
-    border-radius: var(--radius-control);
-    color: var(--color-primary);
-    background: transparent;
-    cursor: pointer;
-    transition: background 160ms ease;
-  }
-
-  .icon-button:hover:not(:disabled) {
-    background: var(--brand-soft);
-  }
-
-  .icon-button:disabled {
-    cursor: wait;
-    opacity: 0.62;
   }
 
   .icon-button svg {
@@ -1152,20 +1114,13 @@
   :global(.conclusion-card) textarea,
   .sell-side-summary-card textarea {
     width: 100%;
-    min-height: 44px;
     padding: 9px 11px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-control);
-    color: var(--text-1);
-    background: #fff;
-    font: inherit;
   }
 
   :global(.conclusion-card) textarea,
   .sell-side-summary-card textarea {
-    min-height: 124px;
     resize: vertical;
-    line-height: 1.55;
+    min-height: 124px;
   }
 
   .editor-actions {
@@ -1180,23 +1135,7 @@
 
   .primary-button,
   .secondary-button {
-    min-height: 44px;
     padding: 0 16px;
-    border-radius: var(--radius-control);
-    cursor: pointer;
-    font: inherit;
-    font-weight: bold;
-  }
-
-  .primary-button {
-    border: 1px solid var(--color-primary);
-    color: #fff;
-    background: var(--color-primary);
-  }
-
-  .secondary-button {
-    border: 1px solid var(--border-strong);
-    background: #fff;
   }
 
   .window-details-toggle {
@@ -1205,16 +1144,6 @@
     height: 44px;
     margin-left: -4px;
     place-items: center;
-    border: 0;
-    border-radius: var(--radius-control);
-    color: var(--brand-deep);
-    background: transparent;
-    cursor: pointer;
-    transition: background 160ms ease;
-  }
-
-  .window-details-toggle:hover {
-    background: var(--brand-soft);
   }
 
   .window-details-toggle svg {
@@ -1433,16 +1362,6 @@
     flex: 0 0 44px;
     place-items: center;
     padding: 0;
-    border: 0;
-    border-radius: 50%;
-    color: var(--text-3);
-    cursor: help;
-  }
-
-  .info-tip:hover,
-  .info-tip:focus-visible {
-    color: var(--color-primary);
-    background: var(--brand-soft);
   }
 
   .info-tip svg {
@@ -1486,7 +1405,7 @@
     max-width: 100%;
     margin-top: 12px;
     overflow-x: auto;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
   }
 
@@ -1507,7 +1426,7 @@
   .forecast-table th,
   .forecast-table td {
     padding: 9px 12px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-color);
     text-align: right;
     white-space: nowrap;
   }
@@ -1550,15 +1469,9 @@
 
   .decision-editor textarea {
     width: 100%;
-    min-height: 92px;
     padding: 9px 11px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-control);
-    color: var(--text-1);
-    background: #fff;
-    font: inherit;
-    line-height: 1.55;
     resize: vertical;
+    min-height: 92px;
   }
 
   .decision-editor .editor-actions {
@@ -1568,7 +1481,7 @@
   .decision-table-wrap {
     max-width: 100%;
     overflow-x: auto;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-color);
     border-radius: 8px;
   }
 
@@ -1582,7 +1495,7 @@
   .decision-table th,
   .decision-table td {
     padding: 11px 12px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-color);
     text-align: left;
     vertical-align: middle;
   }
@@ -1754,14 +1667,7 @@
   }
 
   .error-state button {
-    min-height: 44px;
     padding: 0 16px;
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-control);
-    color: #fff;
-    background: var(--color-primary);
-    cursor: pointer;
-    font-weight: bold;
   }
 
   button:focus-visible,
@@ -1856,6 +1762,7 @@
     .window-card-body {
       grid-template-columns: 1fr;
       gap: 0;
+    min-height: 220px;
     }
 
     .window-decision {
@@ -1900,6 +1807,7 @@
     .model-header {
       align-items: center;
       flex-direction: row;
+    min-height: 64px;
     }
 
     .decision-grid {

@@ -233,21 +233,21 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 <section class="dashboard-grid">
 	<ModuleCard class="financing-panel project-panel">
 		<PanelHeading id="financing-panel-3" title="推进中的融资项目" controlsInline></PanelHeading>
-		<table><thead><tr><th>融资方式</th><th>融资金额</th><th>期限</th><th>融资成本</th><th>落地时间</th></tr></thead><tbody>
+		<table class="table"><thead><tr><th>融资方式</th><th>融资金额</th><th>期限</th><th>融资成本</th><th>落地时间</th></tr></thead><tbody>
 			{#each dashboard.projects as project}<tr><td><a href={withBase(`/projects/${project.id}`)}>{project.debtType}</a><small>{project.name}</small></td><td>{project.amountYi.toFixed(2)}</td><td>{project.tenor}</td><td>{project.cost}</td><td>{project.landingDate ? `${project.landingDate.replaceAll('-', '/')}簿记` : '待定'}</td></tr>{/each}
 		</tbody><tfoot><tr><th>合计</th><th>{projectTableAmountYi.toFixed(2)}</th><th colspan="3"></th></tr></tfoot></table>
 	</ModuleCard>
 
 	<ModuleCard class="financing-panel issuance-panel">
 		<PanelHeading id="financing-panel-4" title="月度发行统计" controlsInline></PanelHeading>
-		<table><thead><tr><th>品种</th><th>{dashboard.monthlyIssuance.currentMonth.replace('-', '年')}月</th><th>{dashboard.monthlyIssuance.comparisonMonth.replace('-', '年')}月</th></tr></thead><tbody>
+		<table class="table"><thead><tr><th>品种</th><th>{dashboard.monthlyIssuance.currentMonth.replace('-', '年')}月</th><th>{dashboard.monthlyIssuance.comparisonMonth.replace('-', '年')}月</th></tr></thead><tbody>
 			{#each dashboard.monthlyIssuance.rows as row}<tr><td>{row.label}</td><td>{row.currentYi.toFixed(2)}</td><td>{row.comparisonYi.toFixed(2)}</td></tr>{/each}
 		</tbody></table>
 	</ModuleCard>
 
 	<ModuleCard class="financing-panel limit-card">
 		<PanelHeading id="financing-panel-5" title="负债额度管理" controlsInline></PanelHeading>
-		<table><thead><tr><th>融资品种</th><th>可发行额度</th><th>已发行额度</th><th>剩余可用额度</th><th>获批日期</th><th>到期日期</th></tr></thead><tbody>
+		<table class="table"><thead><tr><th>融资品种</th><th>可发行额度</th><th>已发行额度</th><th>剩余可用额度</th><th>获批日期</th><th>到期日期</th></tr></thead><tbody>
 			{#each dashboard.limits as item}<tr><td><strong>{item.debtType}</strong></td><td>{item.limitYi.toFixed(2)}</td><td>{item.issuedYi.toFixed(2)}</td><td class:negative={item.remainingYi < 0}><strong>{item.remainingYi.toFixed(2)}</strong><span class="quota-utilization">已用 {item.limitYi > 0 ? (item.issuedYi / item.limitYi * 100).toFixed(0) : 0}%</span></td><td>{dateLabel(item.approvedDate)}</td><td>{dateLabel(item.expiryDate)}</td></tr>{/each}
 		</tbody><tfoot><tr><th>合计</th><th>{dashboard.limitTotals.limitYi.toFixed(2)}</th><th>{dashboard.limitTotals.issuedYi.toFixed(2)}</th><th>{dashboard.limitTotals.remainingYi.toFixed(2)}</th><th></th><th></th></tr></tfoot></table>
 		{#if dashboard.financeParameterReminder}
@@ -258,10 +258,10 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 	<ModuleCard class="financing-panel simulator-card">
 		<PanelHeading id="financing-panel-6" title="发行试算" controlsInline></PanelHeading>
 		<div class="simulator-form">
-			<label><span>拟发行品种</span><select bind:value={simulationType}>{#each dashboard.limits as item}<option>{item.debtType}</option>{/each}</select></label>
-			<label><span>起息日</span><input type="date" bind:value={simulationDate} /></label>
-			<label><span>规模（亿元）</span><input type="number" min="0.01" step="0.01" bind:value={simulationAmount} placeholder="0.00" /></label>
-			<label><span>期限</span><input bind:value={simulationTenor} placeholder="例如 3Y/5Y" /></label>
+			<label><span>拟发行品种</span><select class="select" bind:value={simulationType}>{#each dashboard.limits as item}<option>{item.debtType}</option>{/each}</select></label>
+			<label><span>起息日</span><input class="input" type="date" bind:value={simulationDate} /></label>
+			<label><span>规模（亿元）</span><input class="input" type="number" min="0.01" step="0.01" bind:value={simulationAmount} placeholder="0.00" /></label>
+			<label><span>期限</span><input class="input" bind:value={simulationTenor} placeholder="例如 3Y/5Y" /></label>
 		</div>
 		<div class="simulation-results">
 			<div class:pass={simulationResult?.pass} class:fail={simulationResult && !simulationResult.pass}><Landmark size={18} /><span><strong>负债额度</strong>{simulationResult?.message ?? '输入发行规模后自动校验'}</span></div>
@@ -288,7 +288,7 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 				{/each}
 			</div>
 			<button
-				class="calendar-expand"
+				class="btn btn-ghost calendar-expand"
 				type="button"
 				aria-expanded={calendarExpanded}
 				aria-label={calendarExpanded ? '收起周末，仅显示工作日' : '展开周末，显示完整日历'}

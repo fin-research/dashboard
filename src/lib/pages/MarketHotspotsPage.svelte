@@ -214,7 +214,7 @@
   <header class="hotspot-header">
     {#if !embedded}
     <div class="brand-block">
-      <a class="back-link" href="/" aria-label="返回市场研究门户">
+      <a class="btn btn-ghost back-link" href="/" aria-label="返回市场研究门户">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="m15 18-6-6 6-6" />
         </svg>
@@ -232,7 +232,7 @@
     <div class="header-controls" aria-label="热点控制">
       <div class="scope-control">
         <button
-          class="scope-button"
+          class="btn scope-button"
           type="button"
           aria-expanded={configurationOpen}
           aria-controls="hotspot-scope-panel"
@@ -261,22 +261,22 @@
                 <span>EVIDENCE WINDOW</span>
                 <h2>配置证据范围</h2>
               </div>
-              <button type="button" aria-label="关闭配置" onclick={closeConfiguration}>
+              <button class="btn" type="button" aria-label="关闭配置" onclick={closeConfiguration}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m6 6 12 12M18 6 6 18" />
                 </svg>
               </button>
             </div>
             <div class="scope-tabs" role="tablist" aria-label="范围模式">
-              <button
-                class:active={scopeMode === "rolling"}
+              <button class="btn"
+                class:btn-active={scopeMode === "rolling"}
                 type="button"
                 role="tab"
                 aria-selected={scopeMode === "rolling"}
                 onclick={() => (scopeMode = "rolling")}
               >滚动篇数</button>
-              <button
-                class:active={scopeMode === "range"}
+              <button class="btn"
+                class:btn-active={scopeMode === "range"}
                 type="button"
                 role="tab"
                 aria-selected={scopeMode === "range"}
@@ -287,7 +287,7 @@
               <label class="scope-field">
                 <span>最近文章数</span>
                 <div class="number-field">
-                  <input
+                  <input class="input"
                     type="number"
                     min="8"
                     max="100"
@@ -302,23 +302,23 @@
               <div class="range-fields">
                 <label class="scope-field">
                   <span>开始日期</span>
-                  <input type="date" bind:value={startDate} />
+                  <input class="input" type="date" bind:value={startDate} />
                 </label>
                 <label class="scope-field">
                   <span>结束日期</span>
-                  <input type="date" bind:value={endDate} />
+                  <input class="input" type="date" bind:value={endDate} />
                 </label>
                 <small>日期范围最多读取最近 100 篇文章。</small>
               </div>
             {/if}
-            <button class="apply-scope-button" type="button" onclick={applyConfiguration}>
+            <button class="btn apply-scope-button" type="button" onclick={applyConfiguration}>
               应用并生成热点
             </button>
           </div>
         {/if}
       </div>
       <button
-        class="regenerate-button"
+        class="btn btn-primary regenerate-button"
         type="button"
         disabled={loading || regenerating}
         onclick={regenerateCurrentScope}
@@ -351,7 +351,7 @@
           <strong>热点暂时无法生成</strong>
           <p>{errorMessage}</p>
         </div>
-        <button type="button" onclick={loadLatestHotspots}>重新读取</button>
+        <button class="btn" type="button" onclick={loadLatestHotspots}>重新读取</button>
       </section>
     {:else if data}
       <section class="cloud-panel" aria-labelledby="cloud-heading">
@@ -395,7 +395,7 @@
               <span class="source-label">{selected.sourceLabel}</span>
               <p>热点强度 <strong>{selected.heat}</strong></p>
             </div>
-            <button type="button" aria-label="关闭热点详情" onclick={closeDetails}>
+            <button class="btn" type="button" aria-label="关闭热点详情" onclick={closeDetails}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m6 6 12 12M18 6 6 18" />
               </svg>
@@ -456,11 +456,6 @@
 <style>
   :global(*) {
     box-sizing: border-box;
-  }
-
-  :global(button),
-  :global(input) {
-    font: inherit;
   }
 
   .hotspot-page {
@@ -603,26 +598,9 @@
   }
 
   .scope-button {
-    min-height: 44px;
     gap: 9px;
     padding: 0 13px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    color: #d9e7f7;
-    background: rgba(255, 255, 255, 0.035);
-    cursor: pointer;
     text-align: left;
-    transition:
-      border-color 180ms ease,
-      background 180ms ease;
-  }
-
-  .scope-button:hover,
-  .scope-button:focus-visible,
-  .scope-button[aria-expanded="true"] {
-    border-color: rgba(119, 189, 251, 0.72);
-    background: rgba(119, 189, 251, 0.1);
-    outline: none;
   }
 
   .scope-button > span {
@@ -685,14 +663,8 @@
   .scope-panel__header button {
     display: grid;
     width: 36px;
-    height: 36px;
     padding: 0;
     place-items: center;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    color: #9db2ce;
-    background: transparent;
-    cursor: pointer;
   }
 
   .scope-tabs {
@@ -704,23 +676,6 @@
     border: 1px solid var(--line);
     border-radius: 9px;
     background: rgba(2, 13, 26, 0.55);
-  }
-
-  .scope-tabs button {
-    min-height: 38px;
-    border: 0;
-    border-radius: 6px;
-    color: #8198b7;
-    background: transparent;
-    cursor: pointer;
-    font-size: 0.78rem;
-    font-weight: 700;
-  }
-
-  .scope-tabs button.active {
-    color: #eaf4ff;
-    background: rgba(119, 189, 251, 0.14);
-    box-shadow: inset 0 0 0 1px rgba(119, 189, 251, 0.18);
   }
 
   .scope-field,
@@ -738,19 +693,7 @@
 
   .scope-field input {
     width: 100%;
-    min-height: 42px;
     padding: 0 11px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    color: #eef6ff;
-    background: rgba(255, 255, 255, 0.035);
-    font-variant-numeric: tabular-nums;
-    outline: none;
-  }
-
-  .scope-field input:focus {
-    border-color: rgba(119, 189, 251, 0.75);
-    box-shadow: 0 0 0 3px rgba(119, 189, 251, 0.1);
   }
 
   .scope-field small,
@@ -789,50 +732,12 @@
 
   .apply-scope-button {
     width: 100%;
-    min-height: 44px;
     margin-top: 18px;
-    border: 1px solid rgba(246, 201, 107, 0.48);
-    border-radius: 9px;
-    color: #ffe4ab;
-    background: rgba(246, 201, 107, 0.11);
-    cursor: pointer;
-    font-size: 0.82rem;
-    font-weight: 720;
-  }
-
-  .apply-scope-button:hover,
-  .apply-scope-button:focus-visible {
-    border-color: #f6c96b;
-    background: rgba(246, 201, 107, 0.18);
-    outline: none;
   }
 
   .regenerate-button {
-    min-height: 44px;
     gap: 8px;
     padding: 0 16px;
-    border: 1px solid rgba(246, 201, 107, 0.42);
-    border-radius: 10px;
-    color: #ffe2a8;
-    background: rgba(246, 201, 107, 0.09);
-    cursor: pointer;
-    font-size: 0.82rem;
-    font-weight: 700;
-    transition:
-      border-color 180ms ease,
-      background 180ms ease;
-  }
-
-  .regenerate-button:hover:not(:disabled),
-  .regenerate-button:focus-visible {
-    border-color: #f6c96b;
-    background: rgba(246, 201, 107, 0.16);
-    outline: none;
-  }
-
-  .regenerate-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
   }
 
   .regenerate-button .spinning {
@@ -1205,13 +1110,7 @@
   }
 
   .error-card button {
-    min-height: 40px;
     padding: 0 13px;
-    border: 1px solid rgba(119, 189, 251, 0.35);
-    border-radius: 8px;
-    color: #cfe5fa;
-    background: rgba(119, 189, 251, 0.08);
-    cursor: pointer;
   }
 
   @keyframes spin {
@@ -1287,6 +1186,7 @@
 
     .market-summary {
       padding: 11px 12px;
+    min-height: 78px;
     }
 
     .summary-heading {
@@ -1308,10 +1208,6 @@
       padding: 6px 10px 12px;
     }
 
-    .detail-scrim {
-      background: rgba(0, 8, 18, 0.58);
-    }
-
     .detail-panel {
       top: auto;
       right: 8px;
@@ -1330,6 +1226,7 @@
   @media (max-width: 520px) {
     .hotspot-header {
       gap: 8px;
+      min-height: 76px;
     }
 
     .back-link {

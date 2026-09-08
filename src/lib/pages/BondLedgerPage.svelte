@@ -2,9 +2,6 @@
   import { onMount } from "svelte";
 
   export let embedded = false;
-
-  import "../../app.css";
-  import "../../styles.css";
   import "../../bond-ledger.css";
 
   import {
@@ -616,7 +613,7 @@
       >
         <div class="ledger-range-picker">
           <button
-            class="ledger-range-trigger"
+            class="btn ledger-range-trigger"
             type="button"
             aria-label="选择统计日期范围"
             aria-expanded={rangeOpen}
@@ -632,9 +629,9 @@
           {#if rangeOpen}
             <div class="ledger-range-popover" role="dialog" aria-label="选择统计日期范围" tabindex="-1">
               <div class="range-calendar-nav">
-                <button type="button" aria-label="向前一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, -1))}>‹</button>
+                <button class="btn" type="button" aria-label="向前一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, -1))}>‹</button>
                 <strong>{rangePhase === "start" ? "选择起始日期" : "选择结束日期"}</strong>
-                <button type="button" aria-label="向后一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, 1))}>›</button>
+                <button class="btn" type="button" aria-label="向后一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, 1))}>›</button>
               </div>
               <div class="range-calendar-pair">
                 {#each rangeMonths as month (month)}
@@ -645,7 +642,7 @@
                     </div>
                     <div class="calendar-grid">
                       {#each calendarDays(month) as day (day.date)}
-                        <button
+                        <button class="btn"
                           type="button"
                           class:outside={!day.inMonth}
                           class:in-range={isSelectedDate(day.date)}
@@ -663,7 +660,7 @@
           {/if}
         </div>
 
-        <button class="ledger-management-button" type="button" onclick={openManagement}>
+        <button class="btn ledger-management-button" type="button" onclick={openManagement}>
           <svg viewBox="0 0 20 20" aria-hidden="true">
             <path d="M3.5 5.5h13v11h-13zM6 3.5h8v2M6.5 9h7M6.5 12.5h7" />
           </svg>
@@ -671,7 +668,7 @@
         </button>
         <button
           class:is-exporting={exporting}
-          class="export-button"
+          class="btn btn-primary export-button"
           type="button"
           disabled={!analytics.hasData || loadingRecords || exporting}
           onclick={exportImage}
@@ -700,7 +697,7 @@
           </svg>
         </div>
         <h2>数据库暂无二级池数据</h2>
-        <button type="button" onclick={openManagement}>打开台账管理</button>
+        <button class="btn" type="button" onclick={openManagement}>打开台账管理</button>
       </section>
     {:else}
       <section class="ledger-main">
@@ -727,7 +724,7 @@
                 <div class="ledger-account-filter" role="radiogroup" aria-label="账户范围">
                   {#each TREND_ACCOUNT_OPTIONS as option (option.value)}
                     <label class:active={trendAccount === option.value}>
-                      <input
+                      <input class="radio radio-primary"
                         type="radio"
                         name="ledger-trend-account"
                         value={option.value}
@@ -860,25 +857,26 @@
   onchange={handleFiles}
 />
 
-<dialog bind:this={managementDialog} class="ledger-management-dialog" aria-labelledby="ledger-management-title">
+<dialog bind:this={managementDialog} class="modal" aria-labelledby="ledger-management-title">
+<div class="modal-box ledger-management-dialog">
   <div class="ledger-management-content">
     <header>
       <h2 id="ledger-management-title">台账管理</h2>
-      <button type="button" aria-label="关闭台账管理" onclick={() => managementDialog.close()}>
+      <button class="btn" type="button" aria-label="关闭台账管理" onclick={() => managementDialog.close()}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
       </button>
     </header>
     <div class="ledger-management-toolbar">
-      <button class="ledger-upload-primary" type="button" disabled={uploading} onclick={openBatchUpload}>
+      <button class="btn btn-primary ledger-upload-primary" type="button" disabled={uploading} onclick={openBatchUpload}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5M4 12.5V17h12v-4.5" /></svg>
         <span>{uploading ? "正在上传" : "批量上传 Excel"}</span>
       </button>
       <span>数据库共 {databaseLedgerDates.length} 个报表日</span>
     </div>
     <div class="management-calendar-nav">
-      <button type="button" aria-label="上一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, -1))}>‹</button>
+      <button class="btn" type="button" aria-label="上一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, -1))}>‹</button>
       <strong>{monthLabel(managementMonth)}</strong>
-      <button type="button" aria-label="下一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, 1))}>›</button>
+      <button class="btn" type="button" aria-label="下一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, 1))}>›</button>
     </div>
     <section class="management-calendar" aria-label={monthLabel(managementMonth)}>
       <div class="calendar-weekdays" aria-hidden="true">
@@ -886,7 +884,7 @@
       </div>
       <div class="calendar-grid">
         {#each managementCalendarDays as day (day.date)}
-          <button
+          <button class="btn"
             type="button"
             class:outside={!day.inMonth}
             class:available={day.hasLedger}
@@ -908,9 +906,9 @@
           <span>{managedFile.fileName} · {(managedFile.size / 1024).toFixed(0)} KB</span>
         </div>
         <div class="ledger-management-actions">
-          <button type="button" onclick={() => downloadManagedFile(managedFile)}>下载</button>
-          <button type="button" disabled={uploading} onclick={() => openReupload(managedFile.date)}>重新上传</button>
-          <button class="danger" type="button" disabled={deleting} onclick={() => removeRemoteLedger(managedFile)}>删除</button>
+          <button class="btn" type="button" onclick={() => downloadManagedFile(managedFile)}>下载</button>
+          <button class="btn" type="button" disabled={uploading} onclick={() => openReupload(managedFile.date)}>重新上传</button>
+          <button class="btn btn-error danger" type="button" disabled={deleting} onclick={() => removeRemoteLedger(managedFile)}>删除</button>
         </div>
       {:else if selectedManagedDate && selectedManagedDateHasLedger}
         <div>
@@ -922,4 +920,5 @@
       {/if}
     </section>
   </div>
+</div>
 </dialog>

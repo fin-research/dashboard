@@ -70,7 +70,7 @@
         <strong>经济指标暂时无法加载</strong>
         <span>{error}</span>
       </div>
-      <button type="button" onclick={loadIndicators}>重新加载</button>
+      <button class="btn" type="button" onclick={loadIndicators}>重新加载</button>
     </div>
   {/if}
 

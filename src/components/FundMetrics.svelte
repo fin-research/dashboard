@@ -7,7 +7,7 @@
 
 {#each metrics as item (item.label)}
   <article
-    class={`card card--segmented card--centered indicator card--${tone(item.change)}`}
+    class={`market-stat-card card--segmented card--centered market-indicator card--${tone(item.change)}`}
   >
     <div class="card__content">
       <span class="card__label">{item.label}</span>

@@ -61,7 +61,7 @@
   {#if loading}
     <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取新闻资讯</strong></section>
   {:else if errorMessage}
-    <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><button type="button" onclick={loadNews}>重新读取</button></section>
+    <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><button class="btn" type="button" onclick={loadNews}>重新读取</button></section>
   {:else if detail}
     <div class="news-layout">
       <div class="news-column">

@@ -5,6 +5,7 @@ const window = installDom();
 const { mount, unmount, flushSync, tick } = await import("svelte");
 let reportRequests = 0;
 globalThis.fetch = async url => {
+  if (String(url) === "/auth/session") return Response.json({ user: null, account: null });
   if (String(url).startsWith("/api/credit-assistant/")) return Response.json({ turns: [], running: false, progress: "", error: null, startedAt: 0 });
   reportRequests++;
   return Response.json({ error: "尚未装载报表" }, { status: 503 });

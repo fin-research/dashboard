@@ -1,12 +1,37 @@
-<a class="profile-entry" href="/management" aria-label="管理中心" title="管理中心"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></svg></a>
-<a class="profile-entry" href="/profile" aria-label="个人信息" title="个人信息">
+<script lang="ts">
+  import { getContext, onMount } from 'svelte';
+  import type { AccountSummary } from '$lib/identity';
+
+  const currentAccount = getContext<() => AccountSummary | null>('site-account') ?? (() => null);
+  let sessionAccount = $state<AccountSummary | null>(null);
+  let checking = $state(true);
+  const account = $derived(currentAccount() ?? sessionAccount);
+
+  onMount(() => {
+    if (currentAccount()) { checking = false; return; }
+    const controller = new AbortController();
+    void fetch('/auth/session', { cache: 'no-store', signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) return;
+        const session = await response.json();
+        if (!controller.signal.aborted) sessionAccount = session.account ?? null;
+      })
+      .catch(() => {})
+      .finally(() => { if (!controller.signal.aborted) checking = false; });
+    return () => controller.abort();
+  });
+</script>
+
+<a class="btn btn-ghost account-button" href="/profile" aria-label={account ? `个人管理：${account.name}，${account.department || '未填写部门'}` : '个人管理'}>
   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></svg>
+  <span>{account?.name || (checking ? '个人管理' : '登录 / 注册')}{#if account}<span class="account-divider" aria-hidden="true"> / </span><span class="account-department">{account.department || '未填写部门'}</span>{/if}</span>
 </a>
 
 <style>
-  .profile-entry { display: inline-grid; place-items: center; width: 44px; height: 44px; flex: 0 0 auto; border: 1px solid var(--line, #d8e0ec); border-radius: var(--radius-control, 8px); color: var(--brand, #2f6fd6); background: var(--surface, #fff); text-decoration: none; }
-  svg { width: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .profile-entry:hover { background: var(--brand-soft, #eef4ff); }
-  .profile-entry:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
-  @media print { .profile-entry { display: none; } }
+  svg { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .account-button { max-width: 100%; flex-shrink: 0; gap: .5rem; padding-inline: .75rem; text-decoration: none; }
+  .account-button > span { overflow-wrap: anywhere; text-align: left; }
+  .account-department, .account-divider { color: var(--muted); font-weight: normal; }
+  @media (max-width: 720px) { .account-button { font-size: .875rem; } }
+  @media print { .account-button { display: none; } }
 </style>

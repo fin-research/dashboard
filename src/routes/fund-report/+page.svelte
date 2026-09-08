@@ -1,5 +1,4 @@
 <script lang="ts">
-  import "../../styles.css";
 
   import { onMount } from 'svelte';
   import { invalidate } from '$app/navigation';
@@ -71,7 +70,7 @@
       </h1>
     </div>
     <div class="header-actions">
-      <button class="upload-entry" type="button" disabled={checkingLogin} onclick={openUpload}>
+      <button class="btn upload-entry" type="button" disabled={checkingLogin} onclick={openUpload}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6" /></svg>
         {checkingLogin ? '正在检查登录' : '上传资金日报'}
       </button>
@@ -136,10 +135,8 @@
 
 <style>
   .header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
-  .upload-entry { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--brand); border-radius: var(--radius-control); color: white; background: var(--brand); font: inherit; font-weight: bold; cursor: pointer; }
+  .upload-entry { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; }
   .upload-entry svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .upload-entry:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
-  .upload-entry:disabled { opacity: .65; cursor: wait; }
   @media (max-width: 720px) { .fund-report-header { flex-wrap: wrap; gap: 12px; } }
 
   .fund-report-page {
@@ -451,10 +448,12 @@
 
     .panel-heading {
       align-items: flex-start;
+    min-height: 76px;
     }
 
     .report-list a {
       grid-template-columns: 1fr;
+    min-height: 88px;
     }
 
     .report-meta,

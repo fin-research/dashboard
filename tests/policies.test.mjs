@@ -89,7 +89,7 @@ test("政策页面展示重要性并使用隔离的时间轴类名", async () =>
     readFile(new URL("../migrations/1014_add_policy_importance.sql", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /class="ai-generate-button"/);
+  assert.match(page, /class="btn btn-primary ai-generate-button"/);
   assert.match(page, /disabled=\{generatingPolicyId === policy\.id\}/);
   assert.doesNotMatch(page, /请先关联至少一篇研报/);
   assert.match(page, /<p class="empty-text">尚未生成<\/p>/);

@@ -190,7 +190,7 @@ test("上传模态框保留文件选择与上传主操作", async () => {
   assert.match(page, /class="upload-file-input"[\s\S]*?type="file"/);
   assert.match(
     page,
-    /<footer class="upload-actions">[\s\S]*?<button class="upload-button" type="submit"/,
+    /<footer class="upload-actions">[\s\S]*?<button class="btn btn-primary upload-button" type="submit"/,
   );
   assert.match(page, /disabled=\{!selectedFile \|\| uploading\}/);
 });

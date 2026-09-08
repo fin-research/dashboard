@@ -2,9 +2,6 @@
   import { onMount } from "svelte";
 
   export let embedded = false;
-
-  import "../../app.css";
-  import "../../styles.css";
   import "../../bond-ledger.css";
   import "../../layout-report.css";
   import "../../secondary-bond-pool.css";
@@ -307,7 +304,7 @@
       >
         <div class="ledger-range-picker">
           <button
-            class="ledger-range-trigger"
+            class="btn ledger-range-trigger"
             type="button"
             aria-label="选择周报数据范围"
             aria-expanded={rangeOpen}
@@ -323,9 +320,9 @@
           {#if rangeOpen}
             <div class="ledger-range-popover" role="dialog" aria-label="选择周报数据范围" tabindex="-1">
               <div class="range-calendar-nav">
-                <button type="button" aria-label="向前一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, -1))}>‹</button>
+                <button class="btn" type="button" aria-label="向前一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, -1))}>‹</button>
                 <strong>{rangePhase === "start" ? "选择起始日期" : "选择结束日期"}</strong>
-                <button type="button" aria-label="向后一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, 1))}>›</button>
+                <button class="btn" type="button" aria-label="向后一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, 1))}>›</button>
               </div>
               <div class="range-calendar-pair">
                 {#each rangeMonths as month (month)}
@@ -336,7 +333,7 @@
                     </div>
                     <div class="calendar-grid">
                       {#each calendarDays(month) as day (day.date)}
-                        <button
+                        <button class="btn"
                           type="button"
                           class:outside={!day.inMonth}
                           class:in-range={isSelectedDate(day.date)}
@@ -355,7 +352,7 @@
         </div>
 
         <button
-          class="secondary-weekly-export"
+          class="btn btn-primary secondary-weekly-export"
           class:is-exporting={exporting}
           type="button"
           disabled={!analytics.hasData || !analytics.auditPassed || loading || exporting}

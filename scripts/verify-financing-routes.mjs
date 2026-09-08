@@ -188,6 +188,7 @@ try {
   const task = (await db.query('SELECT id FROM financing.project_tasks WHERE project_id=$1 ORDER BY id LIMIT 1', [project.id])).rows[0];
   assert.ok(task);
   await db.query('UPDATE financing.project_tasks SET assignee_id=$1 WHERE id=$2', ['auth0|other-person', task.id]);
+  const beforeDeniedTask = (await db.query('SELECT status,schedule_type,planned_start_date,due_date FROM financing.project_tasks WHERE id=$1', [task.id])).rows[0];
   currentPermissions = ['financing.task:update_own'];
   await db.query("UPDATE \"authorization\".role_permission SET granted = (permission_code = 'financing.task:update_own')");
   const otherTask = await respond(`/financing/projects/${project.id}?/updateOwnTaskStatus`, {
@@ -198,7 +199,7 @@ try {
   const ownTaskResult = await otherTask.json();
   assert.equal(ownTaskResult.type, 'failure');
   assert.equal(ownTaskResult.status, 403);
-  assert.notEqual((await db.query('SELECT status FROM financing.project_tasks WHERE id=$1', [task.id])).rows[0].status, 'in_progress'); checks++;
+  assert.deepEqual((await db.query('SELECT status,schedule_type,planned_start_date,due_date FROM financing.project_tasks WHERE id=$1', [task.id])).rows[0], beforeDeniedTask); checks++;
   await db.query('UPDATE financing.project_tasks SET assignee_id=$1 WHERE id=$2',[account.user_id,task.id]);
   const beforeOwn=(await db.query('SELECT schedule_type,planned_start_date,due_date FROM financing.project_tasks WHERE id=$1',[task.id])).rows[0];
   await action(`${taskPath}?/updateOwnTaskStatus`,{taskId:task.id,status:'completed',scheduleType:'period',plannedStartDate:'2026-01-01',dueDate:'2026-01-02'});

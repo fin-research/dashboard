@@ -1,4 +1,10 @@
+export interface AccountSummary {
+  name: string;
+  department: string;
+}
+
 export interface SiteAuthorization {
+  department?: string;
   name: string;
   roles: import('./server/auth0-directory').Auth0Role[];
   permissions: string[];

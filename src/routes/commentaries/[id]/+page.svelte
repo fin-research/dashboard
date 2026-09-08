@@ -58,7 +58,7 @@
   {#if loading}
     <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取研究点评</strong></section>
   {:else if errorMessage}
-    <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><button type="button" onclick={loadCommentary}>重新读取</button></section>
+    <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><button class="btn" type="button" onclick={loadCommentary}>重新读取</button></section>
   {:else if detail}
     <div class="commentary-layout">
       <ModuleCard class="commentary-card" labelledBy="commentary-title">

@@ -8,7 +8,7 @@
 
 <svelte:head><title>{debt.name} · 负债详情</title></svelte:head>
 
-<a class="back-link" href={withBase('/')}><ArrowLeft size={16} />返回仪表盘</a>
+<a class="btn btn-ghost back-link" href={withBase('/')}><ArrowLeft size={16} />返回仪表盘</a>
 <section class="debt-heading">
 	<div><p class="eyebrow">DEBT DETAIL</p><h1>{debt.name}</h1></div>
 	<span>{debt.debtType}{debt.subtype ? ` / ${debt.subtype}` : ''}</span>

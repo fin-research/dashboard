@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("首页提供五个业务入口并把账号设置集中到个人信息", async () => {
+test("首页提供五个业务入口和管理模块，账号设置集中到个人管理", async () => {
   const [page, globalStyles] = await Promise.all([
     readFile(new URL("../src/routes/+page.svelte", import.meta.url), "utf8"),
     readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
@@ -10,7 +10,7 @@ test("首页提供五个业务入口并把账号设置集中到个人信息", as
 
   assert.match(
     page,
-    /<article class="tool-card tool-card--fund-report">[\s\S]*?<h2>资金日报<\/h2>/,
+    /<article class="card tool-card tool-card--fund-report">[\s\S]*?<h2>资金日报<\/h2>/,
   );
   assert.match(
     page,
@@ -22,20 +22,21 @@ test("首页提供五个业务入口并把账号设置集中到个人信息", as
   );
   assert.match(
     page,
-    /<a class="tool-card tool-card--workspace" href="\/financing\/">[\s\S]*?<h2>融资工作台<\/h2>/,
+    /<a class="card tool-card tool-card--workspace" href="\/financing\/">[\s\S]*?<h2>融资工作台<\/h2>/,
   );
   assert.match(
     page,
-    /<a class="tool-card tool-card--trading-research" href="\/trading-research">[\s\S]*?<h2>交易研究工作台<\/h2>/,
+    /<a class="card tool-card tool-card--trading-research" href="\/trading-research">[\s\S]*?<h2>交易研究工作台<\/h2>/,
   );
   assert.match(
     page,
-    /<a class="tool-card tool-card--credit-workbench" href="\/credit-workbench">[\s\S]*?<h2>授信工作台<\/h2>/,
+    /<a class="card tool-card tool-card--credit-workbench" href="\/credit-workbench">[\s\S]*?<h2>授信工作台<\/h2>/,
   );
   assert.doesNotMatch(page, /href="\/(market-hotspots|policy-tracking)"/);
+  assert.match(page, /href="\/management">[\s\S]*?<h2>管理<\/h2>/);
   assert.match(page, /<AuthMenu \/>/);
-  assert.doesNotMatch(page, /href="\/management"|settings-dialog|openSettings/);
-  assert.equal((page.match(/class="tool-card /g) ?? []).length, 5);
+  assert.doesNotMatch(page, /settings-dialog|openSettings/);
+  assert.equal((page.match(/class="card tool-card /g) ?? []).length, 6);
   assert.ok(
     page.indexOf('href="/fund-report"') < page.indexOf('href="/market-briefing"'),
   );

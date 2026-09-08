@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import '../app.css';
+  import '../styles.css';
+  import { onMount, setContext } from "svelte";
   import { beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { pageRequiresLogin } from '$lib/auth-navigation';
@@ -10,7 +12,8 @@
   import GlobalMessages from "$lib/GlobalMessages.svelte";
   import { applyPreferences, readPreferences } from "$lib/preferences";
 
-  let { children } = $props();
+  let { children, data } = $props();
+  setContext('site-account', () => data.account);
 
   let checkedDestination: string | null = null;
   let checkingNavigation = false;
