@@ -72,7 +72,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const response = await resolve(event);
 		if (isStaticAsset) return response;
 		const headers = new Headers(response.headers);
-		headers.set('Cache-Control', 'no-store, private');
+		if (routeId !== '/avatar' || response.status !== 200) headers.set('Cache-Control', 'no-store, private');
 		headers.append('Vary', 'Cookie, Cf-Access-Jwt-Assertion');
 		headers.append(
 			'Server-Timing',

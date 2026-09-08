@@ -29,7 +29,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     return dashboardAccessFailure(event.request, new AccessError(401, '请先登录'));
   }
   if (event.locals.user) {
-    response.headers.set('Cache-Control', 'no-store, private');
+    if (event.route.id !== '/financing/avatar' || response.status !== 200) {
+      response.headers.set('Cache-Control', 'no-store, private');
+    }
     response.headers.append('Vary', 'Cookie, Cf-Access-Jwt-Assertion');
   }
   return response;

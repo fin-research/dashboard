@@ -22,13 +22,13 @@ const worker: ExportedHandler<Cloudflare.Env> = {
     return svelteKitWorker.fetch(request, env, context);
   },
   scheduled(controller, env, context) {
-    controller.noRetry();
     if (controller.cron === '0 * * * *') {
       context.waitUntil(import('../src/lib/server/financing/reminder-scheduler.js')
         .then(({ runScheduledReminderCheck }) => runScheduledReminderCheck({ scheduledTime: controller.scheduledTime, env }))
         .then(summary => { console.log(JSON.stringify(summary)); }));
       return;
     }
+    controller.noRetry();
     context.waitUntil(
       runEconomicIndicatorScheduledSync(env, controller.scheduledTime),
     );

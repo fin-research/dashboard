@@ -93,6 +93,11 @@ try {
     assert.equal(queries, before, `${path}: unexpected financing query`); checks++;
   }
   assert.equal((await respond('/financing', { token: unlinkedToken })).status, 403); checks++;
+  await db.query('UPDATE financing.people SET avatar_data_url = $1 WHERE id = $2', ['data:image/png;base64,aGVsbG8=', 'person-route-admin']);
+  const avatar = await respond('/financing/avatar?v=fixture');
+  assert.equal(avatar.status, 200);
+  assert.match(avatar.headers.get('cache-control'), /private, max-age=31536000, immutable/);
+  assert.match(avatar.headers.get('vary'), /Cookie/); checks++;
   for (const [path, target] of [['/financing/people', '/management/people'], ['/financing/settings', '/management/financing-profile']]) {
     for (const method of ['GET', 'POST']) {
       const response = await respond(path + '?/updateProfile', { method });
