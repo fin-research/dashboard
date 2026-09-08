@@ -161,7 +161,7 @@ test('new financing projects use one bookbuilding date anchored to SOP issue day
 	assert.match(page, /<span>计划簿记<\/span>\s*<input name="plannedBookbuildingDate" type="date"/);
 	assert.match(server, /const plannedBookbuildingDate = projectBookbuildingDate\(data\)/);
 	assert.match(server, /planned_start_date, planned_issue_date/);
-	assert.match(server, /offsetDate\(plannedBookbuildingDate, Number\(node\.offsetDays\)\)/);
+	assert.match(server, /resolveSopSchedule\(plannedBookbuildingDate, node/);
 	assert.match(server, /default_offset_days = 0/);
 });
 

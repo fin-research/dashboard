@@ -373,17 +373,21 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 						<div class="task-row">
 							<div class="task-info">
 								<span class={`task-dot ${task.status}`}></span>
-								<span>{index + 1}. {task.name}</span>
+								<span>{index + 1}. {task.name}<small class="task-date">{task.scheduleType === 'period' ? `${task.plannedStartDate} 至 ${task.dueDate}` : task.dueDate ?? '待安排'}</small></span>
 							</div>
 							<div class="task-status">
 								{task.status === 'done' ? '已完成' : task.status === 'doing' ? '进行中' : '待开始'}
 							</div>
 							<div class="task-timeline" style:--timeline-columns={Math.max(1, secondaryTimelineBands.length)}>
-								<div
-									class={`task-bar ${task.status}`}
-									style:left={`${task.startPct}%`}
-									style:width={`${task.widthPct}%`}
-								></div>
+								{#if task.hasSchedule}
+									<div
+										class={`task-bar ${task.status}`}
+										class:task-point={task.scheduleType === 'point'}
+										style:left={`${task.startPct}%`}
+										style:width={task.scheduleType === 'period' ? `${task.widthPct}%` : '0.75rem'}
+										title={task.scheduleType === 'period' ? `${task.name}：${task.plannedStartDate} 至 ${task.dueDate}` : `${task.name}：${task.dueDate}`}
+									></div>
+								{/if}
 							</div>
 						</div>
 					{/each}
@@ -1139,6 +1143,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		background: #dbe8ff;
 	}
 
+	.task-date { display: block; margin-top: 0.2rem; font-size: 0.8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+	.task-bar.task-point { height: 0.75rem; border-radius: 0; transform: translate(-50%, -50%) rotate(45deg); }
 	.task-bar {
 		position: absolute;
 		top: 0.9375rem;

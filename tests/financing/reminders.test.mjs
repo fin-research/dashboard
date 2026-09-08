@@ -87,8 +87,10 @@ test('due reminders match selected SOP nodes and independently expose each due p
 			('period-48', 'rule', 48), ('period-36', 'rule', 36), ('period-6', 'rule', 6);
 	`);
 
+	await database.exec("ALTER TABLE project_tasks ADD COLUMN schedule_type text DEFAULT 'period', ADD COLUMN planned_start_date date DEFAULT '2026-08-01'");
 	const db = databaseAdapter(database);
 	const directory = async () => [{id:'assignee',email:'assignee@example.com',active:true},{id:'owner',email:'owner@example.com',active:true}];
+	assert.deepEqual(await collectDueReminders({ asOf: '2026-08-01T01:00:00.000Z', db, directory }), []);
 	const beforeDailySend = await collectDueReminders({ asOf: '2026-08-23T00:59:59.000Z', db, directory });
 	assert.deepEqual(beforeDailySend, []);
 

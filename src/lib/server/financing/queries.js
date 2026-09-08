@@ -275,7 +275,8 @@ export async function getProjectGanttData(filters = {}) {
 			p.amount_description AS amountDescription,
 			p.owner_id AS ownerId,
 			pt.id AS taskId, pt.name AS taskName, pt.status AS taskStatus,
-			pt.planned_start_date AS taskPlannedStartDate, pt.due_date AS taskDueDate,
+			pt.schedule_type AS taskScheduleType,
+			CASE WHEN pt.schedule_type = 'period' THEN pt.planned_start_date END AS taskPlannedStartDate, pt.due_date AS taskDueDate,
 			pt.completed_at AS taskCompletedAt, pt.sort_order AS taskSortOrder,
 			pt.assignee_id AS taskAssigneeId
 		FROM projects p
@@ -312,7 +313,7 @@ export async function getProjectGanttData(filters = {}) {
 		}
 		if (row.taskId) projects.get(row.id).tasks.push({
 			id: row.taskId, name: row.taskName, status: row.taskStatus,
-			plannedStartDate: row.taskPlannedStartDate, dueDate: row.taskDueDate,
+			scheduleType: row.taskScheduleType, plannedStartDate: row.taskPlannedStartDate, dueDate: row.taskDueDate,
 			completedAt: row.taskCompletedAt, sortOrder: row.taskSortOrder,
 			assigneeName: people.get(row.taskAssigneeId)?.name ?? (row.taskAssigneeId ? '已移除账号' : null)
 		});

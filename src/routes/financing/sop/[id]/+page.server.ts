@@ -3,11 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { getDatabase } from '$lib/server/financing/db.js';
+import { parseSopSchedule } from '$lib/financing/sop-schedule.js';
 import { hasSameOrder, isCompleteReorder } from '$lib/financing/reorder-items.js';
 
 const MAX_NODE_NAME = 120;
-const MIN_OFFSET = -3650;
-const MAX_OFFSET = 3650;
 
 async function templateExists(id: string) {
 	return getDatabase().prepare('SELECT 1 FROM sop_templates WHERE id = ?').get(id);
@@ -25,7 +24,7 @@ async function loadTemplate(id: string) {
 async function loadNodes(templateId: string) {
 	return await getDatabase().prepare(`
 		SELECT id, name, description, sort_order AS sortOrder,
-			default_offset_days AS offsetDays, default_owner_role AS ownerRole
+			default_offset_days AS offsetDays, default_start_offset_days AS startOffsetDays, default_owner_role AS ownerRole
 		FROM sop_nodes WHERE template_id = ? ORDER BY sort_order, created_at, id
 	`).all(templateId) as Array<{
 		id: string;
@@ -33,6 +32,7 @@ async function loadNodes(templateId: string) {
 		description: string | null;
 		sortOrder: number;
 		offsetDays: number;
+		startOffsetDays: number | null;
 		ownerRole: string | null;
 	}>;
 }
@@ -46,6 +46,7 @@ async function loadSopDetail(id: string) {
 				SELECT jsonb_agg(jsonb_build_object(
 					'id', node.id, 'name', node.name, 'description', node.description,
 					'sortOrder', node.sort_order, 'offsetDays', node.default_offset_days,
+					'startOffsetDays', node.default_start_offset_days,
 					'ownerRole', node.default_owner_role
 				) ORDER BY node.sort_order, node.created_at, node.id)
 				FROM sop_nodes node WHERE node.template_id = template.id
@@ -61,14 +62,12 @@ async function parseNode(data: FormData) {
 	const name = String(data.get('name') ?? '').trim();
 	const description = String(data.get('description') ?? '').trim();
 	const ownerRole = String(data.get('ownerRole') ?? '').trim();
-	const offsetDays = Number(data.get('offsetDays'));
+	const schedule = parseSopSchedule(data);
 	if (!name || name.length > MAX_NODE_NAME) return { error: '节点名称应为 1–120 个字符' } as const;
-	if (!Number.isInteger(offsetDays) || offsetDays < MIN_OFFSET || offsetDays > MAX_OFFSET) {
-		return { error: '相对日期必须是 -3650 至 3650 之间的整数' } as const;
-	}
+	if ('error' in schedule) return schedule;
 	if (ownerRole.length > 80) return { error: '默认角色不能超过 80 个字符' } as const;
 	if (ownerRole && !(await getDirectory().roles()).some(role => role.id === ownerRole)) return { error: '请选择有效的 Auth0 角色' } as const;
-	return { name, description, ownerRole, offsetDays } as const;
+	return { name, description, ownerRole, ...schedule } as const;
 }
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -147,15 +146,16 @@ export const actions: Actions = {
 			description: parsed.description || null,
 			sortOrder: nextOrder,
 			offsetDays: parsed.offsetDays,
+			startOffsetDays: parsed.startOffsetDays,
 			ownerRole: parsed.ownerRole || null
 		};
 		await db.batch([
 			db.prepare(`
 				INSERT INTO sop_nodes (
 					id, template_id, name, description, sort_order,
-					default_offset_days, default_owner_role
-				) VALUES (?, ?, ?, ?, ?, ?, ?)
-			`).bind(nodeId, params.id, parsed.name, parsed.description || null, nextOrder, parsed.offsetDays, parsed.ownerRole || null)]);
+					default_offset_days, default_start_offset_days, default_owner_role
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`).bind(nodeId, params.id, parsed.name, parsed.description || null, nextOrder, parsed.offsetDays, parsed.startOffsetDays, parsed.ownerRole || null)]);
 		return { success: true, message: 'SOP 节点已添加', node: after };
 	},
 	updateNode: async (event) => {
@@ -171,17 +171,17 @@ export const actions: Actions = {
 		}
 		const selectState = db.prepare(`
 			SELECT id, name, description, sort_order AS sortOrder,
-				default_offset_days AS offsetDays, default_owner_role AS ownerRole
+				default_offset_days AS offsetDays, default_start_offset_days AS startOffsetDays, default_owner_role AS ownerRole
 			FROM sop_nodes WHERE id = ? AND template_id = ?
 		`);
 		const before = await selectState.get(nodeId, params.id);
 		await db.batch([
 			db.prepare(`
 				UPDATE sop_nodes
-				SET name = ?, description = ?, default_offset_days = ?,
+				SET name = ?, description = ?, default_offset_days = ?, default_start_offset_days = ?,
 					default_owner_role = ?, updated_at = CURRENT_TIMESTAMP
 				WHERE id = ? AND template_id = ?
-			`).bind(parsed.name, parsed.description || null, parsed.offsetDays, parsed.ownerRole || null, nodeId, params.id)]);
+			`).bind(parsed.name, parsed.description || null, parsed.offsetDays, parsed.startOffsetDays, parsed.ownerRole || null, nodeId, params.id)]);
 		return {
 			success: true,
 			message: 'SOP 节点已更新',
@@ -190,6 +190,7 @@ export const actions: Actions = {
 				name: parsed.name,
 				description: parsed.description || null,
 				offsetDays: parsed.offsetDays,
+				startOffsetDays: parsed.startOffsetDays,
 				ownerRole: parsed.ownerRole || null
 			}
 		};
@@ -229,7 +230,7 @@ export const actions: Actions = {
 		const db = getDatabase();
 		const before = await db.prepare(`
 			SELECT id, name, description, sort_order AS sortOrder,
-				default_offset_days AS offsetDays, default_owner_role AS ownerRole
+				default_offset_days AS offsetDays, default_start_offset_days AS startOffsetDays, default_owner_role AS ownerRole
 			FROM sop_nodes WHERE id = ? AND template_id = ?
 		`).get(nodeId, params.id) as any;
 		if (!before) return fail(404, { message: 'SOP 节点不存在' });

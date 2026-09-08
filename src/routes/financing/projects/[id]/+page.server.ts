@@ -2,11 +2,12 @@ import { activePerson, getDirectory } from '$lib/server/directory';
 import { randomUUID } from 'node:crypto';
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { parseTaskSchedule } from '$lib/financing/sop-schedule.js';
+import { refreshProjectStart } from '$lib/server/financing/project-schedule.js';
 import { getDatabase } from '$lib/server/financing/db.js';
 
 const PROJECT_STATUSES = new Set(['planning', 'in_progress', 'at_risk', 'completed', 'cancelled']);
 const TASK_STATUSES = new Set(['not_started', 'in_progress', 'blocked', 'completed']);
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 async function resolveProjectId(rawId: string) {
 	const db = getDatabase();
@@ -38,7 +39,8 @@ async function loadProject(projectId: string) {
 				SELECT jsonb_agg(jsonb_build_object(
 					'id', pt.id, 'name', pt.name, 'status', pt.status,
 					'assigneeId', pt.assignee_id,
-					'plannedStartDate', pt.planned_start_date, 'dueDate', pt.due_date,
+					'scheduleType', pt.schedule_type,
+					'plannedStartDate', CASE WHEN pt.schedule_type = 'period' THEN pt.planned_start_date END, 'dueDate', pt.due_date,
 					'completedAt', pt.completed_at, 'sortOrder', pt.sort_order,
 					'notes', COALESCE(pt.notes, node.description), 'updatedAt', pt.updated_at
 				) ORDER BY pt.sort_order, pt.due_date, pt.name)
@@ -133,9 +135,10 @@ export const actions: Actions = {
 		const taskId = String(data.get('taskId') ?? '');
 		const status = String(data.get('status') ?? '');
 		const assigneeId = String(data.get('assigneeId') ?? '');
-		const dueDate = String(data.get('dueDate') ?? '');
+		const schedule = parseTaskSchedule(data);
+		if ('error' in schedule) return fail(400, { message: schedule.error });
+		const { scheduleType, plannedStartDate, dueDate } = schedule;
 		if (!taskId || !TASK_STATUSES.has(status)) return fail(400, { message: '任务参数无效' });
-		if (dueDate && !ISO_DATE.test(dueDate)) return fail(400, { message: '截止日期格式无效' });
 		const db = getDatabase();
 		if (assigneeId && !await activePerson(assigneeId)) {
 			return fail(400, { message: '任务负责人不存在或已停用' });
@@ -147,10 +150,11 @@ export const actions: Actions = {
 		const before = await selectState.get(taskId, projectId) as any;
 		if (!before) return fail(404, { message: '任务节点不存在' });
 		let task;
+		let project;
 		await db.transaction(async (transaction: ReturnType<typeof getDatabase>) => {
 			task = await transaction.prepare(`
 				UPDATE project_tasks
-				SET status = ?, assignee_id = ?, due_date = ?,
+				SET status = ?, assignee_id = ?, due_date = ?, planned_start_date = ?, schedule_type = ?,
 					completed_at = CASE
 						WHEN ? = 'completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
 						ELSE NULL
@@ -158,15 +162,18 @@ export const actions: Actions = {
 					updated_at = CURRENT_TIMESTAMP
 				WHERE id = ? AND project_id = ?
 				RETURNING id, name, status, assignee_id AS assigneeId,
-					planned_start_date AS plannedStartDate, due_date AS dueDate,
+					schedule_type AS scheduleType,
+					CASE WHEN schedule_type = 'period' THEN planned_start_date END AS plannedStartDate, due_date AS dueDate,
 					completed_at AS completedAt, sort_order AS sortOrder, notes,
 					updated_at AS updatedAt
-			`).get(status, assigneeId || null, dueDate || null, status, taskId, projectId);
+			`).get(status, assigneeId || null, dueDate, plannedStartDate, scheduleType, status, taskId, projectId);
+			project = await refreshProjectStart(transaction, projectId);
 		});
 		return {
 			success: true,
 			message: '任务节点已更新',
 			task,
+			project,
 			refreshReminders:
 				before.status !== status ||
 				(before.assigneeId ?? null) !== (assigneeId || null) ||
@@ -205,7 +212,8 @@ export const actions: Actions = {
 					updated_at = CURRENT_TIMESTAMP
 				WHERE id = ? AND project_id = ? AND assignee_id = ?
 				RETURNING id, name, status, assignee_id AS assigneeId,
-					planned_start_date AS plannedStartDate, due_date AS dueDate,
+					schedule_type AS scheduleType,
+					CASE WHEN schedule_type = 'period' THEN planned_start_date END AS plannedStartDate, due_date AS dueDate,
 					completed_at AS completedAt, sort_order AS sortOrder, notes,
 					updated_at AS updatedAt
 			`).get(status, status, taskId, projectId, personId);
@@ -226,9 +234,10 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const name = String(data.get('name') ?? '').trim();
 		const assigneeId = String(data.get('assigneeId') ?? '');
-		const dueDate = String(data.get('dueDate') ?? '');
+		const schedule = parseTaskSchedule(data);
+		if ('error' in schedule) return fail(400, { message: schedule.error });
+		const { scheduleType, plannedStartDate, dueDate } = schedule;
 		if (!name || name.length > 120) return fail(400, { message: '请输入 1–120 个字符的任务名称' });
-		if (dueDate && !ISO_DATE.test(dueDate)) return fail(400, { message: '截止日期格式无效' });
 		const db = getDatabase();
 		if (assigneeId && !await activePerson(assigneeId)) {
 			return fail(400, { message: '任务负责人不存在或已停用' });
@@ -238,22 +247,27 @@ export const actions: Actions = {
 			FROM project_tasks WHERE project_id = ?
 		`).get(projectId) as { nextOrder: number }).nextOrder;
 		const taskId = randomUUID();
-		await db.batch([
-			db.prepare(`
+		let project;
+		await db.transaction(async (transaction: ReturnType<typeof getDatabase>) => {
+			await transaction.prepare(`
 				INSERT INTO project_tasks (
-					id, project_id, name, status, assignee_id, due_date, sort_order
-				) VALUES (?, ?, ?, 'not_started', ?, ?, ?)
-			`).bind(taskId, projectId, name, assigneeId || null, dueDate || null, nextOrder)]);
+					id, project_id, name, status, assignee_id, due_date, planned_start_date, schedule_type, sort_order
+				) VALUES (?, ?, ?, 'not_started', ?, ?, ?, ?, ?)
+			`).run(taskId, projectId, name, assigneeId || null, dueDate, plannedStartDate, scheduleType, nextOrder);
+			project = await refreshProjectStart(transaction, projectId);
+		});
 		return {
 			success: true,
 			message: '任务节点已添加',
+			project,
 			task: {
 				id: taskId,
 				name,
 				status: 'not_started',
 				assigneeId: assigneeId || null,
 				assigneeName: null,
-				plannedStartDate: null,
+				scheduleType,
+				plannedStartDate,
 				dueDate: dueDate || null,
 				completedAt: null,
 				sortOrder: nextOrder,

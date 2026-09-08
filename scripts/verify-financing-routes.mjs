@@ -18,6 +18,7 @@ const roles = Object.entries(roleIds).map(([name,id]) => ({id,name:'financing:'+
 const db = new PGlite({ parsers: { 1082: value => value, 1114: financingTimestamp, 1184: financingTimestamp } });
 await legacyPermissionSchema(db);
 await migratePermissions(db, {users:[],roles});
+await db.exec(await readFile(new URL('../financing-migrations/0033_sop_schedule_periods.sql', import.meta.url), 'utf8'));
 await db.query("INSERT INTO financing.financial_monthly_data(period_end,net_capital) VALUES ('2026-08-31',100)");
 const account = { user_id: 'auth0|route-admin', email: 'route-admin@18.cn', name: '权限回归人员', email_verified: true, identities: [{ connection: 'eastmoney-email' }] };
 const roleless = { ...account, user_id:'auth0|unlinked', email:'unlinked@18.cn', name:'未分配角色人员' };
@@ -139,6 +140,24 @@ try {
   assert.equal((await db.query("SELECT nullif(current_setting('request.auth.user_id',true), '') AS subject")).rows[0].subject, null); checks++;
   const sop = (await db.query('SELECT id FROM financing.sop_templates WHERE is_active ORDER BY id LIMIT 1')).rows[0];
   assert.ok(sop);
+  async function action(path, fields, expectedStatus) {
+    const response = await respond(path, {
+      method: 'POST', headers: { Accept: 'application/json', 'X-SvelteKit-Action': 'true' },
+      body: new URLSearchParams(fields),
+    });
+    const result = await response.json();
+    assert.equal(result.type, expectedStatus ? 'failure' : 'success', JSON.stringify(result));
+    if (expectedStatus) assert.equal(result.status, expectedStatus, JSON.stringify(result));
+    checks++;
+    return result;
+  }
+  const sopPath = `/financing/sop/${sop.id}`;
+  await action(`${sopPath}?/addNode`, {name:'时段回归节点',scheduleType:'period',startOffsetDays:'-10',offsetDays:'2'});
+  const periodNode = (await db.query("SELECT id FROM financing.sop_nodes WHERE name='时段回归节点'")).rows[0];
+  assert.ok(periodNode);
+  await action(`${sopPath}?/updateNode`, {nodeId:periodNode.id,name:'时段回归节点',scheduleType:'period',startOffsetDays:'3',offsetDays:'2'},400);
+  assert.equal((await db.query('SELECT default_start_offset_days FROM financing.sop_nodes WHERE id=$1',[periodNode.id])).rows[0].default_start_offset_days,-10);
+  assert.match(await (await respond(sopPath)).text(), /启动时点/);
   const creation = await respond('/financing/projects?/createProject', {
     method: 'POST', headers: { Accept: 'application/json', 'X-SvelteKit-Action': 'true' },
     body: new URLSearchParams({ name: '路由回归项目', sopTemplateId: sop.id, amountYi: '1.5', plannedBookbuildingDate: '2026-10-09' }),
@@ -148,6 +167,24 @@ try {
   const project = (await db.query("SELECT id, planned_issue_date FROM financing.projects WHERE name = '路由回归项目'")).rows[0];
   assert.equal(project?.planned_issue_date, '2026-10-09');
   assert.equal((await respond(`/financing/projects/${project.id}`)).status, 200); checks += 2;
+  const taskPath = `/financing/projects/${project.id}`;
+  let periodTask = (await db.query('SELECT * FROM financing.project_tasks WHERE project_id=$1 AND sop_node_id=$2',[project.id,periodNode.id])).rows[0];
+  assert.deepEqual([periodTask.schedule_type,periodTask.planned_start_date,periodTask.due_date],['period','2026-09-29','2026-10-11']);
+  assert.ok((await db.query("SELECT count(*)::int AS n FROM financing.project_tasks WHERE project_id=$1 AND schedule_type='point' AND planned_start_date IS NULL",[project.id])).rows[0].n>0);
+  await action(`${taskPath}?/updateTask`,{taskId:periodTask.id,status:'in_progress',scheduleType:'period',plannedStartDate:'2026-09-08',dueDate:'2026-10-12'});
+  assert.equal((await db.query('SELECT planned_start_date FROM financing.projects WHERE id=$1',[project.id])).rows[0].planned_start_date,'2026-09-08');
+  await action(`${taskPath}?/updateTask`,{taskId:periodTask.id,status:'completed',scheduleType:'period',plannedStartDate:'2026-10-13',dueDate:'2026-10-12'},400);
+  assert.equal((await db.query('SELECT status FROM financing.project_tasks WHERE id=$1',[periodTask.id])).rows[0].status,'in_progress');
+  await action(`${taskPath}?/addTask`,{name:'独立时段',scheduleType:'period',plannedStartDate:'2026-09-20',dueDate:'2026-10-30'});
+  await action('/financing/projects?/updateProject',{id:project.id,name:'路由回归项目',status:'planning',plannedBookbuildingDate:'2026-10-16'});
+  periodTask=(await db.query('SELECT * FROM financing.project_tasks WHERE id=$1',[periodTask.id])).rows[0];
+  assert.deepEqual([periodTask.planned_start_date,periodTask.due_date],['2026-09-15','2026-10-19']);
+  assert.equal((await db.query("SELECT due_date FROM financing.project_tasks WHERE project_id=$1 AND name='独立时段'",[project.id])).rows[0].due_date,'2026-10-30');
+  assert.match(await (await respond(taskPath)).text(), /2026-09-15/);
+  await action(`${taskPath}?/updateTask`,{taskId:periodTask.id,status:'in_progress',scheduleType:'point',dueDate:'2026-10-19'});
+  assert.deepEqual((await db.query('SELECT schedule_type,planned_start_date FROM financing.project_tasks WHERE id=$1',[periodTask.id])).rows[0],{schedule_type:'point',planned_start_date:null});
+  await action(`${sopPath}?/updateNode`, {nodeId:periodNode.id,name:'时段回归节点',scheduleType:'point',offsetDays:'2'});
+  assert.equal((await db.query('SELECT default_start_offset_days FROM financing.sop_nodes WHERE id=$1',[periodNode.id])).rows[0].default_start_offset_days,null);
   const task = (await db.query('SELECT id FROM financing.project_tasks WHERE project_id=$1 ORDER BY id LIMIT 1', [project.id])).rows[0];
   assert.ok(task);
   await db.query('UPDATE financing.project_tasks SET assignee_id=$1 WHERE id=$2', ['auth0|other-person', task.id]);
@@ -155,13 +192,17 @@ try {
   await db.query("UPDATE \"authorization\".role_permission SET granted = (permission_code = 'financing.task:update_own')");
   const otherTask = await respond(`/financing/projects/${project.id}?/updateOwnTaskStatus`, {
     method: 'POST', headers: { Accept: 'application/json', 'X-SvelteKit-Action': 'true' },
-    body: new URLSearchParams({ taskId: task.id, status: 'in_progress' }),
+    body: new URLSearchParams({ taskId: task.id, status: 'in_progress', scheduleType:'period',plannedStartDate:'2026-01-01',dueDate:'2026-01-02' }),
   });
   assert.equal(otherTask.status, 200);
   const ownTaskResult = await otherTask.json();
   assert.equal(ownTaskResult.type, 'failure');
   assert.equal(ownTaskResult.status, 403);
   assert.notEqual((await db.query('SELECT status FROM financing.project_tasks WHERE id=$1', [task.id])).rows[0].status, 'in_progress'); checks++;
+  await db.query('UPDATE financing.project_tasks SET assignee_id=$1 WHERE id=$2',[account.user_id,task.id]);
+  const beforeOwn=(await db.query('SELECT schedule_type,planned_start_date,due_date FROM financing.project_tasks WHERE id=$1',[task.id])).rows[0];
+  await action(`${taskPath}?/updateOwnTaskStatus`,{taskId:task.id,status:'completed',scheduleType:'period',plannedStartDate:'2026-01-01',dueDate:'2026-01-02'});
+  assert.deepEqual((await db.query('SELECT schedule_type,planned_start_date,due_date FROM financing.project_tasks WHERE id=$1',[task.id])).rows[0],beforeOwn);
   currentPermissions = [...PERMISSION_CODES];
   await db.query('UPDATE "authorization".role_permission SET granted = true');
   const denied = await respond('/management/people?/createPerson', { method: 'POST', headers: { Origin: 'https://other.test' } });

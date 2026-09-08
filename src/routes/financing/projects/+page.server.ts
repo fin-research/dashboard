@@ -5,10 +5,11 @@ import type { Actions, PageServerLoad } from './$types';
 import { getDatabase } from '$lib/server/financing/db.js';
 import { getProjectGanttData } from '$lib/server/financing/queries.js';
 import { deleteProjectWithReminders } from '$lib/server/financing/project-deletion.js';
+import { isScheduleDate, projectStartDate, resolveSopSchedule } from '$lib/financing/sop-schedule.js';
+import { refreshProjectStart } from '$lib/server/financing/project-schedule.js';
 import { hasPermission } from '$lib/permissions';
 
 const PROJECT_STATUSES = new Set(['planning', 'in_progress', 'at_risk', 'completed', 'cancelled']);
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function dateInShanghai() {
 	return new Intl.DateTimeFormat('en-CA', {
@@ -22,17 +23,6 @@ async function getProjectSource(projectId: string) {
 
 function projectBookbuildingDate(data: FormData) {
 	return String(data.get('plannedBookbuildingDate') ?? '').trim();
-}
-
-function offsetDate(date: string, offsetDays: number) {
-	return new Date(Date.parse(`${date}T00:00:00Z`) + offsetDays * 86_400_000).toISOString().slice(0, 10);
-}
-
-function projectStartDate(plannedBookbuildingDate: string, nodes: Array<{ offsetDays: number }>) {
-	return nodes.reduce(
-		(earliest, node) => [earliest, offsetDate(plannedBookbuildingDate, Number(node.offsetDays))].sort()[0] ?? earliest,
-		plannedBookbuildingDate
-	);
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -68,7 +58,7 @@ export const actions: Actions = {
 		if (amountYi && (!/^\d+(?:\.\d{1,8})?$/.test(amountYi) || Number(amountYi) < 0)) {
 			return fail(400, { message: '项目规模须为有效的非负亿元数值' });
 		}
-		if (!ISO_DATE.test(plannedBookbuildingDate)) return fail(400, { message: '请填写有效的计划簿记日期' });
+		if (!isScheduleDate(plannedBookbuildingDate)) return fail(400, { message: '请填写有效的计划簿记日期' });
 
 		const db = getDatabase();
 		if (ownerId && !await activePerson(ownerId)) {
@@ -83,7 +73,7 @@ export const actions: Actions = {
 		const projectId = randomUUID();
 		const code = `FIN-${dateInShanghai().replaceAll('-', '')}-${projectId.slice(0, 8).toUpperCase()}`;
 		const nodes = await db.prepare(`
-			SELECT id, name, description, sort_order AS sortOrder, default_offset_days AS offsetDays,
+			SELECT id, name, description, sort_order AS sortOrder, default_offset_days AS offsetDays, default_start_offset_days AS startOffsetDays,
 				default_owner_role AS ownerRole
 			FROM sop_nodes WHERE template_id = ? ORDER BY sort_order
 		`).all(sop.id);
@@ -92,7 +82,12 @@ export const actions: Actions = {
 		for (const assignee of assignees) {
 			for (const role of assignee.roles) if (!assigneeByRole.has(role.id)) assigneeByRole.set(role.id, assignee);
 		}
-		const startDate = projectStartDate(plannedBookbuildingDate, nodes as Array<{ offsetDays: number }>);
+		let startDate: string;
+		try {
+			startDate = projectStartDate(plannedBookbuildingDate, nodes as Array<{ offsetDays: number; startOffsetDays: number | null }>);
+		} catch (cause) {
+			return fail(400, { message: cause instanceof Error ? cause.message : '节点日期无效' });
+		}
 		await db.transaction(async (transaction: ReturnType<typeof getDatabase>) => {
 			await transaction.prepare(`
 				INSERT INTO projects (
@@ -104,16 +99,16 @@ export const actions: Actions = {
 				startDate, plannedBookbuildingDate, sop.id, ownerId || null, notes || null
 			);
 			for (const node of nodes) {
-				const dueDate = offsetDate(plannedBookbuildingDate, Number(node.offsetDays));
+				const { scheduleType, plannedStartDate, dueDate } = resolveSopSchedule(plannedBookbuildingDate, node as { offsetDays: number; startOffsetDays: number | null });
 				const assignee = assigneeByRole.get(node.ownerRole) ?? (ownerId ? { id: ownerId } : undefined);
 				await transaction.prepare(`
 					INSERT INTO project_tasks (
 						id, project_id, sop_node_id, name, status, assignee_id,
-						planned_start_date, due_date, sort_order, notes
-					) VALUES (?, ?, ?, ?, 'not_started', ?, ?, ?, ?, ?)
+						planned_start_date, due_date, sort_order, notes, schedule_type
+					) VALUES (?, ?, ?, ?, 'not_started', ?, ?, ?, ?, ?, ?)
 				`).run(
 					randomUUID(), projectId, node.id, node.name, assignee?.id ?? null,
-					startDate, dueDate, node.sortOrder, node.description || null
+					plannedStartDate, dueDate, node.sortOrder, node.description || null, scheduleType
 				);
 			}
 		});
@@ -137,7 +132,7 @@ export const actions: Actions = {
 		if (!projectId || !name || name.length > 160) return fail(400, { message: '项目名称须为 1–160 个字符' });
 		if (!PROJECT_STATUSES.has(status)) return fail(400, { message: '项目状态无效' });
 		if (notes.length > 4000) return fail(400, { message: '项目说明不能超过 4,000 个字符' });
-		if (!ISO_DATE.test(plannedBookbuildingDate)) return fail(400, { message: '请填写有效的计划簿记日期' });
+		if (!isScheduleDate(plannedBookbuildingDate)) return fail(400, { message: '请填写有效的计划簿记日期' });
 
 		const db = getDatabase();
 		if (ownerId && !await activePerson(ownerId)) {
@@ -158,7 +153,7 @@ export const actions: Actions = {
 							ELSE planned_start_date + (?::date - ?::date)
 						END,
 						due_date = CASE
-							WHEN sop_node_id IN (SELECT id FROM sop_nodes WHERE default_offset_days = 0)
+							WHEN schedule_type = 'point' AND sop_node_id IN (SELECT id FROM sop_nodes WHERE default_offset_days = 0)
 								THEN ?::date
 							WHEN due_date IS NULL THEN NULL
 							ELSE due_date + (?::date - ?::date)
@@ -170,25 +165,13 @@ export const actions: Actions = {
 					plannedBookbuildingDate, before.plannedIssueDate, projectId
 				);
 			}
-			const schedule = await transaction.prepare(`
-				SELECT LEAST(?::date, COALESCE(MIN(due_date), ?::date)) AS startDate
-				FROM project_tasks WHERE project_id = ?
-			`).get(plannedBookbuildingDate, plannedBookbuildingDate, projectId) as { startDate: string };
-			const after = {
-				...before,
-				name,
-				status,
-				ownerId: ownerId || null,
-				plannedStartDate: schedule.startDate,
-				plannedIssueDate: plannedBookbuildingDate,
-				notes: notes || null
-			};
 			await transaction.prepare(`
 				UPDATE projects
-				SET name = ?, status = ?, owner_id = ?, planned_start_date = ?,
+				SET name = ?, status = ?, owner_id = ?,
 					planned_issue_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
 				WHERE id = ?
-			`).run(name, status, ownerId || null, schedule.startDate, plannedBookbuildingDate, notes || null, projectId);
+			`).run(name, status, ownerId || null, plannedBookbuildingDate, notes || null, projectId);
+			await refreshProjectStart(transaction, projectId);
 		});
 		return {
 			success: true,

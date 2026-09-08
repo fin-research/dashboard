@@ -16,6 +16,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	import { autoSave, completeAutoSave, getAutoSaveRevision } from '$lib/financing/auto-save';
 	import { globalMessages } from '$lib/global-messages';
 		import { hasPermission } from '$lib/permissions';
+	import ScheduleFields from '$lib/financing/components/ScheduleFields.svelte';
 	import { withBase } from '$lib/financing/app-paths';
 
 	let { data: routeData, form } = $props();
@@ -216,7 +217,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 				</div>
 			</header>
 			<div class="task-list">
-				{#each data.tasks as task, index}
+				{#each data.tasks as task, index (task.id)}
 					<form
 						method="post"
 						action={canManage ? '?/updateTask' : '?/updateOwnTaskStatus'}
@@ -248,10 +249,9 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 								{/each}
 							</select>
 						</label>
-						<label>
-							<span>截止日</span>
-							<input name="dueDate" type="date" value={task.dueDate ?? ''} aria-label={`${task.name}截止日`} disabled={!canManage} />
-						</label>
+						<div class="task-schedule">
+							<ScheduleFields scheduleType={task.scheduleType ?? 'point'} startValue={task.plannedStartDate} endValue={task.dueDate} label={task.name} disabled={!canManage} />
+						</div>
 					</form>
 				{:else}
 					<p class="empty-state">{canManage ? '尚无任务节点，可在下方添加第一个任务。' : '尚无任务节点。'}</p>
@@ -272,10 +272,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						{/each}
 					</select>
 				</label>
-				<label>
-					<span>截止日</span>
-					<input name="dueDate" type="date" />
-				</label>
+				<div class="task-schedule"><ScheduleFields /></div>
 				<button type="submit" disabled={pendingAction !== ''}>
 					<Plus size={16} />
 					{pendingAction === 'add-task' ? '添加中…' : '添加节点'}
@@ -482,12 +479,14 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	}
 	.task-item {
 		display: grid;
-		grid-template-columns: auto minmax(12rem, 1.4fr) repeat(3, minmax(8.5rem, 0.7fr));
+		grid-template-columns: auto minmax(12rem, 1.4fr) repeat(2, minmax(8.5rem, 0.7fr));
 		align-items: end;
 		gap: 0.75rem;
 		padding: 0.875rem 1rem;
 		border-bottom: 1px solid var(--line);
 	}
+	.task-schedule { grid-column: 2 / -1; }
+	.add-task .task-schedule { grid-column: 1 / -1; }
 	.task-index {
 		display: grid;
 		width: 2rem;
@@ -579,7 +578,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	}
 	.add-task {
 		display: grid;
-		grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 0.6fr) minmax(9rem, 0.6fr) auto;
+		grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 0.6fr);
 		align-items: end;
 		gap: 0.75rem;
 		padding: 1rem;
@@ -668,7 +667,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			grid-template-columns: 1fr;
 		}
 		.task-item {
-			grid-template-columns: auto minmax(11rem, 1fr) repeat(3, minmax(8rem, 0.7fr));
+			grid-template-columns: auto minmax(11rem, 1fr) repeat(2, minmax(8rem, 0.7fr));
 			overflow-x: auto;
 		}
 	}
@@ -680,6 +679,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		.add-task {
 			grid-template-columns: 1fr;
 		}
+		.task-schedule { grid-column: 1 / -1; }
 		.task-index {
 			display: none;
 		}

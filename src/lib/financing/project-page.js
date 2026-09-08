@@ -40,8 +40,9 @@ export function buildProjectPageData(sources, today) {
 		const progress = tasks.length
 			? Math.round((completed / tasks.length) * 100)
 			: project.status === 'completed' ? 100 : 0;
-		const start = project.plannedStartDate ?? project.plannedIssueDate ?? today;
-		const end = project.plannedIssueDate ?? project.plannedMaturityDate ?? start;
+		const scheduledDates = tasks.flatMap((task) => [task.plannedStartDate, task.dueDate]).filter(Boolean);
+		const start = [project.plannedStartDate, project.plannedIssueDate, ...scheduledDates].filter(Boolean).sort()[0] ?? today;
+		const end = [project.plannedIssueDate, ...scheduledDates].filter(Boolean).sort().at(-1) ?? project.plannedMaturityDate ?? start;
 		const nextTask = tasks.find((task) => task.status !== 'completed');
 		const meta = statusMeta(project.status);
 		const members = [...new Set([project.ownerName, ...tasks.map((task) => task.assigneeName)]
@@ -75,10 +76,14 @@ export function buildProjectPageData(sources, today) {
 			dueText: dueText(nextTask?.dueDate ?? end, today),
 			members: members.length ? members : ['待'],
 			tasks: tasks.map((task) => {
-				const taskStartDate = task.plannedStartDate ?? start;
+				const taskStartDate = task.plannedStartDate ?? task.dueDate;
 				const taskEndDate = task.dueDate ?? taskStartDate;
 				return {
 					name: task.name,
+					scheduleType: task.scheduleType ?? (task.plannedStartDate ? 'period' : 'point'),
+					plannedStartDate: task.plannedStartDate ?? null,
+					dueDate: task.dueDate ?? null,
+					hasSchedule: Boolean(taskStartDate),
 					status: task.status === 'completed' ? 'done' : task.status === 'in_progress' ? 'doing' : 'waiting',
 					startPct: positionInTimeline(taskStartDate, timeline),
 					widthPct: widthInTimeline(taskStartDate, taskEndDate, timeline, 1)

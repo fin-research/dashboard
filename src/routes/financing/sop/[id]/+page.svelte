@@ -16,6 +16,7 @@
 	import { globalMessages } from '$lib/global-messages';
 	import { withBase } from '$lib/financing/app-paths';
 	import { hasSameOrder, reorderByOffset, reorderRelative } from '$lib/financing/reorder-items.js';
+	import ScheduleFields from '$lib/financing/components/ScheduleFields.svelte';
 	import { hasPermission } from '$lib/permissions';
 
 	type SopNode = {
@@ -24,6 +25,7 @@
 		description: string;
 		sortOrder: number;
 		offsetDays: number;
+		startOffsetDays: number | null;
 		ownerRole: string;
 	};
 
@@ -72,6 +74,7 @@
 			description: node.description ?? '',
 			ownerRole: node.ownerRole ?? '',
 			offsetDays: Number(node.offsetDays ?? 0),
+			startOffsetDays: node.startOffsetDays == null ? null : Number(node.startOffsetDays),
 			sortOrder: Number(node.sortOrder ?? 0)
 		};
 	}
@@ -334,19 +337,15 @@
 									<input name="name" maxlength="120" required bind:value={node.name} disabled={!canManage} />
 								</label>
 								<label>
-									<span>相对发行日</span>
-									<div class="offset-input">
-										<input name="offsetDays" type="number" min="-3650" max="3650" step="1" required bind:value={node.offsetDays} disabled={!canManage} />
-										<small>天</small>
-									</div>
-								</label>
-								<label>
 									<span>默认角色</span>
 									<select name="ownerRole" bind:value={node.ownerRole} disabled={!canManage}>
 										<option value="">不指定</option>
 										{#each data.roles as role}<option value={role.code}>{role.label}</option>{/each}
 									</select>
 								</label>
+								<div class="node-schedule">
+									<ScheduleFields relative scheduleType={node.startOffsetDays == null ? 'point' : 'period'} startValue={node.startOffsetDays} endValue={node.offsetDays} label={node.name} disabled={!canManage} />
+								</div>
 								<label class="node-description">
 									<span>节点说明</span>
 									<input name="description" bind:value={node.description} placeholder="可选：说明交付物或控制要求" disabled={!canManage} />
@@ -403,9 +402,11 @@
 			<section class="guidance panel">
 				<h2>相对日期规则</h2>
 				<ul>
-					<li><strong>负数</strong>：计划发行日前，例如 -30 表示提前 30 天。</li>
-					<li><strong>0</strong>：计划发行当日。</li>
-					<li><strong>正数</strong>：计划发行日后，例如 5 表示发行后 5 天。</li>
+					<li><strong>负数</strong>：计划簿记日（T）前，例如 -30 表示提前 30 个自然日。</li>
+					<li><strong>0</strong>：计划簿记当日。</li>
+					<li><strong>正数</strong>：计划簿记日后，例如 5 表示簿记后 5 个自然日。</li>
+					<li><strong>时段</strong>：分别配置启动和完成偏移，例如 T-10 至 T-3；启动不能晚于完成。</li>
+					<li>模板用于新建项目；已有项目可在任务节点中调整起止日期。提醒以完成时点为准。</li>
 				</ul>
 			</section>
 		</aside>
@@ -432,16 +433,13 @@
 					<input bind:this={addNodeNameInput} name="name" maxlength="120" required placeholder="例如：发行结果确认" />
 				</label>
 				<label>
-					<span>相对发行日</span>
-					<input name="offsetDays" type="number" min="-3650" max="3650" step="1" required value="0" />
-				</label>
-				<label>
 					<span>默认角色</span>
 					<select name="ownerRole">
 						<option value="">不指定</option>
 						{#each data.roles as role}<option value={role.code}>{role.label}</option>{/each}
 					</select>
 				</label>
+				<div class="wide"><ScheduleFields relative endValue={0} /></div>
 				<label class="wide">
 					<span>节点说明</span>
 					<input name="description" placeholder="可选：说明交付物或控制要求" />
@@ -481,15 +479,12 @@
 	.drag-handle { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 1px solid #d0d5dd; border-radius: 0.5rem; color: #667085; background: #fff; cursor: grab; touch-action: none; }
 	.drag-handle:active, .drag-handle.grabbed { color: var(--color-primary); background: #eff4ff; cursor: grabbing; }
 	.drag-handle:focus-visible { outline: 0.1875rem solid rgb(59 130 246 / 35%); outline-offset: 0.125rem; }
-	.node-form { display: grid; grid-template-columns: minmax(12rem, 1.3fr) minmax(8rem, 0.55fr) minmax(10rem, 0.75fr); gap: 0.75rem; align-items: end; }
-	.node-description { grid-column: 1 / -1; }
+	.node-form { display: grid; grid-template-columns: minmax(12rem, 1.3fr) minmax(10rem, 0.75fr); gap: 0.75rem; align-items: end; }
+	.node-description, .node-schedule { grid-column: 1 / -1; }
 	label { display: grid; gap: 0.3rem; }
 	label span { font-size: 0.75rem; font-weight: bold; color: var(--muted); }
 	input, select, textarea { width: 100%; min-height: 2.75rem; padding: 0.55rem 0.7rem; border: 1px solid #d0d5dd; border-radius: 0.5rem; font-size: 1rem; color: #344054; background: #fff; }
 	textarea { resize: vertical; }
-	.offset-input { position: relative; }
-	.offset-input input { padding-right: 2.5rem; }
-	.offset-input small { position: absolute; top: 50%; right: 0.75rem; font-size: 0.75rem; color: var(--subtle); transform: translateY(-50%); }
 	button:disabled { cursor: wait; opacity: 0.6; }
 	.delete-form { align-self: end; margin-bottom: 0.1rem; }
 	.delete-form button { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 1px solid #d0d5dd; border-radius: 0.5rem; color: #b42318; background: #fff; }
@@ -501,7 +496,7 @@
 	.sop-detail-page .config-modal { max-height: min(90dvh, 42rem); overflow: auto; }
 	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 	@media (max-width: 75rem) { .editor-grid { grid-template-columns: 1fr; } }
-	@media (max-width: 64rem) { .node-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .node-description { grid-column: 1 / -1; } }
+	@media (max-width: 64rem) { .node-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .node-description, .node-schedule { grid-column: 1 / -1; } }
 	@media (max-width: 51.25rem) { .detail-toolbar { align-items: flex-start; flex-direction: column; } .node-card { grid-template-columns: 2.75rem minmax(0, 1fr); } .node-form { grid-template-columns: 1fr; } .node-description { grid-column: auto; } .delete-form { grid-column: 2; justify-self: end; } }
 	@media (prefers-reduced-motion: reduce) { .node-card { transition: none; } }
 </style>
