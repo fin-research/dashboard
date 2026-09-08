@@ -168,9 +168,9 @@
   }
 
   :where(.financing-scope) .report-history-picker input {
-    width: 6.75rem;
+    width: 8.5rem;
     min-width: 0;
-    padding-right: 1.5rem;
+    padding-right: 2rem;
   }
 
   :where(.financing-scope) .header-action {

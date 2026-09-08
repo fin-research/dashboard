@@ -448,7 +448,7 @@ test('all weekly report tables and quota progress charts size to their available
 	assert.match(css, /\.table-scroll\s*\{[^}]*overflow:\s*visible/);
 	assert.match(css, /\.bento-table\s*\{[\s\S]*table-layout:\s*auto/);
 	assert.match(css, /\.quota-progress\s*\{[^}]*width:\s*clamp\(/);
-	assert.match(css, /\.quota-progress\s*\{[^}]*min-width:\s*8rem/);
+	assert.match(css, /\.quota-progress\s*\{[^}]*min-width:\s*0/);
 	assert.doesNotMatch(css, /overflow-x:\s*auto|min-width:\s*(?:32|47|58|9)rem|table-layout:\s*fixed/);
 });
 

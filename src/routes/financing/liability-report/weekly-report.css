@@ -233,7 +233,7 @@
 :where(.financing-scope) .quota-name { font-weight: bold; }
 :where(.financing-scope) .quota-name i { display: inline-block; width: 0.55rem; height: 0.55rem; margin-right: 0.4rem; border-radius: 0.125rem; vertical-align: middle; background: var(--quota-color); }
 :where(.financing-scope) .negative { color: var(--report-red); font-weight: bold; }
-:where(.financing-scope) .quota-progress { width: clamp(8rem, 14vw, 10.5rem); min-width: 8rem; max-width: 100%; margin: 0 auto; }
+:where(.financing-scope) .quota-progress { width: clamp(3rem, 14vw, 8rem); min-width: 0; max-width: 100%; margin: 0 auto; }
 
 :where(.financing-scope) .chart-container { margin-top: 0.75rem; padding: 0.875rem 1rem 0.65rem; }
 :where(.financing-scope) .chart-container h3 { margin: 0 0 0.5rem; color: var(--report-navy); font-size: 0.875rem; font-weight: bold; text-align: center; }
@@ -301,6 +301,9 @@
 	:where(.financing-scope) .event-table,
 	:where(.financing-scope) .plan-table,
 	:where(.financing-scope) .bento-table { font-size: 0.75rem; }
+	:where(.financing-scope) .quota-table th,
+	:where(.financing-scope) .quota-table td { padding: 0.5rem 0.125rem; }
+	:where(.financing-scope) .quota-table .num { overflow-wrap: normal; word-break: normal; }
 }
 
 @page { size: A4 portrait; margin: 0; }
