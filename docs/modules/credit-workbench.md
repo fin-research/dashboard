@@ -47,7 +47,7 @@ Worker 通过 `HYPERDRIVE` 访问 `credit` schema；本地导入脚本使用直�
 
 ## 客户与融资使用额
 
-- `institution_client` 静态关联一个或多个 `public.client`，不带报告日，作为唯一归属规则表，新增明确名称可自动匹配，合并与分项归属见 [客户关联规范](clients.md)。
+- `institution_client` 静态关联一个或多个 `public.client`，不带报告日，作为唯一归属规则表，新增明确名称可自动匹配，银行自营/资管拆分及合并授信归属见 [客户关联规范](clients.md)。
 - 收益凭证、同业拆借使用额按报告日读取融资存续本金，元转亿元；总已用额始终为六类有效分项之和。管理员增删改分项时数据库同步原始分项合计；导入总数与分项不一致时警告原数、合计和差额，并使用分项合计。
 - 客户未关联显示缺失，不按零计算可用额度。总已用额及上述两项使用额在 API 与页面只读，需修订时维护融资负债。其它分项继续人工维护。
 - 接口在机构返回 `clients`、`importedTotalUsed`，分项返回 `usageSource`、`importedUsedAmount`、`linkedClientCount`；`importedTotalUsed` 表示原始分项合计，`importedUsedAmount` 保留导入融资分项值用于核对。

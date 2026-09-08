@@ -23,13 +23,12 @@ try {
   report.unlinked=(await db.query(`SELECT id::text,debt_type,name,counterparty,amount::float8,
     to_char(issue_date,'YYYY-MM-DD') AS issue_date,to_char(maturity_date,'YYYY-MM-DD') AS maturity_date
     FROM financing.debt WHERE client_id IS NULL ORDER BY debt_type,id`)).rows;
-  report.creditMappings=(await db.query(`SELECT m.institution_name,c.name AS client_name,m.yield_certificate,m.interbank_lending,m.notes
+  report.creditMappings=(await db.query(`SELECT m.institution_name,c.name AS client_name,c.type AS client_type,m.notes
     FROM credit.institution_client m JOIN public.client c ON c.id=m.client_id ORDER BY m.institution_name,c.name`)).rows;
   report.latestOutstanding=(await db.query(`SELECT c.name,c.type,u.debt_type,(u.amount/100000000)::float8 AS amount_yi,u.debt_count::integer,
     m.institution_name FROM financing.credit_usage_as_of((SELECT max(report_date) FROM credit.institution)) u
     LEFT JOIN public.client c ON c.id=u.client_id
     LEFT JOIN credit.institution_client m ON m.client_id=u.client_id
-      AND CASE u.debt_type WHEN '收益凭证' THEN m.yield_certificate ELSE m.interbank_lending END
     ORDER BY c.type,c.name,u.debt_type`)).rows;
   await db.query('COMMIT');
   if(outputPath) fs.writeFileSync(outputPath,JSON.stringify(report,null,2),{mode:0o600});
