@@ -4,6 +4,8 @@
   import AuthMenu from "$lib/AuthMenu.svelte";
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
   import type { WorkbenchIconName } from "../trading-research/demo-data";
+  import "../../app.css";
+  import "../../styles.css";
   import "../../layout-report.css";
   import "../trading-research/workbench.css";
 
