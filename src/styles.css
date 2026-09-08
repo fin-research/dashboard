@@ -632,9 +632,11 @@ h2 {
   flex: 1;
 }
 
-.chart-host > div:not(.chart-tooltip),
-.chart-host > div:not(.chart-tooltip) > svg,
-.chart-host > div:not(.chart-tooltip) > canvas {
+/* Only the drawing surface fills the host. ECharts also adds a tooltip div,
+   which must not become a second full-height block before the first hover. */
+.chart-host > div:has(> svg, > canvas),
+.chart-host > div > svg,
+.chart-host > div > canvas {
   width: 100% !important;
   height: 100% !important;
 }

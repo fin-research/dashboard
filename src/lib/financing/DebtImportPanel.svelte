@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ModuleCard from "../../components/ModuleCard.svelte";
+	import PanelHeading from "../trading-research/PanelHeading.svelte";
 import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	import { onMount } from 'svelte';
 	import {
@@ -318,27 +320,23 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	});
 </script>
 
-<section class="section-card import-card" aria-labelledby="debt-import-title">
-	<div class="card-header">
-		<div class="header-icon blue"><FileSpreadsheet size={20} /></div>
-		<div>
-			<h2 id="debt-import-title">在线导入借入资金汇总表</h2>
-			<p>浏览器内解析并压缩，原始 Excel 不上传；仅加入增量，历史记录由管理员手动维护。</p>
-		</div>
+<ModuleCard class="section-card import-card" labelledBy="debt-import-title">
+	<PanelHeading id="debt-import-title" title="在线导入借入资金汇总表" controlsInline>
 		<div class="header-actions">
-			<label class="secondary-action file-picker" class:disabled={Boolean(activeRun) || uploading}>
+			<label class="btn file-picker" class:disabled={Boolean(activeRun) || uploading}>
 				<FileSpreadsheet size={18} />
 				<span>选择文件</span>
-				<input class="file-input" id="debt-import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange={chooseFile} disabled={Boolean(activeRun) || uploading} />
+				<input class="file-input" aria-label="选择借入资金汇总表" id="debt-import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange={chooseFile} disabled={Boolean(activeRun) || uploading} />
 			</label>
 			<button class="btn btn-primary primary-action" type="button" onclick={() => void uploadWorkbook()} disabled={!selectedFile || Boolean(activeRun) || uploading}>
 				{#if uploading}<LoaderCircle class="spin" size={18} />{:else}<UploadCloud size={18} />{/if}
 				上传并导入
 			</button>
 		</div>
-	</div>
+	</PanelHeading>
 
 	<div class="import-body">
+		<p class="import-help">原始 Excel 不上传；仅加入增量，历史记录由管理员手动维护。</p>
 		{#if selectedFile && !activeRun}
 			<div class="selected-file" aria-live="polite">
 				<FileSpreadsheet size={18} />
@@ -400,14 +398,16 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<div class="empty-import"><FileSpreadsheet size={20} /> 请选择待导入的借入资金汇总表</div>
 		{/if}
 	</div>
-</section>
+</ModuleCard>
 
 <style>
-	.import-card { margin-bottom: 1rem; }
+	:global(.import-card) { margin-bottom: 1rem; }
 	.file-picker { position: relative; cursor: pointer; }
 	.file-picker.disabled { cursor: not-allowed; opacity: .55; }
-	.file-picker input { position: absolute; inset: 0; }
-	.import-body { display: grid; gap: .75rem; padding: 0 1.125rem 1.125rem; border-top: 1px solid var(--line); }
+	.file-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+	.file-picker:focus-within { outline: 3px solid var(--brand-soft); outline-offset: 2px; }
+	.import-help { margin: 1rem 0 0; color: var(--muted); font-size: .875rem; }
+	.import-body { display: grid; gap: .75rem; padding: 0; border-top: 1px solid var(--line); }
 	.selected-file { display: flex; min-width: 0; align-items: center; gap: .5rem; margin-top: 1rem; padding: .75rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--blue-soft); }
 	.selected-file strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.selected-file span { margin-left: auto; color: var(--muted); white-space: nowrap; }
@@ -418,7 +418,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	.run-heading > div { display: grid; min-width: 0; }
 	.run-heading strong { overflow-wrap: anywhere; }
 	.run-heading span, .progress-copy span { color: var(--muted); }
-	.run-status { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .375rem; font-weight: 700; color: var(--blue) !important; }
+	.run-status { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .375rem; font-weight: bold; color: var(--blue) !important; }
 	.complete .run-status { color: var(--teal) !important; }
 	.failed .run-status { color: var(--red) !important; }
 	progress { width: 100%; height: .625rem; overflow: hidden; border: 0; border-radius: 999rem; accent-color: var(--blue); }
@@ -429,8 +429,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	.stage-list li { display: flex; min-width: 0; align-items: center; gap: .375rem; color: var(--subtle); font-size: .75rem; }
 	.stage-list li span { display: grid; flex: 0 0 auto; place-items: center; }
 	.stage-list li.done { color: var(--teal); }
-	.stage-list li.active { color: var(--blue); font-weight: 700; }
-	.stage-list li.failed { color: var(--red); font-weight: 700; }
+	.stage-list li.active { color: var(--blue); font-weight: bold; }
+	.stage-list li.failed { color: var(--red); font-weight: bold; }
 	.run-error { margin: 0; padding: .75rem; border-radius: .5rem; color: var(--red); background: color-mix(in srgb, var(--red) 7%, var(--surface)); }
 	.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; padding-top: .75rem; border-top: 1px solid var(--line); }
 	.summary-grid div { display: grid; gap: .1875rem; padding: .625rem; border-radius: .5rem; background: var(--canvas); }

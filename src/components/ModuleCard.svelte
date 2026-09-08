@@ -6,18 +6,21 @@
     class: className = "",
     style = "",
     variant = "default",
+    padding = "default",
     children,
   }: {
     labelledBy?: string;
     class?: string;
     style?: string;
     variant?: "default" | "report";
+    padding?: "default" | "none";
     children: Snippet;
   } = $props();
 </script>
 
 <section
   class:module-card--report={variant === "report"}
+  class:module-card--flush={padding === "none"}
   class={`card card-border bg-base-100 module-card tr-panel ${className}`.trim()}
   aria-labelledby={labelledBy}
   {style}
@@ -57,5 +60,9 @@
     .module-card--report {
       padding: 0;
     }
+  }
+
+  .module-card--flush {
+    padding: 0;
   }
 </style>

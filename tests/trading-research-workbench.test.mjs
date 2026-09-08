@@ -343,7 +343,7 @@ test("工作台使用抽屉 path 导航、复用页面组件且不展示实现�
   assert.match(shell, /aria-controls="tr-workbench-drawer"/);
   assert.match(shell, /class="btn btn-ghost btn-square tr-sidebar-toggle"[\s\S]*?<WorkbenchIcon name="sidebar"/);
   assert.match(shell, /class="tr-portal-link" href="\/"[\s\S]*?东方财富证券 · 资金管理部/);
-  assert.match(shell, /class="tr-breadcrumb"[\s\S]*?homeHref[\s\S]*?activeView\?\.label/);
+  assert.match(shell, /class="tr-breadcrumb"[\s\S]*?homeHref[\s\S]*?currentLabel/);
   assert.match(page, /title="交易研究工作台"/);
   assert.doesNotMatch(shell, /tr-brand|tr-back-link|tr-drawer__collapse/);
   assert.match(page, /href: workbenchViewPath\(view\.id\)/);

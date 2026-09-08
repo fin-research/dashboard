@@ -19,21 +19,36 @@
   let desktopCollapsed = $state(false);
   let mobileDrawerOpen = $state(false);
   let mainRegion: HTMLElement;
+  let workspaceRegion: HTMLElement;
+  let keyboardNavigation = false;
+  let topbarHeight = $state(72);
+  function measureTopbar(element: HTMLElement) {
+    const resize = () => (topbarHeight = Math.ceil(element.getBoundingClientRect().height));
+    const observer = new ResizeObserver(resize);
+    observer.observe(element);
+    resize();
+    return { destroy: () => observer.disconnect() };
+  }
   const activeView = $derived(views.find(view => view.id === activeViewId) ?? { label: activeLabel });
+  const currentLabel = $derived(activeLabel || activeView.label);
 
-  afterNavigate(() => {
+  afterNavigate(({ from, to, type }) => {
     mobileDrawerOpen = false;
-    requestAnimationFrame(() => mainRegion?.focus({ preventScroll: true }));
+    if (type !== "popstate" && from?.url.pathname !== to?.url.pathname) {
+      workspaceRegion?.scrollTo({ top: 0, left: 0 });
+    }
+    if (keyboardNavigation) requestAnimationFrame(() => mainRegion?.focus({ preventScroll: true }));
   });
   function toggleDesktopSidebar() { desktopCollapsed = !desktopCollapsed; }
   function toggleMobileDrawer() { mobileDrawerOpen = !mobileDrawerOpen; }
   function handleWindowKeydown(event: KeyboardEvent) {
+    if (event.key === "Tab" || event.key === "Enter") keyboardNavigation = true;
     if (event.key === "Escape") mobileDrawerOpen = false;
   }
 </script>
 
 <svelte:head>
-  <title>{activeView?.label} · {title}</title>
+  <title>{currentLabel} · {title}</title>
   <meta
     name="description"
     content={`${title}业务模块`}
@@ -41,16 +56,17 @@
   <meta name="theme-color" content="#f6f8fb" />
 </svelte:head>
 
-<svelte:window onkeydown={handleWindowKeydown} />
+<svelte:window onkeydown={handleWindowKeydown} onpointerdown={() => (keyboardNavigation = false)} />
 
 <div
   class:tr-shell--collapsed={desktopCollapsed}
   class:tr-shell--mobile-open={mobileDrawerOpen}
   class={`tr-workbench tr-shell ${className}`}
+  style:--tr-topbar-height={`${topbarHeight}px`}
 >
   <a class="tr-skip-link" href="#tr-workbench-main">跳至工作台内容</a>
 
-  <header class="navbar tr-topbar">
+  <header class="navbar tr-topbar" use:measureTopbar>
     <div class="tr-topbar__title">
       <button
         class="btn btn-ghost btn-square tr-sidebar-toggle"
@@ -80,7 +96,7 @@
           <ol>
             <li><a href={homeHref}>{title}</a></li>
             <li class="tr-breadcrumb__separator" aria-hidden="true">/</li>
-            <li aria-current="page"><h1>{activeView?.label}</h1></li>
+            <li aria-current="page"><h1>{currentLabel}</h1></li>
           </ol>
         </nav>
       </div>
@@ -118,7 +134,7 @@
     onclick={() => (mobileDrawerOpen = false)}
   ></button>
 
-  <section class="tr-workspace">
+  <section class="tr-workspace" bind:this={workspaceRegion}>
     {#if status}{@render status()}{/if}
     <main
       id="tr-workbench-main"

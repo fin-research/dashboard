@@ -184,6 +184,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	<span class={`project-state ${data.project.status}`}>{statusLabels[data.project.status] ?? data.project.status}</span>
 </div>
 
+<div class="financing-detail-heading"><h2>{data.project.name}</h2></div>
+
 <section class="summary-grid" aria-label="项目概览">
 	<article>
 		<span><ClipboardList size={18} /> 项目进度</span>

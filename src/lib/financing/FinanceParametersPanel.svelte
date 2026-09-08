@@ -1,6 +1,8 @@
 <script lang="ts">
+	import ModuleCard from "../../components/ModuleCard.svelte";
+	import PanelHeading from "../trading-research/PanelHeading.svelte";
 	import { onMount } from 'svelte';
-	import { Landmark, LoaderCircle, Pencil, Plus, RefreshCw, X } from '@lucide/svelte';
+	import { LoaderCircle, Pencil, Plus, RefreshCw, X } from '@lucide/svelte';
 	import type { DataRow } from './data-admin';
 	import { FINANCE_PARAMETER_CONFIG, FINANCIAL_INPUT_FIELDS, FINANCIAL_RATIO_FIELDS, financeParameterPayload, financialReconciliation, financialValue } from './finance-parameters';
 	import { NeonDataApi } from './neon-data-api';
@@ -91,13 +93,12 @@
 	}
 </script>
 
-<section class="section-card parameter-panel" aria-label="月度财务数据" aria-busy={loading}>
-	<header class="card-header">
-		<div class="header-icon blue"><Landmark size={21} /></div>
-		<h2>月度财务数据</h2>
+<ModuleCard class="section-card parameter-panel" labelledBy="finance-parameters-title">
+<div aria-busy={loading}>
+	<PanelHeading id="finance-parameters-title" title="月度财务数据" controlsInline>
 		<button class="btn secondary-action" type="button" onclick={() => void loadRows()} disabled={loading || saving} aria-label="刷新财务数据"><RefreshCw size={17} class={loading ? 'spin' : ''} />刷新</button>
-	</header>
-	<p class="parameter-help">每月独立保存，可补录和修订历史月份。金额单位为亿元，资产负债率自动计算。</p>
+		<span class="parameter-unit">单位：亿元</span>
+	</PanelHeading>
 	<p class="save-notice" aria-live="polite">{notice}</p>
 	{#if loading}
 		<p class="empty-state"><LoaderCircle size={18} class="spin" /> 正在读取财务数据…</p>
@@ -128,7 +129,8 @@
 			{#if selected.notes}<p class="parameter-notes">{String(selected.notes)}</p>{/if}
 		{/if}
 	{/if}
-</section>
+</div>
+</ModuleCard>
 
 {#if !loading && !loadError}
 	{#if canCreate}<button class="btn btn-primary floating-create-button" type="button" aria-label="新增月份" title="新增月份" onclick={() => openEditor()}><Plus size={24} /></button>{/if}
@@ -154,27 +156,27 @@
 			{#if preview.difference != null && Math.abs(preview.difference) > 0.00015}<p class="mismatch">勾稽差额：{financialValue(preview.difference)}，请核对证券净资产与资产负债的主体和口径。</p>{/if}
 		</div>
 		{#if saveError}<p class="error-message" role="alert">{saveError}。输入已保留；如有并发冲突，请取消后刷新。</p>{/if}
-		<div class="modal-actions"><button class="btn" type="button" onclick={() => dialog.close()} disabled={saving}>取消</button><button class="btn secondary-action" type="submit" disabled={saving}>{#if saving}<LoaderCircle size={17} class="spin" />{/if}{saving ? '保存中…' : '保存'}</button></div>
+		<div class="modal-actions"><button class="btn" type="button" onclick={() => dialog.close()} disabled={saving}>取消</button><button class="btn btn-primary" type="submit" disabled={saving}>{#if saving}<LoaderCircle size={17} class="spin" />{/if}{saving ? '保存中…' : '保存'}</button></div>
 	</form>
 </div>
 </dialog>
 
 <style>
-	.parameter-panel { min-width: 0; }
-	.parameter-help { margin: 0; padding: 0 1.125rem 1rem; color: var(--muted); font-size: .875rem; }
+	.parameter-unit { color: var(--muted); font-size: .875rem; }
 	.save-notice { margin: 0; padding-inline: 1.125rem; color: var(--teal); }
 	.save-notice:not(:empty) { padding-bottom: 1rem; }
-	.month-toolbar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; padding: 0 1.125rem 1rem; }
-	.month-toolbar label { display: flex; align-items: center; gap: .5rem; }
-	.month-toolbar select { padding-inline: .75rem; }
+	.month-toolbar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; padding: 0 0 1rem; }
+	.month-toolbar label { display: flex; flex: 0 0 auto; align-items: center; gap: .5rem; }
+	.month-toolbar label span { white-space: nowrap; font-size: .875rem; color: var(--muted); }
+	.month-toolbar select { width: 9rem; padding-inline: .75rem; }
 	.history-count { margin-right: auto; color: var(--muted); font-size: .875rem; }
-	.parameter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; padding: 0 1.125rem 1.125rem; }
+	.parameter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; padding: 0; }
 	.parameter-card { min-width: 0; padding: .875rem; border: 1px solid var(--line); border-radius: .5rem; overflow-wrap: anywhere; }
-	h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin: 0; font-size: 1rem; font-weight: 650; }
-	h3 span { font-size: .75rem; color: var(--muted); font-weight: 400; }
-	.parameter-value { margin: .75rem 0 0; font-size: clamp(1.125rem, 1.6vw, 1.5rem); font-weight: 650; font-variant-numeric: tabular-nums; }
+	h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin: 0; font-size: 1rem; font-weight: bold; }
+	h3 span { font-size: .75rem; color: var(--muted); font-weight: normal; }
+	.parameter-value { margin: .75rem 0 0; font-size: clamp(1.125rem, 1.6vw, 1.5rem); font-weight: bold; font-variant-numeric: tabular-nums; }
 	.computed { background: var(--canvas); }
-	.parameter-notes, .reconciliation { margin: 0; padding: 0 1.125rem 1rem; font-size: .875rem; overflow-wrap: anywhere; }
+	.parameter-notes, .reconciliation { margin: 0; padding: 0 0 1rem; font-size: .875rem; overflow-wrap: anywhere; }
 	.parameter-notes { color: var(--muted); white-space: pre-wrap; }
 	.reconciliation { color: var(--teal); }
 	.mismatch { color: var(--red); }

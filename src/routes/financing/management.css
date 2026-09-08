@@ -27,9 +27,9 @@
 }
 
 :where(.financing-scope) .management-page .link-button {
-	min-height: 2.25rem;
+	min-height: 2.75rem;
 	padding-inline: 0.625rem;
-	font-size: 0.75rem;
+	font-size: 0.875rem;
 	color: #175cd3;
 }
 
@@ -62,7 +62,7 @@
 
 :where(.financing-scope) .management-page .card-header p {
 	margin: 0.1875rem 0 0;
-	font-size: 0.75rem;
+	font-size: 0.875rem;
 	color: #667085;
 }
 
@@ -106,7 +106,7 @@
 	gap: 0.25rem;
 	padding: 0.1875rem 0.4375rem;
 	border-radius: 999rem;
-	font-size: 0.75rem;
+	font-size: 0.875rem;
 	font-weight: bold;
 	color: #067647;
 	background: #ecfdf3;
@@ -125,7 +125,7 @@
 }
 
 :where(.financing-scope) .management-page .config-modal {
-	width: min(92vw, 36rem);
+	width: min(100%, 36rem);
 	padding: 0;
 }
 
@@ -149,7 +149,7 @@
 
 :where(.financing-scope) .management-page .modal-header p:not(.eyebrow) {
 	margin: 0.3125rem 0 0;
-	font-size: 0.75rem;
+	font-size: 0.875rem;
 	color: #667085;
 }
 
@@ -162,7 +162,7 @@
 
 :where(.financing-scope) .management-page .form-grid {
 	display: grid;
-	grid-template-columns: 1fr 1fr;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 0.8125rem;
 	padding: 1.0625rem 0;
 }
@@ -172,12 +172,12 @@
 	gap: 0.3125rem;
 }
 
-:where(.financing-scope) .management-page .form-grid label.wide {
+:where(.financing-scope) .management-page .form-grid .wide {
 	grid-column: 1 / -1;
 }
 
 :where(.financing-scope) .management-page .form-grid label span {
-	font-size: 0.75rem;
+	font-size: 0.875rem;
 	font-weight: bold;
 	color: #475467;
 }
@@ -219,7 +219,7 @@
 		grid-template-columns: 1fr;
 	}
 
-	:where(.financing-scope) .management-page .form-grid label.wide {
+	:where(.financing-scope) .management-page .form-grid .wide {
 		grid-column: auto;
 	}
 }

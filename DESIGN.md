@@ -80,6 +80,8 @@
 
 融资工作台和管理中心复用 `WorkbenchShell`；指标使用 `MetricCard`，模块容器使用 `ModuleCard`，标题使用 `PanelHeading`，图表通过 `ChartHost` 共用 registry，全站只挂载一个 `GlobalMessages`。融资页面的业务 CSS 限定 `.financing-scope` 并映射全局令牌，不再维护独立 Tailwind/daisyUI 主题或全局 html/body 规则。六页负债周报保留专用报告版式。
 
+融资待办使用顶栏“查看提醒”下拉面板，不占用正文高度；窄屏保留个人入口、提醒和周报操作，抽屉顶部跟随顶栏实际高度。项目和 SOP 详情在正文展示实体名称。含贴边表格或时间轴的模块使用 `ModuleCard padding="none"`；项目汇总类使用业务前缀，防止市场报告的网格规则泄漏到融资页面。
+
 公共交互统一为可访问 label、44px 控件、保留失败输入、模态框内滚动、危险操作确认与减少动效支持。融资项目/SOP 普通字段共用 650ms 防抖串行保存；这属于模块行为，细则由对应模块文档维护。页面特殊布局、字段顺序和图表口径见 [模块索引](docs/INDEX.md)。
 
 ## daisyUI 基础组件

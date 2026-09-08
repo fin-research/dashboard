@@ -287,6 +287,8 @@
 		{/if}
 	</div>
 
+<div class="financing-detail-heading"><h2>{template.name}</h2></div>
+
 	<p class="sr-only" aria-live="assertive">{reorderAnnouncement}</p>
 	<form method="post" action="?/reorderNodes" use:enhance={enhanceForm('reorder', { rollbackOrderOnFailure: true })} bind:this={reorderForm} class="reorder-form">
 		<input type="hidden" name="orderedNodeIds" value={currentOrder().join(',')} />

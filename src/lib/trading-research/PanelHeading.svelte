@@ -67,6 +67,8 @@
     font-size: 1.125rem;
     font-weight: bold;
     line-height: 1.3;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .tr-panel-heading__controls {
@@ -115,6 +117,8 @@
   }
 
   @media (max-width: 720px) {
+    .tr-panel-heading--controls-inline { grid-template-columns: minmax(0, 1fr); }
+    .tr-panel-heading--controls-inline .tr-panel-heading__controls { justify-content: flex-start; }
     .tr-panel-heading__controls {
       flex-wrap: wrap;
     }

@@ -103,19 +103,19 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<option value="failed">失败</option>
 		</select>
 	</label>
-	<label class="query-field">
+	<div class="query-field">
 		<span>关键词</span>
-		<div>
+		<label class="input query-input">
 			<Search size={16} />
-			<input class="input"
+			<input aria-label="提醒关键词"
 				name="query"
 				value={data.filters.query}
 				placeholder="规则、目标、邮箱或失败原因"
 			/>
-		</div>
-	</label>
-	<button class="btn" type="submit">查询</button>
-	<a href={withBase('/sop/reminders')}>清除</a>
+		</label>
+	</div>
+	<button class="btn btn-primary" type="submit">查询</button>
+	<a class="btn btn-ghost" href={withBase('/sop/reminders')}>清除</a>
 </form>
 
 <section class="history-panel">
@@ -261,19 +261,19 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		background: #fff;
 	}
 
-	.filter-bar label {
+	.filter-bar label, .query-field {
 		display: grid;
 		gap: 0.375rem;
 	}
 
-	.filter-bar label > span {
+	.filter-bar label > span, .query-field > span {
 		font-size: 0.75rem;
 		font-weight: bold;
 		color: #475467;
 	}
 
 	.filter-bar select,
-	.query-field > div,
+	.query-input,
 	.filter-bar button,
 	.filter-bar > a {
 		min-height: 2.75rem;
@@ -292,7 +292,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		flex: 1;
 	}
 
-	.query-field > div {
+	.filter-bar .query-input {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;

@@ -1882,7 +1882,7 @@ body:has(.tr-workbench) {
 
   .tr-drawer {
     position: fixed;
-    top: 72px;
+    top: var(--tr-topbar-height, 72px);
     bottom: 0;
     left: 0;
     height: auto;
@@ -1901,7 +1901,7 @@ body:has(.tr-workbench) {
   }
 
   .tr-drawer-backdrop {
-    inset: 72px 0 0;
+    inset: var(--tr-topbar-height, 72px) 0 0;
   }
 
   .tr-sidebar-toggle {

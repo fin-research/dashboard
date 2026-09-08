@@ -22,6 +22,7 @@
 		aria: { enabled: true, decal: { show: false } },
 		color: colors,
 		tooltip: {
+			confine: true,
 			trigger: 'axis',
 			formatter: (params: any) => formatTooltip(params)
 		},
@@ -38,13 +39,13 @@
 		},
 		yAxis: [
 			{
-				type: 'value', name: '%', scale: true,
-				nameTextStyle: { color: '#64748b' }, axisLabel: { color: '#64748b', formatter: '{value}%' },
+				type: 'value', name: '%', scale: true, minInterval: 0.01,
+				nameTextStyle: { color: '#64748b' }, axisLabel: { color: '#64748b', formatter: (value: number) => `${Number(value.toFixed(2))}%` },
 				splitLine: { lineStyle: { color: '#e8edf3' } }
 			},
 			...(hasBasisPoints ? [{
-				type: 'value', name: 'bp', scale: true,
-				nameTextStyle: { color: '#64748b' }, axisLabel: { color: '#64748b', formatter: '{value}bp' },
+				type: 'value', name: 'bp', scale: true, minInterval: 0.1,
+				nameTextStyle: { color: '#64748b' }, axisLabel: { color: '#64748b', formatter: (value: number) => `${Number(value.toFixed(1))}bp` },
 				splitLine: { show: false }
 			}] : [])
 		],

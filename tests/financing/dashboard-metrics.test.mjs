@@ -145,6 +145,6 @@ test('dashboard metric cards keep an isolated two-row, three-column layout', asy
 	assert.match(page, /<section class="financing-metric-grid" aria-label="融资指标">/);
 	assert.match(page, /<MetricCard label=\{metric\.label\}/);
 	assert.doesNotMatch(page, /financing-metric-card/);
-	assert.match(styles, /\.financing-metric-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);[\s\S]*?grid-auto-rows:\s*minmax\(9rem,\s*auto\);/);
+	assert.match(styles, /\.financing-metric-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);[\s\S]*?grid-auto-rows:\s*minmax\(10rem,\s*auto\);/);
 	assert.doesNotMatch(page, /class="metric-grid"|class={`metric-card/);
 });

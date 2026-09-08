@@ -595,6 +595,12 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	@media (max-width: 51.25rem) {
+    .sop-item { grid-template-columns: 2.5rem minmax(0, 1fr) auto; align-items: start; gap: .75rem; padding: 1rem 0; }
+    .sop-copy { display: contents; }
+    .sop-copy p, .sop-meta { grid-column: 1 / -1; }
+    .sop-copy > div:first-child { flex-wrap: wrap; }
+    .sop-item > :global(svg) { grid-column: 3; grid-row: 1; }
+
 		.rule-fieldset {
 			grid-column: auto;
 		}

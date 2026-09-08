@@ -8,6 +8,7 @@
 	} from '@lucide/svelte';
 	import DebtPresetFilter from '$lib/financing/DebtPresetFilter.svelte';
 	import './dashboard.css';
+import { financingCalendarDates } from '$lib/financing/calendar';
 import MetricCard from '../../components/MetricCard.svelte';
 import ModuleCard from '../../components/ModuleCard.svelte';
 import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
@@ -101,22 +102,22 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 	]);
 	const regulatoryItems = $derived([
 		{
-			label: '1年以内短期负债占净资本', value: ratioText(dashboard.metrics.shortDebtRatio),
+			label: '1年以内短期负债占净资本', shortLabel: '短期负债 / 净资本', value: ratioText(dashboard.metrics.shortDebtRatio),
 			tone: ratioTone(dashboard.metrics.shortDebtRatio, 100),
 			limit: '100%', detailLabel: '短期负债', detailValue: `${dashboard.metrics.shortDebtYi.toFixed(2)}亿元`
 		},
 		{
-			label: '新增单笔借款较证券上年末净资产', value: ratioText(dashboard.metrics.largestBorrowingRatio),
+			label: '新增单笔借款较证券上年末净资产', shortLabel: '新增单笔 / 证券净资产', value: ratioText(dashboard.metrics.largestBorrowingRatio),
 			tone: ratioTone(dashboard.metrics.largestBorrowingRatio, 20),
 			limit: '20%', detailLabel: '最大单笔', detailValue: `${dashboard.metrics.largestBorrowingYi.toFixed(2)}亿元`
 		},
 		{
-			label: '累计新增借款较证券上年末净资产', value: ratioText(dashboard.metrics.cumulativeSecuritiesRatio),
+			label: '累计新增借款较证券上年末净资产', shortLabel: '累计新增 / 证券净资产', value: ratioText(dashboard.metrics.cumulativeSecuritiesRatio),
 			tone: ratioTone(dashboard.metrics.cumulativeSecuritiesRatio, 50),
 			limit: '50%', detailLabel: '净新增', detailValue: `${dashboard.metrics.cumulativeBorrowingYi > 0 ? '+' : ''}${dashboard.metrics.cumulativeBorrowingYi.toFixed(2)}亿元`
 		},
 		{
-			label: '累计新增借款较集团上年末净资产', value: ratioText(dashboard.metrics.cumulativeGroupRatio),
+			label: '累计新增借款较集团上年末净资产', shortLabel: '累计新增 / 集团净资产', value: ratioText(dashboard.metrics.cumulativeGroupRatio),
 			tone: ratioTone(dashboard.metrics.cumulativeGroupRatio, 10),
 			limit: '10%', detailLabel: '净新增', detailValue: `${dashboard.metrics.cumulativeBorrowingYi > 0 ? '+' : ''}${dashboard.metrics.cumulativeBorrowingYi.toFixed(2)}亿元`
 		}
@@ -143,18 +144,13 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 	let calendarExpanded = $state(false);
 	const visibleEvents = $derived(dashboard.events.filter((event: any) => calendarTypes.length === 0 || calendarTypes.includes(event.filterType)));
 	const cellsPerWeek = $derived(calendarExpanded ? 7 : 5);
-	const calendarStart = $derived.by(() => {
-		const firstDate = new Date(`${dashboard.calendarMonth}-01T00:00:00Z`);
-		const startOffset = firstDate.getUTCDay();
-		firstDate.setUTCDate(firstDate.getUTCDate() - startOffset);
-		if (!calendarExpanded) firstDate.setUTCDate(firstDate.getUTCDate() + 1);
-		return firstDate;
-	});
-	const calendarCells = $derived(Array.from({ length: 6 * cellsPerWeek }, (_, index) => {
-		const date = new Date(calendarStart); date.setUTCDate(date.getUTCDate() + index);
-		const key = date.toISOString().slice(0, 10);
-		return { date: key, day: date.getUTCDate(), other: key.slice(0, 7) !== dashboard.calendarMonth, today: key === dashboard.today, events: visibleEvents.filter((event: any) => event.date === key) };
-	}));
+	const calendarCells = $derived(financingCalendarDates(dashboard.calendarMonth, calendarExpanded).map((key) => ({
+    date: key,
+    day: Number(key.slice(-2)),
+    other: key.slice(0, 7) !== dashboard.calendarMonth,
+    today: key === dashboard.today,
+    events: visibleEvents.filter((event: any) => event.date === key)
+  })));
 	const calendarWeekdays = $derived(calendarExpanded ? ['日', '一', '二', '三', '四', '五', '六'] : ['一', '二', '三', '四', '五']);
 	const calendarSummaryDefinitions = [
 		{ label: '公司债券', types: ['小公募', '私募债', '科创债'] },
@@ -204,12 +200,11 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 			{#each regulatoryItems as item}
 				<div class="regulatory-cell">
 					<div class="regulatory-title">
-						<span>{item.label}</span>
+						<span title={item.label}>{item.shortLabel}</span>
 						<span class={`financing-status-light ${item.tone}`} role="img" aria-label={toneLabel(item.tone)} title={toneLabel(item.tone)}></span>
 					</div>
-					<strong class:financing-muted-value={item.value === '待配置'}>{item.value}</strong>
+					<div class="regulatory-value-row"><strong class:financing-muted-value={item.value === '待配置'}>{item.value}</strong><span>上限 {item.limit}</span></div>
 					<div class="regulatory-details">
-						<span>上限 <b class={item.tone}>{item.limit}</b></span>
 						<span>{item.detailLabel} <b class={item.tone}>{item.detailValue}</b></span>
 					</div>
 				</div>
@@ -221,12 +216,12 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 <section class="overview-row">
 	<ModuleCard class="financing-panel structure-panel">
 		<PanelHeading id="financing-panel-1" title="存量负债结构" controlsInline><span>{compositionTotal.toFixed(2)}亿元</span></PanelHeading>
-    <ChartHost option={financingCompositionOption(dashboard.composition)} ariaLabel={`存量负债结构，合计 ${compositionTotal.toFixed(2)}亿元`} height={19} />
+    <ChartHost option={financingCompositionOption(dashboard.composition)} ariaLabel={`存量负债结构，合计 ${compositionTotal.toFixed(2)}亿元`} height={17} />
 	</ModuleCard>
 
 	<ModuleCard class="financing-panel maturity-panel">
 		<PanelHeading id="financing-panel-2" title="到期分布" controlsInline><span>未来 6 个月 · 亿元</span></PanelHeading>
-    <ChartHost option={financingMaturityOption(dashboard.maturityDistribution)} ariaLabel="未来六个月到期本金分布，单位亿元" height={19} />
+    <ChartHost option={financingMaturityOption(dashboard.maturityDistribution)} ariaLabel="未来六个月到期本金分布，单位亿元" height={17} />
 	</ModuleCard>
 </section>
 
@@ -271,10 +266,9 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 	</ModuleCard>
 
 	<ModuleCard class="financing-panel calendar-card">
-		<header>
-			<h2>融资日历</h2>
+		<PanelHeading id="financing-calendar" title={`融资日历 · ${dashboard.calendarMonth}`}>
 			<div class="calendar-filter"><DebtPresetFilter options={dashboard.typeOptions} presets={calendarPresets} bind:preset={calendarPreset} bind:values={calendarTypes} note={`台账截至 ${dashboard.asOfDate}`} compact /></div>
-		</header>
+		</PanelHeading>
 		<div class="calendar-wrap" class:expanded={calendarExpanded}>
 			<div class="calendar-grid" style={`--cols: ${cellsPerWeek}`}>
 				{#each calendarWeekdays as weekday}<div class="weekday">{weekday}</div>{/each}

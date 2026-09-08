@@ -202,7 +202,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	<title>项目进度 · 融资工作台</title>
 </svelte:head>
 
-<section class="summary-strip" aria-label="项目汇总">
+<section class="financing-project-summary" aria-label="项目汇总">
 	<div>
 		<span class="summary-icon blue"><CircleDashed size={17} /></span>
 		<p><strong>{summary.inProgress}</strong><span>进行中</span></p>
@@ -222,10 +222,10 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 </section>
 
 <section class="toolbar" aria-label="甘特图筛选">
-	<div class="search-field">
+	<label class="input search-field">
 		<Search size={15} />
-		<input class="input" aria-label="搜索项目" placeholder="搜索项目名称或编号" />
-	</div>
+		<input aria-label="搜索项目" placeholder="搜索项目名称或编号" />
+	</label>
 	<div class="select-group">
 		<Filter size={14} />
 		<MultiSelectFilter
@@ -248,14 +248,14 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		/>
 	</div>
 	<div class="view-switcher" aria-label="时间视图">
-		<button class="btn" class:btn-active={view === 'month'} type="button" onclick={() => (view = 'month')}>月</button>
-		<button class="btn" class:btn-active={view === 'quarter'} type="button" onclick={() => (view = 'quarter')}
+		<button class="btn btn-ghost" class:btn-active={view === 'month'} type="button" onclick={() => (view = 'month')}>月</button>
+		<button class="btn btn-ghost" class:btn-active={view === 'quarter'} type="button" onclick={() => (view = 'quarter')}
 			>季</button
 		>
 	</div>
 </section>
 
-<ModuleCard class="gantt-panel">
+<ModuleCard class="gantt-panel" padding="none">
 	<div class="gantt-head">
 		<div class="project-column-title">项目 / 负责人</div>
 		<div class="status-column-title">状态</div>
@@ -289,7 +289,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 							<ChevronRight size={15} />
 						{/if}
 					</button>
-					<div>
+					<div class="project-copy">
 						<a href={withBase(`/projects/${project.id}`)}>{project.name}</a>
 						<p>
 							<span>{project.code}</span>
@@ -305,7 +305,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					{#if canManage || canDelete}
 						<div class="project-row-actions">
               {#if canManage}
-							<button class="btn"
+							<button class="btn btn-ghost btn-square"
 								type="button"
 								aria-label={`编辑 ${project.name}`}
 								title="编辑项目"
@@ -326,7 +326,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 								<input type="hidden" name="id" value={project.id} />
 								<button
 									type="submit"
-									class="btn btn-error danger-action"
+									class="btn btn-ghost btn-square danger-action"
 									aria-label={`删除 ${project.name}`}
 									title="删除项目"
 									disabled={actionState.status === 'pending'}
@@ -355,7 +355,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					>
 						<span>{project.progress}%</span>
 					</div>
-					<div class="next-node" style:left={`${Math.min(project.startPct + project.widthPct + 2, 84)}%`}>
+					<div class="next-node" style:left={`${Math.min(project.startPct, 60)}%`}>
 						<i></i>
 						<span>{project.nextNode}</span>
 					</div>
@@ -419,9 +419,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	<form method="post" action="?/createProject" use:enhance={enhanceProjectAction('create', 'create')}>
 		<div class="modal-header">
 			<div>
-				<p class="eyebrow">NEW PROJECT</p>
+
 				<h2>新建融资项目</h2>
-				<p>项目独立建档，不读取、不绑定也不修改现有负债。</p>
+
 			</div>
 			<button class="btn" type="button" aria-label="关闭" onclick={() => newProjectDialog.close()}>×</button>
 		</div>
@@ -498,9 +498,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		<form method="post" action="?/updateProject" use:autoSave use:enhance={enhanceProjectAction('edit')}>
 			<div class="modal-header">
 				<div>
-					<p class="eyebrow">EDIT PROJECT</p>
+
 					<h2>修改融资项目</h2>
-					<p>修改后会自动保存，不再需要逐项确认。</p>
+
 				</div>
 				<button class="btn" type="button" aria-label="关闭" onclick={() => editProjectDialog.close()}>×</button>
 			</div>
@@ -573,7 +573,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		}
 	}
 
-	.summary-strip {
+	.financing-project-summary {
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
 		margin-bottom: 0.75rem;
@@ -583,7 +583,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
 	}
 
-	.summary-strip > div {
+	.financing-project-summary > div {
 		display: flex;
 		align-items: center;
 		gap: 0.6875rem;
@@ -592,7 +592,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		border-right: 1px solid #eaecf0;
 	}
 
-	.summary-strip > div:last-child {
+	.financing-project-summary > div:last-child {
 		border-right: 0;
 	}
 
@@ -625,30 +625,31 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		background: #ecfdf3;
 	}
 
-	.summary-strip p {
+	.financing-project-summary p {
 		display: grid;
 		margin: 0;
 	}
 
-	.summary-strip strong {
-		font-family: 'SFMono-Regular', Consolas, monospace;
+	.financing-project-summary strong {
+		font-variant-numeric: tabular-nums;
 		font-size: 1.25rem;
 		line-height: 1.1;
 		color: #101828;
 	}
 
-	.summary-strip p span {
+	.financing-project-summary p span {
 		margin-top: 0.1875rem;
 		font-size: 0.75rem;
-		color: #98a2b3;
+		color: var(--muted);
 	}
 
 	.toolbar {
 		display: flex;
 		min-height: 3.375rem;
 		align-items: center;
-		gap: 0.625rem;
-		margin-bottom: 0.75rem;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		margin-bottom: 1rem;
 		padding: 0.5625rem 0.75rem;
 		border: 1px solid var(--border-color);
 		border-radius: 0.625rem;
@@ -657,14 +658,13 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.search-field {
 		display: flex;
-		height: 2.125rem;
+		min-height: 2.75rem;
 		width: 15rem;
+		flex: 1 1 14rem;
 		align-items: center;
 		gap: 0.4375rem;
 		padding: 0 0.625rem;
-		border: 1px solid #d0d5dd;
-		border-radius: 0.4375rem;
-		color: #98a2b3;
+		color: var(--muted);
 	}
 
 	.search-field input {
@@ -674,8 +674,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.select-group {
 		display: flex;
 		align-items: center;
-		gap: 0.4375rem;
-		color: #98a2b3;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		color: var(--muted);
 	}
 
 	.select-group :global(.multi-filter) {
@@ -684,9 +685,10 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.view-switcher {
 		display: flex;
-		height: 2.125rem;
+		min-height: 2.75rem;
+		flex: 0 0 auto;
 		margin-left: auto;
-		padding: 0.1875rem;
+		padding: 0;
 		border: 1px solid #d0d5dd;
 		border-radius: 0.4375rem;
 		background: #f9fafb;
@@ -705,7 +707,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.project-row,
 	.task-row {
 		display: grid;
-		grid-template-columns: minmax(17.5rem, 30%) 7.875rem minmax(32.5rem, 1fr);
+		grid-template-columns: minmax(24rem, 35%) 7.5rem minmax(28rem, 1fr);
 	}
 
 	.gantt-head {
@@ -795,23 +797,25 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.expand-button {
 		display: grid;
-		width: 1.6875rem;
+		width: 2.75rem;
 		flex: 0 0 auto;
 		place-items: center;
 	}
 
-	.project-info > div:nth-child(2) {
+	.project-copy {
 		min-width: 0;
+		flex: 1;
 	}
 
 	.project-info a {
 		display: block;
 		overflow: hidden;
-		font-size: 0.75rem;
 		font-weight: bold;
 		color: #1d2939;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		white-space: normal;
+		overflow-wrap: anywhere;
+		font-size: 0.875rem;
+		line-height: 1.5;
 	}
 
 	.project-info a:hover {
@@ -822,9 +826,10 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		display: flex;
 		align-items: center;
 		gap: 0.3125rem;
+		flex-wrap: wrap;
 		margin: 0.25rem 0 0;
 		font-size: 0.75rem;
-		color: #98a2b3;
+		color: var(--muted);
 	}
 
 	.project-info p i {
@@ -933,7 +938,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.project-status small {
 		font-size: 0.75rem;
-		color: #98a2b3;
+		color: var(--muted);
 	}
 
 	.timeline-cell,
@@ -965,6 +970,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		position: absolute;
 		top: 0.25rem;
 		left: 0.25rem;
+		white-space: nowrap;
 		padding: 1px 0.25rem;
 		border-radius: 0.1875rem;
 		font-size: 0.75rem;
@@ -998,7 +1004,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	.project-bar.gray {
-		background: linear-gradient(90deg, #667085, #98a2b3);
+		background: linear-gradient(90deg, #667085, var(--muted));
 	}
 
 	.project-bar span {
@@ -1012,6 +1018,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.next-node {
 		position: absolute;
 		top: 3.375rem;
+		right: .75rem;
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
@@ -1019,6 +1026,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		color: #667085;
 		white-space: nowrap;
 	}
+
+	.next-node span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 	.next-node i {
 		width: 0.375rem;
@@ -1062,7 +1071,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.task-dot {
 		width: 0.4375rem;
 		height: 0.4375rem;
-		border: 2px solid #98a2b3;
+		border: 2px solid var(--muted);
 		border-radius: 50%;
 	}
 
@@ -1083,7 +1092,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		top: 0.9375rem;
 		height: 0.5rem;
 		border-radius: 6.1875rem;
-		background: #98a2b3;
+		background: var(--muted);
 	}
 
 	.task-bar.done {
@@ -1107,7 +1116,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	.new-project-modal {
-		width: min(35rem, calc(100vw - 2rem));
+		width: min(35rem, 100%);
 		padding: 0;
 	}
 
@@ -1128,15 +1137,10 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		font-size: 1.125rem;
 	}
 
-	.modal-header p:not(.eyebrow) {
-		margin: 0.3125rem 0 0;
-		font-size: 0.75rem;
-		color: #667085;
-	}
 
 	.modal-header button {
 		display: grid;
-		width: 2.125rem;
+		width: 2.75rem;
 		place-items: center;
 	}
 
@@ -1149,7 +1153,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.form-grid label {
 		display: grid;
-		gap: 0.3125rem;
+		gap: 0.375rem;
 	}
 
 	.form-grid label.wide {
@@ -1157,7 +1161,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	.form-grid label span {
-		font-size: 0.75rem;
+		font-size: 0.875rem;
 		font-weight: bold;
 		color: #475467;
 	}
@@ -1165,6 +1169,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.form-grid input,
 	.form-grid select,
 	.form-grid textarea {
+		width: 100%;
 		padding: 0 0.625rem;
 	}
 
@@ -1219,15 +1224,15 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	@media (max-width: 51.25rem) {
-		.summary-strip {
+		.financing-project-summary {
 			grid-template-columns: 1fr 1fr;
 		}
 
-		.summary-strip > div:nth-child(2) {
+		.financing-project-summary > div:nth-child(2) {
 			border-right: 0;
 		}
 
-		.summary-strip > div:nth-child(-n + 2) {
+		.financing-project-summary > div:nth-child(-n + 2) {
 			border-bottom: 1px solid #eaecf0;
 		}
 
@@ -1301,8 +1306,18 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	}
 
+	@media (max-width: 51.25rem) {
+    .project-row { grid-template-columns: minmax(0, 1fr); }
+    .project-info { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr) auto; }
+    .project-people { display: none; }
+    .project-row-actions { grid-column: 3; grid-row: 1; }
+    .project-status { display: flex; align-items: center; gap: .75rem; padding: 0 .875rem .75rem; }
+    .progress-line { flex: 1; }
+    .project-info p { overflow-wrap: anywhere; }
+  }
+
 	@media (max-width: 35rem) {
-		.summary-strip > div {
+		.financing-project-summary > div {
 			padding: 0.625rem 0.75rem;
 		min-height: 4.625rem;
 		}

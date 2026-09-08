@@ -12,7 +12,7 @@
 <div class="multi-filter">
   <span class="filter-label">{label}</span>
   <details class="dropdown" bind:this={details}>
-    <summary class="btn filter-trigger" aria-label={`${label}：${summary}`}><span>{summary}</span><ChevronDown size={16} aria-hidden="true" /></summary>
+    <summary class="btn btn-outline filter-trigger" aria-label={`${label}：${summary}`}><span>{summary}</span><ChevronDown size={16} aria-hidden="true" /></summary>
     <div class="dropdown-content card card-border bg-base-100 filter-popover">
       <button type="button" class="btn btn-ghost" class:btn-active={values.length === 0} aria-pressed={values.length === 0} onclick={() => values = []}>{allLabel}</button>
       {#each options as option}
@@ -25,7 +25,7 @@
 <style>
   .multi-filter { position: relative; display: flex; align-items: center; gap: .5rem; min-width: 0; }
   .filter-label { font-size: .875rem; color: var(--muted); white-space: nowrap; }
-  .filter-trigger { min-width: 8.5rem; width: 100%; justify-content: space-between; list-style: none; }
+  .filter-trigger { min-width: 7rem; width: 100%; justify-content: space-between; list-style: none; }
   summary::-webkit-details-marker { display: none; }
   .filter-popover { z-index: 45; display: grid; gap: .25rem; width: max(100%, 14rem); max-width: calc(100vw - 3rem); max-height: min(24rem, 60dvh); overflow-y: auto; margin-top: .5rem; padding: .5rem; box-shadow: var(--shadow-card); }
   .filter-popover > button { justify-content: flex-start; }

@@ -61,6 +61,7 @@
 		allLabel="全部品种"
 		{optionLabels}
 	/>
+	{#if note && !compact}<span class="filter-note">{note}</span>{/if}
 </section>
 
 <style>
@@ -91,6 +92,8 @@
 		min-width: 0;
 		padding: 0 2rem 0 0.75rem;
 	}
+
+	.filter-note { margin-left: auto; color: var(--muted); font-size: .8125rem; white-space: nowrap; }
 
 	.debt-filter.compact {
 		min-height: 0;
