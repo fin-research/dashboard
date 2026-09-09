@@ -24,7 +24,7 @@
 
 <a class="btn btn-ghost account-button" href="/profile" aria-label={account ? `个人管理：${account.name}，${account.department || '未填写部门'}` : '个人管理'}>
   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></svg>
-  <span>{account?.name || (checking ? '个人管理' : '登录 / 注册')}{#if account}<span class="account-divider" aria-hidden="true"> / </span><span class="account-department">{account.department || '未填写部门'}</span>{/if}</span>
+  <span>{account?.name || (checking ? '个人管理' : '登录 / 注册')}{#if account}<span class="account-divider" aria-hidden="true">&nbsp;/&nbsp;</span><span class="account-department">{account.department || '未填写部门'}</span>{/if}</span>
 </a>
 
 <style>
