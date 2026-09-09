@@ -1,5 +1,7 @@
 import type { R2Bucket } from "@cloudflare/workers-types";
 import { Decimal } from "decimal.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { corpusSchema, type CreditCorpus, type CreditBlock, type CreditCalculation,
   type CreditAnswerDraft, type CreditAnswer, type CreditSource, calculationSchema } from "../credit-assistant/types.ts";
 import type { z } from "zod";
@@ -39,28 +41,20 @@ function rankCreditBlocks(corpus: CreditCorpus, query: string): Array<{ block: C
 export function lexicalSearch(corpus: CreditCorpus, query: string, limit = 16): CreditBlock[] {
   return rankCreditBlocks(corpus, query).slice(0, limit).map(x => x.block);
 }
-export type CreditSearchHit = { key: string; text: string };
-export function canonicalSearchEvidence(corpus: CreditCorpus, query: string, hits: Array<CreditSearchHit | string>): CreditBlock[] {
+export type CreditSearchHit = { key: string; text: string; id?: string };
+export function searchResultEvidence(corpus: CreditCorpus, hits: Array<CreditSearchHit | string>): CreditBlock[] {
   const found = new Map<string, CreditBlock>();
-  for (const raw of hits.slice(0, 20)) {
+  for (const raw of hits.slice(0, 50)) {
     const hit = typeof raw === "string" ? { key: raw, text: "" } : raw;
+    if (!hit.text.trim()) continue;
     const file = corpus.searchFiles?.find(f => f.key === hit.key);
-    const blocks = corpus.blocks.filter(b => (file ? b.documentId === file.documentId : b.searchKey === hit.key) && b.extraction !== "unreadable");
-    if (!blocks.length) continue;
-    // AI Search chooses the chunk boundaries. Its text only locates canonical evidence;
-    // never cite an index payload directly or take the first pages of a matched document.
-    const candidates = { ...corpus, blocks };
-    const questionScores = new Map(rankCreditBlocks(candidates, query).map(x => [x.block.id, x.score]));
-    const passageRanks = rankCreditBlocks(candidates, hit.text.slice(0, 6000) || query);
-    const maxQuestion = Math.max(1, ...questionScores.values());
-    const maxPassage = Math.max(1, passageRanks[0]?.score ?? 0);
-    // Normalize each signal so a long neighboring row cannot swamp the requested account.
-    const ranked = passageRanks
-      .map(x => ({ ...x, score: x.score / maxPassage + 2 * (questionScores.get(x.block.id) ?? 0) / maxQuestion }))
-      .sort((a, b) => b.score - a.score).slice(0, 2);
-    for (const { block } of ranked) found.set(block.id, block);
+    const documentId = file?.documentId ?? corpus.blocks.find(b => b.searchKey === hit.key)?.documentId;
+    if (!documentId || !corpus.documents.some(d => d.id === documentId)) continue;
+    const id = "search-" + bytesToHex(sha256(new TextEncoder().encode(JSON.stringify([documentId, hit.key, hit.text])))).slice(0, 32);
+    found.set(id, { id, documentId, text: hit.text, searchKey: hit.key,
+      extraction: "ai_search", locator: "AI Search 检索片段" });
   }
-  return [...found.values()].slice(0, 8);
+  return [...found.values()].slice(0, 12);
 }
 export function isCreditOriginalKey(key: string): boolean {
   return key.startsWith("originals/") && /\.(pdf|docx?|xlsx?)$/i.test(key)
@@ -146,17 +140,20 @@ export function finalizeCreditAnswer(draft: CreditAnswerDraft, corpus: CreditCor
     }
   }
   if (!draft.paragraphs.length && !draft.gaps.length && !draft.attachments.length) throw new Error("回答为空");
-  const files = draft.attachments.map(id => {
+  const sources = [...ids].map(id => sourceFor(corpus, opened.get(id)!));
+  const attachmentIds = [...new Set([...draft.attachments, ...sources.map(s => s.documentId)])];
+  const files = attachmentIds.map(id => {
     const doc = corpus.documents.find(d => d.id === id);
     if (!doc) throw new Error("附件不存在于材料目录");
     return { id, title: doc.title, url: `/api/credit-assistant/files/${id}` };
   });
-  const sources = [...ids].map(id => sourceFor(corpus, opened.get(id)!));
   const warnings: string[] = [];
-  if (sources.some(s => s.extraction === "ocr")) warnings.push("部分引文由扫描页识别，涉及数值请对照所附原页复核。");
+  if (sources.some(s => s.extraction === "ocr" || s.extraction === "ai_search" && corpus.documents.find(d => d.id === s.documentId)?.ocrCount)) {
+    warnings.push("部分来源包含扫描识别内容，涉及数值请对照所附原件复核。");
+  }
   if (sources.some(s => s.authority === "draft")) warnings.push("部分材料标注待部门确认，相关内容应在确认后对外使用。");
   if (sources.some(s => s.authority === "historical_reply")) warnings.push("历史授信答复仅代表原答复时点，不能据此确认当前情况。");
-  return { ...draft, status: warnings.length || draft.gaps.length ? (draft.status === "insufficient" ? "insufficient" : "partial") : draft.status,
+  return { ...draft, attachments: attachmentIds, status: warnings.length || draft.gaps.length ? (draft.status === "insufficient" ? "insufficient" : "partial") : draft.status,
     sources: sources.map(({ text: _text, searchKey: _key, ...source }) => source),
     calculations: calculations.filter(c => usedCalculations.has(c.id)), files,
     warnings, corpusVersion: corpus.builtAt, createdAt: new Date().toISOString() };

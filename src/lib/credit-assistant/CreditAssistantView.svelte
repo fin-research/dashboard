@@ -3,7 +3,7 @@
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
   import { portal } from "../portal";
   import { globalMessages } from "../global-messages";
-  import { customerAnswerText, creditCustomerSchema, confidentialityLabel, type CreditAnswer, type CreditCustomer, type CreditSession } from "./types";
+  import { customerAnswerText, creditCustomerSchema, confidentialityLabel, CREDIT_STAGES, type CreditAnswer, type CreditCustomer, type CreditSession } from "./types";
 
   let session = $state<CreditSession>({ turns: [], running: false, progress: "", error: null, startedAt: 0 });
   let question = $state("");
@@ -13,6 +13,9 @@
   let sending = $state(false);
   let creating = $state(false);
   let customerName = $state("");
+  let activeInstitution = $state("");
+  let draftText = $state("");
+  let streamNotice = $state("");
   let customers = $state<CreditCustomer[]>([]);
   let searching = $state(false);
   let searchError = $state("");
@@ -25,7 +28,8 @@
   let chat: HTMLDivElement;
   let textarea: HTMLTextAreaElement;
   let form: HTMLFormElement;
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let stream: EventSource | undefined;
+  let streamFailures = 0;
   let mounted = false;
   let revision = 0;
   const pendingQuestion = $derived(session.pendingQuestion || optimisticQuestion);
@@ -34,15 +38,53 @@
   const authorityNames: Record<string, string> = { audited: "审计报告", disclosure: "正式披露", internal: "业务材料", historical_reply: "历史答复", draft: "待部门确认" };
 
   async function api<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`/api/credit-assistant/${path}`, { ...init, signal: AbortSignal.timeout(30_000),
+    const query = activeInstitution ? `${path.includes("?") ? "&" : "?"}institutionName=${encodeURIComponent(activeInstitution)}` : "";
+    const response = await fetch(`/api/credit-assistant/${path}${query}`, { ...init, signal: AbortSignal.timeout(30_000),
       headers: { "content-type": "application/json", ...init?.headers } });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? "请求未完成，请重试");
     return data as T;
   }
-  function schedulePoll() {
-    clearTimeout(timer);
-    if (mounted && session.running) timer = setTimeout(() => void refresh(), 2500);
+  function stopStream() {
+    stream?.close(); stream = undefined; streamNotice = "";
+  }
+  function rememberInstitution(name: string) {
+    activeInstitution = name;
+    try { localStorage.setItem("credit-assistant:institution", name); } catch { /* Selection can still be used in this tab. */ }
+  }
+  function watchSession() {
+    if (!mounted || !session.running || !activeInstitution) { stopStream(); return; }
+    if (stream) return;
+    const current = revision;
+    const source = new EventSource(`/api/credit-assistant/session/events?institutionName=${encodeURIComponent(activeInstitution)}`);
+    stream = source;
+    source.addEventListener("session", event => {
+      if (!mounted || current !== revision || stream !== source) return;
+      try {
+        const next = JSON.parse((event as MessageEvent).data) as CreditSession;
+        const followLatest = nearLatest();
+        session = next;
+        draftText = next.draftText ?? "";
+        streamNotice = ""; streamFailures = 0; loadError = "";
+        if (!next.running) { if (!next.error) optimisticQuestion = ""; draftText = ""; stopStream(); }
+        if (followLatest) void scrollLatest();
+      } catch { loadError = "读取答复失败，请重新连接。"; stopStream(); }
+    });
+    source.addEventListener("draft", event => {
+      if (!mounted || current !== revision || stream !== source) return;
+      try {
+        const data = JSON.parse((event as MessageEvent).data) as { text: string; questionId: string };
+        if (data.questionId !== session.questionId || typeof data.text !== "string") return;
+        const followLatest = nearLatest();
+        draftText = data.text;
+        if (followLatest) void scrollLatest();
+      } catch { /* A subsequent session snapshot restores the current draft. */ }
+    });
+    source.onerror = () => {
+      if (!mounted || current !== revision || stream !== source) return;
+      streamNotice = "连接中断，正在重连…";
+      if (++streamFailures >= 3 || source.readyState === 2) { loadError = "连接已断开，请重新连接以查看答复。"; stopStream(); }
+    };
   }
   function nearLatest() {
     const workspace = chat?.closest<HTMLElement>(".tr-workspace");
@@ -61,6 +103,7 @@
       const next = await api<CreditSession>("session");
       if (!mounted || current !== revision) return;
       session = next;
+      draftText = next.draftText ?? "";
       if (loading) customerName = next.customer?.name ?? "";
       loadError = "";
       if (!session.running && !session.error) optimisticQuestion = "";
@@ -68,7 +111,7 @@
     } catch (error) {
       if (mounted && current === revision) loadError = error instanceof Error ? error.message : "读取对话失败";
     } finally {
-      if (mounted && current === revision) { loading = false; schedulePoll(); }
+      if (mounted && current === revision) { loading = false; watchSession(); }
     }
   }
   function searchCustomers(event: Event) {
@@ -99,20 +142,18 @@
     clearTimeout(searchTimer);
     searchRevision++;
     revision++;
-    clearTimeout(timer);
+    stopStream();
     try {
-      if ((session.customer && session.customer.name !== customer.name) || (!session.customer && (session.turns.length || session.error))) {
-        session = await api<CreditSession>("session/new", { method: "POST" });
-        optimisticQuestion = "";
-        question = "";
-      }
       const next = await api<CreditSession>("session/institution", { method: "POST", body: JSON.stringify({ institutionName: customer.name }) });
       if (!mounted) return;
       session = next;
       customerName = next.customer?.name ?? "";
+      rememberInstitution(customerName);
+      optimisticQuestion = ""; question = ""; draftText = ""; streamFailures = 0;
       customers = [];
       searchError = "";
       loadError = "";
+      watchSession();
       textarea?.focus({ preventScroll: true });
     } catch (error) {
       if (mounted) { customerName = ""; globalMessages.error(error instanceof Error ? error.message : "选择机构失败"); }
@@ -141,18 +182,19 @@
     if (!text || busy || loading || loadError) return;
     if (!selectedCustomer) { globalMessages.error("请先输入客户名称并从列表中选择机构。"); customerInput?.focus(); return; }
     revision++;
-    clearTimeout(timer);
+    stopStream();
     sending = true;
     optimisticQuestion = text;
     const draft = question;
     question = "";
+    draftText = ""; streamFailures = 0;
     session = { ...session, error: null, pendingQuestion: "" };
     void scrollLatest();
     try {
       const next = await api<CreditSession>("session", { method: "POST", body: JSON.stringify({ question: text, institutionName: selectedCustomer.name }) });
       if (!mounted) return;
       session = next;
-      schedulePoll();
+      watchSession();
     } catch (error) {
       if (!mounted) return;
       question ||= draft || text;
@@ -177,15 +219,17 @@
   async function newSession() {
     if (busy || loading) return;
     revision++;
-    clearTimeout(timer);
+    stopStream();
     creating = true;
     try {
-      const next = await api<CreditSession>("session/new", { method: "POST" });
+      if (!session.customer) { customerInput?.focus(); return; }
+      const next = await api<CreditSession>("session/new", { method: "POST", body: JSON.stringify({ institutionName: session.customer.name }) });
       if (!mounted) return;
       session = next;
       optimisticQuestion = "";
       question = "";
-      customerName = "";
+      customerName = next.customer?.name ?? "";
+      draftText = "";
       customers = [];
       showCustomers = false;
       clearTimeout(searchTimer);
@@ -193,7 +237,7 @@
       loadError = "";
       await tick();
       resizeInput();
-      customerInput?.focus({ preventScroll: true });
+      textarea?.focus({ preventScroll: true });
       void scrollLatest();
     } catch (error) { globalMessages.error(error instanceof Error ? error.message : "新建对话失败"); }
     finally { creating = false; }
@@ -223,8 +267,9 @@
   function fileType(title: string) { return title.match(/\.([a-z0-9]+)$/i)?.[1]?.toUpperCase() || "文件"; }
   onMount(() => {
     mounted = true;
+    try { activeInstitution = localStorage.getItem("credit-assistant:institution") ?? ""; } catch { /* No persisted selection. */ }
     void refresh();
-    return () => { mounted = false; revision++; searchRevision++; clearTimeout(timer); clearTimeout(searchTimer); };
+    return () => { mounted = false; revision++; searchRevision++; stopStream(); clearTimeout(searchTimer); };
   });
 </script>
 
@@ -274,7 +319,7 @@
                 {#each turn.answer.sources as source}
                   <div class="source" id={`source-${turn.id}-${source.id}`} tabindex="-1">
                     <a href={source.url} target="_blank" rel="noreferrer">{source.title} · {source.locator}</a>
-                    <span class="source-kind">{authorityNames[source.authority]}{source.extraction === "ocr" ? " · 扫描识别" : ""}</span>
+                    <span class="source-kind">{authorityNames[source.authority]}{source.extraction === "ocr" ? " · 扫描识别" : source.extraction === "ai_search" ? " · 检索片段" : ""}</span>
                     {#each turn.answer.paragraphs.flatMap(p => p.citations).filter(c => c.sourceId === source.id) as cite}<blockquote>{cite.quote}</blockquote>{/each}
                   </div>
                 {/each}
@@ -297,7 +342,16 @@
         <div class="message message--assistant">
           <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手</span></div>
           {#if session.running || sending}
-            <p class="chat-progress" role="status"><span class="loading-dot"></span>{sending ? "正在发送…" : session.progress || "正在核对材料…"}</p>
+            <ol class="credit-stages" aria-label="答复阶段">
+              {#each CREDIT_STAGES as stage}
+                <li class:active={session.stage === stage.id} class:complete={session.completedStages?.includes(stage.id)}
+                  aria-current={session.stage === stage.id ? "step" : undefined}>
+                  <span class="stage-marker" aria-hidden="true">{session.completedStages?.includes(stage.id) && session.stage !== stage.id ? "✓" : "·"}</span>{stage.label}
+                </li>
+              {/each}
+            </ol>
+            <p class="chat-progress" role="status" aria-atomic="true"><span class="loading-dot"></span>{streamNotice || (sending ? "正在发送…" : session.progress || "正在核对材料…")}</p>
+            {#if draftText}<div class="streaming-answer" aria-label="正在生成的答复" aria-live="off"><p class="answer-paragraph">{draftText}</p></div>{/if}
           {:else if session.error}
             <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<button class="btn chat-button" type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</button>{/if}</div>
           {/if}
@@ -335,7 +389,7 @@
     </div>
     <form class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
-      <textarea class="textarea textarea-ghost" id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} maxlength="3000" rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={loading || creating} aria-describedby="credit-composer-hint"></textarea>
+      <textarea class="textarea textarea-ghost" id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={loading || creating} aria-describedby="credit-composer-hint"></textarea>
       <div class="composer-actions">
         <span id="credit-composer-hint">Enter 发送<span class="keyboard-hint"> · Shift + Enter 换行</span></span>
         <button class="btn chat-button chat-button--send" type="submit" disabled={!selectedCustomer || !question.trim() || busy || loading || !!loadError} aria-label={busy ? "正在处理消息" : "发送消息"} title={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
@@ -386,6 +440,13 @@
   .source-kind { display: block; color: var(--text-3); margin-top: 4px; }
   blockquote { margin: 10px 0; padding: 4px 12px; border-left: 2px solid var(--border-strong); white-space: pre-wrap; }
   .chat-progress { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--text-3); font-size: .875rem; }
+  .credit-stages { display: flex; flex-wrap: wrap; gap: 8px 20px; list-style: none; padding: 0; margin: 0; font-size: .875rem; color: var(--text-3); }
+  .credit-stages li { display: flex; align-items: center; gap: 6px; }
+  .credit-stages li.active { color: var(--brand); font-weight: bold; }
+  .credit-stages li.complete:not(.active) { color: var(--text-2); }
+  .stage-marker { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--border-strong); border-radius: 50%; }
+  .active .stage-marker { border-color: var(--brand); background: var(--brand-soft); }
+  .streaming-answer { min-width: 0; padding-top: 8px; }
   .loading-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--brand); }
   .answer-error p, .chat-load-error p { margin: 0 0 12px; color: var(--text-2); }
   .chat-load-error { margin-bottom: 24px; }

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import ts from "typescript";
 import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
 import { CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
+import { creditAgentName } from "../src/lib/server/credit-session.ts";
 
 // Execute the actual Worker handlers; replace only the Cloudflare runtime,
 // database transport and model transport, not routing or disclosure logic.
@@ -13,6 +14,7 @@ const agents = moduleUrl(`export class Agent {
   get state() { return this._state ??= structuredClone(this.initialState); }
   setState(state) { this._state = state; }
   async schedule(_delay, callback, payload) { this.jobs.push({callback,payload}); }
+  sql() { return []; }
   getQueues() { return []; }
 } export async function getAgentByName(binding, name) { return binding.get(name); }`);
 const postgres = moduleUrl("export async function withPostgres(_connection, _application, operation) { return operation(globalThis.creditTestClient); }");
@@ -33,6 +35,7 @@ const corpus = { version: "credit-document-v2", builtAt: "2026-09-07", documents
   blocks: [publicDoc, privateDoc].map(d => ({ id: d.id + "-1", documentId: d.id, text: "现金50亿元", locator: "PDF第1页", extraction: "text", searchKey: `search/${d.relativePath}.md` })) };
 const origin = "https://test.example";
 
+const testUser = { id: "access-test", auth0Id: "auth0|test", email: "test@18.cn", issuedAt: 0, expiresAt: 9999999999 };
 function setup() {
   const customers = new Map([["银行甲", { name: "银行甲", confidentialityStatus: true, reportDate: "2026-09-07" }],
     ["银行乙", { name: "银行乙", confidentialityStatus: false, reportDate: "2026-09-07" }]]);
@@ -42,7 +45,7 @@ function setup() {
     return { rows: sql.startsWith("SELECT") ? [...customers.values()].filter(c => values[1] ? c.name === values[0] : c.name.includes(values[0])) : [] };
   } };
   globalThis.creditTestAnswer = options => answerCreditQuestion({ ...options, semanticSearch: undefined,
-    generate: async (_credentials, _messages, schema) => schema.parse({ step: { action: "answer", answer: {
+    generate: async (_credentials, _messages, schema, name) => name === "credit_scope" ? schema.parse({ inScope: true }) : schema.parse({ step: { action: "answer", answer: {
       status: "complete", paragraphs: [], gaps: [], attachments: [options.question.includes("保密") ? privateDoc.id : publicDoc.id],
     } } }) });
   const sessions = new Map();
@@ -56,11 +59,15 @@ function setup() {
     return sessions.get(name);
   } } };
   let cookie = "";
+  let selectedInstitution = "";
   async function request(path, body, method = body ? "POST" : "GET", options = {}) {
-    const response = await creditAssistantHttp(new Request(origin + "/api/credit-assistant/" + path, {
+    const url = new URL(origin + "/api/credit-assistant/" + path);
+    if (!url.searchParams.has("institutionName") && selectedInstitution) url.searchParams.set("institutionName", selectedInstitution);
+    const response = await creditAssistantHttp(new Request(url, {
       method, headers: { origin, cookie, "content-type": "application/json", ...options.headers },
       ...(body ? { body: JSON.stringify(body) } : {}),
-    }), env);
+    }), env, Object.hasOwn(options, "user") ? options.user : testUser);
+    if (path === "session/institution" && response.ok) selectedInstitution = body.institutionName;
     if (response.headers.get("set-cookie")) cookie = response.headers.get("set-cookie").split(";")[0];
     return response;
   }
@@ -85,7 +92,8 @@ test("HTTP selection, submit, signed private download and live revocation", asyn
   assert.equal((await app.request(path, null, "HEAD")).status, 200);
   assert.equal((await app.request(path, null, "GET", { headers: { range: "bytes=0-3" } })).status, 206);
   assert.equal((await app.request("files/" + privateDoc.id)).status, 403);
-  assert.equal((await app.request("session/institution", { institutionName: "银行乙" })).status, 409);
+  assert.equal((await app.request("session/institution", { institutionName: "银行乙" })).status, 200);
+  await app.request("session/institution", { institutionName: "银行甲" });
   app.customers.set("银行甲", { ...app.customers.get("银行甲"), confidentialityStatus: false });
   const hidden = await (await app.request("session")).json();
   assert.equal(hidden.turns[0].answer.notice, CREDIT_NDA_REQUIRED);
@@ -94,7 +102,7 @@ test("HTTP selection, submit, signed private download and live revocation", asyn
   assert.equal((await app.request(path, null, "HEAD")).status, 403);
   assert.equal((await app.request(path, null, "GET", { headers: { range: "bytes=0-2" } })).status, 403);
   assert.equal(app.originalReads(), before);
-  await app.request("session/new", {}, "POST");
+  await app.request("session/new", { institutionName: "银行甲" }, "POST");
   assert.equal((await app.request(path)).status, 403);
 });
 
@@ -111,7 +119,7 @@ test("unsigned materials and direct file endpoints never expose restricted recor
   assert.equal((await (await app.request("session")).json()).turns[0].answer.notice, CREDIT_NDA_REQUIRED);
 });
 
-test("revocation during generation is checked before persisting a result", async () => {
+test("generation uses its submission permission snapshot, without a final recheck", async () => {
   const app = setup();
   await app.request("session/institution", { institutionName: "银行甲" });
   await app.request("session", { institutionName: "银行甲", question: "保密审计报告.pdf" });
@@ -123,8 +131,9 @@ test("revocation during generation is checked before persisting a result", async
   };
   const agent = [...app.sessions.values()].find(s => s.jobs.length);
   await agent.answerQuestion(agent.jobs[0].payload);
-  assert.equal(agent.state.turns[0].answer.notice, CREDIT_NDA_REQUIRED);
-  assert.deepEqual(agent.state.turns[0].answer.files, []);
+  assert.equal(agent.state.turns[0].answer.files[0].id, privateDoc.id);
+  // A new read/download is still a new authorized request.
+  assert.equal((await (await app.request("session")).json()).turns[0].answer.notice, CREDIT_NDA_REQUIRED);
 });
 
 test("database failures fail closed, and POSTs cannot bypass same-origin validation", async () => {
@@ -135,4 +144,91 @@ test("database failures fail closed, and POSTs cannot bypass same-origin validat
   assert.equal((await app.request("session")).status, 503);
   assert.equal((await app.request("files/" + privateDoc.id + "?turnId=anything")).status, 503);
   assert.equal(app.originalReads(), 0);
+});
+
+test("verified users have deterministic isolated sessions and cannot select another user through cookies or headers", async () => {
+  const app = setup();
+  assert.equal((await app.request("session", null, "GET", { user: null })).status, 401);
+  await app.request("session/institution", { institutionName: "银行甲" });
+  await app.request("session", { institutionName: "银行甲", question: "年度报告.pdf" });
+  const agent = app.sessions.get(creditAgentName(testUser.auth0Id, "银行甲"));
+  await agent.answerQuestion(agent.jobs[0].payload);
+  const sameUser = await (await app.request("session", null, "GET", { headers: { cookie: "credit-session=00000000-0000-4000-8000-000000000000" } })).json();
+  assert.equal(sameUser.turns.length, 1);
+  const another = { ...testUser, id: "access-test-rotated", auth0Id: "auth0|test-other" };
+  const isolated = await (await app.request("session", null, "GET", { user: another,
+    headers: { "x-user-id": testUser.auth0Id, "x-credit-user-id": testUser.auth0Id } })).json();
+  assert.equal(isolated.turns.length, 0);
+  const issued = sameUser.turns[0].answer.files[0];
+  // Public documents may be read by either logged-in identity; private turn IDs never confer ownership.
+  assert.equal(issued.id, publicDoc.id);
+  await app.request("session", { institutionName: "银行甲", question: "保密审计报告.pdf" });
+  await agent.answerQuestion(agent.jobs.at(-1).payload);
+  const privateUrl = agent.state.turns.at(-1).answer.files[0].url.replace("/api/credit-assistant/", "");
+  assert.equal((await app.request(privateUrl, null, "GET", { user: another })).status, 403);
+  await app.request("session/institution", { institutionName: "银行乙" });
+  assert.equal((await (await app.request("session")).json()).turns.length, 0);
+  await app.request("session/institution", { institutionName: "银行甲" });
+  assert.equal((await (await app.request("session")).json()).turns.length, 2);
+});
+
+test("long questions pass the actual HTTP route and retain only a byte-level transport bound", async () => {
+  const app = setup();
+  await app.request("session/institution", { institutionName: "银行甲" });
+  const question = "公司财务资料".repeat(4000);
+  assert.equal((await app.request("session", { institutionName: "银行甲", question })).status, 202);
+  const agent = app.sessions.get(creditAgentName(testUser.auth0Id, "银行甲"));
+  assert.equal(agent.state.pendingQuestion, question);
+  assert.equal((await app.request("session", { institutionName: "银行甲", question: "大".repeat(1024 * 1024) })).status, 413);
+});
+
+test("SSE milestones never re-expose historical private answers after a new unsigned submission", async () => {
+  const app = setup();
+  await app.request("session/institution", { institutionName: "银行甲" });
+  await app.request("session", { institutionName: "银行甲", question: "保密审计报告.pdf" });
+  const agent = app.sessions.get(creditAgentName(testUser.auth0Id, "银行甲"));
+  await agent.answerQuestion(agent.jobs[0].payload);
+  app.customers.set("银行甲", { ...app.customers.get("银行甲"), confidentialityStatus: false });
+  await app.request("session", { institutionName: "银行甲", question: "年度报告.pdf" });
+  const response = await app.request("session/events");
+  const reading = response.text();
+  await agent.answerQuestion(agent.jobs.at(-1).payload);
+  const events = await reading;
+  assert.equal(events.includes(privateDoc.id), false);
+  assert.equal(events.includes("保密审计报告.pdf"), false);
+  assert.match(events, /尚未签署保密协议/);
+  assert.match(events, /"running":false/);
+});
+
+test("SSE sends stages and draft text immediately, reconnects to the running turn, and closes on completion", async () => {
+  const app = setup();
+  await app.request("session/institution", { institutionName: "银行甲" });
+  await app.request("session", { institutionName: "银行甲", question: "年度报告.pdf" });
+  const agent = app.sessions.get(creditAgentName(testUser.auth0Id, "银行甲"));
+  const response = await app.request("session/events");
+  assert.match(response.headers.get("content-type"), /text\/event-stream/);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  assert.match(decoder.decode((await reader.read()).value), /"running":true/);
+  let finish;
+  const gate = new Promise(resolve => { finish = resolve; });
+  const realAnswer = globalThis.creditTestAnswer;
+  globalThis.creditTestAnswer = async options => {
+    options.progress("正在检索材料", "retrieval"); options.draft("公司资产"); await gate;
+    return realAnswer(options);
+  };
+  const running = agent.answerQuestion(agent.jobs[0].payload);
+  const stage = decoder.decode((await reader.read()).value);
+  assert.match(stage, /"stage":"retrieval"/);
+  assert.match(decoder.decode((await reader.read()).value), /event: draft[\s\S]*公司资产/);
+  await reader.cancel();
+  const reconnected = await app.request("session/events");
+  const restored = reconnected.body.getReader();
+  assert.match(decoder.decode((await restored.read()).value), /"draftText":"公司资产"/);
+  finish(); await running;
+  let final = "";
+  while (true) { const part = await restored.read(); if (part.done) break; final += decoder.decode(part.value); }
+  assert.match(final, /"running":false/);
+  assert.match(final, /年度报告.pdf/);
+  assert.equal(agent.jobs.length, 1, "reconnect must not schedule a second answer");
 });

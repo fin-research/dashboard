@@ -25,8 +25,8 @@ const worker: ExportedHandler<Cloudflare.Env> = {
     if (new URL(request.url).pathname.startsWith("/api/credit-assistant/")) {
       try {
         const route = new URL(request.url).pathname.replace(/\/files\/[a-f0-9]{24}$/, '/files/[id]');
-        await authorizeRequest(request, env, route);
-        return await creditAssistantHttp(request, env);
+        const { user } = await authorizeRequest(request, env, route);
+        return await creditAssistantHttp(request, env, user);
       } catch (error) {
         return dashboardAccessFailure(request, error);
       }

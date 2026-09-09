@@ -4,17 +4,21 @@ import { corpusSchema, customerAnswerText } from "../src/lib/credit-assistant/ty
 import { cloudflareClient } from "./credit-cloudflare-client.mjs";
 import { withPostgres } from "../src/lib/server/postgres.ts";
 import { findCreditCustomers } from "../src/lib/server/credit-repository.ts";
+import { SITE_ORIGIN, loginTestAccount, readAuthTestConfig } from "./lib/programmatic-login.mjs";
+import { readSse } from "../src/lib/server/ai-stream.ts";
 
 const cases = [
   { id: "material", question: "请提供东方财富证券2025年度审计报告。" },
   { id: "capital", question: "2025年公司吸收投资收到的现金30.90亿元，主要是吸收哪里的投资？请核对主体、金额和用途分类，给出可向客户提供的答复和来源。" },
   { id: "borrowing", question: "2025年公司取得借款收到的现金50亿元，主要是什么用途，哪里借入的？请给出准确来源，材料未披露的不要推断。" },
   { id: "calculation", question: "2025年公司现金增资中，计入实收资本和资本公积分别占增资款的比例是多少？请计算并列明来源和公式。" },
+  { id: "scope", question: "明天上海天气怎么样？请推荐一道晚餐。" },
 ];
 const selected = process.argv.find(a => a.startsWith("--case="))?.slice(7);
 if (selected && !cases.some(c => c.id === selected)) throw new Error("未知用例：" + selected);
 const baseArgument = process.argv.find(a => a.startsWith("--base-url="))?.slice(11);
 const base = baseArgument ? new URL(baseArgument).origin : undefined;
+if (base && base !== SITE_ORIGIN) throw new Error("线上验收仅允许项目生产域名，避免把测试登录凭据发送到其他来源");
 const institutionName = process.argv.find(a => a.startsWith("--institution="))?.slice(14);
 if (!institutionName) throw new Error("请使用 --institution=授信库中的机构名称，验收也必须核对真实保密协议状态");
 if (!base && !process.env.CF_AIG_TOKEN) throw new Error("本地验收需要 CF_AIG_TOKEN；线上验收使用 --base-url=https://eastmoney.hasbai.xyz");
@@ -24,6 +28,7 @@ const request = base ? undefined : await cloudflareClient();
 const customer = base ? undefined : await withPostgres(process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE ?? process.env.DATABASE_URL,
   "credit-evaluation", async client => (await findCreditCustomers(client, institutionName, true))[0]);
 if (!base && !customer) throw new Error("最新授信记录中没有该机构");
+const httpSession = base ? await loginTestAccount(await readAuthTestConfig()) : undefined;
 await mkdir(".credit-local/evaluations", { recursive: true });
 for (const item of cases.filter(c => !selected || selected === c.id)) {
   const started = Date.now();
@@ -39,7 +44,7 @@ for (const item of cases.filter(c => !selected || selected === c.id)) {
           headers: { "content-type": "application/json" }, body: JSON.stringify({ query, ai_search_options: {
             retrieval: { retrieval_type: "hybrid", max_num_results: 50 }, query_rewrite: { enabled: false }, cache: { enabled: false },
           } }) })).json();
-        return (response.result?.chunks ?? []).map(c => ({ key: c.item.key, text: c.text }));
+        return (response.result?.chunks ?? []).map(c => ({ id: c.id, key: c.item.key, text: c.text }));
       },
     }) };
   } catch (error) {
@@ -58,33 +63,32 @@ for (const item of cases.filter(c => !selected || selected === c.id)) {
 }
 
 async function evaluateHttp(item, progress) {
-  // No existing browser cookie is reused: every case creates an isolated evaluation session.
+  // Use only the programmatically verified test account. Fixed user/customer DOs
+  // archive the previous test conversation when starting each new case.
+  const headers = { origin: base, cookie: httpSession.cookies.header(base), "content-type": "application/json" };
   const select = await fetch(base + "/api/credit-assistant/session/institution", { method: "POST",
-    headers: { origin: base, "content-type": "application/json" }, body: JSON.stringify({ institutionName }), signal: AbortSignal.timeout(45_000) });
-  const selectedCookie = select.headers.get("set-cookie")?.split(";")[0];
-  if (!select.ok || !selectedCookie) throw new Error("选择验收机构失败 HTTP " + select.status);
+    headers, body: JSON.stringify({ institutionName }), signal: AbortSignal.timeout(45_000), redirect: "error" });
+  if (!select.ok) throw new Error("选择验收机构失败 HTTP " + select.status);
   await select.body?.cancel();
+  const fresh = await fetch(base + "/api/credit-assistant/session/new", { method: "POST", headers,
+    body: JSON.stringify({ institutionName }), signal: AbortSignal.timeout(45_000), redirect: "error" });
+  if (!fresh.ok) throw new Error("归档验收会话失败 HTTP " + fresh.status);
+  await fresh.body?.cancel();
   const submit = await fetch(base + "/api/credit-assistant/session", { method: "POST",
-    headers: { origin: base, cookie: selectedCookie, "content-type": "application/json" }, body: JSON.stringify({ question: item.question, institutionName }),
-    signal: AbortSignal.timeout(45_000) });
-  const cookie = submit.headers.get("set-cookie")?.split(";")[0];
-  if (submit.status !== 202 || !cookie) throw new Error("创建验收会话失败 HTTP " + submit.status);
+    headers, body: JSON.stringify({ question: item.question, institutionName }), signal: AbortSignal.timeout(45_000), redirect: "error" });
+  if (submit.status !== 202) throw new Error("创建验收会话失败 HTTP " + submit.status);
   await submit.body?.cancel();
-  const deadline = Date.now() + 15 * 60_000;
-  let last = "";
-  while (Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    let state;
-    try {
-      const response = await fetch(base + "/api/credit-assistant/session", { headers: { cookie }, signal: AbortSignal.timeout(25_000) });
-      if (!response.ok) throw new Error("读取验收会话失败 HTTP " + response.status);
-      state = await response.json();
-    } catch { continue; }
+  const response = await fetch(`${base}/api/credit-assistant/session/events?institutionName=${encodeURIComponent(institutionName)}`,
+    { headers: { cookie: headers.cookie, accept: "text/event-stream" }, signal: AbortSignal.timeout(15 * 60_000), redirect: "error" });
+  if (!response.ok || !response.body || !response.headers.get("content-type")?.includes("text/event-stream")) throw new Error("SSE 连接失败 HTTP " + response.status);
+  let state, draftEvents = 0, last = "";
+  await readSse(response.body, event => {
+    if (event.event === "draft") { draftEvents++; return; }
+    if (event.event !== "session") return;
+    state = JSON.parse(event.data);
     if (state.progress !== last) { last = state.progress; progress(last); }
-    if (!state.running) {
-      const answer = state.turns.at(-1)?.answer;
-      return state.error ? { error: state.error, state } : answer ? { answer } : { error: "任务结束但没有答复", state };
-    }
-  }
-  throw new Error("真实问答验收等待超过 15 分钟，请在服务日志中检查任务状态");
+  }, 32 * 1024 * 1024);
+  if (!state || state.running) throw new Error("SSE 在问答完成前断开，请检查服务日志或重新读取会话");
+  const answer = state.turns.at(-1)?.answer;
+  return state.error ? { error: state.error, state, draftEvents } : answer ? { answer, draftEvents } : { error: "任务结束但没有答复", state };
 }

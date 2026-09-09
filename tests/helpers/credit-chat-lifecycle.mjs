@@ -36,5 +36,54 @@ await unmount(app);
 pending.splice(0).forEach(resolve => resolve());
 await tick();
 assert.equal(document.querySelectorAll(".credit-chat, .chat-toolbar, .tr-workbench").length, 0);
+
+// Exercise the real component with a controllable SSE transport. No browser or
+// authentication flow is involved in this DOM lifecycle regression.
+globalThis.localStorage = window.localStorage;
+localStorage.setItem("credit-assistant:institution", "测试银行");
+const streams = [];
+globalThis.EventSource = class {
+  constructor(url) { this.url = url; this.listeners = new Map(); this.closed = false; streams.push(this); }
+  addEventListener(name, callback) { this.listeners.set(name, callback); }
+  close() { this.closed = true; }
+  emit(name, value) { this.listeners.get(name)?.({ data: JSON.stringify(value) }); }
+};
+const customer = { name: "测试银行", confidentialityStatus: false, reportDate: "2026-09-09" };
+const running = { ...session, running: true, questionId: "q-1", pendingQuestion: "公司资产是多少", customer, stage: "retrieval", progress: "正在检索材料" };
+const requests = [];
+globalThis.fetch = async (url, options) => { requests.push({ url, options }); return Response.json(running); };
+const streamingApp = mount(Host, { target: document.body });
+flushSync();
+await new Promise(resolve => setImmediate(resolve));
+flushSync();
+assert.equal(streams.length, 1);
+assert.match(streams[0].url, /session\/events\?institutionName=/);
+assert.equal(document.querySelectorAll(".credit-stages li").length, 4);
+assert.equal(document.querySelector(".credit-stages [aria-current=step]")?.textContent.includes("检索材料"), true);
+assert.equal(document.querySelector("#credit-question").hasAttribute("maxlength"), false);
+streams[0].emit("draft", { questionId: "other-question", text: "迟到的旧内容" });
+flushSync();
+assert.equal(document.querySelector(".streaming-answer"), null);
+streams[0].emit("draft", { questionId: "q-1", text: "公司资产100亿元。" });
+flushSync();
+assert.match(document.querySelector(".streaming-answer").textContent, /公司资产100亿元/);
+streams[0].emit("session", { ...running, stage: "review", completedStages: ["scope", "retrieval", "answer"], progress: "正在复核", draftText: "公司资产100亿元。" });
+flushSync();
+assert.match(document.querySelector(".credit-stages [aria-current=step]").textContent, /证据复核/);
+assert.equal(requests.length, 1, "SSE updates must not trigger polling");
+flushSync(() => streamingApp.changeView("weekly"));
+assert.equal(streams[0].closed, true);
+streams[0].emit("draft", { questionId: "q-1", text: "迟到响应" });
+flushSync();
+assert.equal(document.querySelector(".streaming-answer"), null);
+flushSync(() => streamingApp.changeView("assistant"));
+await new Promise(resolve => setImmediate(resolve));
+flushSync();
+assert.equal(streams.length, 2, "remount resumes the same customer session");
+streams[1].emit("session", { ...running, running: false, pendingQuestion: "", error: "模型暂不可用", draftText: "" });
+flushSync();
+assert.equal(streams[1].closed, true);
+assert.match(document.querySelector(".answer-error").textContent, /模型暂不可用/);
+await unmount(streamingApp);
 await window.happyDOM.abort();
-console.log("Credit chat mount/switch/unmount and late responses passed");
+console.log("Credit chat lifecycle, SSE phases/drafts, reconnect and late responses passed");

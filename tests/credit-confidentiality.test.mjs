@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
+import { answerCreditQuestion as runCreditQuestion } from "../src/lib/server/credit-assistant.ts";
 import { findCreditCustomers } from "../src/lib/server/credit-repository.ts";
 import { creditQuestionSchema, creditCustomerSelectionSchema, customerAnswerText } from "../src/lib/credit-assistant/types.ts";
 import { isPublicCreditDocument, canProvideCreditDocument, creditCorpusForCustomer, creditNdaRefusal,
   canProvideCreditAnswer, creditHistoryForCustomer, discloseCreditSession, canDownloadCreditDocument,
   creditAnswerForTurn, CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
+
+const answerCreditQuestion = options => runCreditQuestion({ ...options, generate: (...args) => args[3] === "credit_scope"
+  ? Promise.resolve(args[2].parse({ inScope: true })) : options.generate(...args) });
 
 const unsigned = { name: "未签银行", confidentialityStatus: false, reportDate: "2026-09-07" };
 const signed = { name: "已签银行", confidentialityStatus: true, reportDate: "2026-09-07" };
@@ -105,7 +108,7 @@ test("public OCR evidence remains available with its accuracy warning", async ()
       schema.parse({ step: { action: "answer", answer: { status: "complete", paragraphs: [{ text: "公开现金为10亿元。", citations: [{ sourceId: blocks[0].id, quote: blocks[0].text }] }], attachments: [], gaps: [] } } }) });
   assert.equal(answer.status, "partial");
   assert.equal(answer.disclosure.blocked, false);
-  assert.match(answer.warnings.join(""), /扫描页/);
+  assert.match(answer.warnings.join(""), /扫描识别/);
   assert.equal(answer.paragraphs.length, 1);
 });
 
@@ -141,7 +144,9 @@ test("signed institutions receive restricted attachments; revocation, reclassifi
 test("private downloads require a signed current session and that turn's issued attachment or source", async () => {
   const answer = creditAnswerForTurn(await answerCreditQuestion({ question: "机密罚单", customer: signed, corpus, credentials, history: [], generate: modelAnswer(attachmentDraft(documents[1].id)) }), "turn-1");
   const session = { customer: signed, turns: [turn(answer)] };
-  assert.match(answer.files[0].url, /\?turnId=turn-1$/);
+  const fileUrl = new URL(answer.files[0].url, "https://test.example");
+  assert.equal(fileUrl.searchParams.get("turnId"), "turn-1");
+  assert.equal(fileUrl.searchParams.get("institutionName"), signed.name);
   assert.equal(canDownloadCreditDocument(documents[1], session, "turn-1"), true);
   assert.equal(canDownloadCreditDocument(documents[1], null, "turn-1"), false);
   assert.equal(canDownloadCreditDocument(documents[1], session, null), false);

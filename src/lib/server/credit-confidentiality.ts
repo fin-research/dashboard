@@ -62,6 +62,7 @@ export function creditAnswerForTurn(answer: CreditAnswer, turnId: string): Credi
   const urlFor = (url: string) => {
     const parsed = new URL(url, "https://credit.invalid");
     parsed.searchParams.set("turnId", turnId);
+    if (answer.disclosure?.institutionName) parsed.searchParams.set("institutionName", answer.disclosure.institutionName);
     return parsed.pathname + parsed.search + parsed.hash;
   };
   return { ...answer, files: answer.files.map(f => ({ ...f, url: urlFor(f.url) })),

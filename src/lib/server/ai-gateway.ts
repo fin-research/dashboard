@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readResponsesStream } from "./ai-stream.ts";
 
 const MAX_AI_GATEWAY_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_CREDIT_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
@@ -38,6 +39,7 @@ export interface AiGatewayOptions {
   requestTimeoutMs: number;
   taskType: AiGatewayTaskType;
   tools?: readonly AiGatewayTool[];
+  onTextDelta?: (delta: string) => void;
 }
 
 export interface AiGatewayAttemptFailure {
@@ -304,6 +306,7 @@ async function runProvider<OUTPUT>(
           },
         },
         input: prompt.input,
+        ...(options.onTextDelta ? { stream: true } : {}),
       }),
       signal: AbortSignal.timeout(options.requestTimeoutMs + 5_000),
     });
@@ -320,8 +323,10 @@ async function runProvider<OUTPUT>(
   const gatewayLogId = response.headers.get("cf-aig-log-id") ?? "";
   let responseText: string;
   try {
-    responseText = await readTextBounded(response, options.taskType === "credit_answer"
-      ? MAX_CREDIT_GATEWAY_RESPONSE_BYTES : MAX_AI_GATEWAY_RESPONSE_BYTES);
+    const maxBytes = options.taskType === "credit_answer" ? MAX_CREDIT_GATEWAY_RESPONSE_BYTES : MAX_AI_GATEWAY_RESPONSE_BYTES;
+    responseText = response.ok && options.onTextDelta && response.body && response.headers.get("content-type")?.includes("text/event-stream")
+      ? JSON.stringify(await readResponsesStream(response.body, options.onTextDelta, maxBytes))
+      : await readTextBounded(response, maxBytes);
   } catch (error) {
     throw new AiGatewayResponseError({
       provider,

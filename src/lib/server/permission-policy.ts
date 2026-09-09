@@ -63,6 +63,7 @@ export const ROUTE_PERMISSIONS: Record<string, Methods> = {
   '/api/credit-assistant/materials': { GET: 'credit.assistant:read' },
   '/api/credit-assistant/files/[id]': { GET: 'credit.assistant:read' },
   '/api/credit-assistant/session': { GET: 'credit.assistant:read', POST: 'credit.assistant:ask', DELETE: 'credit.assistant:delete' },
+  '/api/credit-assistant/session/events': { GET: 'credit.assistant:read' },
   '/api/credit-assistant/session/new': { POST: 'credit.assistant:ask' },
   '/api/credit-assistant/session/institution': { POST: 'credit.assistant:ask' },
 };

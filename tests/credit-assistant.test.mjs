@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Decimal } from "decimal.js";
 import { z } from "zod";
-import { arithmetic, calculateCredit, finalizeCreditAnswer, lexicalSearch, verifyQuote, canonicalSearchEvidence, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
-import { answerCreditQuestion, recoverQueuedCreditAnswers } from "../src/lib/server/credit-assistant.ts";
+import { arithmetic, calculateCredit, finalizeCreditAnswer, lexicalSearch, verifyQuote, searchResultEvidence, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
+import { answerCreditQuestion as runCreditQuestion, recoverQueuedCreditAnswers, CREDIT_SEARCH_TIMEOUT_MS } from "../src/lib/server/credit-assistant.ts";
 import { generateAiGatewayObject } from "../src/lib/server/ai-gateway.ts";
 import { customerAnswerText, stepSchema } from "../src/lib/credit-assistant/types.ts";
+
+const answerCreditQuestion = options => runCreditQuestion({ ...options, generate: (...args) => args[3] === "credit_scope"
+  ? Promise.resolve(args[2].parse({ inScope: true })) : options.generate(...args) });
 
 const doc = { id: "a".repeat(24), title: "2025年审计报告.pdf", relativePath: "定期报告/2025年审计报告.pdf", sha256: "a".repeat(64), bytes: 123,
   authority: "audited", originalKey: "originals/定期报告/2025年审计报告.pdf", modifiedAt: "2026-01-01", blockCount: 2, ocrCount: 0 };
@@ -96,7 +99,8 @@ test("slow semantic search does not block canonical lexical evidence", async t =
       return schema.parse({ step: { action: "answer", answer: { status: "complete", paragraphs: [], gaps: [], attachments: [doc.id] } } });
     },
   });
-  t.mock.timers.tick(15_000);
+  await Promise.resolve();
+  t.mock.timers.tick(CREDIT_SEARCH_TIMEOUT_MS);
   const answer = await answerPromise;
   assert.ok(initialSources.some(s => s.id === "a-1"));
   assert.match(answer.warnings.join(""), /全文精确检索/);
@@ -121,18 +125,25 @@ test("follow-up questions retain prior attachments, evidence and calculations", 
   assert.equal(history.length, 1);
 });
 
-test("whole-document search matches the returned passage rather than the first page", () => {
+test("AI Search passages are directly citable and mapped to current original files", () => {
   const key = "search/定期报告/2025年度审计报告.pdf.md";
   const pages = [{ ...blocks[0], id: "cover", text: "2025年度审计报告封面", searchKey: key },
     { ...blocks[1], id: "late-note", locator: "PDF第102页", text: "关联方东方财富支付借款利息8,520,547.95元。", searchKey: key }];
   const whole = { ...corpus, version: "credit-document-v2", blocks: pages,
     searchFiles: [{ key, documentId: doc.id, bytes: 100, sha256: "b".repeat(64), part: 1 },
       { key: key + ".part-002.md", documentId: doc.id, bytes: 100, sha256: "c".repeat(64), part: 2 }] };
-  const result = canonicalSearchEvidence(whole, "借款的来源", [{ key, text: "关联方东方财富支付借款利息8,520,547.95元。" }]);
-  assert.equal(result[0].id, "late-note");
-  assert.equal(canonicalSearchEvidence(whole, "借款", [{ key: key + ".part-002.md", text: "关联方借款利息" }])[0].id, "late-note");
-  assert.deepEqual(canonicalSearchEvidence(whole, "借款", [{ key: "search/deleted.md", text: "伪造来源" }]), []);
+  const result = searchResultEvidence(whole, [{ key, text: "关联方东方财富支付借款利息8,520,547.95元。" }]);
+  assert.equal(result[0].extraction, "ai_search");
+  assert.equal(result[0].documentId, doc.id);
+  assert.equal(searchResultEvidence(whole, [{ key: key + ".part-002.md", text: "关联方借款利息" }])[0].text, "关联方借款利息");
+  assert.deepEqual(searchResultEvidence(whole, [{ key: "search/deleted.md", text: "伪造来源" }]), []);
   assert.equal(result[0].text, pages[1].text);
+  const indexOnly = searchResultEvidence({ ...whole, blocks: [] }, [{ key, text: "直接来自索引的新增内容50亿元" }])[0];
+  verifyQuote(indexOnly, "新增内容50亿元");
+  const answer = finalizeCreditAnswer({ status: "complete", paragraphs: [{ text: "新增内容50亿元", citations: [{ sourceId: indexOnly.id, quote: "新增内容50亿元" }] }], gaps: [], attachments: [] },
+    whole, new Map([[indexOnly.id, indexOnly]]), []);
+  assert.equal(answer.files[0].id, doc.id);
+  assert.equal(answer.sources[0].locator, "AI Search 检索片段");
 });
 
 test("original file keys preserve names while rejecting traversal and non-material paths", () => {
@@ -141,17 +152,19 @@ test("original file keys preserve names while rejecting traversal and non-materi
   for (const key of ["originals/../secret.pdf", "originals//报告.pdf", "originals/报告.pdf\n", "originals/报告\\a.pdf", "catalog/corpus.json", "originals/file.exe"]) assert.equal(isCreditOriginalKey(key), false);
 });
 
-test("a multi-row search chunk prioritizes the requested account over a longer neighboring row", () => {
+test("a multi-row search chunk preserves every returned row and its numeric context", () => {
   const key = "search/财务报表.xlsx.md";
   const rows = [{ ...blocks[0], id: "borrowing-row", searchKey: key, text: "2025年 取得借款收到的现金 5000000000" },
     { ...blocks[1], id: "neighbor-row", searchKey: key, text: "2025年 分配股利利润或偿付利息支付的现金。筹资活动现金流出小计。支付其他与筹资活动有关的现金。" }];
-  const result = canonicalSearchEvidence({ ...corpus, blocks: rows }, "2025年取得借款收到的现金", [{ key, text: rows.map(b => b.text).join("\n") }]);
-  assert.equal(result[0].id, "borrowing-row");
+  const text = rows.map(b => b.text).join("\n");
+  const result = searchResultEvidence({ ...corpus, blocks: rows }, [{ key, text }]);
+  assert.equal(result[0].text, text);
+  assert.equal(result[0].documentId, doc.id);
 });
 
 test("credit tool decisions use the Responses-supported anyOf schema", () => {
   const json = z.toJSONSchema(stepSchema);
-  assert.equal(json.properties.step.anyOf.length, 4);
+  assert.equal(json.properties.step.anyOf.length, 5);
   assert.equal(JSON.stringify(json).includes('"oneOf"'), false);
   assert.deepEqual(stepSchema.parse({ step: { action: "search", query: "借款" } }), { step: { action: "search", query: "借款" } });
   assert.equal(stepSchema.safeParse({ step: { action: "calculate", query: "借款" } }).success, false);

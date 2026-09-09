@@ -7,7 +7,7 @@ export const documentSchema = z.object({
 });
 export const blockSchema = z.object({
   id: z.string(), documentId: z.string(), locator: z.string(), text: z.string(),
-  extraction: z.enum(["text", "ocr", "unreadable"]), searchKey: z.string(),
+  extraction: z.enum(["text", "ocr", "unreadable", "ai_search"]), searchKey: z.string(),
 });
 export const corpusSchema = z.object({
   version: z.enum(["credit-extract-v1", "credit-document-v2"]), builtAt: z.string(),
@@ -24,7 +24,7 @@ export const creditCustomerSchema = z.object({
 });
 export type CreditCustomer = z.infer<typeof creditCustomerSchema>;
 export const creditCustomerSelectionSchema = z.object({ institutionName: z.string().trim().min(1).max(200) }).strict();
-export const creditQuestionSchema = creditCustomerSelectionSchema.extend({ question: z.string().trim().min(1).max(3000) });
+export const creditQuestionSchema = creditCustomerSelectionSchema.extend({ question: z.string().trim().min(1) });
 export function confidentialityLabel(signed: boolean): string {
   return signed === true ? "已签署保密协议" : "未签署保密协议";
 }
@@ -53,10 +53,20 @@ export type CreditAnswer = CreditAnswerDraft & {
   disclosure?: { policyVersion: 1; institutionName: string; documentIds: string[]; blocked: boolean };
 };
 export type CreditTurn = { id: string; question: string; answer: CreditAnswer; createdAt: string };
+export const CREDIT_STAGES = [
+  { id: "scope", label: "问题判断" }, { id: "retrieval", label: "检索材料" },
+  { id: "answer", label: "生成答复" }, { id: "review", label: "证据复核" },
+] as const;
+export type CreditStage = (typeof CREDIT_STAGES)[number]["id"];
 export type CreditSession = {
   turns: CreditTurn[]; running: boolean; progress: string; error: string | null; startedAt: number;
   pendingQuestion?: string;
   customer?: CreditCustomer | null;
+  conversationId?: string;
+  questionId?: string;
+  stage?: CreditStage;
+  completedStages?: CreditStage[];
+  draftText?: string;
 };
 // Responses structured outputs support nested anyOf; Zod's discriminated union emits oneOf.
 export const stepSchema = z.object({ step: z.union([
@@ -64,6 +74,7 @@ export const stepSchema = z.object({ step: z.union([
   z.object({ action: z.literal("read"), sourceIds: z.array(z.string()).min(1).max(12) }),
   z.object({ action: z.literal("calculate"), calculation: calculationSchema }),
   z.object({ action: z.literal("answer"), answer: answerSchema }),
+  z.object({ action: z.literal("refuse") }),
 ]) });
 
 export function customerAnswerText(answer: CreditAnswer): string {

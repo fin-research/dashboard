@@ -3,12 +3,17 @@ import { loadCreditCorpus, isCreditOriginalKey } from "../src/lib/server/credit-
 import { findCreditCustomers } from "../src/lib/server/credit-repository.ts";
 import { withPostgres } from "../src/lib/server/postgres.ts";
 import { canDownloadCreditDocument, creditCorpusForCustomer, isPublicCreditDocument, CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
-import type { CreditSession } from "../src/lib/credit-assistant/types.ts";
+import { creditCustomerSelectionSchema, creditQuestionSchema, type CreditSession } from "../src/lib/credit-assistant/types.ts";
+import type { SiteIdentity } from "../src/lib/identity.ts";
+import { creditAgentName } from "../src/lib/server/credit-session.ts";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+// Transport/memory protection only; there is no question character limit.
+const MAX_REQUEST_BYTES = 1024 * 1024;
 const PRIVATE_HEADERS = { "cache-control": "private, no-store", "x-content-type-options": "nosniff" };
 
-export async function creditAssistantHttp(request: Request, env: Cloudflare.Env): Promise<Response> {
+export async function creditAssistantHttp(request: Request, env: Cloudflare.Env, user: SiteIdentity | null): Promise<Response> {
+  if (!user?.auth0Id) return Response.json({ error: "请先登录" }, { status: 401, headers: PRIVATE_HEADERS });
+  const userId = user.auth0Id;
   const url = new URL(request.url);
   if (!["GET", "HEAD"].includes(request.method) && request.headers.get("origin") !== url.origin) {
     return Response.json({ error: "请求来源不匹配" }, { status: 403, headers: PRIVATE_HEADERS });
@@ -21,42 +26,51 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env)
       const institutions = query ? await withPostgres(env.HYPERDRIVE.connectionString, "credit-customer-search", client => findCreditCustomers(client, query)) : [];
       return Response.json({ institutions }, { headers: PRIVATE_HEADERS });
     }
-    if (["/api/credit-assistant/session", "/api/credit-assistant/session/new", "/api/credit-assistant/session/institution"].includes(url.pathname)) {
+    if (["/api/credit-assistant/session", "/api/credit-assistant/session/new", "/api/credit-assistant/session/institution", "/api/credit-assistant/session/events"].includes(url.pathname)) {
       const newSession = url.pathname.endsWith("/new");
+      const stream = url.pathname.endsWith("/events");
+      if (stream && request.method !== "GET") return new Response(null, { status: 405 });
       if ((newSession || url.pathname.endsWith("/institution")) && request.method !== "POST") return new Response(null, { status: 405 });
       if (!["GET", "POST", "DELETE"].includes(request.method)) return new Response(null, { status: 405 });
-      const cookie = request.headers.get("cookie")?.match(/(?:^|;\s*)credit-session=([^;]+)/)?.[1];
-      const session = !newSession && cookie && UUID.test(cookie) ? cookie : crypto.randomUUID();
-      let forwarded = newSession ? new Request(url.origin + "/api/credit-assistant/session") : request;
-      if (request.method === "POST" && !newSession) {
-        if (Number(request.headers.get("content-length") ?? 0) > 16000) return new Response(null, { status: 413 });
+      let institutionName = (url.searchParams.get("institutionName") ?? "").trim();
+      let forwarded = request;
+      if (request.method === "POST") {
+        if (Number(request.headers.get("content-length") ?? 0) > MAX_REQUEST_BYTES) return new Response(null, { status: 413 });
         const reader = request.body?.getReader();
         const chunks: Uint8Array[] = []; let size = 0;
         if (reader) while (true) {
           const chunk = await reader.read(); if (chunk.done) break;
           size += chunk.value.byteLength;
-          if (size > 16000) { await reader.cancel(); return new Response(null, { status: 413 }); }
+          if (size > MAX_REQUEST_BYTES) { await reader.cancel(); return new Response(null, { status: 413 }); }
           chunks.push(chunk.value);
         }
         const bytes = new Uint8Array(size); let offset = 0;
         for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
         const body = new TextDecoder().decode(bytes);
-        try { JSON.parse(body); } catch { return Response.json({ error: "请求不是有效JSON" }, { status: 400 }); }
+        let input: unknown;
+        try { input = JSON.parse(body); } catch { return Response.json({ error: "请求不是有效JSON" }, { status: 400 }); }
+        const parsed = (newSession || url.pathname.endsWith("/institution") ? creditCustomerSelectionSchema : creditQuestionSchema).safeParse(input);
+        if (!parsed.success) return Response.json({ error: "请输入问题并从列表中选择客户机构。" }, { status: 400, headers: PRIVATE_HEADERS });
+        institutionName = parsed.data.institutionName;
         forwarded = new Request(request.url, { method: "POST", headers: request.headers, body });
       }
-      const agent = await getAgentByName(env.CREDIT_AGENT, session);
+      if (!institutionName) return request.method === "GET" && !stream
+        ? Response.json({ turns: [], running: false, progress: "", error: null, startedAt: 0, customer: null }, { headers: PRIVATE_HEADERS })
+        : Response.json({ error: "请先输入客户名称并从列表中选择机构。" }, { status: 400, headers: PRIVATE_HEADERS });
+      if (!creditCustomerSelectionSchema.safeParse({ institutionName }).success) return new Response(null, { status: 400 });
+      const agent = await getAgentByName(env.CREDIT_AGENT, creditAgentName(userId, institutionName));
       const response = await agent.fetch(forwarded);
       const headers = new Headers(response.headers);
       for (const [key, value] of Object.entries(PRIVATE_HEADERS)) headers.set(key, value);
-      headers.set("set-cookie", `credit-session=${session}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${url.protocol === "https:" ? "; Secure" : ""}`);
+      if (stream) headers.set("cache-control", "private, no-store, no-transform");
       return new Response(response.body, { status: response.status, headers });
     }
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405 });
     const corpus = await loadCreditCorpus(env.CREDIT);
     async function currentSession(): Promise<CreditSession | null> {
-      const cookie = request.headers.get("cookie")?.match(/(?:^|;\s*)credit-session=([^;]+)/)?.[1];
-      if (!cookie || !UUID.test(cookie)) return null;
-      const agent = await getAgentByName(env.CREDIT_AGENT, cookie);
+      const institutionName = (url.searchParams.get("institutionName") ?? "").trim();
+      if (!creditCustomerSelectionSchema.safeParse({ institutionName }).success) return null;
+      const agent = await getAgentByName(env.CREDIT_AGENT, creditAgentName(userId, institutionName));
       const result = await agent.fetch(new Request(url.origin + "/api/credit-assistant/session"));
       if (!result.ok) throw new Error("Credit session unavailable");
       return result.json<CreditSession>();
