@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {creditDatabase,seedCredit} from "./helpers/credit-database.mjs";
 
 import { utils, write } from "xlsx";
 
@@ -139,208 +140,64 @@ test("周报快讯覆盖五类授信事件且扩额优先于同时发生的续�
   ]);
 });
 
-test("只有一个报告日时不生成周度变化且数据库查询顺序执行", async () => {
-  let active = false;
-  const client = {
-    async query(sql) {
-      assert.equal(active, false, "同一 pg.Client 不应并发执行查询");
-      active = true;
-      await new Promise((resolve) => setImmediate(resolve));
-      active = false;
-      if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
-        return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
-      }
-      if (/FROM credit\.institution_usage\s[\s\S]*WHERE report_date/.test(sql)) {
-        return { rows: [institutionRow()], rowCount: 1 };
-      }
-      if (/FROM credit\.item/.test(sql)) {
-        return { rows: [], rowCount: 0 };
-      }
-      if (/FROM credit\.institution_event/.test(sql)) {
-        return { rows: [], rowCount: 0 };
-      }
-      throw new Error(`未处理的 SQL：${sql}`);
-    },
-  };
-
-  const report = await loadCreditReport(client, "2026-08-21");
-
-  assert.equal(report.previousDate, null);
-  assert.equal(report.summary.totalLimit, 10);
-  assert.equal(report.summary.totalUsed, 3);
-  assert.equal(report.summary.totalAvailable, 7);
-  assert.equal(report.weeklySummary.addedInstitutionCount, 0);
-  assert.equal(report.weeklySummary.expiredInstitutionCount, 0);
-  assert.deepEqual(report.weeklyNews, []);
-  assert.deepEqual(report.limitChanges, []);
-  assert.deepEqual(report.usageChanges, []);
-  assert.ok(report.calendarEvents.some((event) => event.type === "expiry"));
+test("初始截面不生成周度变化且单个数据库连接顺序执行", async t => {
+  const db=await creditDatabase(t);await seedCredit(db);
+  let active=false; const query=db.query.bind(db);
+  db.query=async(...args)=>{assert.equal(active,false);active=true;try{return await query(...args)}finally{active=false}};
+  const report=await loadCreditReport(db,'2026-08-21');
+  assert.equal(report.previousDate,null);assert.equal(report.summary.totalLimit,10);assert.equal(report.summary.totalUsed,3);
+  assert.equal(report.summary.totalAvailable,7);assert.deepEqual(report.weeklyNews,[]);
+  assert.deepEqual(report.usageChanges,[]);assert.ok(report.calendarEvents.some(event=>event.type==='expiry'));
 });
 
-test("周报从独立事件表读取全部事件并筛选近6个月批复", async () => {
-  const rows = [
-    institutionRow({ report_date: "2026-08-14", institution_name: "甲银行", total_limit: 10, total_used: 3, expiry_date: "2026-12-31" }),
-    institutionRow({ report_date: "2026-08-14", institution_name: "乙银行", total_limit: 2, total_used: 1, expiry_date: "2026-08-20" }),
-    institutionRow({ report_date: "2026-08-21", institution_name: "甲银行", total_limit: 12, total_used: 4, expiry_date: "2027-12-31" }),
-    institutionRow({ report_date: "2026-08-21", institution_name: "乙银行", status: "revoked", total_limit: 2, total_used: 1, expiry_date: "2026-08-20" }),
-    institutionRow({ report_date: "2026-08-21", institution_name: "丙银行", total_limit: 5, total_used: 0, effective_date: "2026-08-21" }),
-  ];
-  const client = {
-    async query(sql) {
-      if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
-        return { rows: [{ report_date: "2026-08-14" }, { report_date: "2026-08-21" }], rowCount: 2 };
-      }
-      if (/FROM credit\.institution_usage\s[\s\S]*WHERE report_date/.test(sql)) {
-        return { rows, rowCount: rows.length };
-      }
-      if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };
-      if (/FROM credit\.institution_event/.test(sql)) {
-        const events = [
-          institutionEventRow({ institution_name: "甲银行", event_type: "increase", previous_total_limit: 10, current_total_limit: 12, delta_amount: 2, current_expiry_date: "2027-12-31" }),
-          institutionEventRow({ institution_name: "丙银行", event_type: "new", previous_total_limit: null, current_total_limit: 5, delta_amount: 5, current_effective_date: "2026-08-21" }),
-          institutionEventRow({ institution_name: "乙银行", event_type: "revocation", previous_total_limit: 2, current_total_limit: 2, delta_amount: 0, current_expiry_date: "2026-08-20" }),
-        ];
-        return { rows: events, rowCount: events.length };
-      }
-      throw new Error(`未处理的 SQL：${sql}`);
-    },
-  };
-
-  const report = await loadCreditReport(client, "2026-08-21");
-
-  assert.equal(report.weeklySummary.totalLimit, 17);
-  assert.equal(report.weeklySummary.totalUsed, 4);
-  assert.equal(report.weeklySummary.totalAvailable, 13);
-  assert.equal(report.weeklySummary.addedInstitutionCount, 1);
-  assert.equal(report.weeklySummary.expiredInstitutionCount, 1);
-  assert.deepEqual(
-    report.weeklyNews.map((news) => [news.institutionName, news.eventType]),
-    [["甲银行", "increase"], ["丙银行", "new"], ["乙银行", "revocation"]],
-  );
-  assert.deepEqual(report.recentApprovals.map((event) => event.institutionName), ["甲银行", "丙银行"]);
-  assert.ok(report.calendarEvents.some((event) => event.kind === "renewal"));
-  assert.ok(report.calendarEvents.some((event) => event.kind === "increase"));
-  assert.ok(report.calendarEvents.some((event) => event.kind === "revoked"));
+test("周报从变更和到期日期派生事件并筛选近六个月批复", async t => {
+  const db=await creditDatabase(t);
+  await seedCredit(db,'2026-08-14','甲银行',{expiry_date:'2026-12-31'});
+  await seedCredit(db,'2026-08-14','乙银行',{total:2,bond_investment_used:1,expiry_date:'2026-08-20'});
+  await db.query("SELECT credit.append_diff('2026-08-21','甲银行','{\"total\":12,\"bond_investment_used\":4,\"expiry_date\":\"2027-12-31\"}', 'auth0|test')");
+  await db.query("SELECT credit.append_diff('2026-08-21','乙银行','{\"status\":\"revoked\"}', 'auth0|test')");
+  await seedCredit(db,'2026-08-21','丙银行',{total:5,bond_investment_used:0,effective_date:'2026-08-21'});
+  const report=await loadCreditReport(db,'2026-08-21');
+  assert.equal(report.summary.totalLimit,17);assert.equal(report.summary.totalUsed,4);
+  assert.equal(report.weeklySummary.addedInstitutionCount,1);assert.equal(report.weeklySummary.expiredInstitutionCount,2);
+  assert.deepEqual(report.weeklyNews.map(x=>x.eventType).sort(),['expiry','increase','new','revocation']);
+  assert.deepEqual(report.recentApprovals.map(x=>x.institutionName).sort(),['丙银行','甲银行'].sort());
+  assert.ok(report.calendarEvents.some(e=>e.label==='授信扩额 · 12亿元'));
+  assert.ok(report.calendarEvents.some(e=>e.label==='债券投资 · + 1 亿元'));
+  assert.equal(report.calendarEvents.some(e=>e.kind==='renewal'),false);
 });
 
-test("同日报表导入替换机构与分项并刷新独立授信事件表", async () => {
-  const calls = [];
-  const client = {
-    async query(sql, parameters) {
-      calls.push({ sql, parameters });
-      if (/AS approved_count/.test(sql)) return { rows: [{ approved_count: 2, total_limit: 12, total_used: 4, total_available: 8 }], rowCount: 1 };
-      return /SELECT 1 FROM credit\.institution/.test(sql)
-        ? { rows: [{ "?column?": 1 }], rowCount: 1 }
-        : { rows: [], rowCount: 0 };
-    },
-  };
-  const parsed = parseCreditWorkbook(workbookBuffer(), {
-    reportDate: "2026-08-21",
-    originalFileName: "授信周报.xlsx",
-  });
-
-  const result = await persistCreditWorkbook(client, {
-    parsed,
-  });
-  const sql = calls.map((call) => call.sql).join("\n");
-
-  assert.equal(result.replaced, true);
-  assert.match(sql, /DELETE FROM credit\.institution/);
-  assert.match(sql, /INSERT INTO credit\.institution/);
-  assert.match(sql, /INSERT INTO credit\.item/);
-  assert.match(sql, /refresh_institution_events/);
-  assert.doesNotMatch(sql, /daily_summary|institution_daily|item_daily|import_run|_snapshot/);
-  assert.equal(calls.at(-1).sql, "COMMIT");
+test("同日报表重复导入无变更不增加行，变化只追加差异", async t => {
+  const db=await creditDatabase(t);
+  const parsed=parseCreditWorkbook(workbookBuffer(),{reportDate:'2026-08-21',originalFileName:'授信周报.xlsx'});
+  const first=await persistCreditWorkbook(db,{parsed,createdBy:'auth0|test'});
+  const repeat=await persistCreditWorkbook(db,{parsed,createdBy:'auth0|test'});
+  assert.equal(first.addedDiffCount,2);assert.equal(repeat.addedDiffCount,0);assert.equal(repeat.replaced,false);
+  const before=(await db.query('SELECT to_jsonb(d) value FROM credit.diff d ORDER BY id')).rows;
+  parsed.institutions[0].totalLimit=11;
+  assert.equal((await persistCreditWorkbook(db,{parsed,createdBy:'auth0|test'})).addedDiffCount,1);
+  assert.deepEqual((await db.query('SELECT to_jsonb(d) value FROM credit.diff d ORDER BY id LIMIT 2')).rows,before);
+  const row=(await db.query('SELECT * FROM credit.diff ORDER BY id DESC LIMIT 1')).rows[0];
+  assert.equal(Number(row.total),11);assert.equal(row.institution_type,null);assert.equal(row.bond_investment_used,null);
 });
 
-test("授信详情只更新机构增量字段并在同一事务返回服务端实体", async () => {
-  const calls = [];
-  const client = {
-    async query(sql, parameters) {
-      calls.push({ sql, parameters });
-      if (/UPDATE credit\.institution/.test(sql)) {
-        return {
-          rows: [{
-            effective_date: null,
-            expiry_date: null,
-          }],
-          rowCount: 1,
-        };
-      }
-      if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
-        return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
-      }
-      if (/FROM credit\.institution_usage\s[\s\S]*WHERE report_date/.test(sql)) {
-        return { rows: [institutionRow({ notes: "已更新", updated_at: "2026-08-21T10:00:00.000Z" })], rowCount: 1 };
-      }
-      if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };
-      return { rows: [], rowCount: 0 };
-    },
-  };
-  const current = institution("甲银行", 10, 3, 4, 1);
-
-  const result = await saveCreditInstitution(client, {
-    reportDate: current.reportDate,
-    institutionName: current.institutionName,
-    changes: {
-      institution: { notes: "已更新" },
-    },
-  });
-  const sql = calls.map((call) => call.sql).join("\n");
-  const updateCall = calls.find((call) => /UPDATE credit\.institution/.test(call.sql));
-
-  assert.doesNotMatch(sql, /institution\.updated_at\s*=/);
-  assert.match(sql, /patch\.data \? 'notes'/);
-  assert.doesNotMatch(sql, /jsonb_array_elements/);
-  assert.deepEqual(JSON.parse(updateCall.parameters[2]), { notes: "已更新" });
-  assert.equal(result.institution.notes, "已更新");
-  assert.equal(result.institution.updatedAt, "2026-08-21T10:00:00.000Z");
-  assert.ok(
-    calls.findIndex((call) => /SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(call.sql)) <
-      calls.findIndex((call) => call.sql === "COMMIT"),
-  );
+test("授信详情追加主体字段并保留用户和旧行", async t => {
+  const db=await creditDatabase(t);await seedCredit(db);
+  const before=(await db.query('SELECT to_jsonb(d) value FROM credit.diff d')).rows[0];
+  const result=await saveCreditInstitution(db,{reportDate:'2026-08-21',institutionName:'甲银行',changes:{institution:{notes:'已更新'}}},'auth0|test');
+  assert.equal(result.institution.notes,'已更新');assert.equal(result.institution.totalLimit,10);
+  assert.deepEqual((await db.query('SELECT to_jsonb(d) value FROM credit.diff d ORDER BY id LIMIT 1')).rows[0],before);
+  const row=(await db.query('SELECT * FROM credit.diff ORDER BY id DESC LIMIT 1')).rows[0];
+  assert.equal(row.created_by,'auth0|test');assert.equal(row.updated_at,null);assert.equal(row.total,null);
 });
 
-test("授信详情只更新发生变化的单个分项字段", async () => {
-  const calls = [];
-  const client = {
-    async query(sql, parameters) {
-      calls.push({ sql, parameters });
-      if (/UPDATE credit\.institution/.test(sql)) {
-        return {
-          rows: [{
-            effective_date: null,
-            expiry_date: null,
-          }],
-          rowCount: 1,
-        };
-      }
-      if (/UPDATE credit\.item/.test(sql)) return { rows: [], rowCount: 1 };
-      if (/SELECT DISTINCT[\s\S]*FROM credit\.institution/.test(sql)) {
-        return { rows: [{ report_date: "2026-08-21" }], rowCount: 1 };
-      }
-      if (/FROM credit\.institution_usage\s[\s\S]*WHERE report_date/.test(sql)) {
-        return { rows: [institutionRow()], rowCount: 1 };
-      }
-      if (/FROM credit\.item/.test(sql)) return { rows: [], rowCount: 0 };
-      return { rows: [], rowCount: 0 };
-    },
-  };
-  const current = institution("甲银行", 10, 3, 4, 1);
-
-  await saveCreditInstitution(client, {
-    reportDate: current.reportDate,
-    institutionName: current.institutionName,
-    changes: {
-      items: [{ type: "bond_investment", usedAmount: 2 }],
-    },
-  });
-  const itemUpdate = calls.find((call) => /UPDATE credit\.item/.test(call.sql));
-
-  assert.match(itemUpdate.sql, /changes\.patch \? 'usedAmount'/);
-  assert.deepEqual(JSON.parse(itemUpdate.parameters[2]), [
-    { type: "bond_investment", usedAmount: 2 },
-  ]);
+test("分项维护只追加该字段并在同一事务返回重建后的截面", async t => {
+  const db=await creditDatabase(t);await seedCredit(db);
+  const result=await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{items:[{type:'bond_investment',usedAmount:2}]}},'auth0|test');
+  assert.equal(result.institution.totalUsed,2);assert.equal(result.institution.totalLimit,10);
+  assert.equal((await loadCreditReport(db,'2026-08-21')).institutions[0].totalUsed,3);
+  const row=(await db.query('SELECT * FROM credit.diff ORDER BY id DESC LIMIT 1')).rows[0];
+  assert.equal(Number(row.bond_investment_used),2);assert.equal(row.bond_investment_limit,null);assert.equal(row.status,null);
 });
 
 test("授信增量 PATCH 不需要版本且拒绝空变更", () => {
@@ -380,12 +237,12 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.match(eventMigration, /SELECT credit\.refresh_institution_events\(\)/);
   assert.doesNotMatch(repository, /daily_summary|institution_daily|item_daily|import_run|_snapshot/);
   assert.doesNotMatch(repository, /expectedUpdatedAt|updated_at = \$3::timestamptz/);
-  assert.match(repository, /SS\.US/);
+  assert.match(repository, /to_jsonb\(d\)/);
   assert.doesNotMatch(repository, /SS\.MS/);
-  assert.match(repository, /jsonb_array_elements/);
+  assert.match(repository, /credit\.append_diff/);
   assert.match(
     repository,
-    /report = await loadCreditReport\(client, input\.reportDate\);\s+await client\.query\("COMMIT"\)/,
+    /report=await loadCreditReport\(client,input\.reportDate\);\s+await client\.query\('COMMIT'\)/,
   );
   assert.match(route, /HYPERDRIVE/);
   assert.match(route, /export const PATCH/);
@@ -597,4 +454,84 @@ test('授信布尔协议契约拒绝字符串及已删除的周报标记', () =>
   assert.equal(check({ confidentialityStatus: false }), true);
   for (const value of ['signed', 'not_signed', 'unknown', 'false']) assert.equal(check({ confidentialityStatus: value }), false);
   assert.equal(check({ includedInWeeklyReport: false }), false);
+});
+
+test('稀疏变更正确继承 false、零和清空，补录历史不覆盖后续显式变更',async t=>{
+  const db=await creditDatabase(t);await seedCredit(db,'2026-08-21','甲银行',{confidentiality_status:true,notes:'旧备注'});
+  await saveCreditInstitution(db,{reportDate:'2026-08-23',institutionName:'甲银行',changes:{institution:{totalLimit:12,notes:'后续备注'}}},'auth0|test');
+  await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{institution:{confidentialityStatus:false,totalLimit:0,notes:null},items:[{type:'bond_investment',usedAmount:0}]}},'auth0|test');
+  const before=(await loadCreditReport(db,'2026-08-21')).institutions[0];
+  const middle=(await loadCreditReport(db,'2026-08-22')).institutions[0];
+  const after=(await loadCreditReport(db,'2026-08-25')).institutions[0];
+  assert.equal(before.notes,'旧备注');assert.equal(middle.notes,null);assert.equal(middle.totalLimit,0);assert.equal(middle.confidentialityStatus,false);
+  assert.equal(after.totalLimit,12);assert.equal(after.notes,'后续备注');assert.equal(after.totalUsed,0);
+  const sql=(await db.query("SELECT notes,total::float8,confidentiality_status FROM credit.state_as_of('2026-08-25')")).rows[0];
+  assert.deepEqual(sql,{notes:'后续备注',total:12,confidentiality_status:false});
+  const row=(await db.query("SELECT cleared_fields,total FROM credit.diff WHERE effective_on='2026-08-22'")).rows[0];
+  assert.deepEqual(row.cleared_fields,['notes']);assert.equal(Number(row.total),0);
+});
+
+test('拆借和收益凭证按实际生效、到期和提前结清日期显示逐项变动',async t=>{
+  const db=await creditDatabase(t);await seedCredit(db,'2026-08-01','甲银行',{expiry_date:'2027-12-31'});
+  await db.exec(`INSERT INTO financing.debt(debt_type,name,client_id,amount,activated_at,maturity_date,settled_at) VALUES
+    ('同业拆借','借入',(SELECT id FROM public.client WHERE name='甲银行'),100000000,'2026-08-21','2026-08-25',NULL),
+    ('收益凭证','凭证',(SELECT id FROM public.client WHERE name='甲银行'),200000000,'2026-08-21','2026-08-30','2026-08-24')`);
+  const report=await loadCreditReport(db,'2026-08-26');
+  const events=report.calendarEvents.filter(e=>e.type==='usage');
+  assert.deepEqual(events.map(e=>[e.date,e.label]),[
+    ['2026-08-21','同业拆借 · + 1 亿元'],['2026-08-21','收益凭证 · + 2 亿元'],
+    ['2026-08-24','收益凭证 · - 2 亿元'],['2026-08-25','同业拆借 · - 1 亿元'],
+  ]);
+  assert.equal(events.some(e=>/合计|总已用/.test(e.label)),false);
+  const historical=await loadCreditReport(db,'2026-08-22');assert.equal(historical.summary.totalUsed,6);
+});
+
+test('分项额度变化进入日历，续作替换旧到期提醒且跨月可查询',async t=>{
+  const db=await creditDatabase(t);await seedCredit(db);
+  await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{items:[{type:'bond_investment',limitAmount:6}]}},'auth0|test');
+  await saveCreditInstitution(db,{reportDate:'2026-08-23',institutionName:'甲银行',changes:{institution:{expiryDate:'2027-01-15'}}},'auth0|test');
+  const august=await loadCreditReport(db,'2026-08-25');
+  assert.ok(august.calendarEvents.some(e=>e.date==='2026-08-22'&&e.label==='授信调整 · 10亿元'));
+  assert.equal(august.calendarEvents.some(e=>e.date==='2026-08-30'&&e.kind==='expiry'),false);
+  const january=await loadCreditReport(db,'2026-08-25','2027-01');
+  assert.ok(january.calendarEvents.some(e=>e.date==='2027-01-15'&&e.label==='授信到期 · 10亿元'));
+});
+
+test('无效组合回滚完整变更，新增机构后可直接维护',async t=>{
+  const db=await creditDatabase(t);
+  const input={reportDate:'2026-08-21',institutionName:'甲银行',changes:{institution:{institutionType:'城商行',confidentialityStatus:false,status:'applying'}}};
+  await saveCreditInstitution(db,input,'auth0|test',true);
+  await assert.rejects(saveCreditInstitution(db,input,'auth0|test',true),/已存在/);
+  const before=(await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n;
+  await assert.rejects(saveCreditInstitution(db,{...input,changes:{institution:{effectiveDate:'2026-09-01',expiryDate:'2026-08-01'},items:[{type:'other',usedAmount:5}]}},'auth0|test'),/到期日不能早于生效日/);
+  assert.equal((await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n,before);
+});
+
+// This exercises a nonempty conversion and the explicit removal of the three old tables.
+test('旧快照转换可逐字段复原，并记录旧字段清空和机构撤销',async t=>{
+  const db=await creditDatabase(t,true);
+  await db.exec(`INSERT INTO credit.institution(report_date,institution_name,institution_type,status,confidentiality_status,total_limit,notes,usage_details) VALUES
+    ('2026-08-21','甲','股份行','approved',true,10,'描述','备注'),
+    ('2026-08-28','甲','股份行','approved',false,10,NULL,'后续备注'),
+    ('2026-08-21','乙','城商行','approved',false,5,'乙描述',NULL);
+    INSERT INTO credit.item(report_date,institution_name,item_type,limit_amount,used_amount,details) VALUES
+    ('2026-08-21','甲','other',2,1,'其它说明'),('2026-08-28','甲','other',2,0,'其它说明');`);
+  await db.exec(await readFile(new URL('../credit-migrations/0008_credit_diff.sql',import.meta.url),'utf8'));
+  const original=(await db.query("SELECT detail,notes,confidentiality_status,other_used::float8 FROM credit.state_as_of('2026-08-21') WHERE institution_name='甲'")).rows[0];
+  const later=(await db.query("SELECT detail,notes,confidentiality_status,other_used::float8 FROM credit.state_as_of('2026-08-30') WHERE institution_name='甲'")).rows[0];
+  assert.deepEqual(original,{detail:'描述',notes:'备注',confidentiality_status:true,other_used:1});
+  assert.deepEqual(later,{detail:null,notes:'后续备注',confidentiality_status:false,other_used:0});
+  assert.equal((await db.query("SELECT status FROM credit.state_as_of('2026-08-30') WHERE institution_name='乙'")).rows[0].status,'revoked');
+  assert.deepEqual((await db.query("SELECT to_regclass('credit.institution') institution,to_regclass('credit.item') item,to_regclass('credit.institution_event') event")).rows[0],{institution:null,item:null,event:null});
+});
+
+test('数据库精度归一后相同金额不产生重复 diff，历史补录不能破坏后续期限',async t=>{
+  const db=await creditDatabase(t);await seedCredit(db);
+  const patch={reportDate:'2026-08-21',institutionName:'甲银行',changes:{institution:{totalLimit:10.1234567}}};
+  await saveCreditInstitution(db,patch,'auth0|test');
+  const count=(await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n;
+  await saveCreditInstitution(db,patch,'auth0|test');
+  assert.equal((await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n,count);
+  await saveCreditInstitution(db,{...patch,reportDate:'2026-08-25',changes:{institution:{expiryDate:'2026-08-26'}}},'auth0|test');
+  await assert.rejects(saveCreditInstitution(db,{...patch,reportDate:'2026-08-22',changes:{institution:{effectiveDate:'2026-08-29'}}},'auth0|test'),/到期日不能早于生效日/);
 });

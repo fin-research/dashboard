@@ -12,6 +12,8 @@ import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform, url }) => {
   const date = url.searchParams.get("date");
+  const month = url.searchParams.get("month");
+  if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return Response.json({error:"日历月份无效"},{status:400,headers:{"Cache-Control":"no-store"}});
   if (date && !isIsoDate(date)) {
     return Response.json(
       { error: "报表日必须是有效的 YYYY-MM-DD 日期" },
@@ -25,7 +27,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
       async (client) => {
         await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
         try {
-          const report = await loadCreditReport(client, date);
+          const report = await loadCreditReport(client, date, month ?? undefined);
           await client.query('COMMIT');
           return report;
         } catch (error) {
@@ -50,14 +52,19 @@ export const GET: RequestHandler = async ({ platform, url }) => {
   }
 };
 
-export const PATCH: RequestHandler = async ({ platform, request }) => {
+export const PATCH: RequestHandler = async ({ platform, request, locals }) => {
   try {
     validateSameOrigin(request);
+    if (!locals.user?.auth0Id) throw new CreditDatabaseError(401,"请先登录");
     const input = creditInstitutionUpdateSchema.parse(await request.json());
+    if (request.method === "POST") {
+      const fields = input.changes.institution;
+      if (!fields?.institutionType || !fields.status || fields.confidentialityStatus == null) throw new CreditDatabaseError(400,"请填写机构性质、授信状态和保密协议状态");
+    }
     const result = await withPostgres(
       platform?.env.HYPERDRIVE?.connectionString,
       "eastmoney-credit-update",
-      (client) => saveCreditInstitution(client, input),
+      (client) => saveCreditInstitution(client, input, locals.user!.auth0Id, request.method === "POST"),
     );
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
@@ -80,6 +87,8 @@ export const PATCH: RequestHandler = async ({ platform, request }) => {
     );
   }
 };
+
+export const POST = PATCH;
 
 function isIsoDate(value: string): boolean {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);

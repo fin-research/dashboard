@@ -46,12 +46,12 @@ test("client cannot submit a forged NDA flag or omit customer selection", () => 
   assert.equal(creditCustomerSelectionSchema.safeParse({ institutionName: unsigned.name, signed: true }).success, false);
 });
 
-test("institution search uses literal parameters and latest snapshot with uncached transaction", async () => {
+test("institution search uses literal parameters and reconstructed current state with uncached transaction", async () => {
   const queries = [];
   const client = { query: async (sql, values) => { queries.push({ sql, values }); return { rows: sql.startsWith("SELECT") ? [unsigned] : [] }; } };
   assert.deepEqual(await findCreditCustomers(client, "银行%_' OR true"), [unsigned]);
   assert.equal(queries[0].sql, "BEGIN READ ONLY");
-  assert.match(queries[1].sql, /max\(report_date\)/);
+  assert.match(queries[1].sql, /credit\.state_as_of/);
   assert.match(queries[1].sql, /strpos/);
   assert.deepEqual(queries[1].values, ["银行%_' OR true", false]);
   assert.equal(queries.at(-1).sql, "COMMIT");

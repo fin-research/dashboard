@@ -22,6 +22,9 @@ export function formatCreditWeeklyNews(news: CreditWeeklyNewsItem): string {
       dateDetail("到期日", expiryDate),
     ]);
   }
+  if (news.eventType === "decrease" || news.eventType === "amendment") {
+    return sentence([`${news.institutionName}授信${news.eventType === "decrease" ? "缩额" : "调整"}`,`总额${formatAmount(totalAmount)}亿`,comparisonDetail(news.deltaAmount),dateDetail("到期日",expiryDate)]);
+  }
   if (news.eventType === "renewal") {
     return sentence([
       `${news.institutionName}授信续作完成`,

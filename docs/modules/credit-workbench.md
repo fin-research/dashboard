@@ -1,54 +1,61 @@
 # 授信工作台
 
-入口：`/credit-workbench`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
+入口：`/credit-workbench`。公共规则见 [文档分流](../INDEX.md)。
 
-## 接口
+## 按日截面与存储
 
-- `GET /api/credit`：读取最新授信报告日。
-- `GET /api/credit?date=YYYY-MM-DD`：读取指定报告日；无该日期记录返回 404，无数据库连接返回 503，无效日期返回 400。
-- 响应同时返回同一口径的一览表 `summary`、周报 `weeklySummary`、上一报告日汇总、机构和分项、本周结构化授信事件 `weeklyNews`、截至所选报表日近六个月的新增/续作/扩额批复 `recentApprovals`、使用额度变动及日历事件。
-- 周环比基准是小于当前日期的上一可用报告日，不要求恰好相隔七天。本周事件包括新增、续作、扩额、到期和撤销；续作与扩额同时发生时只记为扩额。新增但使用额为零的机构不进入使用额度变动。
-- `PATCH /api/credit`：以 `(reportDate, institutionName)` 定位一条机构记录，`changes.institution` 仅传发生变化的主体字段，`changes.items` 仅传发生变化的分项及字段；主体与分项在同一事务内更新并重算响应。同字段并发修改以后提交者为准，不同字段自然合并；空增量或非法字段返回 400，记录不存在返回 404。
-- GET 与 PATCH 均使用 `Cache-Control: no-store`。Excel 解析仍只由本地命令执行，浏览器不上传源文件。
+Worker 通过 `HYPERDRIVE` 访问 Neon `credit` schema，migration 只放 `credit-migrations/`。
 
-## 存储：Neon：授信管理
+- `credit.diff` 是唯一授信业务事实表：`id` 定位变更；`institution_name` 标识主体；`effective_on` 为业务生效日；`created_at` 自动记录创建时间；`created_by` 使用已验证的 Auth0 user id。旧快照没有作者，迁移行的 `created_by` 留空，不伪造历史身份。
+- 同一字段按 `(effective_on, created_at, id)` 降序取最近非空值。数值零、布尔 false 和空字符串均是有效值；NULL 表示未变。真正清空某字段时，该字段名写入 `cleared_fields`，截面重建将其作为一次明确的空值变更。
+- `total` 保存授信总额；六项 `*_limit` 保存债券投资、收益凭证、法透、两融收益权转让、同业拆借、其它的额度；各项 `*_detail` 保留额度说明。四项人工已用值保存在 `bond_investment_used`、`legal_overdraft_used`、`margin_income_rights_used`、`other_used`。
+- `detail` 为原 `notes` 的授信额度自然语言描述；`notes` 供人工备注，迁移时保留原 `usage_details` 文本。机构性质、状态、保密协议、期限、经办机构、申请部门、经办人和投资偏好同样按字段记录差异。
+- `institution`、`item`、`institution_event` 和相应旧视图、刷新函数已经移除。期限事件和金额变化从 diff 与融资台账计算，不再维护事件事实表。
+- `credit.state_as_of(date)` 重建 SQL 截面；应用使用相同的排序和清空语义重建响应。可查询首个有记录的业务日期起的任意日期，无需该日恰有导入记录。默认日期为上海时区今天。
+- 页面与导入仅调用 `credit.append_diff`。同一事务内取得授信写锁，比较类型和金额精度归一后的当前值，只追加实际变化；同日重导或重复保存不增加无效行。补录历史从该业务日期向后生效，后续已明确修改的字段继续覆盖历史值；期限组合同时校验受影响的后续截面。
 
-Worker 通过 `HYPERDRIVE` 访问 `credit` schema；本地导入脚本使用直连 `DATABASE_URL`：
+### 历史修订
 
-- `institution`：以 `(report_date, institution_name)` 为主键，保存机构授信、使用、期限、经办信息和并发更新时间；不保存源行号或周报名单标记。
-- `item`：以 `(report_date, institution_name, item_type)` 为主键，保存标准化分项额度、原导入已使用和说明。收益凭证、同业拆借展示值从 `item_usage` 读取融资余额，保留原导入值供核对。
-- `institution_event`：以 `(report_date, institution_name)` 为主键，保存相邻报表日之间的新增、续作、扩额、到期和撤销事件，以及事件发生时的额度、期限和授信分项快照。
-- `status` 与 `item_type` 使用 PostgreSQL enum；`confidentiality_status` 为 boolean，原 `signed` 转 true，`not_signed` / `unknown` 均转 false；空授信状态在解析时规范为 `revoked`。
+正常操作不更新、删除 diff 行。数据库触发器拒绝 DELETE，拒绝普通 UPDATE。确需人工修订错误历史时，在受控事务内显式 `SET LOCAL credit.correct_history='on'` 后按主键 UPDATE；触发器自动更新 `updated_at`，创建时间、创建人和主键仍不可改。历史修订须检查受影响截面，不通过删除再导入替代。
 
-规则：
+`0008_credit_diff.sql` 将所有既有快照逐字段转成差异，保留显式清空；旧报表中机构消失的日期转成撤销变更。静态客户归属继续保留。
 
-- migration 只放 `credit-migrations/`，配置直连 `DATABASE_URL` 后运行 `pnpm credit:db:migrate`。
-- Excel 只在本地解析；导入必须显式指定报告日期，并先使用 `--dry-run` 核对机构数、统一汇总和质量提示。
-- 不建立业务导入审计表、汇总表或导入批次历史。同一报告日期在全局锁、日期锁和单事务内替换机构与分项记录，保留不带日期的静态客户关联；事务内重算全部 `institution_event`，确保补导或重导历史日期时后续比较期同步更新。
-- 一览表与周报的机构数和授信总额由 `institution` 聚合，已用和可用额度由 `institution_usage` 读取；金额统计只纳入 `approved`，不允许使用固定差额修正。
-- 可用额度、使用率和日历事件由机构和分项记录派生；本周快讯、周报新增与到期计数以及近六个月批复从 `institution_event` 读取。
-- 浏览器不接收 Excel、不直连 Neon；详情修改通过同源 `/api/credit` 参数化增量更新，主体与分项在同一事务内提交。
+## 已用额度
 
-## 页面设计
+`institution_client` 保留静态一对多客户关联，归属规则见 [客户与授信关联](clients.md)。
 
-- 授信工作台为首页一级入口 `/credit-workbench`，四个 path 标签页依次为授信一览表（根路径）、授信日历（`/calendar`）、授信周报（`/weekly`）、授信问答（`/assistant`）。两个工作台必须复用 `src/lib/workbench/WorkbenchShell.svelte` 的顶栏、侧栏、移动端抽屉、主内容区和样式；只配置名称、导航和业务内容。
+- 收益凭证、同业拆借按截面日期调用 `financing.credit_usage_as_of(date)` 读取存续本金，元转亿元；不在 diff 中重复存一份融资已用值。
+- 总已用为六项有效值之和。客户未关联时，融资已用、总已用及可用保持缺失，不能当零处理；四项人工使用额的空值沿用合计时按零处理的口径。
+- 授信总额和机构数量统计仍只纳入 `approved`。到期事件用于提醒，不自动替用户撤销机构状态。
+- 原 Excel 融资分项值仅在导入时与融资台账比较并输出警告；不再存 `importedTotalUsed` / `importedUsedAmount`。核对脚本输出当前派生额和缺失关联，原始报表差额在导入阶段核对。
 
-## 页面设计
+## 接口与维护
 
-- 授信工作台的前三个标签页复用同一个 `CreditView.svelte`，由路由参数选择一览表、日历和周报，切换这三个标签时保留已加载报表和编辑状态：一览表默认隐藏已撤销机构（可通过状态筛选查看），按政策性银行、国有行、股份行、城商行、农商行、民营银行、外资行排序，同类按名称排序；支持筛选、逐列排序、显示行序号和详情自动保存；日历按全部、到期、新增筛选事件；周报展示同口径汇总、本周五类结构化授信事件、近六个月新增/续作/扩额批复和授信明细附表。快讯使用编号列表，同一机构同时续作和扩额时只记扩额；明细附表展示全部未撤销机构，按同一分类顺序及银行性质合并单元格，不呈现分项额度变化或使用额度变化为独立快讯。
+- `GET /api/credit?date=YYYY-MM-DD&month=YYYY-MM` 返回所选日期截面、前期汇总、周报事件、六个月批复和日历。`month` 可省略，默认所选日期所在月；返回该月及周边日历格中的额度与已用事件。非法日期/月为 400，早于历史覆盖起点或无记录为 404，连接异常为 503。
+- 周环比优先采用七天前的截面；历史不足七天时取更早的最近变更日。周报事件覆盖比较期间内的新增、续作、扩额、缩额、到期和撤销；续作与扩额同时发生时只记扩额。首次历史导入作为基准，不虚构当日新增批复。
+- `PATCH /api/credit` 以 `reportDate`（本次变更业务日）、`institutionName` 和 `changes` 追加变化。`changes.institution` / `changes.items` 仅传修改字段。用户 ID 由 `locals.user.auth0Id` 注入，客户端不能指定作者或审计字段。
+- `POST /api/credit` 使用相同结构新增机构，至少包含机构性质、状态、保密协议状态。主体重复返回 409；成功后可继续维护全部详情。
+- 两项融资已用及总已用只读。所有写入校验同源、身份与 `credit.institution:update` 权限；GET 使用 `credit.institution:read`。所有响应 `Cache-Control: no-store`。
 
-## 页面设计
+## 导入
 
-- 授信四个标签使用共享侧栏导航，报表日和导出控件挂载到工作台顶栏右侧；“报表日”与选择框水平排列并使用 `1rem` 字号。页面正文不重复展示报告日、机构数、数据来源或导入时间等说明小字。
+Excel 暂时保留本地导入，浏览器不解析、不上传源文件。
 
-## 页面设计
+```sh
+pnpm credit:import -- --file /absolute/path/授信周报.xlsx --date YYYY-MM-DD --dry-run
+pnpm credit:import -- --file /absolute/path/授信周报.xlsx --date YYYY-MM-DD --user-id 'auth0|已核实的用户ID'
+```
 
-- 授信历史日期通过工具栏日期选择器切换；周报使用统一 `1080px` 版式报告画布，打印时隐藏 App Shell、工具栏和交互控件，只输出标题、报告日期、汇总与变动正文。打印不等于建立另一套页面或数据口径。
+dry-run 核对模板、机构数、一览表/周报口径与工作簿总额差异。实际导入返回 `addedDiffCount`，金额比较与写入在同一事务完成；缺席机构不会被自动删除或撤销，撤销需明确状态。来源报表不会覆盖已存在的静态客户关联。先验证目标连接，再写入；不要将源文件提交 Git。
 
-## 客户与融资使用额
+## 页面与日历
 
-- `institution_client` 静态关联一个或多个 `public.client`，不带报告日，作为唯一归属规则表，新增明确名称可自动匹配，银行自营/资管拆分及合并授信归属见 [客户关联规范](clients.md)。
-- 收益凭证、同业拆借使用额按报告日读取融资存续本金，元转亿元；总已用额始终为六类有效分项之和。管理员增删改分项时数据库同步原始分项合计；导入总数与分项不一致时警告原数、合计和差额，并使用分项合计。
-- 客户未关联显示缺失，不按零计算可用额度。总已用额及上述两项使用额在 API 与页面只读，需修订时维护融资负债。其它分项继续人工维护。
-- 接口在机构返回 `clients`、`importedTotalUsed`，分项返回 `usageSource`、`importedUsedAmount`、`linkedClientCount`；`importedTotalUsed` 表示原始分项合计，`importedUsedAmount` 保留导入融资分项值用于核对。
-- `credit.usage_reconciliation` 和 `scripts/reconcile-client-usage.mjs` 用于跨历史日期核对，区分融资差异、未关联与总额/分项不一致。
+四个侧栏入口为授信一览表、日历、周报、问答，继续复用 `WorkbenchShell`。前三页复用 `CreditView.svelte`，保留现有机构排序、筛选、详情自动保存和周报打印版式。
+
+- 顶栏用日期输入选择任意截面；一览表“新增机构”建档，详情维护所有字段和六项额度、四项人工已用。详情显示本次变更业务日期。
+- 日历支持全部、到期、额度变动、已用变动筛选，切月重新请求对应区间，所有事件均可见。
+- 额度事件格式：`授信新增/授信到期/授信扩额/授信续作/授信缩额/授信调整/授信撤销 · 总额亿元`。仅分项额度或授信描述变化也显示授信调整；已被续作替换的旧到期日不再提醒。
+- 已用按业务日、机构、具体分项显示净变化：`同业拆借 · + 1 亿元`、`收益凭证 · - 2 亿元`；不显示合计变动。融资部分读取实际生效、到期、结清、关闭日期；人工部分读取 diff 日期。
+- 周报保留编号快讯、近六个月新增/续作/扩额批复和按银行性质合并单元格的明细附表。分项额度和已用变化在日历展示，不另列周报快讯。
+
+默认验收为类型检查、单元/数据库回归与构建；真实迁移需核对旧三期所有主体字段、分项及有效使用额。浏览器与截图检查仅在明确要求时执行。

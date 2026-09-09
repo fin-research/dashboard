@@ -49,7 +49,7 @@ test('visible native fields share daisyUI primitives and native dialogs separate
     });
   }
   assert.ok(fields > 90);
-  assert.equal(dialogs, 8);
+  assert.equal(dialogs, 9);
 });
 
 test('role drafts, failed saves, personal entry and financing multi-select retain their behavior', async () => {

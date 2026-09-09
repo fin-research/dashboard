@@ -17,6 +17,7 @@ const parsed = parseCreditWorkbook(fileBuffer, {
 });
 const input: PersistCreditImportInput = {
   parsed,
+  createdBy: options.userId,
 };
 
 if (options.dryRun) {
@@ -38,6 +39,7 @@ if (options.dryRun) {
   process.exit(0);
 }
 
+if (!options.userId) throw new Error("写入时必须用 --user-id 提供导入人的 Auth0 user id");
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error("DATABASE_URL is required unless --dry-run is used");
@@ -59,22 +61,25 @@ function parseArguments(args: string[]): {
   file: string;
   reportDate: string;
   dryRun: boolean;
+  userId: string | null;
 } {
   let file = "";
   let reportDate = "";
   let dryRun = false;
+  let userId: string | null = null;
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
     if (argument === "--") continue;
     if (argument === "--file") file = args[++index] ?? "";
     else if (argument === "--date") reportDate = args[++index] ?? "";
     else if (argument === "--dry-run") dryRun = true;
+    else if (argument === "--user-id") userId = args[++index] ?? null;
     else throw new Error(`未知参数：${argument}`);
   }
   if (!file || !reportDate) {
     throw new Error(
-      "用法：pnpm credit:import -- --file <xlsx> --date YYYY-MM-DD [--dry-run]",
+      "用法：pnpm credit:import -- --file <xlsx> --date YYYY-MM-DD [--dry-run] [--user-id <Auth0 user id>]",
     );
   }
-  return { file: path.resolve(file), reportDate, dryRun };
+  return { file: path.resolve(file), reportDate, dryRun, userId };
 }

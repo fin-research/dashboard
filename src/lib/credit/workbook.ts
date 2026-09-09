@@ -121,9 +121,9 @@ export function parseCreditWorkbook(
       bankOffice: cleanText(row[28]),
       applyingDepartment: cleanText(row[29]),
       handler: cleanText(row[30]),
-      notes: cleanText(row[31]),
+      detail: cleanText(row[31]),
       bondPreference: cleanText(row[32]),
-      usageDetails: cleanText(row[33]),
+      notes: cleanText(row[33]),
       items,
     });
   }

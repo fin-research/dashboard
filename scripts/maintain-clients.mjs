@@ -51,8 +51,8 @@ try {
     (SELECT count(*) FROM financing.debt WHERE client_id IS NOT NULL) AS linked_debts,
     (SELECT count(*) FROM financing.debt WHERE client_id IS NULL) AS unlinked_debts,
     (SELECT count(*) FROM credit.institution_client) AS credit_links,
-    (SELECT count(*) FROM credit.usage_reconciliation WHERE report_date=(SELECT max(report_date) FROM credit.institution) AND status='mismatch') AS latest_mismatches,
-    (SELECT count(*) FROM credit.usage_reconciliation WHERE report_date=(SELECT max(report_date) FROM credit.institution) AND status='unlinked') AS latest_unlinked`);
+    (SELECT count(*) FROM credit.state_as_of((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date) s
+      WHERE NOT EXISTS(SELECT 1 FROM credit.institution_client m WHERE m.institution_name=s.institution_name)) AS latest_unlinked`);
   await database.query(process.argv.includes('--apply') ? 'COMMIT' : 'ROLLBACK');
   console.log(JSON.stringify({ mode: process.argv.includes('--apply') ? 'applied' : 'rollback-preview', linkedNow: linked.rowCount, ...rows[0] },null,2));
 } catch (error) {

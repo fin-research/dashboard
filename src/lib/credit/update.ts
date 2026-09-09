@@ -30,9 +30,9 @@ const creditInstitutionChangesSchema = z.object({
   bankOffice: nullableText(500),
   applyingDepartment: nullableText(500),
   handler: nullableText(200),
-  notes: nullableText(4_000),
+  detail: nullableText(4_000),
   bondPreference: nullableText(4_000),
-  usageDetails: nullableText(8_000),
+  notes: nullableText(8_000),
 }).partial().strict();
 
 const creditItemChangesSchema = z.object({
@@ -59,7 +59,7 @@ export const creditInstitutionUpdateSchema = z.object({
     institution: creditInstitutionChangesSchema.optional(),
     items: z.array(creditItemChangesSchema).max(creditItemTypes.length).optional(),
   }).strict(),
-}).superRefine((value, context) => {
+}).strict().superRefine((value, context) => {
   const institutionChanges = value.changes.institution ?? {};
   const itemChanges = value.changes.items ?? [];
   if (!Object.keys(institutionChanges).length && !itemChanges.length) {

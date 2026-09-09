@@ -29,10 +29,16 @@ async function database(t, legacy = false) {
 }
 
 async function institution(db, date='2026-09-04', name='合并授信') {
-  await db.query(`INSERT INTO credit.institution(report_date,institution_name,institution_type,confidentiality_status,status,total_limit,total_used)
-    VALUES ($1,$2,'银行',false,'approved',20,10)`,[date,name]);
-  for (const type of creditItemTypes) await db.query(`INSERT INTO credit.item(report_date,institution_name,item_type,limit_amount,used_amount)
-    VALUES ($1,$2,$3,20,$4)`,[date,name,type,type==='yield_certificate'?8:type==='other'?2:0]);
+  const current=(await db.query("SELECT to_regclass('credit.diff') AS name")).rows[0].name;
+  if (current) {
+    await db.query('SELECT credit.append_diff($1,$2,$3,$4)',[date,name,JSON.stringify({institution_type:'银行',confidentiality_status:false,status:'approved',total:20,
+      ...Object.fromEntries(creditItemTypes.map(type=>[type+'_limit',20])),other_used:2,bond_investment_used:0,legal_overdraft_used:0,margin_income_rights_used:0}),'auth0|test']);
+  } else {
+    await db.query(`INSERT INTO credit.institution(report_date,institution_name,institution_type,confidentiality_status,status,total_limit,total_used)
+      VALUES ($1,$2,'银行',false,'approved',20,10)`,[date,name]);
+    for (const type of creditItemTypes) await db.query(`INSERT INTO credit.item(report_date,institution_name,item_type,limit_amount,used_amount)
+      VALUES ($1,$2,$3,20,$4)`,[date,name,type,type==='yield_certificate'?8:type==='other'?2:0]);
+  }
 }
 
 test('customer matching keeps actual investors, supports prefixes, and never guesses an unknown plan manager',async t=>{
@@ -52,7 +58,7 @@ test('customer matching keeps actual investors, supports prefixes, and never gue
   await assert.rejects(db.query('DELETE FROM public.client WHERE id=2'),/foreign key/);
 });
 
-test('static combined credit sums clients once, excludes matured/future/closed debt, and preserves original usage',async t=>{
+test('static combined credit sums clients once and excludes matured, future and closed debt',async t=>{
   const db=await database(t);
   await db.exec(`INSERT INTO credit.institution_client(institution_name,client_id,notes) VALUES ('合并授信',1,'明确合并'),('合并授信',2,'明确合并')`);
   await institution(db);
@@ -64,22 +70,22 @@ test('static combined credit sums clients once, excludes matured/future/closed d
     INSERT INTO financing.debt(debt_type,name,client_id,amount,issue_date,activated_at,maturity_date,closed_at) VALUES
     ('同业拆借','存续拆借',1,400000000,'2026-09-01','2026-09-01','2026-09-10',NULL),
     ('同业拆借','已关闭',1,900000000,'2026-09-01','2026-09-01','2026-09-10','2026-09-03');`);
-  const report=await loadCreditReport(db);
+  const report=await loadCreditReport(db,'2026-09-04');
   const row=report.institutions[0];
   assert.equal(row.totalUsed,9);
-  assert.equal(row.importedTotalUsed,10);
+  assert.equal(row.importedTotalUsed,undefined);
   assert.equal(row.clients.length,2);
   assert.equal(row.items.find(i=>i.type==='yield_certificate').usedAmount,3);
-  assert.equal(row.items.find(i=>i.type==='yield_certificate').importedUsedAmount,8);
-  assert.equal((await db.query("SELECT total_used FROM credit.institution")).rows[0].total_used,'10.000000');
+  assert.equal(row.items.find(i=>i.type==='yield_certificate').importedUsedAmount,undefined);
+  assert.equal((await db.query("SELECT to_regclass('credit.institution') old")).rows[0].old,null);
   await institution(db,'2026-09-04','重复授信');
   await assert.rejects(db.query(`INSERT INTO credit.institution_client(institution_name,client_id,notes) VALUES ('重复授信',1,'重复测试')`),/unique/);
-  const unknown=(await loadCreditReport(db)).institutions.find(i=>i.institutionName==='重复授信');
+  const unknown=(await loadCreditReport(db,'2026-09-04')).institutions.find(i=>i.institutionName==='重复授信');
   assert.equal(unknown.totalUsed,null);
   assert.equal(unknown.availableAmount,null);
   // Other manually maintained usage changes the total, financing usage is read-only.
   await saveCreditInstitution(db,{reportDate:'2026-09-04',institutionName:'合并授信',changes:{items:[{type:'other',usedAmount:5}]}});
-  assert.equal((await loadCreditReport(db)).institutions[0].totalUsed,12);
+  assert.equal((await loadCreditReport(db,'2026-09-04')).institutions[0].totalUsed,12);
 });
 
 test('credit import keeps static manual mappings and automatically links clear new customers',async t=>{
@@ -87,10 +93,10 @@ test('credit import keeps static manual mappings and automatically links clear n
   await institution(db,'2026-09-04','乙银行');
   assert.equal((await db.query('SELECT client_id FROM credit.institution_client')).rows[0].client_id,3);
   await db.query("UPDATE credit.institution_client SET client_id=2,notes='人工确认主体'");
-  const original=(await loadCreditReport(db)).institutions[0];
+  const original=(await loadCreditReport(db,'2026-09-04')).institutions[0];
   await persistCreditWorkbook(db,{parsed:{reportDate:'2026-09-04',institutions:[original],approvedCount:1,totalLimit:20,totalUsed:10,totalAvailable:10,weeklyApprovedCount:1,weeklyTotalLimit:20,weeklyTotalUsed:10,weeklyTotalAvailable:10}});
   assert.equal((await db.query('SELECT client_id FROM credit.institution_client')).rows[0].client_id,2);
-  assert.equal((await loadCreditReport(db)).institutions[0].items.find(i=>i.type==='yield_certificate').usedAmount,0);
+  assert.equal((await loadCreditReport(db,'2026-09-04')).institutions[0].items.find(i=>i.type==='yield_certificate').usedAmount,0);
 });
 
 test('API rejects edits to derived total and financing usage but permits other components',()=>{
@@ -137,25 +143,18 @@ test('note cleanup removes only empty note records and parsing never recreates t
   assert.equal(transformWorkbook(parsed).debts.length,0);
 });
 
-test('item changes, deletion and direct header updates always preserve the item sum', async t => {
-  const db = await database(t);
-  await institution(db, '2026-08-21', '乙银行');
-  const total = async () => Number((await db.query('SELECT total_used FROM credit.institution')).rows[0].total_used);
-  assert.equal(await total(), 10);
-  await db.query("UPDATE credit.institution SET total_used=99");
-  assert.equal(await total(), 10);
-  await db.query("UPDATE credit.item SET used_amount=0.0245 WHERE item_type='other'");
-  assert.equal(await total(), 8.0245);
-  await db.query("DELETE FROM credit.item WHERE item_type='yield_certificate'");
-  assert.equal(await total(), 0.0245);
-  await db.query("INSERT INTO credit.item(report_date,institution_name,item_type,used_amount) VALUES ('2026-08-21','乙银行','yield_certificate',45)");
-  assert.equal(await total(), 45.0245);
-  // A static manual ownership edit affects all report dates and survives a reimport.
-  await institution(db, '2026-08-28', '乙银行');
-  assert.equal((await db.query('SELECT count(*) n FROM credit.institution_client')).rows[0].n, 1);
-  const report = await loadCreditReport(db, '2026-08-21');
-  assert.equal(report.institutions[0].totalUsed, 0.0245);
-  assert.equal(report.summary.totalUsed, report.weeklySummary.totalUsed);
+test('diff changes preserve component sums and prohibit direct mutation', async t => {
+  const db=await database(t);await institution(db,'2026-08-21','乙银行');
+  const total=async date=>(await loadCreditReport(db,date)).institutions[0].totalUsed;
+  assert.equal(await total('2026-08-21'),2);
+  await assert.rejects(db.query('UPDATE credit.diff SET other_used=99'),/append only/);
+  await assert.rejects(db.query('DELETE FROM credit.diff'),/cannot be deleted/);
+  await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'乙银行',changes:{items:[{type:'other',usedAmount:0.0245}]}},'auth0|test');
+  assert.equal(await total('2026-08-22'),0.0245);assert.equal(await total('2026-08-21'),2);
+  await db.exec("BEGIN; SET LOCAL credit.correct_history='on'; UPDATE credit.diff SET other_used=0.5 WHERE effective_on='2026-08-21'; COMMIT");
+  assert.equal(await total('2026-08-21'),0.5);assert.equal(await total('2026-08-22'),0.0245);
+  assert.ok((await db.query('SELECT updated_at FROM credit.diff ORDER BY id LIMIT 1')).rows[0].updated_at);
+  assert.equal((await db.query('SELECT count(*) n FROM credit.institution_client')).rows[0].n,1);
 });
 
 test('bank proprietary and asset clients own both financing types independently without item flags', async t => {
@@ -167,7 +166,7 @@ test('bank proprietary and asset clients own both financing types independently 
     ('同业拆借','银行拆借','乙银行',200000000,'2026-08-01','2027-08-01'),
     ('收益凭证','资管凭证','乙银行（资管）',300000000,'2026-08-01','2027-08-01'),
     ('同业拆借','资管拆借','乙银行资管',400000000,'2026-08-01','2027-08-01')`);
-  const report = await loadCreditReport(db);
+  const report = await loadCreditReport(db,'2026-09-04');
   const usage = name => report.institutions.find(i=>i.institutionName===name).items.filter(i=>i.usageSource==='financing').map(i=>i.usedAmount);
   assert.deepEqual(usage('乙银行（金市）'), [1,2]);
   assert.deepEqual(usage('乙银行（资管）'), [3,4]);

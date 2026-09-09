@@ -40,7 +40,7 @@ git diff --check
 - Neon migration：配置直连 `DATABASE_URL` 后运行 `pnpm bond:db:migrate`。
 - 融资择时 schema：配置同一 Neon `DATABASE_URL` 后运行 `pnpm financing-model:db:migrate`。
 - 授信 schema：配置同一 Neon `DATABASE_URL` 后运行 `pnpm credit:db:migrate`。
-- 授信导入：先运行 `pnpm credit:import -- --file <xlsx> --date YYYY-MM-DD --dry-run`；确认报告日、目标数据库和汇总后，去掉 `--dry-run` 写入。再次导入同一日期会在单事务内替换当日记录，不产生导入审计历史。
+- 授信导入：先运行 `pnpm credit:import -- --file <xlsx> --date YYYY-MM-DD --dry-run`；确认报告日、目标数据库和汇总后，去掉 `--dry-run` 写入。写入须提供 `--user-id`；同日重导只追加发生变化的字段，未变时不增加 diff 行。
 - 台账回填默认只读；`--apply` 会写数据库，必须先确认目标环境和授权。
 
 ## 发布

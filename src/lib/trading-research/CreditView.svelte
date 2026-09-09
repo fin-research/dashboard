@@ -5,6 +5,7 @@
   import MetricCard from "../../components/MetricCard.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
+  import { globalMessages } from "../global-messages.ts";
   import { portal } from "../portal.ts";
   import { scrollableRegion } from "../scrollable-region";
   import {
@@ -77,6 +78,36 @@
   let sortDirection = $state<"ascending" | "descending">("ascending");
   let calendarFilter = $state<CalendarFilter>("all");
   let calendarMonth = $state("");
+  let createDialog: HTMLDialogElement;
+  let creating = $state(false);
+  let newName = $state("");
+  let newType = $state("股份行");
+  let newStatus = $state<CreditStatus>("applying");
+  let newTotal = $state<number | undefined>(undefined);
+  let newDate = $state(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
+  let loadSequence = 0;
+
+  function openCreate(): void {
+    newName = "";
+    newDate = report?.summary.reportDate ?? newDate;
+    createDialog.showModal();
+  }
+
+  async function createInstitution(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (creating) return;
+    creating = true;
+    try {
+      const result = await updateCreditInstitution({reportDate:newDate,institutionName:newName,changes:{institution:{
+        institutionType:newType,status:newStatus,confidentialityStatus:false,totalLimit:newTotal ?? null,
+      }}},fetch,true);
+      createDialog.close();
+      await loadReport(newDate);
+      if (report) toggleInstitution(result.institution);
+      globalMessages.success("授信机构已新增");
+    } catch(error) { globalMessages.error(error instanceof Error ? error.message : "新增失败"); }
+    finally { creating = false; }
+  }
 
   const filteredInstitutions = $derived.by(() => {
     const currentReport = report;
@@ -227,17 +258,24 @@
     if (saveTimer) clearTimeout(saveTimer);
   });
 
-  async function loadReport(reportDate: string | null = null): Promise<void> {
+  async function loadReport(reportDate: string | null = null, month?: string): Promise<void> {
+    const sequence = ++loadSequence;
+    if (hasPendingChanges()) {
+      await flushEditor();
+      if (hasPendingChanges()) return;
+    }
     loading = true;
     errorMessage = "";
     clearEditor();
     try {
-      report = await fetchCreditReport(reportDate);
-      calendarMonth = report.summary.reportDate.slice(0, 7);
+      const result = await fetchCreditReport(reportDate,fetch,month);
+      if (sequence !== loadSequence) return;
+      report = result;
+      calendarMonth = month ?? report.summary.reportDate.slice(0, 7);
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : "授信数据加载失败";
     } finally {
-      loading = false;
+      if (sequence === loadSequence) loading = false;
     }
   }
 
@@ -352,6 +390,7 @@
         requeueChanges(changes);
         saveState = "error";
         saveMessage = error instanceof Error ? error.message : "保存失败";
+        globalMessages.error(saveMessage);
       }
     } finally {
       saveInFlight = false;
@@ -366,7 +405,7 @@
   }
 
   function setEditorText(
-    field: "institutionType" | "bankOffice" | "applyingDepartment" | "handler" | "notes" | "bondPreference" | "usageDetails",
+    field: "institutionType" | "bankOffice" | "applyingDepartment" | "handler" | "detail" | "bondPreference" | "notes",
     event: Event,
   ): void {
     if (!editor) return;
@@ -548,7 +587,7 @@
   function shiftCalendarMonth(offset: number): void {
     const date = new Date(`${calendarMonth}-01T00:00:00Z`);
     date.setUTCMonth(date.getUTCMonth() + offset);
-    calendarMonth = date.toISOString().slice(0, 7);
+    void loadReport(report?.summary.reportDate ?? null,date.toISOString().slice(0, 7));
   }
 
   function calendarMonthLabel(month: string): string {
@@ -594,6 +633,8 @@
       increase: "扩额",
       expiry: "到期",
       revocation: "撤销",
+      decrease: "缩额",
+      amendment: "调整",
     }[eventType];
   }
 
@@ -638,19 +679,32 @@
     {#if report}
       <div class="tr-credit-toolbar__actions">
         <label>
-          <span>报表日</span>
-          <select class="select" value={report.summary.reportDate} onchange={handleReportDateChange}>
-            {#each [...report.availableDates].reverse() as date}
-              <option value={date}>{date}</option>
-            {/each}
-          </select>
+          <span>数据日期</span>
+          <input class="input" type="date" min={report.availableDates[0]} value={report.summary.reportDate} disabled={saveState === "saving"} onchange={handleReportDateChange} />
         </label>
         {#if activeTab === "weekly"}
           <button class="btn tr-credit-print" type="button" onclick={printWeeklyReport}>打印 / 导出 PDF</button>
         {/if}
       </div>
     {/if}
+    {#if activeTab === "overview"}<button class="btn btn-primary" type="button" onclick={openCreate}>新增机构</button>{/if}
   </div>
+
+  <dialog class="modal" bind:this={createDialog} aria-labelledby="credit-create-title">
+    <div class="modal-box">
+      <form onsubmit={createInstitution}>
+        <h2 id="credit-create-title">新增授信机构</h2>
+        <div class="tr-credit-editor-grid">
+          <label><span>机构名称</span><input class="input" required maxlength="200" bind:value={newName} /></label>
+          <label><span>机构性质</span><input class="input" required maxlength="100" bind:value={newType} /></label>
+          <label><span>变更生效日</span><input class="input" required type="date" bind:value={newDate} /></label>
+          <label><span>授信状态</span><select class="select" bind:value={newStatus}><option value="applying">申请中</option><option value="approved">已获批</option><option value="revoked">已撤销</option></select></label>
+          <label><span>授信总额（亿元）</span><input class="input" type="number" min="0" step="0.000001" bind:value={newTotal} /></label>
+        </div>
+        <div class="modal-action"><button class="btn" type="button" disabled={creating} onclick={() => createDialog.close()}>取消</button><button class="btn btn-primary" type="submit" disabled={creating}>{creating ? "保存中" : "新增"}</button></div>
+      </form>
+    </div>
+  </dialog>
 
   {#if loading}
     <section class="tr-empty-panel" aria-live="polite">
@@ -779,7 +833,7 @@
                   <td colspan="11">
                     <div class="tr-credit-detail">
                       <div class="tr-credit-editor-head">
-                        <strong>{editor.institutionName}</strong>
+                        <strong>{editor.institutionName} · {editor.reportDate}</strong>
                         <span class:error={saveState === "error"} aria-live="polite">{saveMessage}</span>
                       </div>
                       <div class="tr-credit-editor-grid">
@@ -800,20 +854,17 @@
                         {#each editor.items as item, itemIndex (item.type)}
                           <fieldset>
                             <legend>{creditItemLabels[item.type]}</legend>
-                            {#if item.type !== "other"}<label><span>额度（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>{/if}
+                            <label><span>额度（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>
                             <label><span>{item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><input class="input" type="number" step="0.000001" readonly={item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
                             {#if item.type !== "other"}<label><span>可用（亿元）</span><input class="input" readonly value={formatAmount(item.limitAmount == null || (item.usageSource === "financing" && item.usedAmount == null) ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
-                            {#if item.usageSource === "financing" && item.usedAmount != null && Math.abs(item.usedAmount - (item.importedUsedAmount ?? 0)) > 0.0001}
-                              <label><span>原报表已用（亿元）</span><input class="input" readonly value={formatAmount(item.importedUsedAmount)} /></label>
-                            {/if}
                             <label><span>说明</span><input class="input" value={item.details ?? ""} oninput={(event) => setItemDetails(itemIndex, event)} onblur={() => void flushEditor()} /></label>
                           </fieldset>
                         {/each}
                       </div>
                       <div class="tr-credit-notes-grid">
-                        <label><span>备注</span><textarea class="textarea" rows="3" oninput={(event) => setEditorText("notes", event)} onblur={() => void flushEditor()}>{editor.notes ?? ""}</textarea></label>
+                        <label><span>授信额度描述</span><textarea class="textarea" rows="3" oninput={(event) => setEditorText("detail", event)} onblur={() => void flushEditor()}>{editor.detail ?? ""}</textarea></label>
                         <label><span>债券投资偏好</span><textarea class="textarea" rows="3" oninput={(event) => setEditorText("bondPreference", event)} onblur={() => void flushEditor()}>{editor.bondPreference ?? ""}</textarea></label>
-                        <label><span>已用授信具体情况</span><textarea class="textarea" rows="3" oninput={(event) => setEditorText("usageDetails", event)} onblur={() => void flushEditor()}>{editor.usageDetails ?? ""}</textarea></label>
+                        <label><span>备注</span><textarea class="textarea" rows="3" oninput={(event) => setEditorText("notes", event)} onblur={() => void flushEditor()}>{editor.notes ?? ""}</textarea></label>
                       </div>
                     </div>
                   </td>
@@ -834,7 +885,8 @@
           <div class="tr-credit-calendar-filter" role="group" aria-label="授信日历事件类型">
             <button class="btn" class:btn-active={calendarFilter === "all"} type="button" onclick={() => (calendarFilter = "all")}>全部</button>
             <button class="btn" class:btn-active={calendarFilter === "expiry"} type="button" onclick={() => (calendarFilter = "expiry")}>到期</button>
-            <button class="btn" class:btn-active={calendarFilter === "added"} type="button" onclick={() => (calendarFilter = "added")}>新增</button>
+            <button class="btn" class:btn-active={calendarFilter === "added"} type="button" onclick={() => (calendarFilter = "added")}>额度变动</button>
+            <button class="btn" class:btn-active={calendarFilter === "usage"} type="button" onclick={() => (calendarFilter = "usage")}>已用变动</button>
           </div>
           <div class="tr-credit-calendar-nav">
             <button class="btn" type="button" aria-label="上一个月" onclick={() => shiftCalendarMonth(-1)}>‹</button>
@@ -849,13 +901,12 @@
             <div class:outside={cell.outside} class:report-date={cell.reportDate} class="tr-credit-calendar-cell" role="gridcell" aria-label={cell.date}>
               <time datetime={cell.date}>{cell.day}</time>
               <div class="tr-credit-calendar-events">
-                {#each cell.events.slice(0, 3) as event (event.id)}
+                {#each cell.events as event (event.id)}
                   <article class={`tr-credit-calendar-event tr-credit-calendar-event--${event.type} tr-credit-calendar-event--${event.status}`} title={`${event.institutionName} · ${event.label} · ${event.statusLabel}`}>
                     <strong>{event.institutionName}</strong>
-                    <span>{event.label} · {event.statusLabel}</span>
+                    <span>{event.label}</span>
                   </article>
                 {/each}
-                {#if cell.events.length > 3}<span class="tr-credit-calendar-more">另 {cell.events.length - 3} 项</span>{/if}
               </div>
             </div>
           {/each}

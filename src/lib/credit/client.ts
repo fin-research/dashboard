@@ -7,8 +7,12 @@ import type { CreditInstitutionUpdateInput } from "./update.ts";
 export async function fetchCreditReport(
   reportDate: string | null = null,
   fetcher: typeof fetch = fetch,
+  month?: string,
 ): Promise<CreditReportResponse> {
-  const query = reportDate ? `?date=${encodeURIComponent(reportDate)}` : "";
+  const params = new URLSearchParams();
+  if (reportDate) params.set('date',reportDate);
+  if (month) params.set('month',month);
+  const query = params.size ? `?${params}` : '';
   const response = await fetcher(`/api/credit${query}`, {
     headers: { Accept: "application/json" },
   });
@@ -34,9 +38,10 @@ export async function fetchCreditReport(
 export async function updateCreditInstitution(
   input: CreditInstitutionUpdateInput,
   fetcher: typeof fetch = fetch,
+  create = false,
 ): Promise<CreditInstitutionUpdateResponse> {
   const response = await fetcher("/api/credit", {
-    method: "PATCH",
+    method: create ? "POST" : "PATCH",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",

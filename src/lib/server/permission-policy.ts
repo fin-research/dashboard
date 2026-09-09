@@ -29,7 +29,7 @@ export const ROUTE_PERMISSIONS: Record<string, Methods> = {
   '/api/economic-indicators': { GET: 'research.economic_indicator:read' },
   '/credit-workbench/[[view]]': { GET: 'credit.institution:read' },
   '/credit-assistant': { GET: 'credit.assistant:read' },
-  '/api/credit': { GET: 'credit.institution:read', PATCH: 'credit.institution:update' },
+  '/api/credit': { GET: 'credit.institution:read', PATCH: 'credit.institution:update', POST: 'credit.institution:update' },
   '/bond': { GET: 'bond.ledger:read' }, '/bond-ledger': { GET: 'bond.ledger:read' },
   '/secondary-bond-pool': { GET: 'bond.ledger:read' },
   '/api/bond-ledger': { GET: 'bond.ledger:read', POST: 'bond.ledger:import', DELETE: 'bond.ledger:delete' },

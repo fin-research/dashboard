@@ -43,9 +43,9 @@ export interface ParsedCreditInstitution {
   bankOffice: string | null;
   applyingDepartment: string | null;
   handler: string | null;
-  notes: string | null;
+  detail: string | null;
   bondPreference: string | null;
-  usageDetails: string | null;
+  notes: string | null;
   items: ParsedCreditItem[];
 }
 
@@ -114,6 +114,8 @@ export const creditEventTypes = [
   "increase",
   "expiry",
   "revocation",
+  "decrease",
+  "amendment",
 ] as const;
 
 export type CreditEventType = (typeof creditEventTypes)[number];
@@ -145,8 +147,8 @@ export interface CreditWeeklyNewsItem {
 export interface CreditCalendarEvent {
   id: string;
   date: string;
-  type: "expiry" | "added";
-  kind: "expiry" | "revoked" | "new" | "renewal" | "increase";
+  type: "expiry" | "added" | "usage";
+  kind: "expiry" | "revoked" | "new" | "renewal" | "increase" | "decrease" | "amendment" | "usage";
   institutionName: string;
   label: string;
   status: "upcoming" | "due" | "completed" | "revoked";
