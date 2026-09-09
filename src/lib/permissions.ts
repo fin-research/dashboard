@@ -1,3 +1,4 @@
+// Generated from eastmoney-gateway src/lib/permissions.ts. Edit the Gateway source and sync contracts.
 /** The single permission catalogue, shared by entrypoints, UI and migrations. */
 export const PERMISSION_DEFINITIONS = [
   ['research.market_report:read', '市场点评', '读取市场点评及报告行情'],

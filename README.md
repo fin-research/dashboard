@@ -27,6 +27,6 @@ pnpm dev
 
 ## 融资工作台与管理中心
 
-融资业务已合并到 Dashboard，继续从 `/financing` 进入仪表盘、项目、SOP、负债周报和数据后台。人员及 Auth0 角色权限由 `/management/people` 管理；全站个人信息入口为 `/profile`。业务数据仍使用原 Neon `financing` schema 与原 R2 周报快照。
+融资业务已合并到 Dashboard，继续从 `/financing` 进入仪表盘、项目、SOP、负债周报和数据后台。`/management/people` 是 Gateway 角色权限服务的管理界面；全站个人信息入口为 `/profile`。公网认证和权限由独立 Gateway 处理，本 Worker 只通过命名 Service Binding 接入。业务数据仍使用原 Neon `financing` schema 与原 R2 周报快照。
 
 开发前按 [文档分流](docs/INDEX.md) 选择目标模块；公共 UI、认证、数据库和发布规则统一维护，旧 financing 仓库仅保留历史。

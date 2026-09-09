@@ -35,7 +35,9 @@ Schema 与 migration 的所有权表已集中到 [共享数据库](../../eastmon
 
 不得调用全局 `pg.types.setTypeParser`。融资 Client 使用自己的 parser 配置，其他 schema 保持默认语义。乐观锁用的 `updated_at` 不转成丢失微秒的 JavaScript Date。SQLite 本地维护脚本按字段类型补全缺失时区，已有数据库历史不因代码合并批量改写。Excel 的业务日期继续按 `cellDates:false` 提取日历日期；用 UTC 做 date 加减只是日历算法，不能把它当原始 timestamp。
 
-## 统一权限迁移
+## 历史统一权限迁移
+
+当前 `authorization` 表和后续 migration 由 Gateway 维护，Dashboard 不持有权限连接。以下保留原跨 schema 初始化历史，不因 Gateway 重构重放。
 
 `pnpm auth:db:migrate` 通过 Auth0 管理 API 核对旧人员关联，默认只读。以直连数据库环境执行 `--apply` 后，在一个事务中应用 `authorization-migrations/` 与 `financing-migrations/0032_unified_permissions.sql`，分别登记原 migration ledger。替换账号的旧人员 ID 到 Auth0 ID 映射通过 `--person-map` 文件提供；不按姓名或邮箱猜测。缺失、重复映射或未预期的数据库依赖会使整个事务回滚。
 

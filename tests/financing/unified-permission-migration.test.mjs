@@ -3,7 +3,7 @@ import test from 'node:test';
 import {PGlite} from '@electric-sql/pglite';
 import {legacyPermissionSchema,migratePermissions} from './fixtures/unified-permission-schema.mjs';
 import {PERMISSION_CODES} from '../../src/lib/permissions.ts';
-import {roleConfiguration,saveRoleConfiguration,rolePermissions} from '../../src/lib/server/permission-repository.ts';
+import {roleConfiguration,saveRoleConfiguration,rolePermissions} from './fixtures/permission-repository.ts';
 
 test('permission migration preserves business references, refuses unmapped identities and removes local identity/audit storage atomically',async()=>{
  const db=new PGlite();

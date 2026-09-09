@@ -5,7 +5,6 @@ import { createClientSession } from '../src/lib/client-session.ts';
 import { createClientNavigationGuard, requireClientLogin } from '../src/lib/auth-client.ts';
 import { publicSession } from '../src/lib/identity.ts';
 import { pagePermission, ROUTE_PERMISSIONS } from '../src/lib/route-permissions.ts';
-import { requestPolicy } from '../src/lib/server/permission-policy.ts';
 import { PERMISSION_CODES } from '../src/lib/permissions.ts';
 
 const origin = 'https://eastmoney.hasbai.xyz';
@@ -158,14 +157,12 @@ test('session DTO includes only presentation claims, roles and resolved permissi
   assert.deepEqual(publicSession(null), anonymous);
 });
 
-test('client GET permissions match the exact server policy, including dynamic views and encoded aliases', () => {
+test('client GET catalogue preserves static permissions and dynamic aliases', () => {
   for (const [id, methods] of Object.entries(ROUTE_PERMISSIONS)) {
-    if (!methods.GET) continue;
-    const path = id.replace('[[view]]', 'calendar').replace('[view]', 'research').replace('[id]', 'example').replace('[...path]', 'table');
-    const policy = requestPolicy(new Request(origin + path), id);
-    assert.equal(pagePermission(path, id), policy.public ? 'public' : policy.login ? 'login' : policy.permission, id);
+    if (!methods.GET || id === '/trading-research/[view]' || id === '/credit-workbench/[[view]]') continue;
+    assert.equal(pagePermission(id, id), methods.GET);
   }
-  for (const path of ['/trading-research/secondary-bond-pool', '/trading%2dresearch/credit', '/trading-research/credit-assistant/__data.json']) {
-    assert.equal(pagePermission(path, '/trading-research/[view]'), requestPolicy(new Request(origin + path), '/trading-research/[view]').permission);
+  for (const [path, permission] of [['/trading-research/secondary-bond-pool', 'bond.ledger:read'], ['/trading%2dresearch/credit', 'credit.institution:read'], ['/trading-research/credit-assistant/__data.json', 'credit.assistant:read']]) {
+    assert.equal(pagePermission(path, '/trading-research/[view]'), permission);
   }
 });

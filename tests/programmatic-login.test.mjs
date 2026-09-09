@@ -13,36 +13,34 @@ test('programmatic HTTP login preserves form state and verifies the resulting te
     steps.push(`${options.method} ${url.origin}${url.pathname}`);
     assert.equal(options.redirect, 'manual');
     switch (steps.length) {
-      case 1: return redirect(team + '/cdn-cgi/access/login/eastmoney.hasbai.xyz', ['CF_AppSession=fixture; Path=/; Secure; HttpOnly']);
-      case 2: return new Response(`<a href="${auth}/authorize?state=one&amp;client_id=fixture">Login</a>`);
-      case 3: assert.equal(options.headers.get('Cookie'), null); return redirect('/u/login/identifier?state=one', ['auth0=fixture; Path=/; Secure; HttpOnly']);
-      case 4: return new Response('<form method="POST"><input name="state" value="one&amp;two"><input name="username"><button name="action" value="default">Next</button></form>');
-      case 5: {
+      case 1: return redirect(auth + '/authorize?state=one&client_id=fixture', ['__Host-eastmoney_login=fixture; Path=/; Secure; HttpOnly']);
+      case 2: assert.equal(options.headers.get('Cookie'), null); return redirect('/u/login/identifier?state=one', ['auth0=fixture; Path=/; Secure; HttpOnly']);
+      case 3: return new Response('<form method="POST"><input name="state" value="one&amp;two"><input name="username"><button name="action" value="default">Next</button></form>');
+      case 4: {
         const body = new URLSearchParams(options.body);
         assert.equal(body.get('username'), 'test@18.cn'); assert.equal(body.get('state'), 'one&two'); assert.equal(body.get('action'), 'default');
         assert.equal(body.has('password'), false); return redirect('/u/login/password?state=two');
       }
-      case 6: return new Response('<form method="post"><input name="state" value="two"><input name="username"><input name="password" type="password"><button name="action" value="default">Login</button></form>');
-      case 7: assert.equal(new URLSearchParams(options.body).get('password'), 'unit-password'); return redirect(team + '/cdn-cgi/access/callback?code=fixture');
-      case 8: assert.equal(options.headers.get('Cookie'), null); return redirect(site + '/cdn-cgi/access/authorized');
-      case 9: return redirect('/profile', ['CF_Authorization=fixture-user; Path=/; Secure; HttpOnly']);
-      case 10: assert.match(options.headers.get('Cookie'), /CF_Authorization=fixture-user/); return new Response('Profile');
-      case 11: return Response.json({ email: 'test@18.cn', emailVerified: true });
+      case 5: return new Response('<form method="post"><input name="state" value="two"><input name="username"><input name="password" type="password"><button name="action" value="default">Login</button></form>');
+      case 6: assert.equal(new URLSearchParams(options.body).get('password'), 'unit-password'); return redirect(site + '/auth/callback?code=fixture&state=one');
+      case 7: assert.match(options.headers.get('Cookie'), /__Host-eastmoney_login=fixture/); return redirect('/profile', ['__Host-eastmoney_session=fixture-user; Path=/; Secure; HttpOnly']);
+      case 8: assert.match(options.headers.get('Cookie'), /__Host-eastmoney_session=fixture-user/); return new Response('Profile');
+      case 9: return Response.json({ email: 'test@18.cn', emailVerified: true });
       default: throw new Error('unexpected request');
     }
   };
   const session = await loginTestAccount({ email: 'test@18.cn', password: 'unit-password' }, fetcher);
-  assert.equal(session.profile.email, 'test@18.cn'); assert.equal(steps.length, 11);
+  assert.equal(session.profile.email, 'test@18.cn'); assert.equal(steps.length, 9);
 });
 
 test('cookie domain and path scoping prevent user sessions leaking to the identity provider', () => {
   const jar = new SessionCookies();
-  jar.update(new Headers({ 'Set-Cookie': 'CF_Authorization=fixture; Path=/private; Secure' }), site + '/private');
+  jar.update(new Headers({ 'Set-Cookie': '__Host-eastmoney_session=fixture; Path=/private; Secure' }), site + '/private');
   assert.equal(jar.header(auth), ''); assert.equal(jar.header(site + '/private-other'), '');
-  assert.equal(jar.header(site + '/private/child'), 'CF_Authorization=fixture');
+  assert.equal(jar.header(site + '/private/child'), '__Host-eastmoney_session=fixture');
   jar.update(new Headers({ 'Set-Cookie': 'bad=fixture; Domain=evil.test; Path=/' }), site);
   assert.equal(jar.header('https://evil.test/'), '');
-  jar.update(new Headers({ 'Set-Cookie': 'CF_Authorization=; Max-Age=0; Path=/private' }), site);
+  jar.update(new Headers({ 'Set-Cookie': '__Host-eastmoney_session=; Max-Age=0; Path=/private' }), site);
   assert.equal(jar.header(site + '/private'), '');
 });
 

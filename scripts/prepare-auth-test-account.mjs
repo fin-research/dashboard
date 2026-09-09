@@ -1,4 +1,4 @@
-import { createAuth0ManagementClient } from '../src/lib/server/auth0-management.js';
+import { createAuth0ManagementClient } from './lib/auth0-management-client.mjs';
 import { auth0DeployCredentials } from './lib/auth0-deploy-config.mjs';
 
 // User-authorized fixture maintenance. Default is read-only; --apply changes

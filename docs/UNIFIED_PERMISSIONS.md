@@ -1,3 +1,7 @@
+# 当前所有权
+
+认证、权限策略、Auth0 目录、角色权限配置和权限连接已移交 [Gateway](../../gateway/docs/DEVELOPMENT.md)。Dashboard 仅保留管理页面与业务 RLS。以下为首次统一权限迁移记录，不能用于重新启用 Access 或回放权限播种。
+
 # 统一权限系统
 
 用户、角色、成员关系、账号资料和停用状态由 Auth0 管理。应用仅在现有 Neon 数据库的 `authorization` schema 保存权限目录和角色授权，不维护人员或角色表。

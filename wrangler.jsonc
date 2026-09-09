@@ -7,14 +7,6 @@
     "nodejs_compat"
   ],
   "vars": {
-    "AUTH0_DOMAIN": "hasbai.eu.auth0.com",
-    "AUTH0_LOGIN_DOMAIN": "auth.hasbai.xyz",
-    "AUTH0_CLIENT_ID": "16vMxoYpr5AdPRiW1PkwIiHuRWszii6m",
-    "AUTH0_MANAGEMENT_CLIENT_ID": "LA46CcB3FQ4Uac4JyEzPSObcV4PV8CFU",
-    "ACCESS_MODE": "enforce",
-    "AUTHORIZATION_MODE": "beta-open",
-    "ACCESS_TEAM_DOMAIN": "hasbai.cloudflareaccess.com",
-    "ACCESS_AUD": "3eceddd7e32af3ce30d8209174e4ad8238fd9a27b700f1337fcff689a13fa973",
     "CLOUDFLARE_ACCOUNT_ID": "5cecc63c78acf8f5473f8745f4244448",
     "AI_GATEWAY_ID": "default",
     "DATA_API_BASE_URL": "https://eastmoney.hasbai.xyz/data",
@@ -22,13 +14,13 @@
   },
   "secrets": {
     "required": [
-      "CF_AIG_TOKEN",
-      "AUTH0_MANAGEMENT_CLIENT_SECRET"
+      "CF_AIG_TOKEN"
     ]
   },
   "assets": {
     "binding": "ASSETS",
-    "directory": ".svelte-kit/cloudflare"
+    "directory": ".svelte-kit/cloudflare",
+    "run_worker_first": true
   },
   "placement": {
     "mode": "smart"
@@ -39,17 +31,18 @@
       "0 * * * *"
     ]
   },
-  "routes": [
-    {
-      "pattern": "eastmoney.hasbai.xyz/*",
-      "zone_name": "hasbai.xyz"
-    }
-  ],
+  "routes": [],
   "services": [
     {
       "binding": "DATA",
       "service": "eastmoney-data",
       "entrypoint": "InternalData",
+      "remote": true
+    },
+    {
+      "binding": "IDENTITY",
+      "service": "eastmoney-gateway",
+      "entrypoint": "IdentityService",
       "remote": true
     }
   ],
@@ -82,10 +75,6 @@
     {
       "binding": "HYPERDRIVE",
       "id": "26b76413a03a4328836d95f3ca320a1e"
-    },
-    {
-      "binding": "AUTHORIZATION_DB",
-      "id": "4029d2cc81ff452bbc2c907162273162"
     }
   ],
   "workflows": [
@@ -133,5 +122,7 @@
         "CreditAgent"
       ]
     }
-  ]
+  ],
+  "workers_dev": false,
+  "preview_urls": false
 }

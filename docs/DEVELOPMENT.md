@@ -7,7 +7,7 @@ pnpm install
 pnpm dev
 ```
 
-- 开发服务器绑定 `127.0.0.1:8765`。
+- Vite 开发服务器绑定 `127.0.0.1:8765`。独立 Vite 受保护请求因缺少 Gateway 上下文而拒绝；不得加开发身份头旁路。完整请求链使用 Gateway 的多 Worker 开发配置或程序化联调夹具。
 - `.env.dev` 必须提供 `DATA_PROXY_TARGET`；Vite 代理 `/data/*` 与本地二级池接口。
 - 从 `.env.local.example` 创建未跟踪的 `.env.local`，并把 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` 设置为带 TLS 参数的线上 Neon 直连连接串。`pnpm dev` 会在 Vite 启动前加载该文件，使本地 Worker 直连线上 Neon；本地开发不经过 Hyperdrive 缓存。
 - `pnpm dev` 通过 SvelteKit 平台代理使用本地 R2 模拟，避免页面请求连接或写入生产 bucket；本地资金日报初始为空，可通过历史资金日报页的上传模态框上传。
@@ -48,14 +48,10 @@ git diff --check
 - `pnpm worker:dev` 用于构建后本地 Worker 检查。
 - 默认将验证通过的变更推送 GitHub `main`，由 Cloudflare Git 自动构建部署 `eastmoney-dashboard`；核对对应提交的构建状态和线上受影响路由。
 - 自动部署不可用、失败或有其他必要时，可执行 `pnpm worker:deploy` 手动部署同一份已验证代码。自动构建与手动部署全程无需再次向用户申请授权；不得覆盖其他任务尚未集成的改动。
-- 全站与融资业务共用 `AUTH0_MANAGEMENT_CLIENT_ID`、`AUTH0_MANAGEMENT_CLIENT_SECRET`。管理应用保留 `read:users`、`create:users`、`update:users`、`read:roles`、`update:roles`；个人资料 endpoint 仍严格限制当前账号和输入字段。
-- 管理凭据验证：`node --use-env-proxy scripts/provision-auth0-management.mjs`。完成测试和构建后，`--apply` 用临时 0600 文件把既有 Secret 附到新 Worker version，再将该版本切为 100%；Client ID、Secret 和代码一起生效，临时文件在 finally 删除。不得先用 `secret put` 覆盖活动 Secret，造成新旧 Client ID 不匹配。原两个 provisioning 命令仅兼容转发到统一脚本。
-- Access 团队域名变更时，同步 Dashboard、Data 与 financing 的 `ACCESS_TEAM_DOMAIN` 并重新生成类型；执行 `node scripts/update-access-team-domain.mjs --apply` 更新 Auth0 的对应回调与退出白名单，保留其余地址。
-- Auth0 中文主题、两步注册和自定义登录域名的配置与检查见 `auth0/README.md`。浏览器域名为 `AUTH0_LOGIN_DOMAIN`，服务端管理 API 保持 `AUTH0_DOMAIN`；二者不能一起替换。
-- 注册验证提示：Action 源码为 `auth0/actions/eastmoney-login.cjs`，公开页面为 `/auth/verify-email`。必须先发布 Dashboard 并确认提示页 200，再执行 `node --use-env-proxy scripts/publish-auth0-login.mjs --apply`；脚本保留已有 Action Secret、依赖和绑定，拒绝覆盖其他未发布草稿。发布后回读生效版本与 post-login 绑定。
-- 本地账号服务可从 `.dev.vars.example` 创建未跟踪的 `.dev.vars`。变更真实邮箱、姓名及发送密码重置邮件均属于实际账号操作；默认测试使用模拟服务，不修改真实账号。
-- 账号与路由专项验收：`node --test tests/auth-client.test.mjs tests/profile.test.mjs tests/access.test.mjs tests/fund-report.test.mjs`；构建后运行 `node scripts/verify-profile-routes.mjs` 验证真实 SvelteKit 路由与内存上传，全部上游为模拟实现。
-- 导航与会话：`node --test tests/navigation-session.test.mjs` 验证有效会话切页零额外请求、初始化去重、过期、权限拒绝和快速连续导航；构建后运行 `node scripts/verify-navigation-routes.mjs` 检查真实 `__data.json` 的根依赖、跳过根节点的页面数据请求，以及匿名/账号撤销拦截。使用模拟签名与 Auth0，只执行程序化 HTTP，不依赖浏览器。
+- JWT、Auth0、会话、角色配置及其 Secret 由 Gateway 维护；Dashboard 只需要 `IDENTITY` Service Binding。新建或变更绑定须先部署提供对应 entrypoint 的 Gateway。
+- Gateway 变更的发布顺序见 [Gateway DEVELOPMENT](../../gateway/docs/DEVELOPMENT.md)。不能恢复本 Worker 的公网 route、workers.dev、preview 或旧 Access 开关。
+- 程序化联调在 Gateway 执行 `node scripts/verify-integration.mjs`，使用本仓库构建结果验证 SvelteKit 页面、数据预取、登录状态及 Data 契约。`DASHBOARD_CHECKOUT` / `DATA_CHECKOUT` 可指定独立工作树。
+- Auth0 注册配置、资料更新与登录脚本当前在 Gateway 维护。Dashboard 的旧 Auth0 provisioning 仅供迁移回溯，不用于当前生产切换。`verify-profile-routes` / `verify-navigation-routes` 兼容转到 Gateway 集成脚本；`verify-financing-routes` 通过真实 Gateway 校验后执行构建应用和 PGlite 业务回归，工作树设置 `GATEWAY_CHECKOUT`。
 - 发布前核对 `wrangler.jsonc` 中绑定、migration 顺序和生产数据服务路径，但不要把 Secret 写入配置。
 
 ## 文档维护
@@ -70,7 +66,7 @@ git diff --check
 
 迁移：`pnpm financing:db:init -- --schema-only`；Excel 盘点：`pnpm financing:db:import -- --dry-run`；SQLite 盘点：`pnpm financing:db:migrate:sqlite -- --dry-run`；提醒盘点：`pnpm financing:reminders:send -- --dry-run`；Protobuf：`pnpm financing:proto:generate`。凭证与原始 Excel 留在未跟踪本地文件中，导入时显式指定源路径，不把旧 checkout 作为运行依赖。
 
-统一凭据版本上线并确认后，删除 Dashboard 已无调用方的 `FINANCING_AUTH0_MANAGEMENT_CLIENT_SECRET`。此后 Git 自动构建沿用统一 Secret；常规代码发布无需重复执行凭据切换脚本。合并切换历史见 [合并记录](FINANCING_MERGE.md)。
+Gateway 切换验证后，删除 Dashboard 不再使用的 Auth0 管理 Secret；常规 Git 构建使用私有 IDENTITY binding。合并切换历史见 [合并记录](FINANCING_MERGE.md)。
 
 浏览器关键表单交互、200% 缩放和甘特图大字号视觉回归仍作为专项验收；未执行时不得写成已通过。仓库内已覆盖 Excel 映射/勾稽、提醒周期、项目建档和构建后路由测试，旧待办中的对应“缺少单元测试”不再重复列为待办。
 
@@ -80,4 +76,4 @@ git diff --check
 
 按 [共享 AUTH](../../eastmoney/docs/AUTH.md#程序化权限测试) 执行本仓库匿名/测试账号覆盖。权限验收禁止 browser；真实登录统一使用 Dashboard 的 `pnpm auth:verify`，凭据只从项目组根 `.env` 读取，不复制登录实现或密码到各仓库。
 
-Auth0 配置维护使用 `pnpm auth0:export` / `pnpm auth0:plan` / `pnpm auth0:apply`，必须指定 `--include`。详细参数、机器凭据、套餐限制与测试账号准备见 [共享 AUTH](../../eastmoney/docs/AUTH.md#auth0-配置管理deploy-cli)。
+Auth0 配置维护在 Gateway 使用 `pnpm auth0:export` / `pnpm auth0:plan` / `pnpm auth0:apply`，必须指定 `--include`。详细参数、机器凭据、套餐限制与测试账号准备见 [共享 AUTH](../../eastmoney/docs/AUTH.md#auth0-配置管理deploy-cli)。

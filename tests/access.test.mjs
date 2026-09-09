@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dashboardIdentity, dashboardRequiresLogin, requireSameOrigin, safeReturnTo } from '../src/lib/server/dashboard-access.ts';
+import { dashboardRequiresLogin, requireSameOrigin, safeReturnTo } from '../src/lib/server/dashboard-access.ts';
+import { gatewayContext } from '../src/lib/server/gateway-context.ts';
 import { publicMarketRequest } from '../src/lib/server/public-market-resources.ts';
 
 const request = (path, method = 'GET', headers = {}) => new Request(`https://eastmoney.hasbai.xyz${path}`, { method, headers });
@@ -14,8 +15,8 @@ test('portal, market reports and authentication bootstrap stay public; internal 
 
 test('a forwarded email is not identity, and unsafe requests require the actual site origin', async () => {
   const env = { ACCESS_MODE: 'enforce', ACCESS_TEAM_DOMAIN: 'team.cloudflareaccess.com', ACCESS_AUD: 'site' };
-  assert.equal(await dashboardIdentity(request('/'), env), null);
-  await assert.rejects(dashboardIdentity(request('/api/credit', 'GET', { 'Cf-Access-Authenticated-User-Email': 'person@18.cn' }), env), { status: 401 });
+  assert.throws(() => gatewayContext(env), { status: 503 });
+  assert.equal(gatewayContext({ GATEWAY_CONTEXT: { user: null } }).user, null);
   assert.throws(() => requireSameOrigin(request('/api/market-report', 'PUT', { Origin: 'https://other.test' })), { status: 403 });
   assert.doesNotThrow(() => requireSameOrigin(request('/api/market-report', 'PUT', { Origin: 'https://eastmoney.hasbai.xyz' })));
 });

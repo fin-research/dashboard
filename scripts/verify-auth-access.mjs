@@ -45,7 +45,7 @@ function denied(response) {
   if (!location) return false;
   const target = new URL(location, SITE_ORIGIN);
   return (target.origin === SITE_ORIGIN && target.pathname === '/auth/login')
-    || (target.origin === 'https://hasbai.cloudflareaccess.com' && target.pathname.startsWith('/cdn-cgi/access/login/'));
+;
 }
 
 async function main() {

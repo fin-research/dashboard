@@ -30,7 +30,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 
 ## 服务端模块
 
-- 授信问答使用同一 Worker 内的 `CreditAgent`（Agents SDK + SQLite Durable Object），从独立 R2 `credit` 原件/解析文本及 AI Search `credit` 找证据，执行有来源的计算后通过统一 Gateway 生成并复核答复。入口、材料更新、数据边界与 Access 预留路径见 `docs/CREDIT_ASSISTANT.md`。
+- 授信问答使用同一 Worker 内的 `CreditAgent`（Agents SDK + SQLite Durable Object），从独立 R2 `credit` 原件/解析文本及 AI Search `credit` 找证据，执行有来源的计算后通过统一 Gateway 生成并复核答复。入口、材料更新、数据边界与 Gateway 私有入口见 `docs/CREDIT_ASSISTANT.md`。
 
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。
@@ -39,7 +39,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 - `src/lib/server/data-news.ts` 通过 `DATA` Service Binding 有界读取并校验单篇研报正文，供研报详情和政策点评生成复用。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器；传输契约见 [共享 AI](../../eastmoney/docs/AI.md)，业务 Prompt 和 Schema 留在调用模块。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
-- `src/lib/server/profile.ts` 使用已验证 Access JWT 的 `eastmoney_user_id` 定位 Auth0 账号；个人信息 `/profile` 与 `/api/profile` 不依赖融资业务人员关联，不读写 Neon `financing`。权限展示统一入口计算的有效权限，角色来源为 Auth0、授权关系来源为 authorization schema。
+- Gateway 拥有 Auth0 个人信息与角色权限服务；Dashboard `/profile` 保留界面，`/api/profile` 由 Gateway 直接处理，后端兼容转发使用 `IDENTITY` binding。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。
 - `src/lib/server/credit-repository.ts` 封装 `credit` schema 的报表日导入、机构自动保存、历史日期读取、日历事件和相邻报告日比较；Worker 复用短生命周期 PostgreSQL 连接。
@@ -71,6 +71,6 @@ Dashboard 是唯一 UI/API Worker。融资领域位于 `src/lib/financing/`（�
 
 自定义 Worker 同时导出 DebtImportWorkflow，继续使用既有 Workflow 名称和台账原子导入。两个 cron 按表达式分流；从旧 Worker 切换时停止旧 cron，防止重复扫描。迁移不会改变 Quant、Data、Ingest 或其他上游接口。
 
-中央认证生成唯一 `locals.user` 并附加 `user.authorization`；融资领域只使用该统一身份与权限。`src/lib/identity.ts` 定义身份及客户端 DTO，基础 subject、邮箱和认证有效期不被业务缓存替换。
+Gateway 在私有 `GatewayDashboard` 中传入唯一身份；hooks 设置 `locals.user` 及 `user.authorization`；融资领域只使用该统一身份与权限。`src/lib/identity.ts` 定义身份及客户端 DTO，基础 subject、邮箱和认证有效期不被业务缓存替换。
 
-统一权限入口位于 `src/lib/server/authorization.ts`，所有页面/API 和独立 Worker 调用同一实现。Data 的 `AUTHORIZATION` 私有 binding 指向 Dashboard 的 `Authorization` entrypoint；权限不复制到 Data。Auth0 与应用权限库之间只通过稳定的用户 ID、角色 ID 关联，融资业务不再建立身份子系统。
+统一权限与 JWT 验证位于独立 Gateway。Dashboard/Data 无公网路由、workers.dev 或 preview，默认入口 404；Dashboard 经 `IDENTITY: IdentityService` 调用账号目录/角色配置，业务层保留输入、记录归属及 RLS。Gateway 与应用绑定边界见 [共享架构](../../eastmoney/docs/ARCHITECTURE.md)。

@@ -3,8 +3,7 @@ import { parseEnv } from 'node:util';
 
 export const SITE_ORIGIN = 'https://eastmoney.hasbai.xyz';
 const LOGIN_ORIGIN = 'https://auth.hasbai.xyz';
-const TEAM_ORIGIN = 'https://hasbai.cloudflareaccess.com';
-const TRUSTED_ORIGINS = new Set([SITE_ORIGIN, LOGIN_ORIGIN, TEAM_ORIGIN]);
+const TRUSTED_ORIGINS = new Set([SITE_ORIGIN, LOGIN_ORIGIN]);
 const MAX_BODY = 2 * 1024 * 1024;
 
 export class AuthTestError extends Error {
@@ -56,7 +55,7 @@ export class SessionCookies {
       && (!c.secure || url.protocol === 'https:'))
       .sort((a, b) => b.path.length - a.path.length).map(c => `${c.name}=${c.value}`).join('; ');
   }
-  hasSiteSession() { return /(?:^|; )CF_Authorization=/.test(this.header(SITE_ORIGIN + '/')); }
+  hasSiteSession() { return /(?:^|; )__Host-eastmoney_session=/.test(this.header(SITE_ORIGIN + '/')); }
 }
 
 function decode(value) {
@@ -134,14 +133,9 @@ export async function loginTestAccount(config, fetcher = fetch) {
       return { ...session, profile };
     }
     if (response.status !== 200) fail('LOGIN_REJECTED', `Login was rejected at ${response.url.hostname}${response.url.pathname} (HTTP ${response.status})`);
-    if (response.url.pathname.startsWith('/u/custom-prompt/')) fail('PROFILE_REQUIRED', 'The test account must complete its required Auth0 name/department form before Access can issue a session');
+    if (response.url.pathname.startsWith('/u/custom-prompt/')) fail('PROFILE_REQUIRED', 'The test account must complete its required Auth0 name/department form before Gateway can issue a session');
     if (response.url.pathname === '/auth/verify-email') fail('EMAIL_VERIFICATION_REQUIRED', 'The test account must verify its email before a fresh programmatic login');
     const page = parseLoginPage(response.text);
-    if (response.url.origin === TEAM_ORIGIN) {
-      const providers = page.links.map(href => new URL(href, response.url)).filter(url => url.origin === LOGIN_ORIGIN && url.pathname === '/authorize');
-      if (providers.length !== 1) fail('LOGIN_PROVIDER_MISSING', 'Expected one Auth0 provider link on the Access login page');
-      response = await session.request(providers[0]); continue;
-    }
     if (response.url.origin !== LOGIN_ORIGIN || !['/u/login/identifier', '/u/login/password', '/u/login'].includes(response.url.pathname)) {
       fail('UNSUPPORTED_LOGIN_STEP', 'Login requires an unsupported interactive step; browser fallback is prohibited');
     }

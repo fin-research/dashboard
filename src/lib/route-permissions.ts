@@ -1,3 +1,4 @@
+// Generated from eastmoney-gateway src/lib/route-permissions.ts. Edit the Gateway source and sync contracts.
 import type { PermissionCode } from './permissions.ts';
 
 type Methods = Partial<Record<string, PermissionCode | 'public' | 'login'>>;

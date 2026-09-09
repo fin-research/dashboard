@@ -3,16 +3,24 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { Client } from 'pg';
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { PERMISSION_CODES } from '../src/lib/permissions.ts';
-import { roleConfiguration } from '../src/lib/server/permission-repository.ts';
+import { roleConfiguration } from '../tests/financing/fixtures/permission-repository.ts';
 import { legacyPermissionSchema, migratePermissions } from '../tests/financing/fixtures/unified-permission-schema.mjs';
 import { financingTimestamp } from '../src/lib/financing/time.js';
 import { Server } from '../.svelte-kit/output/server/index.js';
 import { manifest } from '../.svelte-kit/output/server/manifest.js';
 
-const { vars } = JSON.parse(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+const gateway = resolve(process.env.GATEWAY_CHECKOUT || '../gateway');
+const { gatewayRequest } = await import(pathToFileURL(resolve(gateway, 'src/app.ts')));
+const { identityService } = await import(pathToFileURL(resolve(gateway, 'src/identity-service.ts')));
+const { Client: GatewayClient } = createRequire(resolve(gateway, 'package.json'))('pg');
+const { vars } = JSON.parse(await readFile(resolve(gateway, 'wrangler.jsonc'), 'utf8'));
+const gatewayOriginals = { connect: GatewayClient.prototype.connect, query: GatewayClient.prototype.query, end: GatewayClient.prototype.end };
 const roleIds = { admin:'rol_Admin', handler:'rol_Handler', reviewer:'rol_Reviewer' };
 const roles = Object.entries(roleIds).map(([name,id]) => ({id,name:'financing:'+name}));
 const db = new PGlite({ parsers: { 1082: value => value, 1114: financingTimestamp, 1184: financingTimestamp } });
@@ -34,13 +42,14 @@ Client.prototype.query = async function (sql, params = []) {
   const result = await db.query(sql, params);
   return { ...result, rowCount: result.affectedRows ?? result.rows.length };
 };
+Object.assign(GatewayClient.prototype, { connect: Client.prototype.connect, query: Client.prototype.query, end: Client.prototype.end });
 const { privateKey, publicKey } = await generateKeyPair('RS256');
 const jwk = { ...await exportJWK(publicKey), kid: 'financing-route-key', alg: 'RS256', use: 'sig' };
 const origin = 'https://eastmoney.hasbai.xyz';
 async function tokenFor(subject, email) {
-  return new SignJWT({ type: 'app', email, custom: { eastmoney_user_id: subject } })
-    .setProtectedHeader({ alg: 'RS256', kid: jwk.kid }).setSubject('access-' + subject)
-    .setIssuer(`https://${vars.ACCESS_TEAM_DOMAIN}`).setAudience(vars.ACCESS_AUD)
+  return new SignJWT({ azp: vars.AUTH0_CLIENT_ID, 'https://eastmoney.hasbai.xyz/email': email })
+    .setProtectedHeader({ alg: 'RS256', kid: jwk.kid }).setSubject(subject)
+    .setIssuer(`https://${vars.AUTH0_LOGIN_DOMAIN}/`).setAudience(vars.AUTH0_AUDIENCE)
     .setIssuedAt().setExpirationTime('5m').sign(privateKey);
 }
 const adminToken = await tokenFor(account.user_id, account.email);
@@ -50,7 +59,7 @@ let auth0Requests = 0;
 const permissionObjects = () => currentPermissions.map(permission_name => ({ permission_name, resource_server_identifier: 'https://eastmoney.hasbai.xyz/financing' }));
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
-  if (url.href === `https://${vars.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`) return Response.json({ keys: [jwk] });
+  if (url.href === `https://${vars.AUTH0_LOGIN_DOMAIN}/.well-known/jwks.json`) return Response.json({ keys: [jwk] });
   assert.equal(url.origin, `https://${vars.AUTH0_DOMAIN}`, 'Unexpected external network request');
   auth0Requests++;
   if (url.pathname === '/oauth/token') {
@@ -75,13 +84,19 @@ const env = { ...vars, AUTHORIZATION_DB: { connectionString: 'postgres://fixture
   LIABILITY_REPORT_SNAPSHOTS: { async get() { return null; } },
   EASTMONEY: { async list() { return { objects: [], truncated: false }; } },
 };
+env.IDENTITY = { fetch: request => identityService(request, env) };
 const server = new Server(manifest);
 await server.init({ env });
+env.DASHBOARD = { fetch(request) {
+  const context = JSON.parse(Buffer.from(request.headers.get('X-Eastmoney-Gateway-Context'), 'base64url').toString());
+  const headers = new Headers(request.headers); headers.delete('X-Eastmoney-Gateway-Context');
+  return server.respond(new Request(request, { headers }), { getClientAddress: () => '127.0.0.1', platform: { env: { ...env, GATEWAY_CONTEXT: context }, context: { waitUntil() {} } } });
+} };
 async function respond(path, { token = adminToken, method = 'GET', headers = {}, body } = {}) {
   const before = opened;
-  const response = await server.respond(new Request(origin + path, { method, headers: {
-    Accept: 'text/html', Origin: origin, ...(token ? { Cookie: `CF_Authorization=${token}` } : {}), ...headers,
-  }, body }), { getClientAddress: () => '127.0.0.1', platform: { env, context: { waitUntil() {} } } });
+  const response = await gatewayRequest(new Request(origin + path, { method, headers: {
+    Accept: 'text/html', Origin: origin, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers,
+  }, body }), env);
   assert.equal(active, 0, `${path}: database client was not closed`);
   assert.ok(opened - before <= 2, `${path}: unexpected extra database connection`);
   return response;
@@ -99,7 +114,7 @@ try {
     assert.equal(queries, before, `${path}: unexpected financing query`); checks++;
   }
   const session = await respond('/auth/session', { headers: { Accept: 'application/json' } });
-  assert.deepEqual((await session.json()).user, { id: 'access-' + account.user_id, email: account.email, auth0Id: account.user_id }); checks++;
+  assert.deepEqual((await session.json()).user, { id: account.user_id, email: account.email, auth0Id: account.user_id }); checks++;
   assert.equal((await respond('/financing', { token: unlinkedToken })).status, 200); checks++;
   assert.equal((await respond('/financing/avatar?v=fixture')).status,410); checks++;
   for (const [path,target,status] of [['/financing/people','/management/people',307],['/financing/settings','/profile',303],['/management/financing-profile','/profile',303]]) {
@@ -213,6 +228,7 @@ try {
   console.log(JSON.stringify({ checks, opened, closed, peak, queries, auth0Requests, database: 'local PGlite', externalServices: 'mocked' }));
 } finally {
   Client.prototype.connect = originals.connect; Client.prototype.query = originals.query; Client.prototype.end = originals.end;
+  Object.assign(GatewayClient.prototype, gatewayOriginals);
   globalThis.fetch = originals.fetch;
   await db.close();
 }

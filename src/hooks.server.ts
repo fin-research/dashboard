@@ -2,7 +2,7 @@ import { redirect, type Handle } from '@sveltejs/kit';
 import { AccessError } from '$lib/server/access';
 import { loginUrl } from '$lib/auth-navigation';
 import { dashboardAccessFailure } from '$lib/server/dashboard-access';
-import { authorizeRequest } from '$lib/server/authorization';
+import { gatewayContext } from '$lib/server/gateway-context';
 import { closeDatabase } from '$lib/server/financing/db.js';
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -12,10 +12,9 @@ export const handle: Handle = async ({ event, resolve }) => {
   try {
     if (!event.platform?.env) return new Response('身份服务暂时不可用', { status: 503 });
     try {
-      const authorization = await authorizeRequest(event.request, event.platform.env, event.route.id, event.fetch);
+      const authorization = gatewayContext(event.platform.env);
       event.locals.user = authorization.user;
       event.locals.permissions = authorization.permissions;
-      event.locals.directory = authorization.directory;
     } catch (failure) {
       if (event.isDataRequest && failure instanceof AccessError && failure.status === 401) redirect(303, loginUrl(event.url.pathname + event.url.search));
       return dashboardAccessFailure(event.request, failure);
@@ -27,7 +26,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
     if (event.locals.user || event.locals.permissions.length) {
       response.headers.set('Cache-Control', 'no-store, private');
-      response.headers.append('Vary', 'Cookie, Cf-Access-Jwt-Assertion');
+      response.headers.append('Vary', 'Cookie, Authorization');
     }
     return response;
   } finally { await closeDatabase(event); }

@@ -4,13 +4,13 @@
 
 - 生成式 AI 只通过 `src/lib/server/ai-gateway.ts`；传输、重试、BYOK 和 AI 日志规则只在 [共享 AI](../../eastmoney/docs/AI.md) 维护。业务代码不读取上游 API Key。
 - `CF_AIG_TOKEN` 只通过 Worker Secret 注入；`CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID` 和数据服务基址是非敏感配置，但仍应通过 Worker/Vite 配置读取。
-- Neon 直连 `DATABASE_URL` 只供本地 migration、回填和授信 Excel 导入脚本使用；本地 `pnpm dev` 通过未跟踪的 `.env.local` 注入 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`，生产 Worker 使用 `HYPERDRIVE` 业务连接与 `AUTHORIZATION_DB` 权限连接，见下文权限边界。
+- Neon 直连 `DATABASE_URL` 只供本地 migration、回填和授信 Excel 导入脚本使用；本地 `pnpm dev` 通过未跟踪的 `.env.local` 注入 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`，生产 Dashboard Worker 仅使用 `HYPERDRIVE` 业务连接；Gateway 使用 `AUTHORIZATION_DB` 权限连接，见下文权限边界。
 - quant 在本机使用 `DATABASE_URL` 追加融资择时模型快照；连接串不得经 dashboard 页面或 API 暴露。
 - Neon 开发直连从 `.env.local.example` 创建未跟踪的 `.env.local`。不要提交该文件。
 
 ## 客户端与服务端边界
 
-- 授信问答使用独立 R2 `credit` 材料库，页面、`/api/credit-assistant/*`、SSE 和 Worker 直连入口统一验证 Access 身份与业务权限。固定 DO 名称从已验证 `user.auth0Id` 和客户名称派生，不接受客户端声明的用户 ID 或随机会话 Cookie。只有 `定期报告/` 为公开材料，其他原件及其信息须机构已签署保密协议。按用户要求，一次生成及其 SSE 沿用提交时核对的客户权限，完成时不再重复查询；新的历史读取、复制和下载请求仍核对当前状态。保密下载同时要求当前用户、客户及 `turnId` 对应的已提供来源/附件，未知、缺失或失败不放行。范围外问题在材料检索前固定拒答；具体流程见 `CREDIT_ASSISTANT.md`。
+- 授信问答使用独立 R2 `credit` 材料库，页面、`/api/credit-assistant/*`、SSE 和 Worker 直连入口在 Gateway 完成身份与路由权限验证后进入业务处理。固定 DO 名称从已验证 `user.auth0Id` 和客户名称派生，不接受客户端声明的用户 ID 或随机会话 Cookie。只有 `定期报告/` 为公开材料，其他原件及其信息须机构已签署保密协议。按用户要求，一次生成及其 SSE 沿用提交时核对的客户权限，完成时不再重复查询；新的历史读取、复制和下载请求仍核对当前状态。保密下载同时要求当前用户、客户及 `turnId` 对应的已提供来源/附件，未知、缺失或失败不放行。范围外问题在材料检索前固定拒答；具体流程见 `CREDIT_ASSISTANT.md`。
 
 - 浏览器不得取得 Provider 密钥、数据库连接字符串、D1/R2 binding、完整二级池 Excel 数据缓存或授信源 Excel。本地授信导入不得上传文件到 Worker、R2 或浏览器接口。
 - `$lib/server` 模块不得被客户端代码导入。
@@ -20,22 +20,16 @@
 - R2 对象 key 和下载文件必须先由数据库记录解析，不能接受任意用户路径直读存储桶。
 - 资金日报列表只枚举 `fund-reports/` 固定前缀并过滤严格日期文件名；单期读取只允许用严格日期派生 `fund-reports/YYYY-MM-DD.html`，不得把 URL 路径直接拼为 R2 key。返回的交互 HTML 使用 CSP sandbox 保留脚本交互，但不授予同源访问能力，并禁用摄像头、麦克风和定位。
 
-## 请求保护
+## 请求保护与私有入口
 
-- Auth0 的 `eastmoney-email` 连接只允许邮箱注册，Pre Registration Action 限制为 `18.cn`；新账号验证邮箱后登录，迁移的既有账号保留原验证状态。
-- Cloudflare Access 使用团队 `hasbai.cloudflareaccess.com` 和独立 eastmoney 应用。Worker 校验 RS256 签名、issuer、audience、有效期与人员邮箱，不信任单独的邮箱头，也不接受服务身份执行用户操作。
-- 新注册账号未验证邮箱时，Post Login Action 暂停登录并跳转公开 `/auth/verify-email`，提示检查邮件；不向 Access 回调发送 `access_denied`，也不签发身份声明。页面不接收或显示邮箱／账号 ID，不消费 Auth0 附带的 `state`；验证后发起全新登录，直接调用旧事务 `/continue` 仍被拒绝。原迁移账号的 UUID、账号 ID 与原邮箱绑定例外保持不变。
-- `/auth/login` 是统一登录／注册入口，返回地址只接受安全的本站路径。退出清理站点 Cookie，再退出 Auth0 和 Access，最后回到本站首页；两层退出目标由服务端生成，不采用请求中的 `returnTo`，退出响应禁止缓存。
-- 浏览器登录与退出使用 `auth.hasbai.xyz`；`AUTH0_DOMAIN` 继续指向原租户域名，仅用于服务端管理 API。新注册用户在 Auth0 Forms 中必填姓名、部门，保存成功后再进入原邮箱验证流程；资料字段不授予角色或自动关联融资人员，原有账号不强制补填。
-- `src/hooks.server.ts` 对全部业务页面和 API 执行统一身份与权限检查，具体规则见下文。
-- `worker/entry.ts` 对绕过 SvelteKit 的授信问答 HTTP 入口执行相同验证；WebSocket 和 GET 也受保护。
-- 写入同时验证 Origin，文件上传继续保留类型、大小、日期、内容校验，数据库写入继续使用参数化查询和事务。登录不能替代业务输入校验。
-- 公开只读的旧报告资源兼容通道只允许报告使用的资源、字段、日期范围和有界条数，不能转发任意 URL、路径、GraphQL 或 Choice 指标。通过私有 DATA binding 读取后流式返回，客户端继续执行原有 Zod 契约校验。
-- 个人资料只使用签名已验证 JWT 中的 `eastmoney_user_id`（兼容 `custom` / `oidc_fields`），绝不通过邮箱查找并关联 Auth0 用户。每次读写再次核对 Auth0 当前账号、连接、停用状态和邮箱；旧邮箱对应的 Access 会话不得继续修改资料。
-- `/api/profile` 严格白名单输入，用户不能传入目标 ID、角色、权限、`app_metadata` 或密码。邮箱变更必须明确确认，仅限 18.cn，设置 `email_verified=false` 与 `verify_email=true` 后退出登录；密码只使用 Auth0 邮件重置流程。管理 API 的 Secret 仅驻留服务端，外部请求禁止跟随重定向，响应与请求均限制读取大小。
-- 前端路由守卫与上传前登录检查属于交互保护；服务端 Access 与 Origin 校验仍是授权边界。浏览器同源 HTTP 401 统一跳转登录，禁止把 403 或上游管理凭证失效误判为当前用户登录失效。
-- 登录相关响应和含身份的页面使用 private/no-store；JWT、Cookie、客户端 Secret 不进入页面数据或日志。
-- `ACCESS_MODE=legacy` 仅用于有明确顺序的迁移与回退；正常配置为 `enforce`，未知模式或保护配置缺失必须失败关闭。
+- Gateway 是本站唯一公网入口，Auth0 JWT、JWKS、会话、账号状态、角色及路由权限全部由 Gateway 处理。详细协议见 [共享 AUTH](../../eastmoney/docs/AUTH.md)。
+- Dashboard `routes=[]`、`workers_dev=false`、`preview_urls=false`，没有 Custom Domain，默认 fetch 固定 404；静态资产 `run_worker_first=true`，不能绕开默认入口。
+- 只有 `GatewayDashboard` 命名 Service Binding 接收 Gateway 的 Base64URL 上下文，解析后移入请求内 `env.GATEWAY_CONTEXT` 并删除身份头。`hooks.server.ts` 仅从该元数据设置 `locals.user` 和 permissions，不读取 Cookie、外部身份头，不验证 JWT，也不调用 Auth0/权限库。缺少元数据失败关闭。
+- 独立授信问答 HTTP 从同一私有入口取得已验证 `user`，继续执行用户/客户会话绑定、材料保密和下载来源检查。DO 不新增公网旁路。
+- Gateway 的同源、方法和 named action 检查发生在转发前；业务仍验证输入白名单、记录归属、乐观锁、文件类型/大小/内容和事务 RLS。上传登录检查、菜单及前端权限只用于交互。
+- Gateway 拥有 `/auth/login`、`/auth/callback`、退出、`/auth/session` 和 `/api/profile`，后端只保留必要的兼容或私有转发。登录响应和包含身份的响应 private/no-store，401 跳登录而 403 保留权限错误；`__data.json` 使用 SvelteKit redirect 数据协议。
+- 新账号的邮箱/姓名/部门和验证流程仍由 Auth0 Actions/Forms 管理；用户字段不授予角色。Auth0 token 的 namespace email 必须与当前账号一致，旧邮箱会话不能修改资料。
+- 个人信息白名单与本人校验由 Gateway 维护；邮箱变更需明确确认，重置验证并退出；密码使用既有重置邮件流程。管理凭据不留在 Dashboard Worker，目录及角色配置通过 `IDENTITY: IdentityService` 取得。
 
 ## 数据与日志
 
@@ -45,24 +39,12 @@
   处理阶段，以及限长后的字段路径、收到类型和标量值。不得返回堆栈、Cookie、token、签名
   URL、连接串、完整正文或大段原始响应；详细堆栈仍只进入服务端日志。
 
-## 全站授权入口
+## 权限结果与业务约束
 
-除公开的市场点评页面、定稿 GET/HEAD 及限定行情兼容通道外，所有到达服务端的业务页面、只读 API、写入 API 和 named actions 由 `src/lib/server/authorization.ts` 检查。`src/hooks.server.ts` 是 SvelteKit 的唯一检查入口。全局服务端 layout 只提供首屏会话展示快照，不依赖 pathname；纯客户端页面切换使用快照中的权限判断入口，业务数据仍须经过受保护 API。门户、市场点评读取、身份流程和静态资源以明确规则公开，其余业务只读接口同样执行应用权限检查。
+`src/lib/permissions.ts` 与 `route-permissions.ts` 是 Gateway 生成的前端展示契约，供菜单与导航使用；不可作为服务端授权输入。修改权限在 Gateway 完成，再同步契约。`locals.user.id` 与 `auth0Id` 均为 Auth0 subject，业务负责人只用 Auth0 ID，不能按邮箱/姓名关联。
 
-`src/lib/permissions.ts` 是权限代码及说明的唯一来源，`src/lib/route-permissions.ts` 维护路由目录及前后端共用的页面 GET 权限，`src/lib/server/permission-policy.ts` 校验 HTTP 方法与 named action。未知路由、未登记操作和含多个 action 的请求失败关闭。GET/HEAD 也校验读取权限；写入检查 Origin，前端可见性不能代替服务端校验。
+客户端会话只由根 layout 实例持有，不跨 SSR 请求共享，不写 localStorage。公开首屏经 `/auth/session` 初始化一次，普通导航复用展示快照；过期和明确角色变更时刷新。其他终端的旧菜单不构成服务端授权，Gateway 对每个业务请求实时核对账号/角色和权限。
 
-前端会话由根 layout 实例独占，不跨 SSR 请求共享，不写 localStorage，不包含 JWT 或 Cookie。受保护首屏下发角色、有效权限和会话到期时间；公开首屏通过 `/auth/session` 后台初始化一次，菜单、导航和上传前检查共享结果及并发请求。普通导航不请求 session、不强制 invalidateAll，允许 SvelteKit 直接复用预取。会话到期或明确修改角色权限时刷新一次；修改姓名只失效 `site:session`。其他终端撤销权限可能暂时保留旧菜单展示，但每个真实业务请求仍核对当前账号与权限，403 不被当作登录失效。
+Dashboard 不持有 `AUTHORIZATION_DB` 或 Auth0 管理 Secret。`/management/people` 保留界面、草稿、版本和错误响应，通过私有 Gateway 服务读写。Gateway 在无缓存权限连接中完成角色锁、版本检查和事务，未知角色/权限失败关闭；配置不会改变当前 beta-open 模式。
 
-独立授信问答 HTTP 入口调用同一授权函数，保留原客户保密材料边界。Data Worker 的 DM、东方财富网及固定行业快照 GET/HEAD 公开只读；Choice 通用查询与 CAMEL 校验 Access 登录。GraphQL 在 Choice 字段执行前校验，公开字段不依赖身份服务。旧私有 `AUTHORIZATION` binding 保留兼容，当前 Data 请求不调用角色授权；不能信任自报身份或权限头。服务绑定和明确允许的 Access 服务身份用于机器任务，不代表用户角色。Ingest 的 HTTP 入口仅公开 health，其工作由 Cron/Workflow 执行；Quant、Choice 无新增用户权限入口。
-
-全站身份仍只有 `locals.user`：`id` 是 Access subject，`auth0Id` 来自已验证的 `eastmoney_user_id`，`authorization` 为统一授权结果。业务负责人只用 Auth0 ID；不能用 Access subject、姓名或邮箱推断关联。每次应用权限请求查询 Auth0 当前账号、连接、验证状态及角色；账号停用、邮箱变更和撤销角色不受应用身份缓存影响。仅管理服务 token 可按有效期缓存，人员目录与角色列表只在单请求内复用。
-
-## 权限存储与内测模式
-
-用户、角色及成员关系仅由 Auth0 管理。应用只维护 `authorization.permission` 和 `authorization.role_permission`，详见 [管理中心](modules/management.md)。模式显式配置为 `beta-open` 或 `enforce`，未知模式拒绝受保护请求；内测开放仅发生在身份验证之后，不能匿名绕过，也不允许未登记操作。
-
-Auth0 管理请求由 `auth0-management.js` 共用唯一 `AUTH0_MANAGEMENT_CLIENT_SECRET`，禁止跟随外部重定向，限时、限长读取。应用权限不读取旧融资 resource server 的 permissions。角色权限保存使用事务、角色锁和版本比对；禁止客户端提供有效权限集合或授权模式。
-
-融资数据后台继续使用同源 Worker 代理、表/字段白名单、参数化 SQL、完整主键和乐观版本条件。事务内设置已验证的 `request.auth.user_id`、`request.auth.permissions`、`request.auth.operation` 后 `SET LOCAL ROLE authenticated`；提交或回滚均清除上下文。RLS 分别检查 read/create/update/delete，不再查询 people 表或保存人员授权到期时间。`authenticated` 无权修改权限表。原人员、角色权限、审计表与审计触发器在迁移中移除，不建立替代审计流程。
-
-权限矩阵的读取、配置和保存只使用 `AUTHORIZATION_DB`，它连接同一 Neon 数据库并明确禁用 Hyperdrive 查询缓存；业务读取继续使用既有 `HYPERDRIVE`。部署配置缺少该权限连接时，正式授权与后台配置失败关闭，不回退到缓存连接。
+融资数据后台继续使用表/字段白名单、参数化 SQL、完整主键与乐观条件。事务用 Gateway 已确认的 Auth0 ID、permissions 和 operation 设置 `request.auth.*` 后 `SET LOCAL ROLE authenticated`；提交/回滚清除上下文。RLS 保留 read/create/update/delete 及记录归属约束，不接受浏览器提供的权限集合。

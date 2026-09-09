@@ -41,9 +41,9 @@ const incrementalContracts = [
 	},
 	{
 		name: 'profile settings',
-		server: 'src/lib/server/profile.ts',
+		server: 'src/routes/api/profile/+server.ts',
 		client: 'src/routes/profile/+page.svelte',
-		response: /name: updated.data.name/,
+		response: /identityRequest/,
 		apply: /result.name/
 	}
 ];

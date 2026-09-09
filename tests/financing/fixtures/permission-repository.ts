@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 type DatabaseClient = { query(sql: string, values?: unknown[]): Promise<{ rows: Record<string, any>[] }> };
-import { PERMISSION_CODES, isPermissionCode } from '../permissions.ts';
+import { PERMISSION_CODES, isPermissionCode } from '../../../src/lib/permissions.ts';
 export class PermissionConfigurationError extends Error {
   status: 400 | 409;
   constructor(status: 400 | 409, message: string) { super(message); this.status = status; }

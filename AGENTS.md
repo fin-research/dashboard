@@ -18,8 +18,8 @@
 - `src/lib/bond-ledger/`：Excel 解析、校验、格式化与分析。
 - `worker/`：自定义 Worker 入口和二级池导入 Workflow。
 - `migrations/`：D1 migration；`postgres-migrations/`：Neon `bond` schema migration；`financing-model-migrations/`：Neon `financing_model` schema migration。
-- `authorization-migrations/`：统一权限 schema migration；`scripts/apply-unified-permissions.mjs` 负责 Auth0 身份核对与跨 schema 原子迁移。
-- `auth0/`：Auth0 中文主题、注册字段和登录 Actions；配置与启用顺序见 `auth0/README.md`。公开提示页先上线，注册字段须先有已验证自定义域名。
+- `authorization-migrations/`：旧跨 schema 迁移的历史快照；后续权限 migration、Auth0 与角色授权由 Gateway 维护。
+- `auth0/`：保留注册配置的历史来源；当前 Auth0 Actions、配置和发布由 Gateway 维护，见 [Gateway](../gateway/AGENTS.md)。
 - `scripts/`：类型生成、D1 同步、Neon migration 与台账回填。
 - `tests/`：Node 单元与契约测试，融资原有回归位于 `tests/financing/`。
 - `financing-migrations/`、`scripts/financing/`：融资 schema migration 与本地维护命令；原 Excel 与凭证不迁入 Git。
@@ -32,7 +32,7 @@
 - 市场点评 REST 编排与视觉/文字共用契约、旧资源兼容边界见 [市场点评模块](docs/modules/market-briefing.md)；业务加工留在 Dashboard。
 - Data 消费端使用 `src/data-contracts.ts` 的 Zod Schema 校验最小 DTO；字段投影与分页遵循 [Data API 契约](../data/docs/API.md)，不透传上游 envelope。债券动态代码与类型筛选见市场点评模块。
 - 新闻详情扇出保持有界并发，复用 `src/lib/server/data-news.ts` 和既有 DATA adapter。
-- 身份只使用 `locals.user`，权限只使用统一入口的 `user.authorization`；业务不得另建身份或授权系统。精确认证、路由豁免、失败关闭与模式规则见 [SECURITY](docs/SECURITY.md)。
+- 身份只使用 Gateway 私有入口注入的 `locals.user`，权限只使用 `user.authorization`；应用不验证 JWT、不回查 Auth0，不另建授权系统。保留记录归属和业务规则。精确认证、路由豁免、失败关闭与模式规则见 [SECURITY](docs/SECURITY.md)。
 - 一级发行视觉与文字输出必须共用 `src/primary-issues.ts`；文字报告不得读取 Python 归档文本。
 - 热点首次访问只读最近成功快照；只有用户手动生成才调用模型并追加 `hotspot_snapshot`。旧快照的证据范围以快照自身为准。
 - 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。
@@ -80,4 +80,4 @@
 
 共享认证架构、各权限范围及测试账号配置见 [项目组 AUTH](../eastmoney/docs/AUTH.md)。权限登录与验收只使用程序化 HTTP、单元测试与 CLI，禁止 browser、Chrome、Playwright 和浏览器 MCP。新增测试仅使用匿名和 `test@18.cn` 两种身份；真实密码只读根目录 `.env`，不进入测试夹具或日志。
 
-Auth0 租户配置按共享 AUTH 使用 Deploy CLI 的显式资源 export / plan / apply；凭据来自根 `.env` 的机器应用，不依赖个人 CLI 会话。用户资料操作复用同一机器应用的 Management API。
+Auth0 租户配置与用户资料服务由 Gateway 维护。Dashboard 只经 `IDENTITY: IdentityService` 调用，不新增 Auth0 凭据或权限数据库 binding。历史维护脚本不构成运行时身份服务。

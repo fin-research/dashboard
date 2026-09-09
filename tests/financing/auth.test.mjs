@@ -162,8 +162,8 @@ test('Data API token requests bypass the Neon Auth session cookie cache', async 
 	const session = await client.getSession({ disableCookieCache: true });
 	assert.equal(session.jwt, 'short-lived-jwt');
 	assert.equal(new URL(requests[0]).searchParams.get('disableCookieCache'), 'true');
-	const hooksSource = fs.readFileSync(new URL('../../src/lib/server/authorization.ts', import.meta.url), 'utf8');
-	assert.match(hooksSource, /await directory.current\(user\)/);
+	const hooksSource = fs.readFileSync(new URL('../../src/lib/server/gateway-context.ts', import.meta.url), 'utf8');
+	assert.match(hooksSource, /env\.GATEWAY_CONTEXT/);
 	assert.doesNotMatch(hooksSource, /readCachedSessionUser/);
 });
 

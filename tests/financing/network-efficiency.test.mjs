@@ -36,7 +36,7 @@ test('authenticated page loads do not transfer the base64 avatar through locals'
 		readFile(new URL('../../src/routes/financing/avatar/+server.ts', import.meta.url), 'utf8')
 	]);
 	assert.doesNotMatch(auth, /avatar_data_url AS avatarDataUrl/);
-	assert.match(auth, /profile.name \|\| profile.email/);
+	assert.match(auth, /identityJson<DirectoryPerson\[\]>/);
 	assert.doesNotMatch(layout, /avatar_data_url|avatarVersion/);
 	assert.match(avatar, /error\(410/);
 });
@@ -57,12 +57,12 @@ test('authorization decisions are fresh while directory requests are reused only
  const [hooks, directory, authorization] = await Promise.all([
    readFile(new URL('../../src/hooks.server.ts', import.meta.url), 'utf8'),
    readFile(new URL('../../src/lib/server/auth0-directory.ts', import.meta.url), 'utf8'),
-   readFile(new URL('../../src/lib/server/authorization.ts', import.meta.url), 'utf8')
+   readFile(new URL('../../src/lib/server/gateway-context.ts', import.meta.url), 'utf8')
  ]);
- assert.match(hooks, /await authorizeRequest/);
- assert.match(directory, /let peopleRequest:/);
- assert.match(directory, /let roleRequest:/);
- assert.match(authorization, /await directory.current/);
+ assert.match(hooks, /gatewayContext/);
+ assert.match(directory, /let people:/);
+ assert.match(directory, /let roles:/);
+ assert.match(authorization, /env\.GATEWAY_CONTEXT/);
  assert.doesNotMatch(authorization, /readCachedSessionUser|cacheSessionUser/);
  assert.match(hooks, /finally.*closeDatabase/);
 });

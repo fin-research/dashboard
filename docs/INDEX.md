@@ -20,7 +20,7 @@
 | `/credit-workbench`、`calendar` / `weekly` 子页、`/api/credit`、授信 Excel 导入 | [授信工作台](modules/credit-workbench.md) |
 | `/credit-workbench/assistant`、旧 `/credit-assistant`、授信材料、CreditAgent、独立问答 HTTP / WebSocket | [授信问答](CREDIT_ASSISTANT.md) |
 | 客户主数据、融资/授信关联、保密协议关联 | [客户与授信关联](modules/clients.md) |
-| `/management*`、`/profile`、`/api/profile`、`/auth/*`、旧融资账号跳转 | [管理中心与账号](modules/management.md)；登录配置才加读 [Auth0](../auth0/README.md) |
+| `/management*`、`/profile`、`/api/profile`、`/auth/*`、旧融资账号跳转 | [管理中心与账号](modules/management.md)；登录配置才加读 [Gateway Auth0](../../gateway/auth0/README.md) |
 | `/financing` | [融资仪表盘](modules/financing-overview.md) |
 | `/financing/projects*`（含 options） | [融资项目](modules/financing-projects.md) |
 | `/financing/sop*`、提醒 Cron | [融资 SOP 与提醒](modules/financing-sop.md) |
@@ -39,7 +39,7 @@
 | 业务不变量与计算 | [DOMAIN](DOMAIN.md) + 目标模块 | 无 |
 | SQL、事务、日期、migration | [DATABASE](DATABASE.md) + 目标模块 | [共享存储](../../eastmoney/docs/DATABASE.md) |
 | load/actions、状态码、分页 | [API](API.md) | Data 变更时读 [Data API](../../data/docs/API.md) |
-| Access、Auth0、权限、Secret | [SECURITY](SECURITY.md)；权限发布读 [UNIFIED_PERMISSIONS](UNIFIED_PERMISSIONS.md) | [共享架构身份所有权](../../eastmoney/docs/ARCHITECTURE.md#身份与授权所有权) |
+| Gateway、Auth0、权限、Secret | [SECURITY](SECURITY.md)；权限发布读 [UNIFIED_PERMISSIONS](UNIFIED_PERMISSIONS.md) | [共享架构身份所有权](../../eastmoney/docs/ARCHITECTURE.md#身份与授权所有权) |
 | AI 调用 | 目标模块 Prompt / Schema | [共享 AI](../../eastmoney/docs/AI.md) |
 | 开发、测试、Git、发布 | [DEVELOPMENT](DEVELOPMENT.md) | 项目组 AGENTS 的并行规则 |
 

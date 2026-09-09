@@ -17,3 +17,5 @@ dist/
 !.env.local.example
 
 .auth0-deploy/
+
+node_modules

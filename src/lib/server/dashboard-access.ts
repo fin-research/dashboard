@@ -1,6 +1,5 @@
-import { AccessError, accessFailure, accessToken, requireHuman, verifyAccess } from './access.ts';
+import { AccessError, accessFailure } from './access.ts';
 import { apiRequiresLogin, pageRequiresLogin, safeReturnTo } from '../auth-navigation.ts';
-import type { SiteIdentity } from '../identity';
 export { safeReturnTo } from '../auth-navigation.ts';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -13,29 +12,6 @@ export function dashboardRequiresLogin(request: Request): boolean {
   return !SAFE_METHODS.has(request.method)
     || pageRequiresLogin(path) || apiRequiresLogin(path)
     || path === '/auth/login';
-}
-
-export async function dashboardIdentity(request: Request, env: Env, forceRequired = false): Promise<SiteIdentity | null> {
-  const required = forceRequired || dashboardRequiresLogin(request);
-  const sessionRequest = new URL(request.url).pathname === '/auth/session';
-  // Public reports and assets do not depend on the identity provider or vary by user.
-  if (!required && !sessionRequest) return null;
-  const mode = String(env.ACCESS_MODE);
-  if (mode === 'legacy') return null;
-  if (mode !== 'enforce') throw new AccessError(503, '身份服务尚未配置完成');
-  if (!required && !accessToken(request)) return null;
-  try {
-    const payload = await verifyAccess(request, env);
-    const user = requireHuman(payload);
-    const custom = payload.custom ?? payload.oidc_fields;
-    const fields = custom && typeof custom === 'object' ? custom as Record<string, unknown> : {};
-    const subject = payload.eastmoney_user_id ?? fields.eastmoney_user_id;
-    return { ...user, auth0Id: typeof subject === 'string' && /^auth0\|[^\s]{1,249}$/.test(subject) ? subject : null,
-      issuedAt: Number(payload.iat), expiresAt: Number(payload.exp) };
-  } catch (error) {
-    if (!required) return null;
-    throw error;
-  }
 }
 
 export function dashboardAccessFailure(request: Request, error: unknown): Response {

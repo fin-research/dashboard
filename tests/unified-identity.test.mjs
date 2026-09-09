@@ -17,18 +17,18 @@ test('one site identity supplies financing projections without changing its subj
 
 test('financing consumes central authentication and all live management clients use one Secret', async () => {
   const [auth, hooks, provider, configText, declarations] = await Promise.all([
-    readFile(new URL('../src/lib/server/authorization.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/lib/server/gateway-context.ts', import.meta.url), 'utf8'),
     readFile(new URL('../src/hooks.server.ts', import.meta.url), 'utf8'),
     readFile(new URL('../src/lib/server/auth0-directory.ts', import.meta.url), 'utf8'),
     readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'),
     readFile(new URL('../src/app.d.ts', import.meta.url), 'utf8'),
   ]);
   assert.doesNotMatch(auth, /verifyAccess|requireHuman|getSessionUser|createNeonAuthClient/);
-  assert.match(auth, /await dashboardIdentity/);
+  assert.match(auth, /env\.GATEWAY_CONTEXT/);
   assert.match(hooks, /event\.locals\.user = authorization.user/);
   assert.doesNotMatch(declarations, /financingUser/);
   const config = JSON.parse(configText);
-  assert.deepEqual(config.secrets.required.filter(name => name.includes('AUTH0')), ['AUTH0_MANAGEMENT_CLIENT_SECRET']);
-  assert.equal(Object.keys(config.vars).filter(name => name.endsWith('MANAGEMENT_CLIENT_ID')).length, 1);
-  assert.match(provider, /clientSecret: config\.AUTH0_MANAGEMENT_CLIENT_SECRET/);
+  assert.deepEqual(config.secrets.required.filter(name => name.includes('AUTH0')), []);
+  assert.equal(Object.keys(config.vars).filter(name => name.endsWith('MANAGEMENT_CLIENT_ID')).length, 0);
+  assert.match(provider, /identityJson/);
 });

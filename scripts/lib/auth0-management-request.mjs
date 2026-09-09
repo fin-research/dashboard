@@ -1,4 +1,4 @@
-import { createAuth0ManagementClient } from '../../src/lib/server/auth0-management.js';
+import { createAuth0ManagementClient } from './auth0-management-client.mjs';
 import { auth0DeployCredentials } from './auth0-deploy-config.mjs';
 
 // Private transport for synchronous maintenance scripts. Credentials stay in
