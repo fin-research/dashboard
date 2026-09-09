@@ -107,7 +107,7 @@ node scripts/upload-credit-corpus.mjs --apply --prune-previous=.credit-local/pre
 
 所有写操作执行同源校验，请求体有传输字节上限；DO 名称仅由已验证用户和所选客户派生；下载仅接受目录中的文档 ID，不能传任意对象路径。返回 `private, no-store` 和 `nosniff`，SSE 额外使用 `no-transform`。不暴露通用 `/agents/*` 路由，不接受客户端 state 更新或任意 RPC 方法。
 
-身份由中央 Access 与统一业务授权入口保护，固定会话使用已验证的 Auth0 用户 ID；客户名称不等于用户身份。机构保密协议控制位于登录校验之内。保护范围同时覆盖页面、SSE、会话、附件及任何 Worker 预览/直连域名。
+身份和路由权限由 Gateway 统一校验，经私有 Service Binding 进入 Dashboard，固定会话使用已验证的 Auth0 用户 ID；客户名称不等于用户身份。机构保密协议控制位于登录校验之内。页面、SSE、会话和附件均经同一私有入口；Worker 预览/直连域名关闭，默认 fetch 404。
 
 ## 验收与发布
 
