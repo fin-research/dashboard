@@ -68,7 +68,7 @@ export const governmentBondSchema = z.object({
   abscissaName: z.string(),
   bondCode: z.string(),
   tradeNum: numericValue,
-  yield: numericValue,
+  yield: nullableNumericValue,
   yieldSubYtdCloseBp: nullableNumericValue,
 });
 const governmentRowsSchema = z.array(governmentBondSchema);

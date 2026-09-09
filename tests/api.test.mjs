@@ -195,6 +195,28 @@ test("浏览器一次拉取原始资源并加工为视觉与文字共享报告",
   assert.equal(report.cached_at, report.generated_at);
 });
 
+test("部分利率债缺少收益率时仍生成国债行情，缺失值不会变为零", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (target) => {
+    const url = new URL(String(target), "https://example.test");
+    if (url.pathname === "/data/bond-top-case") {
+      return Response.json([
+        { ordinateName: "国债", abscissaName: "10Y", bondCode: "260011.IB", tradeNum: 20, yield: 1.8, yieldSubYtdCloseBp: -1 },
+        { ordinateName: "国债", abscissaName: "5Y", bondCode: "260010.IB", tradeNum: 1, yield: null, yieldSubYtdCloseBp: null },
+        { ordinateName: "农发", abscissaName: "3Y", bondCode: "260403.IB", tradeNum: 1, yield: null, yieldSubYtdCloseBp: null },
+      ]);
+    }
+    return directResponse(target);
+  };
+  const { report, resourceIssues } = await fetchReport("2026-08-25", false, undefined, "2026-08-25");
+  assert.deepEqual(resourceIssues, []);
+  assert.deepEqual(report.government_bonds, [
+    { category: "国债", tenor: "5Y", code: "260010.IB", yield_rate: null, change_bp: null },
+    { category: "国债", tenor: "10Y", code: "260011.IB", yield_rate: 1.8, change_bp: -1 },
+  ]);
+});
+
 test("当日读取只请求公开报告原始资源，不读取 market-report 定稿", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
