@@ -67,6 +67,7 @@ body {
 }
 
 .page-shell {
+  --report-control-size: 32px;
   width: 100%;
   min-width: 1280px;
   max-width: 2100px;
@@ -76,6 +77,22 @@ body {
   padding: 0 16px 12px;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+/* Dense report controls share one size; touch layouts retain larger targets. */
+.page-shell .btn {
+  min-width: var(--report-control-size);
+  min-height: var(--report-control-size);
+}
+
+.page-shell :is(.input, .select, .file-input) {
+  min-height: var(--report-control-size);
+}
+
+@media (max-width: 900px), (any-pointer: coarse) {
+  .page-shell {
+    --report-control-size: 44px;
+  }
 }
 
 .sr-only {
@@ -216,7 +233,7 @@ h1 {
 .hero-date {
   position: relative;
   display: flex;
-  min-height: 44px;
+  min-height: var(--report-control-size);
   align-items: center;
   gap: 7px;
   padding: 3px 4px 3px 10px;
@@ -423,7 +440,7 @@ h1 {
 
 .text-report__toolbar {
   display: flex;
-  min-height: 52px;
+  min-height: calc(var(--report-control-size) + 8px);
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
@@ -440,8 +457,8 @@ h1 {
 
 .text-report__action {
   display: inline-grid;
-  width: 44px;
-  height: 44px;
+  width: var(--report-control-size);
+  height: var(--report-control-size);
   place-items: center;
   padding: 0;
 }
@@ -578,8 +595,8 @@ h2 {
 
 .focus-save-button {
   display: inline-grid;
-  width: 44px;
-  min-width: 44px;
+  width: var(--report-control-size);
+  min-width: var(--report-control-size);
   place-items: center;
   padding: 3px;
 }

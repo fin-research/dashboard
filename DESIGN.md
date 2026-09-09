@@ -56,6 +56,7 @@
 - `src/components/MetricCard.svelte` 是市场点评、交易研究工作台普通快照指标、二级池和融资择时模型的唯一指标卡基础。名称、主值、单位、第三行变动、圆形图标容器、图标线宽、语义色、浅色卡片底、边框、圆角、阴影和文字换行均由该组件负责；业务页只配置 `tone`、`iconPosition`、`compact` 与业务数据，不得再定义页面级 `.core-card`、`.metric-card`、`.ledger-metric` 或同义结构。研究辅助的经济数据走势矩阵因每卡同时承载日期和 ECharts 趋势图，统一使用专用 `EconomicIndicatorCard.svelte`，不作为普通指标卡的替代实现。
 - `src/lib/trading-research/SectionHeading.svelte`、`PanelHeading.svelte` 和 `Badge.svelte` 分别负责工作台模块标题、卡片小标题和状态标签。所有工作台标签页及融资择时模型必须复用它们；`PanelHeading` 统一使用左侧品牌色短线、`1.125rem` 粗体标题和下方控件行，筛选框在桌面端保持一字排开，不复制标题 DOM。
 - 市场点评的高密度内容面板继续复用 `.dashboard-panel` 与 `.panel-heading` 并映射全局卡片令牌；二级池及其余工作台内容面板统一复用 `ModuleCard.svelte`，不得仅因标签页不同而改变边框、圆角、阴影和标题层级。
+- 市场点评桌面鼠标操作区采用 `32px` 紧凑控件，通过 `.page-shell` 的 `--report-control-size` 统一顶部切换、按钮、日期、聚焦保存和文字版工具栏尺寸，避免 `44px` 通用按钮撑高模块标题。`900px` 以下或具有粗指针的触屏设备恢复 `44px`；此为高密度报告的尺寸例外，其他页面继续沿用通用触控尺寸。
 - `src/components/ChartHost.svelte` 负责图表生命周期、容器尺寸与可访问名称，`src/charts/` 负责同类图表 option。业务模块不得另建图表容器或内联独立视觉配置。
 - 共享组件样式由组件自身或其唯一共享样式文件维护；业务页 CSS 仅负责网格、模块位置和确有业务含义的布局变体，不得覆盖共享组件的字号、颜色、边框、圆角或阴影来制造局部版本。
 
