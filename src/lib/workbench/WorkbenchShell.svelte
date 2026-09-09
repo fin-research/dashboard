@@ -106,8 +106,8 @@
       </div>
     </div>
     <div class="tr-topbar__meta">
-      {#if account}{@render account()}{:else}<AuthMenu />{/if}
       <div id="tr-topbar-actions" class="tr-topbar__actions">{#if actions}{@render actions()}{/if}</div>
+      {#if account}{@render account()}{:else}<AuthMenu />{/if}
     </div>
   </header>
 

@@ -1020,13 +1020,8 @@
 
   .model-version-control {
     min-height: 44px;
-    gap: 7px;
-    padding: 0 12px;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius-control);
+    gap: 8px;
     color: var(--text-2);
-    background: var(--surface);
-    box-shadow: var(--shadow-card);
   }
 
   .model-version-control svg {
@@ -1040,9 +1035,8 @@
   }
 
   .model-version-control select {
-    min-width: 168px;
-    height: 42px;
-    padding: 0 28px 0 4px;
+    width: auto;
+    min-width: 12.5rem;
   }
 
   .report-stack {

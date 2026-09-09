@@ -215,6 +215,8 @@
     min-height: 80px;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
     border-bottom: 1px solid rgba(21, 36, 59, 0.16);
   }
 
@@ -225,7 +227,7 @@
     gap: 11px;
     border-radius: 8px;
     color: var(--ink);
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: bold;
     letter-spacing: 0.05em;
     text-decoration: none;

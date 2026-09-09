@@ -306,20 +306,19 @@
       </div>
       <div class="masthead-controls" aria-label="报告控制">
         <div class="titlebar-actions">
-          <AuthMenu />
-          <div class="view-toggle" role="group" aria-label="报告展示方式">
-            <button class="btn"
+          <div class="join view-toggle" role="group" aria-label="报告展示方式">
+            <button class="btn join-item"
               id="visual-report-tab"
-              class:btn-active={activeView === "visual"}
+              class:btn-primary={activeView === "visual"}
               type="button"
               aria-pressed={activeView === "visual"}
               onclick={() => selectView("visual")}
             >
               可视化
             </button>
-            <button class="btn"
+            <button class="btn join-item"
               id="text-report-tab"
-              class:btn-active={activeView === "text"}
+              class:btn-primary={activeView === "text"}
               type="button"
               aria-pressed={activeView === "text"}
               onclick={() => selectView("text")}
@@ -376,6 +375,7 @@
           </time>
         </label>
       </div>
+      <div class="report-account"><AuthMenu /></div>
     </header>
 
     {#if loading}

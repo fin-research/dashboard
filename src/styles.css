@@ -102,15 +102,19 @@ body {
   gap: 8px;
 }
 
+.masthead-controls {
+  margin-left: auto;
+}
+
+.report-account {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .refresh-button,
 .export-button {
   gap: 5px;
   padding: 0 9px;
-}
-
-.refresh-button:hover:not(:disabled),
-.export-button:hover:not(:disabled) {
-  transform: translateY(-1px);
 }
 
 .refresh-button svg,
@@ -128,13 +132,7 @@ body {
 }
 
 .view-toggle {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  flex-shrink: 0;
 }
 
 .view-toggle button {
@@ -154,7 +152,7 @@ body {
   display: grid;
   height: calc(100vh - 12px);
   height: calc(100dvh - 12px);
-  grid-template-rows: 42px minmax(0, 1fr);
+  grid-template-rows: 44px minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -170,7 +168,7 @@ body {
   position: relative;
   display: flex;
   min-width: 0;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
   padding: 0 2px;
@@ -218,6 +216,7 @@ h1 {
 .hero-date {
   position: relative;
   display: flex;
+  min-height: 44px;
   align-items: center;
   gap: 7px;
   padding: 3px 4px 3px 10px;
@@ -249,6 +248,8 @@ h1 {
   inset: 0;
   width: 100%;
   height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .hero-date__display {
@@ -577,8 +578,8 @@ h2 {
 
 .focus-save-button {
   display: inline-grid;
-  width: 32px;
-  min-width: 32px;
+  width: 44px;
+  min-width: 44px;
   place-items: center;
   padding: 3px;
 }
@@ -621,6 +622,7 @@ h2 {
 .is-export-capture .focus-save-button,
 .is-export-capture .focus-generation-error,
 .is-export-capture .text-report__toolbar,
+.is-export-capture .report-account,
 .is-export-capture .titlebar-actions {
   display: none;
 }
@@ -1311,10 +1313,13 @@ h2 {
     min-height: calc(100vh - 18px);
     min-height: calc(100dvh - 18px);
     grid-template-rows: auto auto;
+    align-content: start;
     gap: 10px;
   }
 
   .report-masthead {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: stretch;
     gap: 8px;
     padding: 8px 2px 0;
@@ -1331,10 +1336,18 @@ h2 {
   }
 
   .masthead-controls {
+    grid-column: 1 / -1;
+    grid-row: 2;
     width: 100%;
     align-items: stretch;
     gap: 8px;
     flex-direction: column;
+  }
+
+  .report-account {
+    grid-column: 2;
+    grid-row: 1;
+    align-items: center;
   }
 
   .titlebar-actions {
@@ -1569,6 +1582,19 @@ h2 {
 
   .titlebar-actions {
     grid-template-columns: minmax(0, 1fr) 44px 44px;
+  }
+
+  .report-masthead {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-account {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .masthead-controls {
+    grid-row: 3;
   }
 
   .refresh-button,

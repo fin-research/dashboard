@@ -276,6 +276,7 @@ body:has(.tr-workbench) {
 
 .tr-topbar__title,
 .tr-topbar__meta {
+  max-width: 100%;
   display: flex;
   align-items: center;
 }
@@ -345,6 +346,7 @@ body:has(.tr-workbench) {
 }
 
 .tr-topbar__meta {
+  margin-inline-start: auto;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
@@ -353,6 +355,9 @@ body:has(.tr-workbench) {
 .tr-topbar__actions {
   display: flex;
   min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
   justify-content: flex-end;
 }
@@ -396,8 +401,7 @@ body:has(.tr-workbench) {
     flex-wrap: wrap;
   }
 
-  .tr-topbar:has(.tr-topbar__actions:not(:empty)) .tr-topbar__meta,
-  .tr-topbar:has(.tr-topbar__actions:not(:empty)) .tr-topbar__actions {
+  .tr-topbar:has(.tr-topbar__actions:not(:empty)) .tr-topbar__meta {
     width: 100%;
   }
 
@@ -1926,7 +1930,7 @@ body:has(.tr-workbench) {
   }
 
   .tr-topbar__meta {
-    display: none;
+    display: flex;
   }
 
   .tr-topbar:has(.tr-credit-toolbar) {

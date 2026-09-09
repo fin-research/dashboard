@@ -29,9 +29,8 @@
 
 <style>
   svg { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .account-button { max-width: 100%; flex-shrink: 0; gap: .5rem; padding-inline: .75rem; text-decoration: none; }
+  .account-button { max-width: 100%; margin-inline-start: auto; flex-shrink: 0; gap: .5rem; padding-inline: .75rem; font-size: 1rem; text-decoration: none; }
   .account-button > span { overflow-wrap: anywhere; text-align: left; }
   .account-department, .account-divider { color: var(--muted); font-weight: normal; }
-  @media (max-width: 720px) { .account-button { font-size: .875rem; } }
   @media print { .account-button { display: none; } }
 </style>
