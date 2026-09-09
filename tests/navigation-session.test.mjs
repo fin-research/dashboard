@@ -127,6 +127,18 @@ test('permission changes can refresh the shared snapshot explicitly without refr
   assert.equal(setupGuard(state).visit('/trading-research/research').cancelled, true);
 });
 
+test('an already-expired bootstrap response redirects once instead of entering a refresh/navigation loop', async () => {
+  let requests = 0;
+  const state = createClientSession(null, async () => { requests++; return Response.json(authenticated); }, () => 2000000);
+  const { calls, visit } = setupGuard(state);
+  visit('/trading-research/research');
+  await state.load(); await setImmediate();
+  assert.deepEqual(state.current(), anonymous);
+  assert.deepEqual(calls.resumed, []);
+  assert.deepEqual(calls.logins, ['/trading-research/research']);
+  assert.equal(requests, 1);
+});
+
 test('a late bootstrap cannot overwrite a newer profile snapshot and separate SSR instances never share state', async () => {
   let complete;
   const state = createClientSession(null, () => new Promise(resolve => { complete = resolve; }), () => 1000000);

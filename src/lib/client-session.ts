@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { ClientSessionData } from './identity';
+import { publicSession, type ClientSessionData } from './identity.ts';
 
 export const CLIENT_SESSION_CONTEXT = 'site-session';
 export type ClientSession = ReturnType<typeof createClientSession>;
@@ -31,11 +31,14 @@ export function createClientSession(
     pending = (async () => {
       const response = await fetcher('/auth/session', { cache: 'no-store' });
       if (!response.ok) throw new Error('登录状态暂时无法读取，请稍后重试');
-      const session = await response.json() as ClientSessionData;
+      let session = await response.json() as ClientSessionData;
       if (!Array.isArray(session.permissions) || !Array.isArray(session.roles)
         || (session.user && (!session.user.email || !Number.isFinite(session.expiresAt)))) {
         throw new Error('登录状态暂时无法读取，请稍后重试');
       }
+      // JWT verification has clock tolerance; never resume navigation with an
+      // already-expired snapshot and enter an endless refresh/goto cycle.
+      if (session.user && session.expiresAt! * 1000 <= now()) session = publicSession(null);
       // A late public-page request must not replace a newer SSR/action snapshot.
       if (revision === startedAt) seed(session);
       return value!;
