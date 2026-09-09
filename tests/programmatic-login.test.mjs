@@ -3,7 +3,6 @@ import test from 'node:test';
 import { SessionCookies, createHttpSession, loginTestAccount, parseLoginPage } from '../scripts/lib/programmatic-login.mjs';
 
 const site = 'https://eastmoney.hasbai.xyz';
-const team = 'https://hasbai.cloudflareaccess.com';
 const auth = 'https://auth.hasbai.xyz';
 const redirect = (location, cookies = []) => new Response(null, { status: 302, headers: [['Location', location], ...cookies.map(c => ['Set-Cookie', c])] });
 
