@@ -4,6 +4,7 @@ import { withLoginRedirect, LoginRequiredError, requireClientLogin, redirectToLo
 import { loginUrl, pageRequiresLogin } from '../src/lib/auth-navigation.ts';
 import { dashboardAccessFailure, dashboardRequiresLogin } from '../src/lib/server/dashboard-access.ts';
 import { AccessError } from '../src/lib/server/access.ts';
+import { createClientSession } from '../src/lib/client-session.ts';
 
 const current = 'https://eastmoney.hasbai.xyz/fund-report?upload=1#history';
 test('all same-origin 401 responses redirect before parsing or exposing generic failures', async () => {
@@ -57,15 +58,16 @@ test('login destinations preserve local queries and reject encoded loops or exte
 
 test('preflight login checks fail closed and concurrent redirects cause only one navigation', async (t) => {
   const redirects = [];
-  t.mock.method(globalThis, 'fetch', async () => Response.json({ user: { email: 'me@18.cn' } }));
-  assert.equal(await requireClientLogin('/profile'), true);
+  const anonymous = { user: null, account: null, roles: [], permissions: [], expiresAt: null };
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ ...anonymous, user: { email: 'test@18.cn' }, expiresAt: Date.now() / 1000 + 60 }));
+  assert.equal(await requireClientLogin('/profile', createClientSession()), true);
   t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
-  await assert.rejects(requireClientLogin('/profile'), /登录状态暂时无法读取/);
+  await assert.rejects(requireClientLogin('/profile', createClientSession()), /登录状态暂时无法读取/);
   const original = globalThis.window;
   globalThis.window = { location: { pathname: '/', search: '', hash: '', assign: (url) => redirects.push(url) } };
   try {
     t.mock.method(globalThis, 'fetch', async () => Response.json({ user: null, enabled: true }));
-    assert.equal(await requireClientLogin('/fund-report?upload=1'), false);
+    assert.equal(await requireClientLogin('/fund-report?upload=1', createClientSession(anonymous)), false);
     redirectToLogin('/profile');
     assert.deepEqual(redirects, [loginUrl('/fund-report?upload=1')]);
   } finally {

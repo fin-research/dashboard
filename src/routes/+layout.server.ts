@@ -1,9 +1,10 @@
 import type { LayoutServerLoad } from './$types';
+import { publicSession } from '$lib/identity';
 
-// Reading pathname makes every client-side route change visit the server entry
-// guard, including pages whose own load is otherwise entirely client-side.
-export const load: LayoutServerLoad = ({ locals, url }) => ({
-  routePath: url.pathname,
-  permissions: locals.permissions,
-  account: locals.user?.authorization ? { name: locals.user.authorization.name, department: locals.user.authorization.department ?? '' } : null,
-});
+// The root snapshot survives route changes. Real page/API requests are still
+// authorized by hooks; explicit account changes can invalidate this dependency.
+export const load: LayoutServerLoad = ({ locals, depends }) => {
+  depends('site:session');
+  const session = locals.user ? publicSession(locals.user) : null;
+  return { session, permissions: locals.permissions, account: session?.account ?? null };
+};

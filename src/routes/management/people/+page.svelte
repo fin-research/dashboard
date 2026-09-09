@@ -1,14 +1,16 @@
 <script lang="ts">
 import { enhance } from '$app/forms';
-import { untrack } from 'svelte';
+import { getContext, untrack } from 'svelte';
 import type { SubmitFunction } from '@sveltejs/kit';
 import ModuleCard from '../../../components/ModuleCard.svelte';
 import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
 import { PERMISSION_CODES, PERMISSION_DEFINITIONS, PERMISSION_DOMAINS, hasPermission } from '$lib/permissions';
 import { globalMessages } from '$lib/global-messages';
+import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import { Search, ShieldCheck, ExternalLink, Save, RotateCcw } from '@lucide/svelte';
 
 let { data } = $props();
+const session = getContext<ClientSession | undefined>(CLIENT_SESSION_CONTEXT);
 let selectedRole = $state(untrack(() => data.roles[0]?.id ?? ''));
 let configurations = $state(untrack(() => structuredClone(data.configurations)));
 let drafts = $state<Record<string, string[]>>(untrack(() => Object.fromEntries(Object.entries(data.configurations).map(([id, config]) => [id, [...config.permissions]]))));
@@ -16,7 +18,7 @@ let query = $state('');
 let saving = $state(false);
 let roleQuery = $state('');
 const visibleRoles = $derived(data.roles.filter(item => `${item.name} ${item.description}`.toLowerCase().includes(roleQuery.toLowerCase())));
-const canConfigure = $derived(hasPermission(data.permissions, 'auth.permission:update'));
+const canConfigure = $derived(hasPermission($session?.permissions ?? data.permissions, 'auth.permission:update'));
 const role = $derived(data.roles.find(item => item.id === selectedRole));
 const selected = $derived(drafts[selectedRole] ?? []);
 const dirty = $derived(JSON.stringify([...selected].sort()) !== JSON.stringify([...(configurations[selectedRole]?.permissions ?? [])].sort()));
@@ -38,6 +40,9 @@ const save: SubmitFunction = () => {
       configurations[id] = result.data.configuration as { permissions: string[]; version: string };
       drafts[id] = [...configurations[id].permissions];
       globalMessages.success(String(result.data.message));
+      // Configuration changed explicitly; refresh the shared presentation snapshot once.
+      try { await session?.load(true); }
+      catch { globalMessages.error('权限已保存，当前账号权限刷新失败，请重新加载页面'); }
     } else if (result.type === 'failure') globalMessages.error(String(result.data?.message ?? '保存失败'));
     else await update({ reset: false });
   };

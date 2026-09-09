@@ -1,6 +1,6 @@
 <script lang="ts">
   import './profile.css';
-  import { invalidateAll } from '$app/navigation';
+  import { invalidate } from '$app/navigation';
   import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
   import { onMount } from 'svelte';
   import ModuleCard from '../../components/ModuleCard.svelte';
@@ -44,7 +44,7 @@
       const response = await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || '个人信息保存失败');
-      if (typeof result.name === 'string') { profile = { ...profile, name: result.name }; name = result.name; await invalidateAll(); }
+      if (typeof result.name === 'string') { profile = { ...profile, name: result.name }; name = result.name; await invalidate('site:session'); }
       globalMessages.success(result.message, { key: 'profile-action', duration: 10000 });
       if (result.logout) { window.location.assign('/auth/logout'); return; }
     } catch (error) {

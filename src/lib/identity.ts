@@ -35,3 +35,23 @@ export function financingPersonView(identity: SiteIdentity | null) {
 export function publicIdentity(identity: SiteIdentity | null) {
   return identity ? { id: identity.id, email: identity.email, auth0Id: identity.auth0Id } : null;
 }
+
+/** A presentation snapshot, never a credential or a server authorization input. */
+export interface ClientSessionData {
+  user: ReturnType<typeof publicIdentity>;
+  account: AccountSummary | null;
+  roles: { id: string; name: string }[];
+  permissions: string[];
+  expiresAt: number | null;
+}
+
+export function publicSession(identity: SiteIdentity | null): ClientSessionData {
+  const authorization = identity?.authorization;
+  return {
+    user: publicIdentity(identity),
+    account: authorization ? { name: authorization.name, department: authorization.department ?? '' } : null,
+    roles: authorization?.roles.map(({ id, name }) => ({ id, name })) ?? [],
+    permissions: authorization?.permissions ?? [],
+    expiresAt: identity?.expiresAt ?? null,
+  };
+}

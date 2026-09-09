@@ -1,15 +1,17 @@
 <script lang="ts">
 
-  import { onMount } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import { invalidate } from '$app/navigation';
   import { page } from '$app/state';
   import AuthMenu from '$lib/AuthMenu.svelte';
   import FundReportUploadDialog from '$lib/FundReportUploadDialog.svelte';
   import { requireClientLogin, isLoginRedirecting } from '$lib/auth-client';
+  import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
   import { globalMessages } from '$lib/global-messages';
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
+  const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
 
   let uploadDialog: FundReportUploadDialog;
   let checkingLogin = $state(false);
@@ -17,7 +19,7 @@
     if (checkingLogin) return;
     checkingLogin = true;
     try {
-      if (await requireClientLogin('/fund-report?upload=1')) uploadDialog.open();
+      if (await requireClientLogin('/fund-report?upload=1', session)) uploadDialog.open();
     } catch (error) {
       if (!isLoginRedirecting()) globalMessages.error(error instanceof Error ? error.message : '登录状态读取失败');
     } finally { checkingLogin = false; }

@@ -1,4 +1,8 @@
 import { loginUrl } from './auth-navigation.ts';
+import { pagePermission } from './route-permissions.ts';
+import type { ClientSession } from './client-session';
+import type { ClientSessionData } from './identity';
+import type { BeforeNavigate } from '@sveltejs/kit';
 
 export class LoginRequiredError extends Error {
   constructor() { super('请先登录'); }
@@ -31,13 +35,49 @@ export function withLoginRedirect(
   };
 }
 
-export async function requireClientLogin(returnTo: string): Promise<boolean> {
-  const response = await fetch('/auth/session', { cache: 'no-store' });
-  if (!response.ok) throw new Error('登录状态暂时无法读取，请稍后重试');
-  const session = await response.json() as { user?: { email?: string } | null };
-  if (!session.user?.email) {
+export async function requireClientLogin(returnTo: string, state: ClientSession): Promise<boolean> {
+  const session = await state.load();
+  if (!session.user) {
     redirectToLogin(returnTo);
     return false;
   }
   return true;
+}
+
+export function createClientNavigationGuard(state: ClientSession, options: {
+  origin: () => string;
+  navigate: (url: URL) => Promise<unknown>;
+  error: (message: string) => void;
+  login?: (returnTo: string) => void;
+}) {
+  let navigation = 0;
+  return ({ to, cancel }: BeforeNavigate): void => {
+    const attempt = ++navigation;
+    // External navigation and server endpoints have their own request boundary.
+    if (!to || to.url.origin !== options.origin() || !to.route.id) return;
+    const permission = pagePermission(to.url.pathname, to.route.id);
+    if (permission === 'public') return;
+    const allowed = (session: ClientSessionData) => {
+      if (!session.user) {
+        (options.login ?? redirectToLogin)(to.url.pathname + to.url.search + to.url.hash);
+        return false;
+      }
+      if (!permission || (permission !== 'login' && !session.permissions.includes(permission))) {
+        options.error('当前角色无权访问该页面');
+        return false;
+      }
+      return true;
+    };
+    const cached = state.current();
+    if (cached) {
+      if (!allowed(cached)) cancel();
+      return;
+    }
+    cancel();
+    void state.load().then(async session => {
+      if (attempt === navigation && allowed(session)) await options.navigate(to.url);
+    }).catch(error => {
+      if (attempt === navigation && !isLoginRedirecting()) options.error(error.message);
+    });
+  };
 }

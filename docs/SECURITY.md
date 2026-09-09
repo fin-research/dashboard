@@ -47,9 +47,11 @@
 
 ## 全站授权入口
 
-除公开的市场点评页面、定稿 GET/HEAD 及限定行情兼容通道外，所有业务页面、只读 API、写入 API 和 named actions 由 `src/lib/server/authorization.ts` 检查。`src/hooks.server.ts` 是 SvelteKit 的唯一检查入口；全局服务端 layout 依赖 pathname，使纯客户端页面之间的导航也经过入口检查。门户、市场点评读取、身份流程和静态资源以明确规则公开，其余业务只读接口同样执行应用权限检查。
+除公开的市场点评页面、定稿 GET/HEAD 及限定行情兼容通道外，所有到达服务端的业务页面、只读 API、写入 API 和 named actions 由 `src/lib/server/authorization.ts` 检查。`src/hooks.server.ts` 是 SvelteKit 的唯一检查入口。全局服务端 layout 只提供首屏会话展示快照，不依赖 pathname；纯客户端页面切换使用快照中的权限判断入口，业务数据仍须经过受保护 API。门户、市场点评读取、身份流程和静态资源以明确规则公开，其余业务只读接口同样执行应用权限检查。
 
-`src/lib/permissions.ts` 是权限代码及说明的唯一来源，`src/lib/server/permission-policy.ts` 按真实路由 ID、HTTP 方法、named action 分配权限。未知路由、未登记操作和含多个 action 的请求失败关闭。GET/HEAD 也校验读取权限；写入检查 Origin，前端可见性不能代替服务端校验。
+`src/lib/permissions.ts` 是权限代码及说明的唯一来源，`src/lib/route-permissions.ts` 维护路由目录及前后端共用的页面 GET 权限，`src/lib/server/permission-policy.ts` 校验 HTTP 方法与 named action。未知路由、未登记操作和含多个 action 的请求失败关闭。GET/HEAD 也校验读取权限；写入检查 Origin，前端可见性不能代替服务端校验。
+
+前端会话由根 layout 实例独占，不跨 SSR 请求共享，不写 localStorage，不包含 JWT 或 Cookie。受保护首屏下发角色、有效权限和会话到期时间；公开首屏通过 `/auth/session` 后台初始化一次，菜单、导航和上传前检查共享结果及并发请求。普通导航不请求 session、不强制 invalidateAll，允许 SvelteKit 直接复用预取。会话到期或明确修改角色权限时刷新一次；修改姓名只失效 `site:session`。其他终端撤销权限可能暂时保留旧菜单展示，但每个真实业务请求仍核对当前账号与权限，403 不被当作登录失效。
 
 独立授信问答 HTTP 入口调用同一授权函数，保留原客户保密材料边界。Data Worker 的 DM、东方财富网及固定行业快照 GET/HEAD 公开只读；Choice 通用查询与 CAMEL 校验 Access 登录。GraphQL 在 Choice 字段执行前校验，公开字段不依赖身份服务。旧私有 `AUTHORIZATION` binding 保留兼容，当前 Data 请求不调用角色授权；不能信任自报身份或权限头。服务绑定和明确允许的 Access 服务身份用于机器任务，不代表用户角色。Ingest 的 HTTP 入口仅公开 health，其工作由 Cron/Workflow 执行；Quant、Choice 无新增用户权限入口。
 

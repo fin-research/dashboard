@@ -1,48 +1,39 @@
 <script lang="ts">
   import '../app.css';
   import '../styles.css';
-  import { onMount, setContext } from "svelte";
+  import { onMount, setContext, untrack } from "svelte";
   import { beforeNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { pageRequiresLogin } from '$lib/auth-navigation';
-  import { requireClientLogin, isLoginRedirecting } from '$lib/auth-client';
+  import { createClientNavigationGuard, requireClientLogin, isLoginRedirecting } from '$lib/auth-client';
+  import { createClientSession, CLIENT_SESSION_CONTEXT } from '$lib/client-session';
   import { globalMessages } from '$lib/global-messages';
-  import { financingRouteId } from '$lib/financing/route-contract';
 
   import GlobalMessages from "$lib/GlobalMessages.svelte";
   import { applyPreferences, readPreferences } from "$lib/preferences";
 
   let { children, data } = $props();
-  setContext('site-account', () => data.account);
+  const session = createClientSession(untrack(() => data.session));
+  setContext(CLIENT_SESSION_CONTEXT, session);
+  setContext('site-account', () => $session?.account ?? null);
+  setContext('site-account-checking', () => $session === null);
+  $effect(() => { if (data.session) session.seed(data.session); });
 
-  let checkedDestination: string | null = null;
-  let checkingNavigation = false;
-  beforeNavigate(({ to, cancel }) => {
-    if (!to || to.url.origin !== page.url.origin || !pageRequiresLogin(to.url.pathname)) return;
-    // These SSR routes authenticate in their server loads/middleware. Let Kit reuse
-    // layout data and follow its 401 redirect instead of adding a session round trip.
-    if (financingRouteId(to.route.id) !== null) return;
-    if (checkedDestination === to.url.href) { checkedDestination = null; return; }
-    cancel();
-    if (checkingNavigation) return;
-    checkingNavigation = true;
-    void requireClientLogin(to.url.pathname + to.url.search + to.url.hash)
-      .then(async (loggedIn) => {
-        if (loggedIn) {
-          checkedDestination = to.url.href;
-          await goto(to.url, { invalidateAll: true });
-        }
-      })
-      .catch((error) => { if (!isLoginRedirecting()) globalMessages.error(error.message); })
-      .finally(() => { checkingNavigation = false; checkedDestination = null; });
-  });
+  beforeNavigate(createClientNavigationGuard(session, {
+    origin: () => page.url.origin,
+    navigate: (url) => goto(url),
+    error: (message) => globalMessages.error(message),
+  }));
 
   onMount(() => {
     applyPreferences(readPreferences());
-    if (pageRequiresLogin(page.url.pathname) && financingRouteId(page.route.id) === null) {
-      void requireClientLogin(page.url.pathname + page.url.search + page.url.hash)
-        .catch((error) => { if (!isLoginRedirecting()) globalMessages.error(error.message); });
-    }
+    // Authenticated SSR already seeded this store. Public pages bootstrap once in
+    // the background without making report rendering depend on Auth0.
+    void session.load().then(() => {
+      if (pageRequiresLogin(page.url.pathname)) {
+        return requireClientLogin(page.url.pathname + page.url.search + page.url.hash, session);
+      }
+    }).catch((error) => { if (!isLoginRedirecting()) globalMessages.error(error.message); });
   });
 </script>
 

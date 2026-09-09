@@ -55,6 +55,7 @@ git diff --check
 - 注册验证提示：Action 源码为 `auth0/actions/eastmoney-login.cjs`，公开页面为 `/auth/verify-email`。必须先发布 Dashboard 并确认提示页 200，再执行 `node --use-env-proxy scripts/publish-auth0-login.mjs --apply`；脚本保留已有 Action Secret、依赖和绑定，拒绝覆盖其他未发布草稿。发布后回读生效版本与 post-login 绑定。
 - 本地账号服务可从 `.dev.vars.example` 创建未跟踪的 `.dev.vars`。变更真实邮箱、姓名及发送密码重置邮件均属于实际账号操作；默认测试使用模拟服务，不修改真实账号。
 - 账号与路由专项验收：`node --test tests/auth-client.test.mjs tests/profile.test.mjs tests/access.test.mjs tests/fund-report.test.mjs`；构建后运行 `node scripts/verify-profile-routes.mjs` 验证真实 SvelteKit 路由与内存上传，全部上游为模拟实现。
+- 导航与会话：`node --test tests/navigation-session.test.mjs` 验证有效会话切页零额外请求、初始化去重、过期、权限拒绝和快速连续导航；构建后运行 `node scripts/verify-navigation-routes.mjs` 检查真实 `__data.json` 的根依赖、跳过根节点的页面数据请求，以及匿名/账号撤销拦截。使用模拟签名与 Auth0，只执行程序化 HTTP，不依赖浏览器。
 - 发布前核对 `wrangler.jsonc` 中绑定、migration 顺序和生产数据服务路径，但不要把 Secret 写入配置。
 
 ## 文档维护

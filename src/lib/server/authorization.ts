@@ -18,7 +18,9 @@ export async function authorizeRequest(request: Request, env: Env, routeId: stri
   const user = policy.public
     ? (routeId === '/auth/session' ? await dashboardIdentity(request, env) : null)
     : await dashboardIdentity(request, env, true);
-  if (policy.public || policy.login) return { user, permissions: [] as string[], directory: undefined };
+  // A session bootstrap resolves the same role/permission snapshot as a business
+  // request once. Other public resources stay independent of identity services.
+  if ((policy.public && (routeId !== '/auth/session' || !user)) || policy.login) return { user, permissions: [] as string[], directory: undefined };
   if (!user) throw new AccessError(401, '请先登录');
   const mode = authorizationMode(env.AUTHORIZATION_MODE);
   const directory = createDirectory(env, fetcher);

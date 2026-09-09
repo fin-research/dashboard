@@ -1,25 +1,11 @@
 <script lang="ts">
-  import { getContext, onMount } from 'svelte';
+  import { getContext } from 'svelte';
   import type { AccountSummary } from '$lib/identity';
 
   const currentAccount = getContext<() => AccountSummary | null>('site-account') ?? (() => null);
-  let sessionAccount = $state<AccountSummary | null>(null);
-  let checking = $state(true);
-  const account = $derived(currentAccount() ?? sessionAccount);
-
-  onMount(() => {
-    if (currentAccount()) { checking = false; return; }
-    const controller = new AbortController();
-    void fetch('/auth/session', { cache: 'no-store', signal: controller.signal })
-      .then(async response => {
-        if (!response.ok) return;
-        const session = await response.json();
-        if (!controller.signal.aborted) sessionAccount = session.account ?? null;
-      })
-      .catch(() => {})
-      .finally(() => { if (!controller.signal.aborted) checking = false; });
-    return () => controller.abort();
-  });
+  const isChecking = getContext<() => boolean>('site-account-checking') ?? (() => false);
+  const checking = $derived(isChecking());
+  const account = $derived(currentAccount());
 </script>
 
 <a class="btn btn-ghost account-button" href="/profile" aria-label={account ? `个人管理：${account.name}，${account.department || '未填写部门'}` : '个人管理'}>

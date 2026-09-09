@@ -1,0 +1,159 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { setImmediate } from 'node:timers/promises';
+import { createClientSession } from '../src/lib/client-session.ts';
+import { createClientNavigationGuard, requireClientLogin } from '../src/lib/auth-client.ts';
+import { publicSession } from '../src/lib/identity.ts';
+import { pagePermission, ROUTE_PERMISSIONS } from '../src/lib/route-permissions.ts';
+import { requestPolicy } from '../src/lib/server/permission-policy.ts';
+import { PERMISSION_CODES } from '../src/lib/permissions.ts';
+
+const origin = 'https://eastmoney.hasbai.xyz';
+const anonymous = { user: null, account: null, roles: [], permissions: [], expiresAt: null };
+const authenticated = {
+  user: { id: 'access-test', auth0Id: 'auth0|test', email: 'test@18.cn' },
+  account: { name: '测试账号', department: '测试' },
+  roles: [{ id: 'rol_test', name: '测试角色' }],
+  permissions: [...PERMISSION_CODES], expiresAt: 2000,
+};
+const navigation = (path, id = '/trading-research/[view]') => ({
+  to: { url: new URL(path, origin), route: { id } },
+  cancel() { this.cancelled = true; },
+});
+function setupGuard(state) {
+  const calls = { resumed: [], errors: [], logins: [] };
+  const guard = createClientNavigationGuard(state, {
+    origin: () => origin,
+    navigate: async url => calls.resumed.push(url.href),
+    error: message => calls.errors.push(message), login: path => calls.logins.push(path),
+  });
+  function visit(path, id) {
+    const event = navigation(path, id);
+    event.cancel = () => { event.cancelled = true; };
+    guard(event);
+    return event;
+  }
+  return { calls, visit };
+}
+
+test('SSR bootstrap allows repeated tab switches and upload preflight without requests, cancelling navigation or restarting preloads', async () => {
+  let requests = 0;
+  const state = createClientSession(authenticated, async () => { requests++; throw Error('unnecessary request'); }, () => 1000000);
+  const { calls, visit } = setupGuard(state);
+  for (const path of ['/trading-research/research', '/trading-research/market-hotspots', '/trading-research/policy-tracking', '/trading-research/research']) {
+    assert.equal(visit(path).cancelled, undefined);
+  }
+  assert.equal(visit('/financing/projects', '/financing/projects').cancelled, undefined);
+  assert.equal(await requireClientLogin('/fund-report?upload=1', state), true);
+  assert.deepEqual(await state.load(), authenticated, 'root mount also reuses SSR');
+  assert.equal(requests, 0);
+  assert.deepEqual(calls, { resumed: [], errors: [], logins: [] });
+});
+
+test('public bootstrap, navigation and menu subscribers share one request; the last clicked tab wins', async () => {
+  let complete; let requests = 0;
+  const response = new Promise(resolve => { complete = resolve; });
+  const state = createClientSession(null, async (path, init) => {
+    requests++; assert.equal(path, '/auth/session'); assert.equal(init.cache, 'no-store'); return response;
+  }, () => 1000000);
+  const values = [];
+  const unsubscribe = state.subscribe(value => values.push(value));
+  const mount = state.load();
+  const { calls, visit } = setupGuard(state);
+  assert.equal(visit('/trading-research/research').cancelled, true);
+  assert.equal(visit('/trading-research/market-hotspots').cancelled, true);
+  assert.equal(state.load(), mount);
+  complete(Response.json(authenticated));
+  await mount; await setImmediate();
+  assert.equal(requests, 1);
+  assert.deepEqual(calls.resumed, [origin + '/trading-research/market-hotspots']);
+  assert.equal(visit('/trading-research/policy-tracking').cancelled, undefined);
+  assert.deepEqual(values.at(-1), authenticated);
+  unsubscribe();
+});
+
+test('public or external navigation supersedes a pending protected navigation', async () => {
+  for (const [path, id] of [['/', '/'], ['https://other.test/', null]]) {
+    let complete;
+    const state = createClientSession(null, () => new Promise(resolve => { complete = resolve; }), () => 1000000);
+    const { calls, visit } = setupGuard(state);
+    visit('/trading-research/research');
+    assert.equal(visit(path, id).cancelled, undefined);
+    complete(Response.json(authenticated)); await state.load(); await setImmediate();
+    assert.deepEqual(calls, { resumed: [], errors: [], logins: [] });
+  }
+});
+
+test('anonymous state is cached and redirects without a session request; denied roles and unknown routes stay closed', () => {
+  let requests = 0;
+  const fetcher = async () => { requests++; throw Error('unexpected'); };
+  const anon = setupGuard(createClientSession(anonymous, fetcher));
+  assert.equal(anon.visit('/profile?tab=security#details', '/profile').cancelled, true);
+  assert.deepEqual(anon.calls.logins, ['/profile?tab=security#details']);
+  const restricted = setupGuard(createClientSession({ ...authenticated, permissions: ['research.workspace:read'] }, fetcher, () => 1000000));
+  assert.equal(restricted.visit('/trading-research/research').cancelled, undefined);
+  assert.equal(restricted.visit('/trading-research/market-hotspots').cancelled, true);
+  assert.equal(restricted.visit('/unknown', '/unknown').cancelled, true);
+  assert.equal(restricted.calls.errors.length, 2);
+  assert.deepEqual(restricted.calls.logins, []);
+  assert.equal(requests, 0);
+});
+
+test('expired snapshots refresh once, handle logout and never authorize with stale permissions on upstream failure', async () => {
+  for (const status of [200, 503]) {
+    let requests = 0;
+    const state = createClientSession(authenticated, async () => {
+      requests++; return status === 200 ? Response.json(anonymous) : new Response(null, { status });
+    }, () => 2000000);
+    const { calls, visit } = setupGuard(state);
+    assert.equal(visit('/trading-research/research').cancelled, true);
+    assert.equal(visit('/trading-research/policy-tracking').cancelled, true);
+    await setImmediate();
+    assert.equal(requests, 1);
+    assert.deepEqual(calls.resumed, []);
+    assert.equal(calls.logins.length, status === 200 ? 1 : 0);
+    assert.equal(calls.errors.length, status === 503 ? 1 : 0);
+    if (status === 503) assert.equal(state.current(), null);
+  }
+});
+
+test('permission changes can refresh the shared snapshot explicitly without refreshing unrelated page data', async () => {
+  let requests = 0;
+  const updated = { ...authenticated, permissions: ['account.profile:read'] };
+  const state = createClientSession(authenticated, async () => { requests++; return Response.json(updated); }, () => 1000000);
+  await Promise.all([state.load(true), state.load(true)]);
+  assert.equal(requests, 1);
+  assert.deepEqual(state.current(), updated);
+  assert.equal(setupGuard(state).visit('/trading-research/research').cancelled, true);
+});
+
+test('a late bootstrap cannot overwrite a newer profile snapshot and separate SSR instances never share state', async () => {
+  let complete;
+  const state = createClientSession(null, () => new Promise(resolve => { complete = resolve; }), () => 1000000);
+  const request = state.load();
+  state.seed(authenticated);
+  complete(Response.json(anonymous));
+  assert.deepEqual(await request, authenticated);
+  const other = createClientSession();
+  assert.equal(other.current(), null);
+});
+
+test('session DTO includes only presentation claims, roles and resolved permissions, never JWTs or metadata', () => {
+  const identity = { ...authenticated.user, issuedAt: 1000, expiresAt: 2000,
+    token: 'must-not-leak', metadata: { secret: 'must-not-leak' },
+    authorization: { ...authenticated.account, roles: authenticated.roles, permissions: authenticated.permissions, mode: 'beta-open', picture: 'must-not-leak' } };
+  assert.deepEqual(publicSession(identity), authenticated);
+  assert.deepEqual(publicSession(null), anonymous);
+});
+
+test('client GET permissions match the exact server policy, including dynamic views and encoded aliases', () => {
+  for (const [id, methods] of Object.entries(ROUTE_PERMISSIONS)) {
+    if (!methods.GET) continue;
+    const path = id.replace('[[view]]', 'calendar').replace('[view]', 'research').replace('[id]', 'example').replace('[...path]', 'table');
+    const policy = requestPolicy(new Request(origin + path), id);
+    assert.equal(pagePermission(path, id), policy.public ? 'public' : policy.login ? 'login' : policy.permission, id);
+  }
+  for (const path of ['/trading-research/secondary-bond-pool', '/trading%2dresearch/credit', '/trading-research/credit-assistant/__data.json']) {
+    assert.equal(pagePermission(path, '/trading-research/[view]'), requestPolicy(new Request(origin + path), '/trading-research/[view]').permission);
+  }
+});
