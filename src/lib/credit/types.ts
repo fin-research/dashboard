@@ -151,6 +151,7 @@ export interface CreditCalendarEvent {
   kind: "expiry" | "revoked" | "new" | "renewal" | "increase" | "decrease" | "amendment" | "usage";
   institutionName: string;
   label: string;
+  itemType?: CreditItemType;
   status: "upcoming" | "due" | "completed" | "revoked";
   statusLabel: string;
 }

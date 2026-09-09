@@ -163,7 +163,7 @@ test("周报从变更和到期日期派生事件并筛选近六个月批复", as
   assert.deepEqual(report.weeklyNews.map(x=>x.eventType).sort(),['expiry','increase','new','revocation']);
   assert.deepEqual(report.recentApprovals.map(x=>x.institutionName).sort(),['丙银行','甲银行'].sort());
   assert.ok(report.calendarEvents.some(e=>e.label==='授信扩额 · 12亿元'));
-  assert.ok(report.calendarEvents.some(e=>e.label==='债券投资 · + 1 亿元'));
+  assert.ok(report.calendarEvents.some(e=>e.label==='债券投资 · 增加1亿元'));
   assert.equal(report.calendarEvents.some(e=>e.kind==='renewal'),false);
 });
 
@@ -479,8 +479,8 @@ test('拆借和收益凭证按实际生效、到期和提前结清日期显示�
   const report=await loadCreditReport(db,'2026-08-26');
   const events=report.calendarEvents.filter(e=>e.type==='usage');
   assert.deepEqual(events.map(e=>[e.date,e.label]),[
-    ['2026-08-21','同业拆借 · + 1 亿元'],['2026-08-21','收益凭证 · + 2 亿元'],
-    ['2026-08-24','收益凭证 · - 2 亿元'],['2026-08-25','同业拆借 · - 1 亿元'],
+    ['2026-08-21','同业拆借 · 增加1亿元'],['2026-08-21','收益凭证 · 增加2亿元'],
+    ['2026-08-24','收益凭证 · 减少2亿元'],['2026-08-25','同业拆借 · 减少1亿元'],
   ]);
   assert.equal(events.some(e=>/合计|总已用/.test(e.label)),false);
   const historical=await loadCreditReport(db,'2026-08-22');assert.equal(historical.summary.totalUsed,6);
@@ -491,7 +491,7 @@ test('分项额度变化进入日历，续作替换旧到期提醒且跨月可�
   await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{items:[{type:'bond_investment',limitAmount:6}]}},'auth0|test');
   await saveCreditInstitution(db,{reportDate:'2026-08-23',institutionName:'甲银行',changes:{institution:{expiryDate:'2027-01-15'}}},'auth0|test');
   const august=await loadCreditReport(db,'2026-08-25');
-  assert.ok(august.calendarEvents.some(e=>e.date==='2026-08-22'&&e.label==='授信调整 · 10亿元'));
+  assert.ok(august.calendarEvents.some(e=>e.date==='2026-08-22'&&e.label==='授信分项额度变更 · 10亿元'));
   assert.equal(august.calendarEvents.some(e=>e.date==='2026-08-30'&&e.kind==='expiry'),false);
   const january=await loadCreditReport(db,'2026-08-25','2027-01');
   assert.ok(january.calendarEvents.some(e=>e.date==='2027-01-15'&&e.label==='授信到期 · 10亿元'));
@@ -534,4 +534,33 @@ test('数据库精度归一后相同金额不产生重复 diff，历史补录不
   assert.equal((await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n,count);
   await saveCreditInstitution(db,{...patch,reportDate:'2026-08-25',changes:{institution:{expiryDate:'2026-08-26'}}},'auth0|test');
   await assert.rejects(saveCreditInstitution(db,{...patch,reportDate:'2026-08-22',changes:{institution:{effectiveDate:'2026-08-29'}}},'auth0|test'),/到期日不能早于生效日/);
+});
+
+test('只改额度描述和机构资料不生成额度事件，数值分项变动保留明确定义',async t=>{
+  const db=await creditDatabase(t);
+  await seedCredit(db,'2026-08-21','甲银行',{detail:'债券投资额度4亿元'});
+  await saveCreditInstitution(db,{reportDate:'2026-09-04',institutionName:'甲银行',changes:{institution:{detail:'债券投资授信额度为4亿元。',notes:'手工备注',handler:'新经办人'},items:[{type:'bond_investment',details:'仅说明文字变化'}]}},'auth0|test');
+  const report=await loadCreditReport(db,'2026-09-09','2026-09');
+  assert.equal(report.calendarEvents.filter(e=>e.date==='2026-09-04').length,0);
+  assert.equal(report.institutions[0].detail,'债券投资授信额度为4亿元。');
+  assert.equal((await db.query("SELECT count(*) n FROM credit.diff WHERE effective_on='2026-09-04'")).rows[0].n,1);
+  await saveCreditInstitution(db,{reportDate:'2026-09-05',institutionName:'甲银行',changes:{items:[{type:'bond_investment',limitAmount:6}]}},'auth0|test');
+  const revised=await loadCreditReport(db,'2026-09-09','2026-09');
+  assert.deepEqual(revised.calendarEvents.filter(e=>e.date==='2026-09-05').map(e=>e.label),['授信分项额度变更 · 10亿元']);
+});
+
+test('六个已用分项的日历事件均带稳定类型，金额使用增加减少文字',async t=>{
+  const db=await creditDatabase(t);await seedCredit(db,'2026-08-21','甲银行',{other_used:0,legal_overdraft_used:0,margin_income_rights_used:0});
+  await saveCreditInstitution(db,{reportDate:'2026-09-04',institutionName:'甲银行',changes:{items:[
+    {type:'bond_investment',usedAmount:2.5},{type:'other',usedAmount:0.0245},
+    {type:'legal_overdraft',usedAmount:1},{type:'margin_income_rights',usedAmount:2},
+  ]}},'auth0|test');
+  await db.exec(`INSERT INTO financing.debt(debt_type,name,client_id,amount,activated_at,maturity_date) VALUES
+    ('同业拆借','拆借',(SELECT id FROM public.client WHERE name='甲银行'),100000000,'2026-09-04','2026-10-01'),
+    ('收益凭证','凭证',(SELECT id FROM public.client WHERE name='甲银行'),200000000,'2026-09-04','2026-10-01')`);
+  const events=(await loadCreditReport(db,'2026-09-09','2026-09')).calendarEvents.filter(e=>e.date==='2026-09-04'&&e.type==='usage');
+  assert.deepEqual(events.map(e=>e.itemType).sort(),['bond_investment','yield_certificate','legal_overdraft','margin_income_rights','interbank_lending','other'].sort());
+  assert.ok(events.every(e=>/ · (增加|减少)[0-9.]+亿元$/.test(e.label)));
+  assert.ok(events.some(e=>e.label==='其它 · 增加0.0245亿元'));
+  assert.ok(events.some(e=>e.label==='债券投资 · 减少0.5亿元'));
 });

@@ -160,9 +160,10 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
       for (const row of snapshot(date)) {
         const prior = before.get(row.institutionName);
         if (!prior || row.status !== 'approved' || news.some(event => event.institutionName === row.institutionName)) continue;
-        if (row.detail !== prior.detail || row.items.some(item => item.limitAmount !== prior.items.find(value => value.type === item.type)?.limitAmount)) {
+        // Wording changes are stored in diff but are not changes to a credit limit.
+        if (row.items.some(item => item.limitAmount !== prior.items.find(value => value.type === item.type)?.limitAmount)) {
           calendarEvents.push({id:`credit:amendment:${row.institutionName}:${date}`,date,type:'added',kind:'amendment',institutionName:row.institutionName,
-            label:`授信调整 · ${formatCalendarAmount(row.totalLimit)}亿元`,...calendarState(date,reportDate,'amendment')});
+            label:`授信分项额度变更 · ${formatCalendarAmount(row.totalLimit)}亿元`,...calendarState(date,reportDate,'amendment')});
         }
       }
     }
@@ -189,8 +190,8 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
       if (item.usedAmount == null || prior && prior.usedAmount == null) continue;
       const delta = item.usedAmount-(prior?.usedAmount ?? 0);
       if (Math.abs(delta)<=AMOUNT_TOLERANCE) continue;
-      calendarEvents.push({id:`usage:${institution.institutionName}:${item.type}:${date}`,date,type:'usage',kind:'usage',institutionName:institution.institutionName,
-        label:`${creditItemLabels[item.type]} · ${delta>=0?'+':'-'} ${formatCalendarAmount(Math.abs(delta))} 亿元`,
+      calendarEvents.push({id:`usage:${institution.institutionName}:${item.type}:${date}`,date,type:'usage',kind:'usage',itemType:item.type,institutionName:institution.institutionName,
+        label:`${creditItemLabels[item.type]} · ${delta>=0?'增加':'减少'}${formatCalendarAmount(Math.abs(delta))}亿元`,
         ...calendarState(date,reportDate,'usage')});
     }
   }
@@ -234,7 +235,7 @@ function calendarState(date:string,asOf:string,kind:string):Pick<CreditCalendarE
   return {status:date>asOf?'upcoming':date===asOf?'due':'completed',statusLabel:date>asOf?'待生效':kind==='expiry'?'已到期':'已生效'};
 }
 function calendarCreditEvent(event:CreditWeeklyNewsItem,asOf:string):CreditCalendarEvent {
-  const labels:Record<CreditEventType,string>={new:'授信新增',renewal:'授信续作',increase:'授信扩额',decrease:'授信缩额',amendment:'授信调整',expiry:'授信到期',revocation:'授信撤销'};
+  const labels:Record<CreditEventType,string>={new:'授信新增',renewal:'授信续作',increase:'授信扩额',decrease:'授信缩额',amendment:'授信分项额度变更',expiry:'授信到期',revocation:'授信撤销'};
   return {id:`credit:${event.eventType}:${event.institutionName}:${event.reportDate}`,date:event.reportDate,
     type:event.eventType==='expiry'||event.eventType==='revocation'?'expiry':'added',kind:event.eventType==='revocation'?'revoked':event.eventType,
     institutionName:event.institutionName,label:`${labels[event.eventType]} · ${formatCalendarAmount(event.currentAmount)}亿元`,

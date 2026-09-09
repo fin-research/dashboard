@@ -6,6 +6,8 @@
   import ModuleCard from "../../components/ModuleCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import { globalMessages } from "../global-messages.ts";
+  import MultiSelectFilter from "../financing/MultiSelectFilter.svelte";
+  import { creditLimitFilterLabels, matchesCreditCalendarEvent } from "../credit/calendar.ts";
   import { portal } from "../portal.ts";
   import { scrollableRegion } from "../scrollable-region";
   import {
@@ -14,7 +16,7 @@
   } from "../credit/client.ts";
   import {
     creditItemLabels,
-    type CreditCalendarEvent,
+    creditItemTypes,
     type CreditInstitutionView,
     type CreditItemType,
     type CreditReportResponse,
@@ -34,7 +36,6 @@
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
 
   type CreditTab = "overview" | "calendar" | "weekly";
-  type CalendarFilter = "all" | CreditCalendarEvent["type"];
   type CreditAlert = {
     id: string;
     level: "critical" | "high" | "medium" | "low";
@@ -76,7 +77,8 @@
   let pendingItemChanges = new Map<CreditItemType, CreditItemChanges>();
   let sortKey = $state<SortKey>("institutionType");
   let sortDirection = $state<"ascending" | "descending">("ascending");
-  let calendarFilter = $state<CalendarFilter>("all");
+  let calendarLimitFilters = $state<string[]>([]);
+  let calendarUsageFilters = $state<string[]>([]);
   let calendarMonth = $state("");
   let createDialog: HTMLDialogElement;
   let creating = $state(false);
@@ -234,7 +236,7 @@
     const mondayOffset = (first.getUTCDay() + 6) % 7;
     first.setUTCDate(first.getUTCDate() - mondayOffset);
     const visibleEvents = (report?.calendarEvents ?? []).filter(
-      (event) => calendarFilter === "all" || event.type === calendarFilter,
+      (event) => matchesCreditCalendarEvent(event, calendarLimitFilters, calendarUsageFilters),
     );
     return Array.from({ length: 42 }, (_, index) => {
       const date = new Date(first);
@@ -882,11 +884,9 @@
       <SectionHeading id="credit-calendar-title" title="授信日历" />
       <ModuleCard class="tr-credit-calendar-panel" labelledBy="credit-calendar-title">
         <div class="tr-credit-calendar-toolbar">
-          <div class="tr-credit-calendar-filter" role="group" aria-label="授信日历事件类型">
-            <button class="btn" class:btn-active={calendarFilter === "all"} type="button" onclick={() => (calendarFilter = "all")}>全部</button>
-            <button class="btn" class:btn-active={calendarFilter === "expiry"} type="button" onclick={() => (calendarFilter = "expiry")}>到期</button>
-            <button class="btn" class:btn-active={calendarFilter === "added"} type="button" onclick={() => (calendarFilter = "added")}>额度变动</button>
-            <button class="btn" class:btn-active={calendarFilter === "usage"} type="button" onclick={() => (calendarFilter = "usage")}>已用变动</button>
+          <div class="tr-credit-calendar-filter" role="group" aria-label="授信日历筛选">
+            <MultiSelectFilter label="额度" options={Object.keys(creditLimitFilterLabels)} optionLabels={creditLimitFilterLabels} bind:values={calendarLimitFilters} />
+            <MultiSelectFilter label="已用" options={[...creditItemTypes]} optionLabels={creditItemLabels} bind:values={calendarUsageFilters} />
           </div>
           <div class="tr-credit-calendar-nav">
             <button class="btn" type="button" aria-label="上一个月" onclick={() => shiftCalendarMonth(-1)}>‹</button>
