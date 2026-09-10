@@ -1,4 +1,4 @@
-import { Agent } from "agents";
+import { Agent, isDurableObjectCodeUpdateReset, isPlatformTransientError } from "agents";
 import { answerCreditQuestion, recoverQueuedCreditAnswers } from "../src/lib/server/credit-assistant.ts";
 import { loadCreditCorpus } from "../src/lib/server/credit-evidence.ts";
 import { AiGatewayResponseError } from "../src/lib/server/ai-gateway.ts";
@@ -8,6 +8,8 @@ import { withPostgres } from "../src/lib/server/postgres.ts";
 import { creditAnswerForTurn, discloseCreditSession, CREDIT_CUSTOMER_REQUIRED, CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
 import { CreditEventHub } from "../src/lib/server/credit-events.ts";
 import { appendCreditActivity } from "../src/lib/credit-assistant/progress.ts";
+import { CreditExecutionError, creditFailure } from "../src/lib/server/credit-errors.ts";
+import { creditCacheParts, type CreditRunCache } from "../src/lib/server/credit-checkpoint.ts";
 
 export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   initialState: CreditSession = { turns: [], running: false, progress: "", error: null, startedAt: 0, pendingQuestion: "", customer: null };
@@ -15,6 +17,28 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   private draftText = "";
   private lastDraftPush = 0;
   private activeCorpus: CreditCorpus | undefined;
+
+  private runCache(runId: string): CreditRunCache {
+    this.sql`CREATE TABLE IF NOT EXISTS credit_run_cache (run_id TEXT NOT NULL, cache_key TEXT NOT NULL, part INTEGER NOT NULL, value TEXT NOT NULL, PRIMARY KEY (run_id, cache_key, part))`;
+    return {
+      get: key => {
+        const rows = this.sql<{ value: string }>`SELECT value FROM credit_run_cache WHERE run_id = ${runId} AND cache_key = ${key} ORDER BY part`;
+        return rows.length ? rows.map(row => row.value).join("") : undefined;
+      },
+      put: (key, value) => this.ctx.storage.transactionSync(() => {
+        this.sql`DELETE FROM credit_run_cache WHERE run_id = ${runId} AND cache_key = ${key}`;
+        creditCacheParts(value).forEach((part, index) => {
+          this.sql`INSERT INTO credit_run_cache (run_id, cache_key, part, value) VALUES (${runId}, ${key}, ${index}, ${part})`;
+        });
+      }),
+    };
+  }
+
+  private clearRunCache() {
+    if (!this.state.questionId) return;
+    this.runCache(this.state.questionId);
+    this.sql`DELETE FROM credit_run_cache WHERE run_id = ${this.state.questionId}`;
+  }
 
   private save(state: CreditSession) {
     this.setState(state);
@@ -79,10 +103,11 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         return Response.json({ error: CREDIT_NDA_REQUIRED }, { status: 403 });
       }
       return new URL(request.url).pathname.endsWith("/events")
-        ? this.events.response({ ...state, draftText: this.draftText }) : Response.json(state);
+        ? this.events.response({ ...state, draftText: this.draftText }, () => { this.sql`SELECT 1`; }) : Response.json(state);
     }
     if (request.method === "DELETE") {
       if (this.state.running) return Response.json({ error: "当前问答仍在处理中" }, { status: 409 });
+      this.clearRunCache();
       this.draftText = "";
       this.save({ ...this.initialState, turns: [], customer: this.state.customer, conversationId: crypto.randomUUID() });
       return Response.json(this.state);
@@ -114,6 +139,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         this.sql`CREATE TABLE IF NOT EXISTS credit_conversation_archive (id TEXT PRIMARY KEY, state TEXT NOT NULL)`;
         this.sql`INSERT INTO credit_conversation_archive (id, state) VALUES (${this.state.conversationId ?? crypto.randomUUID()}, ${JSON.stringify(this.state)})`;
       }
+      this.clearRunCache();
       this.draftText = "";
       this.save({ ...this.initialState, turns: [], customer, conversationId: crypto.randomUUID() });
       return Response.json(this.state);
@@ -125,6 +151,8 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
     const parsed = creditQuestionSchema.safeParse(input);
     if (!parsed.success) return Response.json({ error: "请输入问题，并选择客户机构。" }, { status: 400 });
     const id = crypto.randomUUID();
+    this.runCache(id); // Initialise before dropping only the previous run's temporary checkpoints.
+    this.clearRunCache();
     this.draftText = "";
     this.activeCorpus = undefined;
     const progress = "正在判断问题范围";
@@ -142,16 +170,27 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
 
   async answerQuestion(payload: { question: string; id: string }): Promise<void> {
     if (this.state.turns.some(t => t.id === payload.id)) return;
-    if (!this.state.running || this.state.pendingQuestion !== payload.question || !this.state.customer) return;
+    if (!this.state.running || (this.state.questionId && this.state.questionId !== payload.id) || this.state.pendingQuestion !== payload.question || !this.state.customer) return;
+    const started = Date.now();
+    let modelCalls = 0, searchCalls = 0;
     try {
+      if (Date.now() - this.state.startedAt >= 12 * 60_000) throw new CreditExecutionError("deadline", "本次核对已达到总时限");
       // Submission verified this customer. The running turn uses that snapshot.
       const customer = this.state.customer;
-      const corpus = await loadCreditCorpus(this.env.CREDIT);
+      const corpus = await loadCreditCorpus(this.env.CREDIT).catch(() => { throw new CreditExecutionError("materials", "材料目录加载失败"); });
       this.activeCorpus = corpus;
+      console.log(JSON.stringify({ event: "credit_materials_loaded", run_id: payload.id, elapsed_ms: Date.now() - started }));
       const generated = await answerCreditQuestion({ question: payload.question, corpus, customer, history: this.state.turns,
         credentials: { accountId: this.env.CLOUDFLARE_ACCOUNT_ID, gatewayId: this.env.AI_GATEWAY_ID, token: this.env.CF_AIG_TOKEN },
         progress: (progress, stage) => this.progress(progress, stage),
         draft: text => this.draft(text),
+        runId: payload.id,
+        cache: this.runCache(payload.id), startedAt: this.state.startedAt,
+        operation: operation => {
+          if (operation.operation === "search") searchCalls += operation.outcome === "cache" ? 0 : 1;
+          else modelCalls += operation.outcome === "cache" ? 0 : 1;
+          console.log(JSON.stringify({ event: "credit_operation", run_id: payload.id, ...operation }));
+        },
         semanticSearch: async query => {
           const result = await this.env.CREDIT_SEARCH.search({ query, ai_search_options: {
             retrieval: { retrieval_type: "hybrid", max_num_results: 50 },
@@ -161,17 +200,28 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         },
       });
       const answer = creditAnswerForTurn(generated, payload.id);
+      console.log(JSON.stringify({ event: "credit_answer_completed", run_id: payload.id, elapsed_ms: Date.now() - started,
+        model_calls: modelCalls, search_calls: searchCalls, answer_status: answer.status }));
       this.draftText = "";
       this.save({ ...this.state, turns: [...this.state.turns, { id: payload.id, question: payload.question, answer, createdAt: answer.createdAt }],
         running: false, progress: "", error: null, pendingQuestion: "" });
     } catch (error) {
-      console.error(JSON.stringify({ event: "credit_answer_failed", error_type: error instanceof Error ? error.name : "unknown",
+      // The SDK preserves one-shot schedules across platform resets. Do not
+      // turn a deploy interruption into a failed user answer or write to a dead isolate.
+      if (!(error instanceof AiGatewayResponseError) && isPlatformTransientError(error)) {
+        console.warn(JSON.stringify({ event: "credit_answer_recovering", run_id: payload.id,
+          reason: isDurableObjectCodeUpdateReset(error) ? "code_updated" : "platform_reset" }));
+        this.events.finish();
+        throw error;
+      }
+      const failure = creditFailure(error);
+      console.error(JSON.stringify({ event: "credit_answer_failed", run_id: payload.id, code: failure.code,
+        stage: this.state.stage, elapsed_ms: Date.now() - started, model_calls: modelCalls, search_calls: searchCalls,
+        error_type: error instanceof Error ? error.name : "unknown",
         ...(error instanceof AiGatewayResponseError ? { provider: error.provider, status: error.status, gateway_log_id: error.gatewayLogId,
-          detail: (this.env.CF_AIG_TOKEN ? error.message.replaceAll(this.env.CF_AIG_TOKEN, "[secret]") : error.message).slice(0, 500) } : {}),
+        } : {}),
       }));
-      const message = error instanceof AiGatewayResponseError && error.status === 429
-        ? "指定模型服务暂时繁忙或额度受限，请稍后重试。管理员可检查 codex 上游的额度与凭证状态。"
-        : "本次答复未完成，请重试。若持续失败，请检查材料索引和 AI Gateway 配置。";
+      const message = `${failure.message}（错误编号：${payload.id}）`;
       this.draftText = "";
       this.save({ ...this.state, running: false, progress: "", error: message });
     }

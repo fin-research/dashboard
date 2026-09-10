@@ -29,6 +29,9 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
         import { env } from 'cloudflare:workers';
         export async function recoverQueuedCreditAnswers() {}
         export async function answerCreditQuestion(options) {
+          const checkpoint = '中😀'.repeat(400000);
+          options.cache.put('runtime-checkpoint', checkpoint);
+          if (options.cache.get('runtime-checkpoint') !== checkpoint) throw new Error('checkpoint roundtrip failed');
           await env.TEST_GATE.fetch('https://gate.test/ready');
           options.progress('正在检索材料','retrieval');
           options.draft('公司资产');

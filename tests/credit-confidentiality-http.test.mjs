@@ -9,8 +9,9 @@ import { creditAgentName } from "../src/lib/server/credit-session.ts";
 // Execute the actual Worker handlers; replace only the Cloudflare runtime,
 // database transport and model transport, not routing or disclosure logic.
 const moduleUrl = code => `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
-const agents = moduleUrl(`export class Agent {
-  constructor(ctx, env) { this.env = env; this.jobs = []; }
+const agents = moduleUrl(`export { isDurableObjectCodeUpdateReset, isPlatformTransientError } from ${JSON.stringify(new URL("../node_modules/agents/dist/retries.js", import.meta.url).href)};
+export class Agent {
+  constructor(ctx, env) { this.ctx = { storage: { transactionSync: operation => operation() } }; this.env = env; this.jobs = []; }
   get state() { return this._state ??= structuredClone(this.initialState); }
   setState(state) { this._state = state; }
   async schedule(_delay, callback, payload) { this.jobs.push({callback,payload}); }
@@ -47,7 +48,7 @@ function setup() {
     return { rows: sql.startsWith("SELECT") ? [...customers.values()].filter(c => values[1] ? c.name === values[0] : c.name.includes(values[0])) : [] };
   } };
   globalThis.creditTestAnswer = options => answerCreditQuestion({ ...options, semanticSearch: undefined,
-    generate: async (_credentials, _messages, schema, name) => name === "credit_scope" ? schema.parse({ inScope: true }) : schema.parse({ step: { action: "answer", answer: {
+    generate: async (_credentials, _messages, schema, name) => name === "credit_scope" ? schema.parse({ inScope: true, queries: [], attachments: [] }) : schema.parse({ step: { action: "answer", answer: {
       status: "complete", paragraphs: [], gaps: [], attachments: [options.question.includes("保密") ? privateDoc.id : publicDoc.id],
     } } }) });
   const sessions = new Map();
@@ -90,6 +91,19 @@ test("fresh customer selection needs no write or NDA lookup; first question veri
   await agent.answerQuestion(agent.jobs[0].payload);
   assert.equal(agent.state.turns[0].answer.notice, CREDIT_NDA_REQUIRED);
   assert.deepEqual(agent.state.turns[0].answer.files, []);
+});
+
+test("a deployment reset is deferred to the SDK instead of becoming a generic failed answer", async () => {
+  const app = setup();
+  await app.request("session", { institutionName: "银行乙", question: "查公司资产" });
+  const agent = [...app.sessions.values()].find(session => session.jobs.length);
+  const reset = new Error("SQL query failed: Durable Object reset because its code was updated.", { cause: new Error("Durable Object reset because its code was updated.") });
+  reset.name = "SqlError";
+  globalThis.creditTestAnswer = async () => { throw reset; };
+  await assert.rejects(agent.answerQuestion(agent.jobs[0].payload), { name: "SqlError" });
+  assert.equal(agent.state.running, true);
+  assert.equal(agent.state.error, null);
+  assert.equal(agent.state.pendingQuestion, "查公司资产");
 });
 
 test("cold-start institution options include the whole list, not just twenty search hits", async () => {

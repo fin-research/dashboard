@@ -8,7 +8,7 @@ import { isPublicCreditDocument, canProvideCreditDocument, creditCorpusForCustom
   creditAnswerForTurn, CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
 
 const answerCreditQuestion = options => runCreditQuestion({ ...options, generate: (...args) => args[3] === "credit_scope"
-  ? Promise.resolve(args[2].parse({ inScope: true })) : options.generate(...args) });
+  ? Promise.resolve(args[2].parse({ inScope: true, queries: [], attachments: [] })) : options.generate(...args) });
 
 const unsigned = { name: "未签银行", confidentialityStatus: false, reportDate: "2026-09-07" };
 const signed = { name: "已签银行", confidentialityStatus: true, reportDate: "2026-09-07" };

@@ -2,7 +2,7 @@
   "owner": "eastmoney-gateway",
   "version": 1,
   "files": {
-    "permissions.ts": "544247281d820b0b532a75c32c646f9df1c3eda37dd969d87d9015d199260c39",
+    "permissions.ts": "9332d0f9b8e1c72d5af6011013e456a5e58701cdafc51927618d6b40b52b4266",
     "route-permissions.ts": "cfa317a83bc2456eddfa4ac6b5856ab332fd112589258c84172d8b5580361de8"
   }
 }

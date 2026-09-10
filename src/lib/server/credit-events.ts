@@ -31,7 +31,7 @@ export class CreditEventHub {
     this.clients.clear(); clearInterval(this.heartbeat); this.heartbeat = undefined;
   }
 
-  response(state: CreditSession): Response {
+  response(state: CreditSession, checkAlive?: () => void): Response {
     let client: ReadableStreamDefaultController<Uint8Array>;
     const stream = new ReadableStream<Uint8Array>({
       start: controller => {
@@ -40,6 +40,7 @@ export class CreditEventHub {
         if (!state.running) { controller.close(); return; }
         this.clients.add(controller);
         this.heartbeat ??= setInterval(() => {
+          try { checkAlive?.(); } catch { this.finish(); return; }
           for (const subscriber of this.clients) {
             try { subscriber.enqueue(this.encoder.encode(": keep-alive\n\n")); }
             catch { this.remove(subscriber); }

@@ -26,11 +26,11 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 - `/credit-workbench` 的授信报表通过 `/api/credit` 读取 Neon `credit` 日报；交易研究工作台总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；融资工作台的负债周报也只读这张公共表。Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 - `/trading-research/policy-tracking` 只读 ingest Workflow 已聚合的政策、面向境内资金/利率研究的三档重要性与自动研报关系；人工调整关系和手动生成/编辑政策点评通过同源 `/api/policies/*` 写 D1。页面加载和筛选不调用模型。政策资讯、关联研报与点评分别使用 `/news/[id]`、`/articles/[id]`、`/commentaries/[id]` 独立深链；政策资讯详情读取 D1 已归档的 DM 原文与政策原文链接，研报详情通过 Worker 的 `DATA` Service Binding 获取正文，点评详情只读 D1。
 
-- 交易研究工作台与授信工作台使用同一 `src/lib/workbench/WorkbenchShell.svelte`。市场热点和政策跟踪由 `src/lib/pages/` 维护单一业务组件，在工作台内使用嵌入布局；旧独立入口仅做兼容跳转。授信问答以固定根容器包裹聊天和工具栏，只有嵌套工具栏通过 portal 挂载页头，避免切换标签时遗留聊天 DOM。
+- 交易研究工作台与授信工作台使用同一 `src/lib/workbench/WorkbenchShell.svelte`。市场热点和政策跟踪由 `src/lib/pages/` 维护单一业务组件，在工作台内使用嵌入布局；旧独立入口仅做兼容跳转。授信助手以固定根容器包裹聊天和工具栏，只有嵌套工具栏通过 portal 挂载页头，避免切换标签时遗留聊天 DOM。
 
 ## 服务端模块
 
-- 授信问答使用同一 Worker 内的 `CreditAgent`（Agents SDK + SQLite Durable Object），从独立 R2 `credit` 原件/解析文本及 AI Search `credit` 找证据，执行有来源的计算后通过统一 Gateway 生成并复核答复。入口、材料更新、数据边界与 Gateway 私有入口见 `docs/CREDIT_ASSISTANT.md`。
+- 授信助手使用同一 Worker 内的 `CreditAgent`（Agents SDK + SQLite Durable Object），从独立 R2 `credit` 原件/解析文本及 AI Search `credit` 找证据，执行有来源的计算后通过统一 Gateway 生成并复核答复。入口、材料更新、数据边界与 Gateway 私有入口见 `docs/CREDIT_ASSISTANT.md`。
 
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。

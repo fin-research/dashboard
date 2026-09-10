@@ -37,9 +37,9 @@ assert.equal(scrollResets, 1, 'history navigation preserves scroll position');
 assert.equal(document.querySelector(".tr-breadcrumb a").textContent, "授信工作台");
 assert.deepEqual([...document.querySelectorAll(".tr-drawer__nav a")].map(a => [a.textContent.trim(), a.getAttribute("href")]), [
   ["授信一览表", "/credit-workbench"], ["授信日历", "/credit-workbench/calendar"],
-  ["授信周报", "/credit-workbench/weekly"], ["授信问答", "/credit-workbench/assistant"],
+  ["授信周报", "/credit-workbench/weekly"], ["授信助手", "/credit-workbench/assistant"],
 ]);
-assert.equal(document.querySelector("h1").textContent, "授信问答");
+assert.equal(document.querySelector("h1").textContent, "授信助手");
 assert.equal(document.querySelector("main").classList.contains("tr-chat-page"), true);
 flushSync(() => app.navigate("calendar"));
 const reportView = document.querySelector(".tr-credit-view");

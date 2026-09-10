@@ -10,10 +10,10 @@
 
 ## 客户端与服务端边界
 
-- 授信问答使用独立 R2 `credit` 材料库，页面、`/api/credit-assistant/*`、SSE 和 Worker 直连入口在 Gateway 完成身份与路由权限验证后进入业务处理。固定 DO 名称从已验证 `user.auth0Id` 和客户名称派生，不接受客户端声明的用户 ID 或随机会话 Cookie。只有 `定期报告/` 为公开材料，其他原件及其信息须机构已签署保密协议。按用户要求，一次生成及其 SSE 沿用提交时核对的客户权限，完成时不再重复查询；新的历史读取、复制和下载请求仍核对当前状态。保密下载同时要求当前用户、客户及 `turnId` 对应的已提供来源/附件，未知、缺失或失败不放行。范围外问题在材料检索前固定拒答；具体流程见 `CREDIT_ASSISTANT.md`。
+- 授信助手使用独立 R2 `credit` 材料库，页面、`/api/credit-assistant/*`、SSE 和 Worker 直连入口在 Gateway 完成身份与路由权限验证后进入业务处理。固定 DO 名称从已验证 `user.auth0Id` 和客户名称派生，不接受客户端声明的用户 ID 或随机会话 Cookie。只有 `定期报告/` 为公开材料，其他原件及其信息须机构已签署保密协议。按用户要求，一次生成及其 SSE 沿用提交时核对的客户权限，完成时不再重复查询；新的历史读取、复制和下载请求仍核对当前状态。保密下载同时要求当前用户、客户及 `turnId` 对应的已提供来源/附件，未知、缺失或失败不放行。范围外问题在材料检索前固定拒答；具体流程见 `CREDIT_ASSISTANT.md`。
 
 - 浏览器不得取得 Provider 密钥、数据库连接字符串、D1/R2 binding、完整二级池 Excel 数据缓存或授信源 Excel。本地授信导入不得上传文件到 Worker、R2 或浏览器接口。
-- 授信问答客户选择与协议标签仅使用工作台内存中的展示快照，不进行选择前授权往返；空闲且无答复的会话读取不回查协议。第一条问题可直接创建客户会话，提交时必须查询后端当前机构和协议；含材料的历史读取及附件权限规则不变，前端保密标志不进入授权输入。
+- 授信助手客户选择与协议标签仅使用工作台内存中的展示快照，不进行选择前授权往返；空闲且无答复的会话读取不回查协议。第一条问题可直接创建客户会话，提交时必须查询后端当前机构和协议；含材料的历史读取及附件权限规则不变，前端保密标志不进入授权输入。
 - `$lib/server` 模块不得被客户端代码导入。
 - Dashboard Worker 到同一 zone 的 Data Worker 使用 `DATA` Service Binding；服务端代码不得以公开 hostname 做 Worker-to-Worker 回环请求。市场点评浏览器直接请求公开 `/data/*` 行情资源；旧 `/api/market-resources/*` 使用同一公开只读边界，保留资源与参数白名单。
 - 生成式 AI 输出必须经 Zod Schema 或明确的文本协议校验后进入业务层。
@@ -26,7 +26,7 @@
 - Gateway 是本站唯一公网入口，Auth0 JWT、JWKS、会话、账号状态、角色及路由权限全部由 Gateway 处理。详细协议见 [共享 AUTH](../../eastmoney/docs/AUTH.md)。
 - Dashboard `routes=[]`、`workers_dev=false`、`preview_urls=false`，没有 Custom Domain，默认 fetch 固定 404；静态资产 `run_worker_first=true`，不能绕开默认入口。
 - 只有 `GatewayDashboard` 命名 Service Binding 接收 Gateway 的 Base64URL 上下文，解析后移入请求内 `env.GATEWAY_CONTEXT` 并删除身份头。`hooks.server.ts` 仅从该元数据设置 `locals.user` 和 permissions，不读取 Cookie、外部身份头，不验证 JWT，也不调用 Auth0/权限库。缺少元数据失败关闭。
-- 独立授信问答 HTTP 从同一私有入口取得已验证 `user`，继续执行用户/客户会话绑定、材料保密和下载来源检查。DO 不新增公网旁路。
+- 独立授信助手 HTTP 从同一私有入口取得已验证 `user`，继续执行用户/客户会话绑定、材料保密和下载来源检查。DO 不新增公网旁路。
 - Gateway 的同源、方法和 named action 检查发生在转发前；业务仍验证输入白名单、记录归属、乐观锁、文件类型/大小/内容和事务 RLS。上传登录检查、菜单及前端权限只用于交互。
 - Gateway 拥有 `/auth/login`、`/auth/callback`、退出、`/auth/session` 和 `/api/profile`，后端只保留必要的兼容或私有转发。登录响应和包含身份的响应 private/no-store，401 跳登录而 403 保留权限错误；`__data.json` 使用 SvelteKit redirect 数据协议。
 - 新账号的邮箱/姓名/部门和验证流程仍由 Auth0 Actions/Forms 管理；用户字段不授予角色。Auth0 token 的 namespace email 必须与当前账号一致，旧邮箱会话不能修改资料。

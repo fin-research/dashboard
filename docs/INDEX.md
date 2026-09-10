@@ -18,7 +18,7 @@
 | `/financing-model`、`/trading-research/financing-model`、`/api/financing-model/*` | [融资择时模型](modules/financing-model.md) |
 | `/fund-report`、`/fund-report/[date].html`、`/api/fund-report` | [资金日报](modules/fund-report.md) |
 | `/credit-workbench`、`calendar` / `weekly` 子页、`/api/credit`、授信 Excel 导入 | [授信工作台](modules/credit-workbench.md) |
-| `/credit-workbench/assistant`、旧 `/credit-assistant`、授信材料、CreditAgent、独立问答 HTTP / WebSocket | [授信问答](CREDIT_ASSISTANT.md) |
+| `/credit-workbench/assistant`、旧 `/credit-assistant`、授信材料、CreditAgent、独立问答 HTTP / WebSocket | [授信助手](CREDIT_ASSISTANT.md) |
 | 客户主数据、融资/授信关联、保密协议关联 | [客户与授信关联](modules/clients.md) |
 | `/management*`、`/profile`、`/api/profile`、`/auth/*`、旧融资账号跳转 | [管理中心与账号](modules/management.md)；登录配置才加读 [Gateway Auth0](../../gateway/auth0/README.md) |
 | `/financing` | [融资仪表盘](modules/financing-overview.md) |

@@ -82,7 +82,7 @@ test("scope rejection returns the fixed message before retrieval or answer gener
     semanticSearch: async () => assert.fail("out-of-scope requests must not retrieve materials"),
     generate: async (_credentials, messages, schema, name) => {
       calls++; assert.equal(name, "credit_scope"); assert.equal(JSON.parse(messages[1].content).question, "明天天气怎么样？");
-      return schema.parse({ inScope: false });
+      return schema.parse({ inScope: false, queries: [], attachments: [] });
     } });
   assert.equal(calls, 1); assert.equal(answer.notice, CREDIT_SCOPE_REFUSAL);
   assert.deepEqual([answer.paragraphs, answer.files, answer.sources, answer.calculations], [[], [], [], []]);
@@ -96,7 +96,7 @@ test("related follow-ups reach the scope classifier with same-customer history",
     generate: async (_credentials, messages, schema, name) => {
       if (name === "credit_scope") {
         assert.equal(JSON.parse(messages[1].content).history[0].files[0], doc.title);
-        return schema.parse({ inScope: true });
+        return schema.parse({ inScope: true, queries: [], attachments: [] });
       }
       return schema.parse({ step: { action: "answer", answer: { status: "complete", paragraphs: [], gaps: [], attachments: [doc.id] } } });
     } });
@@ -105,7 +105,7 @@ test("related follow-ups reach the scope classifier with same-customer history",
 
 test("the answer model can still refuse an out-of-scope request after scope admission", async () => {
   const answer = await answerCreditQuestion({ credentials, customer, corpus, history: [], question: "授信报告以外的事情",
-    generate: async (_credentials, _messages, schema, name) => schema.parse(name === "credit_scope" ? { inScope: true } : { step: { action: "refuse" } }) });
+    generate: async (_credentials, _messages, schema, name) => schema.parse(name === "credit_scope" ? { inScope: true, queries: [], attachments: [] } : { step: { action: "refuse" } }) });
   assert.equal(answer.notice, CREDIT_SCOPE_REFUSAL);
 });
 
@@ -116,7 +116,7 @@ test("AI Search source text streams as answer prose and supplies its original fi
     progress: (_message, stage) => stages.push(stage), draft: text => drafts.push(text),
     semanticSearch: async () => [{ key: "search/report.md", text }],
     generate: async (_credentials, messages, schema, name, options) => {
-      if (name === "credit_scope") return schema.parse({ inScope: true });
+      if (name === "credit_scope") return schema.parse({ inScope: true, queries: [], attachments: [] });
       if (name === "credit_review") return schema.parse({ approved: true, issues: [] });
       const source = JSON.parse(messages[2].content).sources[0];
       assert.equal(source.text, text);
@@ -147,14 +147,14 @@ test("multi-round retrieval and failed review report real activities, not premat
   const text = "公司资产100亿元。";
   await answerCreditQuestion({ credentials, customer, corpus, history: [], question: "请核对公司资产",
     progress: (_message, stage) => stages.push(stage), draft: text => drafts.push(text),
-    semanticSearch: async () => [{ key: "search/report.md", text }],
+    semanticSearch: async query => [{ key: "search/report.md", text: text + query }],
     generate: async (_credentials, messages, schema, name, options) => {
-      if (name === "credit_scope") return schema.parse({ inScope: true });
+      if (name === "credit_scope") return schema.parse({ inScope: true, queries: [], attachments: [] });
       if (name === "credit_review") return schema.parse({ approved: ++reviews === 2, issues: reviews === 1 ? ["请再核实口径"] : [] });
       assert.equal(stages.at(-1), "analysis", "waiting for the next model action is analysis, not answer generation");
       const action = actions[stepIndex++];
       const source = JSON.parse(messages[2].content).sources[0];
-      const step = action === "search" ? { action, query: "资产附注" } : action === "read" ? { action, sourceIds: [source.id] }
+      const step = action === "search" ? { action, query: reviews ? "合并范围附注" : "资产附注" } : action === "read" ? { action, sourceIds: [source.id] }
         : { action, answer: { status: "complete", paragraphs: [{ text, citations: [{ sourceId: source.id, quote: text }] }], attachments: [], gaps: [] } };
       if (action === "answer") options.onTextDelta(JSON.stringify({ step }));
       return schema.parse({ step });
@@ -172,7 +172,7 @@ test("review provider failures stop the turn without silently retrying model req
     semanticSearch: async () => [{ key: "search/report.md", text: "资产100亿元。" }],
     generate: async (_credentials, messages, schema, name) => {
       names.push(name);
-      if (name === "credit_scope") return schema.parse({ inScope: true });
+      if (name === "credit_scope") return schema.parse({ inScope: true, queries: [], attachments: [] });
       if (name === "credit_review") throw new AiGatewayResponseError({ provider: "custom-codex", status: 429, gatewayLogId: "test", retryable: true, message: "rate limited" });
       const source = JSON.parse(messages[2].content).sources[0];
       return schema.parse({ step: { action: "answer", answer: { status: "complete", paragraphs: [{ text: "资产100亿元。", citations: [{ sourceId: source.id, quote: source.text }] }], attachments: [], gaps: [] } } });

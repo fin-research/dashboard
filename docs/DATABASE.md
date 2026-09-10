@@ -12,7 +12,7 @@ Schema 和字段以 migration 与代码为事实来源。本文件只维护 Dash
 
 资金日报当前不需要 D1/Neon 索引：上传文件名已经提供日期，公开 URL 和 R2 key 都可由日期直接确定；历史列表只枚举 `fund-reports/` 固定前缀并过滤严格日期文件名。需要审批或同日报告的版本历史时再增加独立元数据模型。
 
-负债周报快照由 [负债周报模块](modules/liability-report.md) 维护 key、版本与读写规则。授信材料与会话存储按 [授信问答](CREDIT_ASSISTANT.md) 读取，不能套用台账上传流程。
+负债周报快照由 [负债周报模块](modules/liability-report.md) 维护 key、版本与读写规则。授信材料与会话存储按 [授信助手](CREDIT_ASSISTANT.md) 读取，不能套用台账上传流程。
 
 ## 变更检查
 

@@ -8,7 +8,7 @@ import { generateAiGatewayObject } from "../src/lib/server/ai-gateway.ts";
 import { customerAnswerText, stepSchema } from "../src/lib/credit-assistant/types.ts";
 
 const answerCreditQuestion = options => runCreditQuestion({ ...options, generate: (...args) => args[3] === "credit_scope"
-  ? Promise.resolve(args[2].parse({ inScope: true })) : options.generate(...args) });
+  ? Promise.resolve(args[2].parse({ inScope: true, queries: [], attachments: [] })) : options.generate(...args) });
 
 const doc = { id: "a".repeat(24), title: "2025年审计报告.pdf", relativePath: "定期报告/2025年审计报告.pdf", sha256: "a".repeat(64), bytes: 123,
   authority: "audited", originalKey: "originals/定期报告/2025年审计报告.pdf", modifiedAt: "2026-01-01", blockCount: 2, ocrCount: 0 };
@@ -92,14 +92,16 @@ test("credit model is pinned to codex with max effort and no provider fallback",
 test("slow semantic search does not block canonical lexical evidence", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   let initialSources;
+  let markSearchStarted;
+  const searchStarted = new Promise(resolve => { markSearchStarted = resolve; });
   const answerPromise = answerCreditQuestion({ customer, question: "2025吸收投资现金", corpus, history: [], credentials,
-    semanticSearch: () => new Promise(() => {}),
+    semanticSearch: () => { markSearchStarted(); return new Promise(() => {}); },
     generate: async (_credentials, messages, schema) => {
       initialSources = JSON.parse(messages[2].content).sources;
       return schema.parse({ step: { action: "answer", answer: { status: "complete", paragraphs: [], gaps: [], attachments: [doc.id] } } });
     },
   });
-  await Promise.resolve();
+  await searchStarted;
   t.mock.timers.tick(CREDIT_SEARCH_TIMEOUT_MS);
   const answer = await answerPromise;
   assert.ok(initialSources.some(s => s.id === "a-1"));
@@ -164,7 +166,7 @@ test("a multi-row search chunk preserves every returned row and its numeric cont
 
 test("credit tool decisions use the Responses-supported anyOf schema", () => {
   const json = z.toJSONSchema(stepSchema);
-  assert.equal(json.properties.step.anyOf.length, 5);
+  assert.equal(json.properties.step.anyOf.length, 7);
   assert.equal(JSON.stringify(json).includes('"oneOf"'), false);
   assert.deepEqual(stepSchema.parse({ step: { action: "search", query: "借款" } }), { step: { action: "search", query: "借款" } });
   assert.equal(stepSchema.safeParse({ step: { action: "calculate", query: "借款" } }).success, false);

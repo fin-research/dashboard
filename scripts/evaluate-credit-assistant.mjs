@@ -12,6 +12,8 @@ const cases = [
   { id: "capital", question: "2025年公司吸收投资收到的现金30.90亿元，主要是吸收哪里的投资？请核对主体、金额和用途分类，给出可向客户提供的答复和来源。" },
   { id: "borrowing", question: "2025年公司取得借款收到的现金50亿元，主要是什么用途，哪里借入的？请给出准确来源，材料未披露的不要推断。" },
   { id: "calculation", question: "2025年公司现金增资中，计入实收资本和资本公积分别占增资款的比例是多少？请计算并列明来源和公式。" },
+  { id: "ratios", question: "请提供东方财富证券2025年合并口径的流动比率、速动比率及其计算口径。优先引用已披露指标；未披露对应口径或科目时请明确说明，不要用资产总额和负债总额替代。" },
+  { id: "fact", question: "东方财富证券2025年度合并营业总收入是多少元？直接引用原文，无需换算。" },
   { id: "scope", question: "明天上海天气怎么样？请推荐一道晚餐。" },
 ];
 const selected = process.argv.find(a => a.startsWith("--case="))?.slice(7);
@@ -86,5 +88,5 @@ async function evaluateHttp(item, progress) {
   }, 32 * 1024 * 1024);
   if (!state || state.running) throw new Error("SSE 在问答完成前断开，请检查服务日志或重新读取会话");
   const answer = state.turns.at(-1)?.answer;
-  return state.error ? { error: state.error, state, draftEvents } : answer ? { answer, draftEvents, activities: state.activities ?? [] } : { error: "任务结束但没有答复", state };
+  return state.error ? { error: state.error, state, draftEvents } : answer ? { answer, draftEvents, activities: state.activities ?? [], runId: state.questionId } : { error: "任务结束但没有答复", state };
 }

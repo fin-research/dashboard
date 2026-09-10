@@ -68,8 +68,10 @@ export type CreditSession = {
 // Responses structured outputs support nested anyOf; Zod's discriminated union emits oneOf.
 export const stepSchema = z.object({ step: z.union([
   z.object({ action: z.literal("search"), query: z.string().min(1).max(500) }),
+  z.object({ action: z.literal("search_many"), queries: z.array(z.string().min(1).max(500)).min(1).max(3) }),
   z.object({ action: z.literal("read"), sourceIds: z.array(z.string()).min(1).max(12) }),
   z.object({ action: z.literal("calculate"), calculation: calculationSchema }),
+  z.object({ action: z.literal("calculate_answer"), calculations: z.array(calculationSchema).min(1).max(8), answer: answerSchema }),
   z.object({ action: z.literal("answer"), answer: answerSchema }),
   z.object({ action: z.literal("refuse") }),
 ]) });

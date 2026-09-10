@@ -39,7 +39,7 @@
 - D1/Neon/R2 所有权及跨仓库 migration 协同遵循 [共享数据库](../eastmoney/docs/DATABASE.md)；本地连接、日期和导入一致性遵循 [DATABASE](docs/DATABASE.md)。
 - 生成式 AI 仅通过 `src/lib/server/ai-gateway.ts`；传输、重试与检索遵循 [共享 AI](../eastmoney/docs/AI.md)，业务 Prompt、Schema 和例外留在目标模块。
 - 融资模型的 Quant / Dashboard 写入分工见 [共享数据库](../eastmoney/docs/DATABASE.md#融资模型跨仓库写入)，页面契约见 [融资模型模块](docs/modules/financing-model.md)。
-- 卖方观点使用研究库检索，授信问答使用独立授信材料库；不得跨用其证据来源和权限。具体检索分别见融资模型模块与 [授信问答](docs/CREDIT_ASSISTANT.md)。
+- 卖方观点使用研究库检索，授信助手使用独立授信材料库；不得跨用其证据来源和权限。具体检索分别见融资模型模块与 [授信助手](docs/CREDIT_ASSISTANT.md)。
 - 不手动编辑生成文件 `worker-configuration.d.ts`；绑定变化使用 `pnpm worker:typegen`。
 - `pnpm dev` 不自动同步远程 D1。只有任务明确需要本地证据时才运行 `pnpm db:sync:remote`。
 - 保留用户已有改动，不做无关重构，不通过删除测试或关闭检查掩盖错误。
@@ -72,7 +72,7 @@
 - SQL、日期、事务和导入：加读 [DATABASE](docs/DATABASE.md)；共享表/存储归属变化才加读共享数据库。
 - API / actions：加读 [API](docs/API.md)；身份与权限：加读 [SECURITY](docs/SECURITY.md)。
 - 测试、开发和交付：加读 [DEVELOPMENT](docs/DEVELOPMENT.md)。
-- AI 调用：加读 [共享 AI](../eastmoney/docs/AI.md) 与模块 Prompt/Schema；授信问答 `credit_answer` 例外由 [CREDIT_ASSISTANT](docs/CREDIT_ASSISTANT.md) 维护。
+- AI 调用：加读 [共享 AI](../eastmoney/docs/AI.md) 与模块 Prompt/Schema；授信助手 `credit_answer` 例外由 [CREDIT_ASSISTANT](docs/CREDIT_ASSISTANT.md) 维护。
 
 融资和管理功能不读取旧 Financing 文档作为当前规范。共享文档总入口为 [项目组索引](../eastmoney/docs/INDEX.md)。
 

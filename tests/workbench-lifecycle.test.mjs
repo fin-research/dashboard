@@ -2,7 +2,7 @@ import test from "node:test";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-test("实际授信问答组件切换标签后清理聊天 DOM、页头操作和迟到响应", async () => {
+test("实际授信助手组件切换标签后清理聊天 DOM、页头操作和迟到响应", async () => {
   await promisify(execFile)(process.execPath, ["--conditions=browser", "tests/helpers/credit-chat-lifecycle.mjs"], {
     cwd: new URL("../", import.meta.url), timeout: 20_000, maxBuffer: 20_000,
   });
