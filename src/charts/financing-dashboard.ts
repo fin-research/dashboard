@@ -1,7 +1,8 @@
 import type { ChartOption } from './charting';
 
-const colors = ['#2f6fed', '#16a394', '#6941c6', '#f79009', '#d92d20', '#0ba5ec', '#6172f3', '#12b76a'];
-const common = {
+export const financingColors = ['#2f6fed', '#16a394', '#6941c6', '#f79009', '#d92d20', '#0ba5ec', '#6172f3', '#12b76a'];
+const colors = financingColors;
+export const financingChartCommon = {
   color: colors,
   animationDuration: 260,
   animationDurationUpdate: 180,
@@ -9,6 +10,7 @@ const common = {
   textStyle: { fontFamily: 'system-ui, sans-serif', fontSize: 16 },
   tooltip: { confine: true, textStyle: { fontSize: 16 } },
 };
+const common = financingChartCommon;
 
 export function financingCompositionOption(rows: Array<{ type: string; amountYi: number }>): ChartOption {
   return {

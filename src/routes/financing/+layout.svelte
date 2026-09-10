@@ -19,6 +19,7 @@ $effect(() => {
 const views = $derived([
   { id: 'overview', href: '/financing/', label: '仪表盘', icon: 'overview' as WorkbenchIconName },
   { id: 'liability-report', href: '/financing/liability-report', label: '负债周报', icon: 'file' as WorkbenchIconName },
+  ...(hasPermission(data.permissions, 'financing.data:read') ? [{ id: 'bond-investors', href: '/financing/bond-investors', label: '债券投资人', icon: 'user' as WorkbenchIconName }] : []),
   { id: 'projects', href: '/financing/projects', label: '项目进度', icon: 'workflow' as WorkbenchIconName },
   { id: 'sop', href: '/financing/sop', label: 'SOP 管理', icon: 'check' as WorkbenchIconName },
   ...(hasPermission(data.permissions, 'financing.data:read') ? [{ id: 'data', href: '/financing/data', label: '融资数据', icon: 'database' as WorkbenchIconName }] : [])
