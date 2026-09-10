@@ -253,15 +253,9 @@ test("经济指标数据库、增量 Cron 和本地全量回填受静态契约�
   assert.match(scheduled, /economicIndicatorWorkflowInstanceId/);
   assert.match(scheduled, /retention/);
   assert.match(workflow, /class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint/);
-  assert.match(workflow, /fetch Choice EDB incremental/);
-  assert.match(workflow, /fetch DM funding history incremental/);
-  assert.match(workflow, /persist Neon economic indicators/);
-  assert.match(workflow, /NonRetryableError/);
-  assert.match(workflow, /runWithoutAutomaticRetry/);
-  assert.match(workflow, /economic_indicators_workflow_step_failed/);
-  assert.match(workflow, /retries: \{ limit: 1, delay: "1 second", backoff: "constant"/);
-  assert.doesNotMatch(workflow, /limit: [2-9]/);
-  assert.match(workflow, /workflowInstanceId/);
+  assert.match(workflow, /runEconomicIndicatorSync/);
+  assert.match(workflow, /requestEconomicIndicatorData/);
+  assert.doesNotMatch(workflow, /NonRetryableError|runWithoutAutomaticRetry/);
   assert.match(worker, /EconomicIndicatorSyncWorkflow/);
   assert.match(worker, /scheduled\(controller, env, context\)/);
   assert.match(worker, /controller\.noRetry\(\)/);

@@ -62,7 +62,7 @@ export async function startEconomicIndicatorSyncWorkflow(
 /*
  * Keep the schedule entrypoint small: all external calls and database writes
  * belong to the Workflow so they are represented by durable steps that can be
- * inspected and manually restarted without automatic retries.
+ * inspected and retried independently without repeating successful requests.
  */
 export async function runEconomicIndicatorScheduledSync(
   env: Cloudflare.Env,

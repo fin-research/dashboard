@@ -99,11 +99,46 @@ export async function fetchChoiceEconomicIndicatorRows(
     rawRows.push(...payload.rows);
   }
 
+  const rows = normalizeChoiceEconomicIndicatorRows(rawRows, endDate);
+  const requestedCodes = CHOICE_ECONOMIC_INDICATORS.map(
+    (definition) => definition.code,
+  );
+  const returnedCodes = [...new Set(rows.map((row) => row.code))].sort();
+  if (mode === "full") {
+    const returned = new Set(returnedCodes);
+    const missingCodes = requestedCodes.filter((code) => !returned.has(code));
+    if (missingCodes.length) {
+      throw new Error(
+        `Choice EDB response is missing indicators: ${missingCodes.join(",")}`,
+      );
+    }
+  }
+
+  return {
+    rows,
+    requestedCodes,
+    returnedCodes,
+    range: {
+      startDate: batches.reduce(
+        (earliest, batch) =>
+          batch.startDate < earliest ? batch.startDate : earliest,
+        batches[0]!.startDate,
+      ),
+      endDate,
+    },
+  };
+}
+
+export function normalizeChoiceEconomicIndicatorRows(
+  rawRows: Array<Record<string, unknown>>,
+  endDate: string,
+  publishDateRows: Array<Record<string, unknown>> = rawRows,
+): EconomicIndicatorSyncRow[] {
   const definitionsByCode = new Map(
     CHOICE_ECONOMIC_INDICATORS.map((definition) => [definition.code, definition]),
   );
   const publishedDatesBySeriesPeriod = new Map<string, string>();
-  for (const row of rawRows) {
+  for (const row of publishDateRows) {
     const publishedDate = choicePublishedDate(row.PUBLISHDATE);
     if (!publishedDate || publishedDate > endDate) continue;
     publishedDatesBySeriesPeriod.set(
@@ -152,39 +187,27 @@ export async function fetchChoiceEconomicIndicatorRows(
       left.code.localeCompare(right.code) ||
       left.observationDate.localeCompare(right.observationDate),
   );
-  const requestedCodes = CHOICE_ECONOMIC_INDICATORS.map(
-    (definition) => definition.code,
-  );
-  const returnedCodes = [...new Set(rows.map((row) => row.code))].sort();
-  if (mode === "full") {
-    const returned = new Set(returnedCodes);
-    const missingCodes = requestedCodes.filter((code) => !returned.has(code));
-    if (missingCodes.length) {
-      throw new Error(
-        `Choice EDB response is missing indicators: ${missingCodes.join(",")}`,
-      );
-    }
-  }
+  return rows;
+}
 
-  return {
-    rows,
-    requestedCodes,
-    returnedCodes,
-    range: {
-      startDate: batches.reduce(
-        (earliest, batch) =>
-          batch.startDate < earliest ? batch.startDate : earliest,
-        batches[0]!.startDate,
-      ),
-      endDate,
-    },
-  };
+const choiceObservationSchema = z.object({
+  code: z.string(), date: z.string(),
+  RESULT: z.union([z.number(), z.string(), z.null()]),
+  PUBLISHDATE: z.union([z.number(), z.string(), z.null()]).optional(),
+});
+export type ChoiceEconomicIndicatorRawRow = z.infer<typeof choiceObservationSchema>;
+
+export function parseChoiceEconomicIndicatorTable(payload: unknown): ChoiceEconomicIndicatorRawRow[] {
+  const table = choiceTableSchema.parse(payload);
+  if (table.function !== "EDB") throw new Error(`Unexpected Choice function: ${table.function}`);
+  return table.rows.map((row) => choiceObservationSchema.parse(row));
 }
 
 export async function fetchDmFundingRateRows(
   request: DataApiRequest,
   mode: EconomicIndicatorSyncMode,
   now = new Date(),
+  bondCodes: readonly string[] = [...dmFundingRateCodeMap.keys()],
 ): Promise<{
   rows: EconomicIndicatorSyncRow[];
   requestedCodes: string[];
@@ -195,7 +218,8 @@ export async function fetchDmFundingRateRows(
   const incrementalStartDate = daysBefore(shanghaiDate(now), 14);
   let pageCount = 0;
 
-  for (const [bondCode, indicatorCode] of dmFundingRateCodeMap) {
+  const selectedCodes = [...dmFundingRateCodeMap].filter(([code]) => bondCodes.includes(code));
+  for (const [bondCode, indicatorCode] of selectedCodes) {
     let endCapitalTime = now.getTime();
     let previousEndCapitalTime = Number.POSITIVE_INFINITY;
     for (let page = 0; page < MAX_DM_FULL_HISTORY_PAGES; page += 1) {
@@ -254,7 +278,7 @@ export async function fetchDmFundingRateRows(
       left.code.localeCompare(right.code) ||
       left.observationDate.localeCompare(right.observationDate),
   );
-  const requestedCodes = [...dmFundingRateCodeMap.values()];
+  const requestedCodes = selectedCodes.map(([, code]) => code);
   const returnedCodes = [...new Set(rows.map((row) => row.code))].sort();
   if (mode === "full") {
     const returned = new Set(returnedCodes);
@@ -268,7 +292,7 @@ export async function fetchDmFundingRateRows(
   return { rows, requestedCodes, returnedCodes, pageCount };
 }
 
-function choiceRequestBatches(
+export function choiceRequestBatches(
   mode: EconomicIndicatorSyncMode,
   endDate: string,
 ): Array<{ definitions: EconomicIndicatorDefinition[]; startDate: string }> {

@@ -1,202 +1,23 @@
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
-import { NonRetryableError } from "cloudflare:workflows";
-
-import {
-  fetchChoiceEconomicIndicatorRows,
-  fetchDmFundingRateRows,
-  type EconomicIndicatorSyncParams,
-} from "../src/lib/server/economic-indicator-sync.ts";
-import {
-  persistEconomicIndicators,
-  type EconomicIndicatorSyncRow,
-} from "../src/lib/server/economic-indicators-repository.ts";
+import type { EconomicIndicatorSyncParams } from "../src/lib/server/economic-indicator-sync.ts";
+import { persistEconomicIndicators } from "../src/lib/server/economic-indicators-repository.ts";
+import { requestEconomicIndicatorData } from "../src/lib/server/economic-indicator-request.ts";
 import { withPostgres } from "../src/lib/server/postgres.ts";
+import { runEconomicIndicatorSync } from "./economic-indicator-run.ts";
+export type { EconomicIndicatorSyncResult } from "./economic-indicator-run.ts";
 
-export type EconomicIndicatorSyncResult = {
-  workflowInstanceId: string;
-  scheduledTime: number;
-  range: { startDate: string; endDate: string };
-  requestedIndicators: number;
-  returnedIndicators: number;
-  dmPages: number;
-  storedRows: number;
-  asOf: string;
-};
-
-const sourceStepConfig = {
-  retries: { limit: 1, delay: "1 second", backoff: "constant" as const },
-  timeout: "5 minutes",
-} as const;
-
-const persistStepConfig = {
-  retries: { limit: 1, delay: "1 second", backoff: "constant" as const },
-  timeout: "2 minutes",
-} as const;
-
-export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<
-  Cloudflare.Env,
-  EconomicIndicatorSyncParams
-> {
-  async run(
-    event: Readonly<WorkflowEvent<EconomicIndicatorSyncParams>>,
-    step: WorkflowStep,
-  ): Promise<EconomicIndicatorSyncResult> {
-    const scheduledTime =
-      event.payload?.scheduledTime ??
-      event.schedule?.scheduledTime ??
-      event.timestamp.getTime();
-
-    const [choice, dm] = await Promise.all([
-      step.do(
-        "fetch Choice EDB incremental",
-        sourceStepConfig,
-        (context) =>
-          runWithoutAutomaticRetry(
-            event.instanceId,
-            "fetch Choice EDB incremental",
-            async () => {
-              const result = await fetchChoiceEconomicIndicatorRows(
-                (path, searchParams) =>
-                  requestDataApi(this.env, path, searchParams),
-                "incremental",
-                new Date(scheduledTime),
-              );
-              console.log(
-                JSON.stringify({
-                  event: "economic_indicators_workflow_source",
-                  source: "choice-edb",
-                  workflowInstanceId: event.instanceId,
-                  attempt: context.attempt,
-                  requestedIndicators: result.requestedCodes.length,
-                  returnedIndicators: result.returnedCodes.length,
-                  rowCount: result.rows.length,
-                  range: result.range,
-                }),
-              );
-              return result;
-            },
-          ),
-      ),
-      step.do(
-        "fetch DM funding history incremental",
-        sourceStepConfig,
-        (context) =>
-          runWithoutAutomaticRetry(
-            event.instanceId,
-            "fetch DM funding history incremental",
-            async () => {
-              const result = await fetchDmFundingRateRows(
-                (path, searchParams) =>
-                  requestDataApi(this.env, path, searchParams),
-                "incremental",
-                new Date(scheduledTime),
-              );
-              console.log(
-                JSON.stringify({
-                  event: "economic_indicators_workflow_source",
-                  source: "dm-funding-history",
-                  workflowInstanceId: event.instanceId,
-                  attempt: context.attempt,
-                  requestedIndicators: result.requestedCodes.length,
-                  returnedIndicators: result.returnedCodes.length,
-                  rowCount: result.rows.length,
-                  pageCount: result.pageCount,
-                }),
-              );
-              return result;
-            },
-          ),
-      ),
-    ]);
-
-    const rows: EconomicIndicatorSyncRow[] = [...choice.rows, ...dm.rows];
-    const stored = await step.do(
-      "persist Neon economic indicators",
-      persistStepConfig,
-      (context) =>
-        runWithoutAutomaticRetry(
-          event.instanceId,
-          "persist Neon economic indicators",
-          async () => {
-            const result = await withPostgres(
-              this.env.HYPERDRIVE?.connectionString,
-              "eastmoney-edb-workflow",
-              (client) => persistEconomicIndicators(client, rows),
-            );
-            console.log(
-              JSON.stringify({
-                event: "economic_indicators_workflow_persisted",
-                workflowInstanceId: event.instanceId,
-                attempt: context.attempt,
-                storedRows: result.rowCount,
-                asOf: result.asOf,
-              }),
-            );
-            return result;
-          },
-        ),
-    );
-
-    const result: EconomicIndicatorSyncResult = {
-      workflowInstanceId: event.instanceId,
-      scheduledTime,
-      range: choice.range,
-      requestedIndicators:
-        choice.requestedCodes.length + dm.requestedCodes.length,
-      returnedIndicators:
-        choice.returnedCodes.length + dm.returnedCodes.length,
-      dmPages: dm.pageCount,
-      storedRows: stored.rowCount,
-      asOf: stored.asOf,
-    };
-    console.log(
-      JSON.stringify({
-        event: "economic_indicators_workflow_complete",
-        ...result,
-      }),
-    );
+export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<Cloudflare.Env, EconomicIndicatorSyncParams> {
+  async run(event: Readonly<WorkflowEvent<EconomicIndicatorSyncParams>>, step: WorkflowStep) {
+    const scheduledTime = event.payload?.scheduledTime ?? event.schedule?.scheduledTime ?? event.timestamp.getTime();
+    const result = await runEconomicIndicatorSync(step, event.instanceId, scheduledTime,
+      (path, parameters) => requestEconomicIndicatorData(this.env.DATA, path, parameters),
+      (rows) => withPostgres(this.env.HYPERDRIVE?.connectionString, "eastmoney-edb-workflow",
+        (client) => persistEconomicIndicators(client, rows)));
+    if (result.status === "failed") {
+      // All branches have settled and the durable summary is already saved.
+      throw new Error(JSON.stringify(result));
+    }
     return result;
   }
-}
-
-async function runWithoutAutomaticRetry<T>(
-  workflowInstanceId: string,
-  stepName: string,
-  operation: () => Promise<T>,
-): Promise<T> {
-  try {
-    return await operation();
-  } catch (error) {
-    const message = errorMessage(error);
-    console.error(
-      JSON.stringify({
-        event: "economic_indicators_workflow_step_failed",
-        workflowInstanceId,
-        step: stepName,
-        error: message,
-      }),
-    );
-    throw new NonRetryableError(`${stepName}: ${message}`);
-  }
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-async function requestDataApi(
-  env: Cloudflare.Env,
-  path: string,
-  searchParams: URLSearchParams,
-): Promise<unknown> {
-  const url = new URL(`https://eastmoney.hasbai.xyz/data${path}`);
-  url.search = searchParams.toString();
-  const response = await env.DATA.fetch(
-    new Request(url, { headers: { Accept: "application/json" } }),
-  );
-  if (!response.ok) {
-    throw new Error(`Data API request failed: ${path} (HTTP ${response.status})`);
-  }
-  return response.json();
 }
