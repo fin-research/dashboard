@@ -93,26 +93,12 @@ type ClientLink = { institution_name: string; id: string; name: string };
 type UsageRow = { date: string; institution_name: string; item_type: CreditItemType; amount: number };
 const auditFields = new Set(['id','institution_name','effective_on','created_at','created_by','updated_at','cleared_fields']);
 
-function statesAt(rows: DiffRow[], date: string): Map<string, DiffRow> {
-  const result = new Map<string, DiffRow>();
-  for (const row of rows) {
-    if (row.effective_on > date) break;
-    const state = result.get(row.institution_name) ?? {} as DiffRow;
-    for (const [key,value] of Object.entries(row)) {
-      if (auditFields.has(key) || value != null || row.cleared_fields.includes(key)) state[key] = value;
-    }
-    result.set(row.institution_name,state);
-  }
-  return result;
-}
-
-function institutionView(state: DiffRow, date: string, links: ClientLink[], usage: UsageRow[]): CreditInstitutionView {
-  const clients = links.filter(row => row.institution_name === state.institution_name).map(({id,name}) => ({id,name}));
+function institutionView(state: DiffRow, date: string, clients: Array<{id:string;name:string}>, usage: Map<string,number>): CreditInstitutionView {
   const items = creditItemTypes.map(type => {
     const bond = type === 'bond_investment';
     const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
     const limitAmount = nullableNumber(state[`${type}_limit`]);
-    const onlineAmount = clients.length ? usage.find(row => row.date === date && row.institution_name === state.institution_name && row.item_type === type)?.amount ?? 0 : null;
+    const onlineAmount = clients.length ? usage.get(`${date}:${state.institution_name}:${type}`) ?? 0 : null;
     const secondaryUsedAmount = nullableNumber(state.bond_investment_secondary_used) ?? 0;
     const usedAmount = financing ? (onlineAmount == null ? null : sumAmounts([onlineAmount,bond ? secondaryUsedAmount : 0]))
       : nullableNumber(state[`${type}_used`]);
@@ -167,12 +153,30 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
     JOIN credit.institution_client m ON m.client_id=u.client_id GROUP BY d.date,m.institution_name,u.debt_type
     UNION ALL SELECT to_char(d.date,'YYYY-MM-DD'),u.institution_name,'bond_investment',(u.amount/100000000)::float8
     FROM unnest($1::date[]) d(date) CROSS JOIN LATERAL credit.bond_primary_usage_as_of(d.date) u`,[financeDates])).rows;
+  const clientsByInstitution = new Map<string,Array<{id:string;name:string}>>();
+  for (const {institution_name,id,name} of links) {
+    const group = clientsByInstitution.get(institution_name) ?? [];
+    group.push({id,name}); clientsByInstitution.set(institution_name,group);
+  }
+  const usageByKey = new Map(usage.map(row => [`${row.date}:${row.institution_name}:${row.item_type}`,row.amount]));
+  // Walk sparse changes once in date order. Each rendered view is independent of later states.
   const cache = new Map<string,CreditInstitutionView[]>();
-  const snapshot = (date:string) => {
-    let value=cache.get(date);
-    if (!value) { value=[...statesAt(rows,date).values()].map(state => institutionView(state,date,links,usage)); cache.set(date,value); }
-    return value;
-  };
+  const states = new Map<string,DiffRow>();
+  let rowIndex = 0;
+  for (const date of [...snapshotDates].sort()) {
+    while (rowIndex < rows.length) {
+      const row = rows[rowIndex];
+      if (!row || row.effective_on > date) break;
+      rowIndex++;
+      const state = states.get(row.institution_name) ?? {} as DiffRow;
+      for (const [key,value] of Object.entries(row)) {
+        if (auditFields.has(key) || value != null || row.cleared_fields.includes(key)) state[key] = value;
+      }
+      states.set(row.institution_name,state);
+    }
+    cache.set(date,[...states.values()].map(state => institutionView(state,date,clientsByInstitution.get(state.institution_name) ?? [],usageByKey)));
+  }
+  const snapshot = (date:string) => cache.get(date) ?? [];
   const current = snapshot(reportDate).sort(compareCreditInstitutionOrder);
   const previous = previousDate ? snapshot(previousDate) : [];
   const allNews: CreditWeeklyNewsItem[] = [];
