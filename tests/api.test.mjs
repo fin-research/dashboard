@@ -428,8 +428,13 @@ test("保存定稿只提交规范报告与今日聚焦", async (context) => {
 test("原始 Data 单资源错误时其余市场模块继续生成", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
-  globalThis.fetch = async (url) =>
-    String(url).startsWith("/data/industry?")
+  globalThis.fetch = async (url) => {
+    if (String(url).startsWith("/data/primary-issues?")) {
+      const query = new URL(String(url), "https://example.test").searchParams;
+      assert.equal(query.get("startDate"), "2026-08-25");
+      return Response.json([{ bidStartDate: "2026-08-25", comShortName: "测试证券", bondShortName: "26测试01", issueTenor: "1Y", planIssueAmount: 10 }]);
+    }
+    return String(url).startsWith("/data/industry?")
       ? Response.json({
           detail: "Choice 数据源不可用",
           error: {
@@ -445,6 +450,7 @@ test("原始 Data 单资源错误时其余市场模块继续生成", async (cont
           },
         }, { status: 503 })
       : directResponse(url);
+  };
   const { report, resourceIssues } = await fetchReport(
     "2026-08-25",
     false,
@@ -452,10 +458,13 @@ test("原始 Data 单资源错误时其余市场模块继续生成", async (cont
     "2026-08-25",
   );
   assert.deepEqual(report.equities, []);
+  assert.equal(report.primary_summary.current_amount, 10);
+  assert.equal(report.primary_summary.change_amount, null);
+  assert.equal(report.primary_issues.length, 1);
   assert.equal(report.omo_operations[0].amount_yi, 1000);
   assert.deepEqual(
     resourceIssues.map((issue) => issue.resource),
-    ["industry", "primary"],
+    ["industry"],
   );
   assert.match(resourceIssues[0].detail, /Choice 数据源不可用/);
   assert.match(resourceIssues[0].detail, /equities\.0\.close/);

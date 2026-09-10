@@ -58,7 +58,7 @@ export const reportDataSchema = z
       .strict(),
     equities: z.array(
       z
-        .object({ name: z.string(), close: z.number(), change_pct: z.number() })
+        .object({ name: z.string(), close: nullableNumber, change_pct: nullableNumber })
         .strict(),
     ),
     equity_data_time: isoDateTime.nullable(),
@@ -68,14 +68,14 @@ export const reportDataSchema = z
       z
         .object({
           name: z.string(),
-          change_pct: z.number(),
-          market_cap_yuan: z.number(),
+          change_pct: nullableNumber,
+          market_cap_yuan: nullableNumber,
         })
         .strict(),
     ),
     industry_data_date: isoDate,
     primary_summary: z
-      .object({ current_amount: z.number(), change_amount: nullableNumber })
+      .object({ current_amount: nullableNumber, change_amount: nullableNumber })
       .strict(),
     primary_issues: z.array(
       z
@@ -87,7 +87,7 @@ export const reportDataSchema = z
           bond_names: z.array(z.string()),
           tenors: z.array(z.string()),
           coupons: z.array(nullableNumber),
-          amount: z.number(),
+          amount: nullableNumber,
         })
         .strict(),
     ),

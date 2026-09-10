@@ -125,7 +125,7 @@ function classifyPrimary(row: PrimaryIssue): string {
 }
 
 function primaryDateKey(row: PrimaryIssue): string {
-  return isoDate(row.bidStartDate ?? row.issueStartDate) ?? "";
+  return isoDate(row.bidStartDate) ?? isoDate(row.issueStartDate) ?? "";
 }
 
 function primaryDateText(row: PrimaryIssue): string {
@@ -200,18 +200,18 @@ function aggregatePrimaryIssues(primaryRows: PrimaryIssue[]): ReportData["primar
     issueDateKey: string;
     issuer: string;
     category: string;
-    amount: number;
+    amount: number | null;
     legs: Leg[];
   }
   const groups = new Map<string, Group>();
   for (const row of primaryRows) {
     if (isEastmoneyPrimary(row)) continue;
     const issueDateKey = primaryDateKey(row);
-    const issuer = primaryIssuer(row);
+    const issuer = primaryIssuer(row) || "发行人暂缺";
     const amount = toFloat(row.planIssueAmount);
-    if (!issueDateKey || !issuer || amount === null) continue;
+    if (!issueDateKey) continue;
     const category = classifyPrimary(row);
-    const key = `${issueDateKey}\u0000${category}\u0000${issuer}`;
+    const key = `${issueDateKey}\u0000${category}\u0000${issuer}${issuer === "发行人暂缺" ? `\u0000${groups.size}` : ""}`;
     const group = groups.get(key) ?? {
       issueDate: primaryDateText(row),
       issueDateKey,
@@ -220,7 +220,7 @@ function aggregatePrimaryIssues(primaryRows: PrimaryIssue[]): ReportData["primar
       amount: 0,
       legs: [],
     };
-    group.amount += amount;
+    group.amount = group.amount === null || amount === null ? null : group.amount + amount;
     group.legs.push({
       bondName: String(row.bondShortName ?? "--"),
       tenor: formatPrimaryTenor(row.issueTenor),
@@ -280,22 +280,25 @@ function primaryReport(
   const datedRows = primaryRows.filter((row) =>
     [previousDate, reportDate].includes(primaryDateKey(row)),
   );
-  const amount = (date: string) =>
-    datedRows
-      .filter(
-        (row) =>
-          primaryDateKey(row) === date &&
-          !isEastmoneyPrimary(row) &&
-          parseTenorYears(row.issueTenor) !== null &&
-          toFloat(row.planIssueAmount) !== null,
-      )
-      .reduce((sum, row) => sum + (toFloat(row.planIssueAmount) ?? 0), 0);
+  const amount = (date: string): number | null => {
+    if (!date) return null;
+    // Undated rows could belong to this date; do not publish a partial total.
+    if (primaryRows.some((row) => !isEastmoneyPrimary(row) && !primaryDateKey(row))) return null;
+    const candidates = datedRows.filter((row) => primaryDateKey(row) === date && !isEastmoneyPrimary(row));
+    let total = 0;
+    for (const row of candidates) {
+      const value = toFloat(row.planIssueAmount);
+      if (value === null || parseTenorYears(row.issueTenor) === null) return null;
+      total += value;
+    }
+    return total;
+  };
   const current = amount(reportDate);
   const previous = amount(previousDate);
   return {
     primary_summary: {
       current_amount: current,
-      change_amount: current - previous,
+      change_amount: current === null || previous === null ? null : current - previous,
     },
     primary_issues: aggregatePrimaryIssues(datedRows),
   };
@@ -509,7 +512,14 @@ function attachBondInfos<T extends TodayTrade | FavoriteQuote>(
   return rows.map((row) => {
     const info = byCode.get(String(row.bondUniCode));
     if (!info) return row;
-    return infoFirst ? { ...info, ...row } : { ...row, ...info };
+    const merged = { ...row, ...info };
+    if (infoFirst) {
+      // A missing quote name must not overwrite the known basic-info name.
+      for (const [key, value] of Object.entries(row)) {
+        if (value != null && value !== "") Reflect.set(merged, key, value);
+      }
+    }
+    return merged;
   });
 }
 
@@ -532,13 +542,12 @@ export function referencedBondCodes(
 export function previousTradingDate(
   industryPayload: IndustrySnapshot,
   reportDate: string,
-): string {
+): string | null {
   const previousDate = industryPayload.tradingDates
     .filter((date) => date < reportDate)
     .sort()
     .at(-1);
-  if (!previousDate) throw new Error("Choice 未返回足够的同业发行交易日");
-  return previousDate;
+  return previousDate ?? null;
 }
 
 export function buildReportData(resources: RawMarketReportResources): ReportData {

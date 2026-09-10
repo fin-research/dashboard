@@ -38,7 +38,8 @@ function renderEquityGaugeLayout(
   points: EquityPoint[],
   mobile: boolean,
 ): void {
-  const valid = points.filter((point) => Number.isFinite(point.change_pct));
+  const valid = points.filter((point): point is EquityPoint & { change_pct: number } =>
+    point.change_pct !== null && Number.isFinite(point.change_pct));
   if (!valid.length) {
     setEmpty(host, "权益行情数据暂缺");
     return;
@@ -210,8 +211,9 @@ export function renderIndustryTreemap(
   points: IndustryPoint[],
 ): void {
   const valid = points.filter(
-    (point) =>
-      Number.isFinite(point.market_cap_yuan) && point.market_cap_yuan > 0,
+    (point): point is IndustryPoint & { market_cap_yuan: number; change_pct: number } =>
+      point.market_cap_yuan !== null && Number.isFinite(point.market_cap_yuan) && point.market_cap_yuan > 0 &&
+      point.change_pct !== null && Number.isFinite(point.change_pct),
   );
   if (!valid.length) {
     setEmpty(host, "行业数据暂缺");

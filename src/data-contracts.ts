@@ -1,14 +1,11 @@
 import { z } from "zod";
 
+function isMissingValue(value: unknown): boolean {
+  return value == null || (typeof value === "string" && ["", "--"].includes(value.trim()));
+}
 const finiteNumber = z.number().finite();
-const numericValue = z
-  .union([
-    finiteNumber,
-    z.string().trim().regex(/^-?\d+(?:\.\d+)?$/),
-  ])
-  .transform(Number);
 const nullableNumericValue = z.preprocess(
-  (value) => value === undefined ? null : value,
+  (value) => isMissingValue(value) ? null : typeof value === "string" ? value.trim() : value,
   z
     .union([
       finiteNumber,
@@ -30,20 +27,37 @@ function directOrLegacyList<T extends z.ZodType, L extends z.ZodType>(
   legacy: L,
   selectLegacy: (value: z.output<L>) => unknown,
 ): z.ZodType<z.output<typeof rows>> {
-  return z.union([rows, legacy]).transform((value) =>
-    rows.parse(Array.isArray(value) ? value : selectLegacy(value)),
-  );
+  const sparseRows = z.preprocess((value) => {
+    if (value == null) return [];
+    if (!Array.isArray(value)) return value;
+    return value.filter((row) => {
+      if (row == null || (typeof row === "object" && !Array.isArray(row) && Object.values(row).every(isMissingValue))) return false;
+      const parsed = rows.element.safeParse(row);
+      if (parsed.success) return true;
+      return !parsed.error.issues.every((issue) => {
+        let received: unknown = row;
+        for (const key of issue.path) {
+          received = received !== null && typeof received === "object" ? Reflect.get(received, key) : undefined;
+        }
+        return isMissingValue(received);
+      });
+    });
+  }, rows);
+  return z.preprocess((value) => value == null ? [] : value,
+    z.union([sparseRows, legacy]).transform((value) =>
+      sparseRows.parse(Array.isArray(value) ? value : selectLegacy(value)),
+    ));
 }
 
 export const omoOperationSchema = z.object({
   operationDate: z.string(),
-  operationName: z.string(),
-  duration: z.string(),
+  operationName: z.string().nullish(),
+  duration: z.string().nullish(),
   interestRate: nullableNumericValue,
   operationAmount: nullableNumericValue,
 });
 const omoRowsSchema = z.array(omoOperationSchema);
-const legacyOmoSchema = z.object({ data: z.array(z.unknown()) });
+const legacyOmoSchema = z.object({ data: z.array(z.unknown()).nullish() });
 export const omoOperationsSchema = directOrLegacyList(
   omoRowsSchema,
   legacyOmoSchema,
@@ -56,7 +70,7 @@ export const cfetsRateSchema = z.object({
   weightedYieldUpDownValueBp: nullableNumericValue,
 });
 const cfetsRowsSchema = z.array(cfetsRateSchema);
-const legacyCfetsSchema = z.object({ cfetsCapitalTable: z.array(z.unknown()) });
+const legacyCfetsSchema = z.object({ cfetsCapitalTable: z.array(z.unknown()).nullish() });
 export const cfetsRatesSchema = directOrLegacyList(
   cfetsRowsSchema,
   legacyCfetsSchema,
@@ -64,15 +78,15 @@ export const cfetsRatesSchema = directOrLegacyList(
 );
 
 export const governmentBondSchema = z.object({
-  ordinateName: z.string(),
-  abscissaName: z.string(),
+  ordinateName: z.string().nullish(),
+  abscissaName: z.string().nullish(),
   bondCode: z.string(),
-  tradeNum: numericValue,
+  tradeNum: nullableNumericValue,
   yield: nullableNumericValue,
   yieldSubYtdCloseBp: nullableNumericValue,
 });
 const governmentRowsSchema = z.array(governmentBondSchema);
-const legacyGovernmentSchema = z.object({ data: z.array(z.unknown()) });
+const legacyGovernmentSchema = z.object({ data: z.array(z.unknown()).nullish() });
 export const governmentBondsSchema = directOrLegacyList(
   governmentRowsSchema,
   legacyGovernmentSchema,
@@ -86,7 +100,7 @@ export const futuresQuoteSchema = z.object({
 });
 const futuresRowsSchema = z.array(futuresQuoteSchema);
 const legacyFuturesSchema = z.object({
-  futuresContractLatestTradeProtoList: z.array(z.unknown()),
+  futuresContractLatestTradeProtoList: z.array(z.unknown()).nullish(),
 });
 export const futuresQuotesSchema = directOrLegacyList(
   futuresRowsSchema,
@@ -96,12 +110,12 @@ export const futuresQuotesSchema = directOrLegacyList(
 
 export const marginBalanceSchema = z.object({
   DIM_DATE: z.string(),
-  TOTAL_RZRQYE: numericValue,
-  TOTAL_RZYE: numericValue,
-  TOTAL_RQYE: numericValue,
+  TOTAL_RZRQYE: nullableNumericValue,
+  TOTAL_RZYE: nullableNumericValue,
+  TOTAL_RQYE: nullableNumericValue,
 });
 const marginRowsSchema = z.array(marginBalanceSchema);
-const legacyMarginSchema = z.object({ data: z.array(z.unknown()) });
+const legacyMarginSchema = z.object({ data: z.array(z.unknown()).nullish() });
 export const marginBalancesSchema = directOrLegacyList(
   marginRowsSchema,
   legacyMarginSchema,
@@ -109,44 +123,44 @@ export const marginBalancesSchema = directOrLegacyList(
 );
 
 export const primaryIssueSchema = z.object({
-  bidStartDate: z.string().optional(),
-  issueStartDate: z.string().optional(),
-  biddingTime: z.string().optional(),
-  comShortName: z.string().optional(),
-  issuerShortName: z.string().optional(),
-  issuerShortNameCn: z.string().optional(),
-  comFullName: z.string().optional(),
-  issuerName: z.string().optional(),
-  publicOffering: z.union([z.string(), finiteNumber]).optional(),
-  publicOfferingText: z.string().optional(),
-  offeringType: z.string().optional(),
-  issueWay: z.string().optional(),
-  raisingMode: z.string().optional(),
-  bondTypeText: z.string().optional(),
-  bondShortName: z.string(),
-  issueTenor: z.string().optional(),
-  planIssueAmount: numericValue.optional(),
+  bidStartDate: z.string().nullish(),
+  issueStartDate: z.string().nullish(),
+  biddingTime: z.string().nullish(),
+  comShortName: z.string().nullish(),
+  issuerShortName: z.string().nullish(),
+  issuerShortNameCn: z.string().nullish(),
+  comFullName: z.string().nullish(),
+  issuerName: z.string().nullish(),
+  publicOffering: z.union([z.string(), finiteNumber]).nullish(),
+  publicOfferingText: z.string().nullish(),
+  offeringType: z.string().nullish(),
+  issueWay: z.string().nullish(),
+  raisingMode: z.string().nullish(),
+  bondTypeText: z.string().nullish(),
+  bondShortName: z.string().nullish(),
+  issueTenor: z.string().nullish(),
+  planIssueAmount: nullableNumericValue.optional(),
   issueCouponRate: nullableNumericValue.optional(),
 });
 const primaryRowsSchema = z.array(primaryIssueSchema);
 const legacyPrimarySchema = z.object({
-  data: z.object({ list: z.array(z.unknown()) }),
+  data: z.object({ list: z.array(z.unknown()).nullish() }).nullish(),
 });
 export const primaryIssuesSchema = directOrLegacyList(
   primaryRowsSchema,
   legacyPrimarySchema,
-  (value) => value.data.list,
+  (value) => value.data?.list,
 );
 
 export const todayTradeSchema = z.object({
   bondUniCode: identifier,
-  remainingTenor: z.string(),
+  remainingTenor: z.string().nullish(),
   cbYte: nullableNumericValue.optional(),
   tradeYield: nullableNumericValue,
   tradeYieldSubCb: nullableNumericValue.optional(),
 });
 const todayRowsSchema = z.array(todayTradeSchema);
-const legacyTodaySchema = z.object({ list: z.array(z.unknown()) });
+const legacyTodaySchema = z.object({ list: z.array(z.unknown()).nullish() });
 export const todayTradesSchema = directOrLegacyList(
   todayRowsSchema,
   legacyTodaySchema,
@@ -155,9 +169,9 @@ export const todayTradesSchema = directOrLegacyList(
 
 export const favoriteQuoteSchema = z.object({
   bondUniCode: identifier,
-  bondShortName: z.string().optional(),
-  remainingTenor: z.string(),
-  remainingTenorDay: numericValue.optional(),
+  bondShortName: z.string().nullish(),
+  remainingTenor: z.string().nullish(),
+  remainingTenorDay: nullableNumericValue.optional(),
   cbYield: nullableNumericValue.optional(),
   bidYield: nullableNumericValue.optional(),
   bidEntryPrice: nullableNumericValue.optional(),
@@ -167,7 +181,7 @@ export const favoriteQuoteSchema = z.object({
   tradeYieldSubCb: nullableNumericValue.optional(),
 });
 const favoriteRowsSchema = z.array(favoriteQuoteSchema);
-const legacyFavoriteSchema = z.object({ list: z.array(z.unknown()) });
+const legacyFavoriteSchema = z.object({ list: z.array(z.unknown()).nullish() });
 export const favoriteQuotesSchema = directOrLegacyList(
   favoriteRowsSchema,
   legacyFavoriteSchema,
@@ -176,14 +190,14 @@ export const favoriteQuotesSchema = directOrLegacyList(
 
 export const bondInfoSchema = z.object({
   bondUniCode: identifier,
-  bondShortName: z.string(),
-  comShortName: z.string(),
-  bondType: numericValue,
-  bondOfferingType: numericValue,
-  sciTechInnoBondStatus: numericValue,
+  bondShortName: z.string().nullish(),
+  comShortName: z.string().nullish(),
+  bondType: nullableNumericValue,
+  bondOfferingType: nullableNumericValue,
+  sciTechInnoBondStatus: nullableNumericValue,
 });
 const bondInfoRowsSchema = z.array(bondInfoSchema);
-const legacyBondInfoSchema = z.object({ data: z.array(z.unknown()) });
+const legacyBondInfoSchema = z.object({ data: z.array(z.unknown()).nullish() });
 export const bondInfosSchema = directOrLegacyList(
   bondInfoRowsSchema,
   legacyBondInfoSchema,
@@ -192,13 +206,13 @@ export const bondInfosSchema = directOrLegacyList(
 
 const equitySchema = z.object({
   name: z.string(),
-  close: finiteNumber,
-  change_pct: finiteNumber,
+  close: nullableNumericValue,
+  change_pct: nullableNumericValue,
 });
 const industrySchema = z.object({
   name: z.string(),
-  change_pct: finiteNumber,
-  market_cap_yuan: finiteNumber,
+  change_pct: nullableNumericValue,
+  market_cap_yuan: nullableNumericValue,
 });
 export const industrySnapshotSchema = z.object({
   dataDate: z.string(),

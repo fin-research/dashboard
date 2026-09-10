@@ -7,7 +7,7 @@ export interface MarketMetric {
 
 export interface OmoPoint {
   day: string;
-  net_amount: number;
+  net_amount: number | null;
 }
 
 export interface OmoOperation {
@@ -40,14 +40,14 @@ export interface BondFuture {
 
 export interface EquityPoint {
   name: string;
-  close: number;
-  change_pct: number;
+  close: number | null;
+  change_pct: number | null;
 }
 
 export interface IndustryPoint {
   name: string;
-  change_pct: number;
-  market_cap_yuan: number;
+  change_pct: number | null;
+  market_cap_yuan: number | null;
 }
 
 export interface PrimaryIssueDetail {
@@ -58,11 +58,11 @@ export interface PrimaryIssueDetail {
   bond_names: string[];
   tenors: string[];
   coupons: Array<number | null>;
-  amount: number;
+  amount: number | null;
 }
 
 export interface PrimarySummary {
-  current_amount: number;
+  current_amount: number | null;
   change_amount: number | null;
 }
 

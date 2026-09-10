@@ -250,7 +250,7 @@ export async function fetchReport(
         const previousDate = previousTradingDate(industry, reportDate);
         const primaryQuery = new URLSearchParams({
           date: reportDate,
-          startDate: previousDate,
+          startDate: previousDate ?? reportDate,
           fields: [
             "bidStartDate", "issueStartDate", "biddingTime", "comShortName",
             "issuerShortName", "issuerShortNameCn", "comFullName", "issuerName",
@@ -260,7 +260,7 @@ export async function fetchReport(
           ].join(","),
         });
         return {
-          previousDate,
+          previousDate: previousDate ?? "",
           payload: await getJson(
             `/data/primary-issues?${primaryQuery}`,
             primaryIssuesSchema,

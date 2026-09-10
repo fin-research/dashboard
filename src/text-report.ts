@@ -141,6 +141,9 @@ export function briefOmo(rows: OmoOperation[], reportDate: string): string {
   const dayRows = rows.filter(
     (row) => row.operation_date === reportDate,
   );
+  if (dayRows.some((row) => row.amount_yi === null || !row.operation_name || !row.duration)) {
+    return "公开市场操作明细不完整，净投放金额暂缺。";
+  }
   const inject = dayRows
     .filter((row) => (row.amount_yi ?? 0) > 0)
     .sort((left, right) => left.amount_yi! - right.amount_yi!);

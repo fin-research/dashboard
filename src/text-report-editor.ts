@@ -348,7 +348,7 @@ function updatePrimary(
     }
     if (line === "今日暂无。") continue;
     const match = line.match(
-      /^(\d{2}\/\d{2})-(.+)-(.+)-([\d,.]+)亿-(.+)$/,
+      /^(\d{2}\/\d{2})-(.+)-(.+)-([\d,.]+亿|规模暂缺)-(.+)$/,
     );
     if (!match || !category) {
       issues.push(`【一级发行】无法识别：${line}`);
@@ -376,9 +376,10 @@ function updatePrimary(
       bond_names: existing?.bond_names ?? [],
       tenors,
       amount:
-        existing && match[4]!.replaceAll(",", "") === String(Math.round(existing.amount))
+        match[4] === "规模暂缺" ? null :
+        existing && existing.amount !== null && match[4]!.replace(/[亿,]/g, "") === String(Math.round(existing.amount))
           ? existing.amount
-          : Number(match[4]!.replaceAll(",", "")),
+          : Number(match[4]!.replace(/[亿,]/g, "")),
       coupons:
         existing && match[5] === formatPrimaryCoupons(existing.coupons)
           ? existing.coupons
@@ -394,13 +395,13 @@ function updatePrimary(
   data.primary_issues = parsed;
   const current = parsed
     .filter((row) => row.issue_date_key === data.report_date)
-    .reduce((sum, row) => sum + row.amount, 0);
+    .reduce<number | null>((sum, row) => sum === null || row.amount === null ? null : sum + row.amount, 0);
   const previous = parsed
     .filter((row) => row.issue_date_key !== data.report_date)
-    .reduce((sum, row) => sum + row.amount, 0);
+    .reduce<number | null>((sum, row) => sum === null || row.amount === null ? null : sum + row.amount, 0);
   data.primary_summary = {
     current_amount: current,
-    change_amount: current - previous,
+    change_amount: current === null || previous === null ? null : current - previous,
   };
   if (before === JSON.stringify([data.primary_issues, data.primary_summary])) {
     issues.push("【一级发行】未识别到可回写的数据修改");

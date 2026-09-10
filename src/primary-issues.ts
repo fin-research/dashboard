@@ -22,7 +22,7 @@ export interface PrimaryIssueDetail {
   bond_names: string[];
   tenors: string[];
   coupons: Array<number | null>;
-  amount: number;
+  amount: number | null;
 }
 
 interface PrimaryIssueLeg {
@@ -37,7 +37,7 @@ interface PrimaryIssueGroup {
   issueDateKey: string;
   issuer: string;
   category: string;
-  amount: number;
+  amount: number | null;
   legs: PrimaryIssueLeg[];
 }
 
@@ -65,7 +65,7 @@ export function primaryIssueDetails(
     if (!allowedDates.has(issueDateKey)) continue;
     const issuer = primaryIssuer(row);
     const amount = number(row.amount) ?? number(row.planIssueAmount);
-    if (!issuer || amount === null) continue;
+    if (!issuer) continue;
 
     const category = primaryCategory(row);
     const groupKey = `${issueDateKey}\u0000${category}\u0000${issuer}`;
@@ -77,7 +77,7 @@ export function primaryIssueDetails(
       amount: 0,
       legs: [],
     };
-    group.amount += amount;
+    group.amount = group.amount === null || amount === null ? null : group.amount + amount;
     group.legs.push({
       bondName: string(row.bond_name || row.bondShortName) || "--",
       tenor: primaryTenor(row),
@@ -119,7 +119,8 @@ export function primaryIssueDetails(
     });
 }
 
-export function formatPrimaryAmount(value: number): string {
+export function formatPrimaryAmount(value: number | null): string {
+  if (value === null) return "规模暂缺";
   return `${Math.round(value).toLocaleString("zh-CN")}亿`;
 }
 

@@ -5,7 +5,7 @@ import {
   number,
   signed,
   tone,
-} from "./formatters";
+} from "./formatters.ts";
 import type { ReportDerived } from "./report-view";
 import type {
   ComparablePoint,
@@ -70,10 +70,8 @@ export function coreMetricCards(
   missingResources: readonly MarketReportResource[] = [],
 ): MetricCardView[] {
   const missing = new Set(missingResources);
-  const omo =
-    [...derived.omoHistory]
-      .reverse()
-      .find((point) => point.day === data.report_date)?.net_amount ?? 0;
+  const omoPoint = derived.omoHistory.find((point) => point.day === data.report_date);
+  const omo = omoPoint ? omoPoint.net_amount : 0;
   const dr007 = derived.funds.find((item) => item.label === "DR007");
   const government10 = derived.governmentBonds.find(
     (item) => item.label === "10Y国债",
@@ -97,13 +95,13 @@ export function coreMetricCards(
   return [
     {
       label: "公开市场操作",
-      value: missing.has("omo")
+      value: missing.has("omo") || omo === null
         ? "—"
         : `${Math.abs(omo).toLocaleString("zh-CN")} 亿`,
-      detail: missing.has("omo")
+      detail: missing.has("omo") || omo === null
         ? "数据缺失"
         : omo > 0 ? "净投放" : omo < 0 ? "净回笼" : "净投放为零",
-      valueTone: omo > 0 ? "inject" : omo < 0 ? "withdraw" : "flat",
+      valueTone: omo === null ? "flat" : omo > 0 ? "inject" : omo < 0 ? "withdraw" : "flat",
       icon: "bank",
     },
     {
@@ -135,7 +133,7 @@ export function coreMetricCards(
     },
     {
       label: "同业发行",
-      value: missing.has("primary")
+      value: missing.has("primary") || data.primary_summary.current_amount === null
         ? "—"
         : `${compactValue(data.primary_summary.current_amount)} 亿`,
       detail: missing.has("primary")
@@ -181,13 +179,13 @@ export function omoSummaryItems(
   const available = [...points]
     .filter(
       (point) =>
-        point.day <= reportDate && Number.isFinite(point.net_amount),
+        point.day <= reportDate,
     )
     .sort((left, right) => left.day.localeCompare(right.day));
   const sum = (size: number): number | null => {
     const rows = available.slice(-size);
     return rows.length
-      ? rows.reduce((total, point) => total + point.net_amount, 0)
+      ? rows.reduce<number | null>((total, point) => total === null || point.net_amount === null ? null : total + point.net_amount, 0)
       : null;
   };
   return [

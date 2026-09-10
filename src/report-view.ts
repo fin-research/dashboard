@@ -34,13 +34,13 @@ export function deriveReport(data: ReportData): ReportDerived {
 }
 
 export function omoHistoryPoints(rows: ReportData["omo_operations"]): OmoPoint[] {
-  const totals = new Map<string, number>();
+  const totals = new Map<string, number | null>();
   for (const row of rows) {
     const day = row.operation_date;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
     const amount = row.amount_yi;
-    if (amount === null) continue;
-    totals.set(day, (totals.get(day) ?? 0) + amount);
+    const previous = totals.has(day) ? totals.get(day)! : 0;
+    totals.set(day, previous === null || amount === null ? null : previous + amount);
   }
   return [...totals.entries()]
     .sort(([left], [right]) => left.localeCompare(right))

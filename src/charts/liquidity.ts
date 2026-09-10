@@ -22,7 +22,11 @@ export function renderOmo(host: HTMLElement, points: OmoPoint[]): void {
     setEmpty(host, "公开市场操作数据暂缺");
     return;
   }
-  const amounts = points.map((point) => point.net_amount);
+  const amounts = points.map((point) => point.net_amount).filter((value): value is number => value !== null);
+  if (!amounts.length) {
+    setEmpty(host, "公开市场操作金额暂缺");
+    return;
+  }
   const maximum = Math.max(0, ...amounts);
   const minimum = Math.min(0, ...amounts);
   const span = Math.max(1, maximum - minimum);
@@ -47,6 +51,7 @@ export function renderOmo(host: HTMLElement, points: OmoPoint[]): void {
         const item = (params as Array<{ dataIndex: number }>)[0];
         const point = item ? points[item.dataIndex] : undefined;
         if (!point) return "";
+        if (point.net_amount === null) return `${escapeHtml(point.day)}<br>操作金额暂缺`;
         const direction = point.net_amount >= 0 ? "净投放" : "净回笼";
         return `${escapeHtml(point.day)}<br><strong>${direction} ${Math.abs(point.net_amount).toLocaleString("zh-CN")} 亿元</strong>`;
       },
@@ -74,7 +79,7 @@ export function renderOmo(host: HTMLElement, points: OmoPoint[]): void {
         data: points.map((point, index) => ({
           value: point.net_amount,
           label: {
-            position: point.net_amount >= 0 ? "top" : "bottom",
+            position: (point.net_amount ?? 0) >= 0 ? "top" : "bottom",
             align: index === points.length - 1 ? "right" : "center",
             color: colors.ink,
             textBorderColor: colors.paper,
@@ -82,8 +87,8 @@ export function renderOmo(host: HTMLElement, points: OmoPoint[]): void {
             distance: 7,
           },
           itemStyle: {
-            color: point.net_amount >= 0 ? colors.green : colors.red,
-            borderRadius: point.net_amount >= 0 ? [2, 2, 0, 0] : [0, 0, 2, 2],
+            color: (point.net_amount ?? 0) >= 0 ? colors.green : colors.red,
+            borderRadius: (point.net_amount ?? 0) >= 0 ? [2, 2, 0, 0] : [0, 0, 2, 2],
           },
         })),
         label: {
