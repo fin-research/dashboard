@@ -17,14 +17,14 @@ export class CreditDatabaseError extends Error {
 /** Resolve today's NDA flag from all prior diffs, never from one sparse row. */
 export async function findCreditCustomers(client: DatabaseClient, query: string, exact = false): Promise<CreditCustomer[]> {
   const name = query.trim();
-  if (!name || name.length > 200) return [];
+  if ((exact && !name) || name.length > 200) return [];
   await client.query('BEGIN READ ONLY');
   try {
     const result = await client.query(`SELECT institution_name AS name, confidentiality_status AS "confidentialityStatus",
       to_char(effective_on,'YYYY-MM-DD') AS "reportDate", CURRENT_TIMESTAMP::text AS "checkedAt"
       FROM credit.state_as_of((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date)
       WHERE ($2::boolean AND institution_name=$1 OR NOT $2::boolean AND strpos(lower(institution_name),lower($1))>0)
-      ORDER BY (institution_name=$1) DESC,institution_name LIMIT 20`, [name,exact]);
+      ORDER BY (institution_name=$1) DESC,institution_name LIMIT CASE WHEN $1='' THEN NULL ELSE 20 END`, [name,exact]);
     const customers = result.rows.map(row => creditCustomerSchema.parse(row));
     await client.query('COMMIT'); return customers;
   } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }

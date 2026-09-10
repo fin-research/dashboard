@@ -127,7 +127,7 @@ test("AI Search source text streams as answer prose and supplies its original fi
     } });
   assert.ok(drafts.includes("公司")); assert.equal(drafts.at(-1), text);
   assert.ok(drafts.every(draft => !draft.includes("sourceId") && !draft.includes("search-")));
-  assert.deepEqual(stages, ["scope", "retrieval", "answer", "review"]);
+  assert.deepEqual(stages, ["scope", "retrieval", "analysis", "answer", "review"]);
   assert.equal(answer.files[0].id, doc.id); assert.equal(answer.sources[0].extraction, "ai_search");
 });
 
@@ -138,6 +138,32 @@ test("questions longer than 3000 characters are accepted and sessions are stable
   assert.notEqual(creditAgentName("auth0|test", "银行甲"), creditAgentName("auth0|test", "银行乙"));
   assert.notEqual(creditAgentName("auth0|test", "银行甲"), creditAgentName("auth0|test-other", "银行甲"));
   assert.equal(CREDIT_SEARCH_TIMEOUT_MS, 60_000);
+});
+
+test("multi-round retrieval and failed review report real activities, not premature completed answers", async () => {
+  const stages = [], drafts = [];
+  let stepIndex = 0, reviews = 0;
+  const actions = ["search", "read", "answer", "search", "answer"];
+  const text = "公司资产100亿元。";
+  await answerCreditQuestion({ credentials, customer, corpus, history: [], question: "请核对公司资产",
+    progress: (_message, stage) => stages.push(stage), draft: text => drafts.push(text),
+    semanticSearch: async () => [{ key: "search/report.md", text }],
+    generate: async (_credentials, messages, schema, name, options) => {
+      if (name === "credit_scope") return schema.parse({ inScope: true });
+      if (name === "credit_review") return schema.parse({ approved: ++reviews === 2, issues: reviews === 1 ? ["请再核实口径"] : [] });
+      assert.equal(stages.at(-1), "analysis", "waiting for the next model action is analysis, not answer generation");
+      const action = actions[stepIndex++];
+      const source = JSON.parse(messages[2].content).sources[0];
+      const step = action === "search" ? { action, query: "资产附注" } : action === "read" ? { action, sourceIds: [source.id] }
+        : { action, answer: { status: "complete", paragraphs: [{ text, citations: [{ sourceId: source.id, quote: text }] }], attachments: [], gaps: [] } };
+      if (action === "answer") options.onTextDelta(JSON.stringify({ step }));
+      return schema.parse({ step });
+    } });
+  assert.equal(stages.filter(stage => stage === "retrieval").length, 3);
+  assert.equal(stages.filter(stage => stage === "answer").length, 2);
+  assert.equal(stages.filter(stage => stage === "review").length, 2);
+  assert.ok(stages.includes("read"));
+  assert.ok(drafts.slice(drafts.indexOf(text) + 1, -1).includes(""), "rejected draft is withdrawn before more work");
 });
 
 test("review provider failures stop the turn without silently retrying model requests", async () => {

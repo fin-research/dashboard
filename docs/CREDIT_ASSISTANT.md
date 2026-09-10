@@ -4,9 +4,11 @@
 
 界面为单一聊天流，不展示问答/材料双模块、材料目录或预设提问案例。用户在底部输入框提问或索取文件，答复内的附件卡片直接下载原件（`?download=1`）；全文证据有明确 PDF 页码时来源链接可打开原页，AI Search 片段仅标记检索片段并链接原件，不虚构页码。Enter 发送、Shift + Enter 换行，中文输入法确认不会触发发送。问题无业务字数上限，仍拒绝空输入；HTTP 请求体保留 1 MiB 的内存保护上限。
 
-提交后由 SSE 推送会话状态和模型正在生成的正文，UI 分开展示“问题判断、检索材料、生成答复、证据复核”四阶段及当前进度。正文从 Responses 的 output_text 增量中提取 answer.paragraphs 的文字，不显示结构化工具 JSON、引文 ID 或 reasoning 内容；模型复核或更正后由完成答复替换草稿。仅任务进行中保持 SSE 连接，结束即关闭；中断后重连先收到当前快照，不重复提交问题。正在生成时可起草下一条消息；进行中和失败的问题保存在会话中，刷新后仍可查看或重试。
+提交后由 SSE 推送会话状态和模型正在生成的正文。UI 默认只显示当前活动、用时与“处理记录”展开入口，不使用固定步骤进度条或完成勾选。记录按实际执行顺序追加问题判断、检索、分析、阅读、核算、整理和复核；再次检索或复核显示第 N 轮，重连恢复同一份记录。等待模型决定下一动作属于分析，只有实际答复正文出现才显示整理答复。正文从 Responses 的 output_text 增量中提取 answer.paragraphs 的文字，不显示结构化工具 JSON、引文 ID 或 reasoning 内容；流式正文明确标为草稿，复核未通过时撤下草稿并继续查证，完成后由最终答复替换。仅任务进行中保持 SSE 连接，结束即关闭；中断后重连先收到当前快照，不重复提交问题。正在生成时可起草下一条消息；进行中和失败的问题保存在会话中，刷新后仍可查看或重试。
 
-输入框上方的“客户名称”必须通过授信库搜索并点击候选机构（也支持方向键、Enter）完成选择，展示已签署或未签署的保密协议状态。机构与协议状态来自服务端授信库。选择、提交及新的会话读取/下载请求按既有数据库查询核对，客户端或对话中自述已签署不能授权。一次生成使用提交时确认的客户协议快照，生成结束不再重复查询协议和材料目录。切换客户恢复该用户对应客户的会话。
+输入框上方的“客户名称”从候选机构中选择，也支持方向键、Enter。工作台在组件实例内保留已加载授信报表的机构名称、保密状态和快照日期，切到问答直接复用；直接打开问答且没有列表时仅加载一次完整候选列表。输入过程仅本地过滤（最多展示20条，匹配范围是完整列表），不防抖请求后端。此缓存不跨 SSR 请求共享、不持久化完整台账，离开工作台实例即释放。
+
+选择客户与保密标签立即在前端更新，不调用 `POST session/institution`，不等待后端检查协议，也不清空尚未发送的输入。后台仅以 GET 恢复该用户/客户的历史对话，恢复期间仍可输入、发送和切换；迟到响应按版本隔离。没有材料内容的空闲会话读取不查协议。有历史内容或正在生成的会话读取仍按现行权限披露。第一次提交问题可直接初始化客户会话，由后端查询当前客户及保密协议；客户端不提交保密标志，也不能通过前端快照或对话中的自述授权。一次生成使用提交时确认的客户协议快照，生成结束不再重复查询协议和材料目录。
 
 ## 保密规则
 
@@ -21,7 +23,7 @@
 
 在 Dashboard 的自定义 Worker 内使用 Cloudflare Agents SDK。`authorizeRequest` 返回的已验证 `user.auth0Id` 与客户名称经 SHA-256 生成固定 DO 名称；不能从用户输入、Header 或 Cookie 接受用户 ID。相同用户和客户在不同浏览器恢复同一份会话，不同用户或客户隔离。浏览器只在 localStorage 保存上次选择的机构名称，不保存答复/材料；每次内容访问仍需登录。
 
-通过 `schedule()` 持久化到 SQLite Durable Object alarm 后执行问答，SSE 订阅阶段和正文；断线不终止任务，重新连接恢复当前快照。阶段与完成答复通过 `setState` 保存，正文增量仅在 DO 内存中合并，每 100ms 最多推送一次，不逐 token 写 SQLite；实例重启后进行中的临时文字重新生成，完成答复与问题不丢失。旧队列迁移仍先写幂等定时任务再移除旧队列记录。“新对话”在同一个 DO 的 `credit_conversation_archive` 表中归档现有对话后清空当前上下文，保留客户。此前随机 Cookie 对应的 DO 不自动归属任何用户，也不删除原存储。
+通过 `schedule()` 持久化到 SQLite Durable Object alarm 后执行问答，SSE 订阅活动和正文；断线不终止任务，重新连接恢复当前快照。活动记录与完成答复通过 `setState` 保存，活动记录为有序追加列表（最多64条，连续相同事件去重），不再生成 `completedStages`。正文增量仅在 DO 内存中合并，每 100ms 最多推送一次，不逐 token 写 SQLite；实例重启后进行中的临时文字重新生成，完成答复与问题不丢失。旧队列迁移仍先写幂等定时任务再移除旧队列记录。“新对话”在同一个 DO 的 `credit_conversation_archive` 表中归档现有对话后清空当前上下文，保留客户。此前随机 Cookie 对应的 DO 不自动归属任何用户，也不删除原存储。
 
 ```text
 本机材料 ── 只读解析 / OCR ── R2 credit
@@ -96,8 +98,8 @@ node scripts/upload-credit-corpus.mjs --apply --prune-previous=.credit-local/pre
 | 接口 | 用途 |
 | --- | --- |
 | `GET /api/credit-assistant/materials` | 当前客户可提供的文件目录；未选择机构时仅公开材料 |
-| `GET /api/credit-assistant/institutions?q=名称` | 最新授信快照中最多20个名称匹配候选及保密协议状态 |
-| `POST /api/credit-assistant/session/institution` | `{ "institutionName": "..." }` 选择并恢复当前用户对应客户会话 |
+| `GET /api/credit-assistant/institutions` | 问答冷启动时一次加载完整机构候选；兼容 `?q=名称` 的最多20条搜索 |
+| `POST /api/credit-assistant/session/institution` | 旧客户端兼容接口；当前 UI 不调用 |
 | `GET /api/credit-assistant/files/:id` | 由目录解析的原件；PDF 支持页码深链和 Range |
 | `GET /api/credit-assistant/session?institutionName=...` | 当前用户对应客户的会话、任务进度和答复 |
 | `GET /api/credit-assistant/session/events?institutionName=...` | SSE 推送 `session` 快照及 `draft` 正文，完成后关闭 |
@@ -129,4 +131,4 @@ node scripts/evaluate-credit-assistant.mjs --base-url=https://eastmoney.hasbai.x
 
 当前 Dashboard 已连接 Cloudflare Git，推送 `main` 会触发自动构建和发布；不要再手动执行部署。新增 `credit-agent-v1` SQLite Durable Object migration 随 Git 发布执行，不另改 D1 或 Neon schema。独立手动部署仍需明确授权。默认不做浏览器截图验收。
 
-保密协议字段 `confidentiality_status` 与 API `confidentialityStatus` 统一为布尔值，只有明确的 `true` 允许提供受限材料。未签署、未知以及旧会话中的遗留字符串均不能作为授权；请求时仍回查最新数据库状态。
+保密协议字段 `confidentiality_status` 与 API `confidentialityStatus` 统一为布尔值，只有后端确认的 `true` 允许提供受限材料。未签署、未知、前端展示缓存以及旧会话中的遗留字符串均不能作为授权；生成与材料内容访问时仍按上述边界查询当前状态。

@@ -56,9 +56,10 @@
 
   const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
 
-  let { tab = "overview" }: { tab?: CreditTab } = $props();
+  let { tab = "overview", onreport }: { tab?: CreditTab; onreport?: (report: CreditReportResponse) => void } = $props();
   const activeTab = $derived(tab);
   let report = $state<CreditReportResponse | null>(null);
+  $effect(() => { if (report) onreport?.(report); });
   let loading = $state(true);
   let errorMessage = $state("");
   let query = $state("");

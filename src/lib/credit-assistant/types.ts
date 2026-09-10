@@ -53,11 +53,8 @@ export type CreditAnswer = CreditAnswerDraft & {
   disclosure?: { policyVersion: 1; institutionName: string; documentIds: string[]; blocked: boolean };
 };
 export type CreditTurn = { id: string; question: string; answer: CreditAnswer; createdAt: string };
-export const CREDIT_STAGES = [
-  { id: "scope", label: "问题判断" }, { id: "retrieval", label: "检索材料" },
-  { id: "answer", label: "生成答复" }, { id: "review", label: "证据复核" },
-] as const;
-export type CreditStage = (typeof CREDIT_STAGES)[number]["id"];
+export type CreditStage = "scope" | "retrieval" | "analysis" | "read" | "calculate" | "answer" | "review";
+export type CreditActivity = { id: number; stage: CreditStage; message: string; startedAt: number };
 export type CreditSession = {
   turns: CreditTurn[]; running: boolean; progress: string; error: string | null; startedAt: number;
   pendingQuestion?: string;
@@ -65,7 +62,7 @@ export type CreditSession = {
   conversationId?: string;
   questionId?: string;
   stage?: CreditStage;
-  completedStages?: CreditStage[];
+  activities?: CreditActivity[];
   draftText?: string;
 };
 // Responses structured outputs support nested anyOf; Zod's discriminated union emits oneOf.

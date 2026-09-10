@@ -135,7 +135,7 @@ export async function answerCreditQuestion(options: {
   let reviews = 0;
   for (let turn = 0; turn < 12; turn++) {
     if (Date.now() + 1000 >= deadline) break;
-    options.progress?.(`正在核对证据（第${turn + 1}步）`, "answer");
+    options.progress?.("正在分析已有证据与待补充信息", "analysis");
     let prefix = "", lastDraft = "";
     options.draft?.("");
     const decision = await generate(options.credentials, messages, stepSchema, "credit_step", {
@@ -144,7 +144,10 @@ export async function answerCreditQuestion(options: {
       ...(options.draft ? { onTextDelta: (delta: string) => {
         prefix += delta;
         const text = creditDraftText(prefix);
-        if (text !== lastDraft) { lastDraft = text; options.draft!(text); }
+        if (text !== lastDraft) {
+          if (text && !lastDraft) options.progress?.("正在整理有来源支持的答复", "answer");
+          lastDraft = text; options.draft!(text);
+        }
       } } : {}),
     });
     const step = decision.step;
@@ -156,13 +159,14 @@ export async function answerCreditQuestion(options: {
         messages.push({ role: "user", content: JSON.stringify({ tool: "search", sources: await search(step.query) }) });
       } else if (step.action === "read") {
         if (step.sourceIds.some(restrictedId)) return deny();
+        options.progress?.("正在阅读原文与上下文", "read");
         const blocks = [...new Map([...corpus.blocks, ...opened.values()].filter(b => step.sourceIds.includes(b.id)).map(b => [b.id, b])).values()];
         const documentBlocks = corpus.blocks.filter(b => step.sourceIds.includes(b.documentId));
         messages.push({ role: "user", content: JSON.stringify({ tool: "read", sources: read(blocks),
           directory: documentBlocks.map(b => ({ sourceId: b.id, locator: b.locator, preview: b.text.slice(0, 180) })) }) });
       } else if (step.action === "calculate") {
         if (step.calculation.inputs.some(i => restrictedId(i.sourceId))) return deny();
-        options.progress?.("正在复算并记录数据来源", "answer");
+        options.progress?.("正在复算并记录数据来源", "calculate");
         const result = calculateCredit(step.calculation, opened, `calc-${calculations.length + 1}`);
         calculations.push(result);
         messages.push({ role: "user", content: JSON.stringify({ tool: "calculate", result }) });
@@ -181,6 +185,8 @@ export async function answerCreditQuestion(options: {
             metadata: { business: "credit-assistant-review", prompt_version: "v1", step: ++reviews },
           });
           if (!review.approved) {
+            options.draft?.("");
+            options.progress?.("复核发现待确认项，正在补充查证", "analysis");
             messages.push({ role: "user", content: JSON.stringify({ tool: "review", issues: review.issues, instruction: "补充证据或更正后再回答，不能保留无依据结论。" }) });
             continue;
           }

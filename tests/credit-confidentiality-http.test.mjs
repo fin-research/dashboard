@@ -40,7 +40,9 @@ function setup() {
   const customers = new Map([["银行甲", { name: "银行甲", confidentialityStatus: true, reportDate: "2026-09-07" }],
     ["银行乙", { name: "银行乙", confidentialityStatus: false, reportDate: "2026-09-07" }]]);
   let unavailable = false;
+  let customerReads = 0;
   globalThis.creditTestClient = { query: async (sql, values) => {
+    if (sql.startsWith("SELECT")) customerReads++;
     if (unavailable) throw new Error("database unavailable");
     return { rows: sql.startsWith("SELECT") ? [...customers.values()].filter(c => values[1] ? c.name === values[0] : c.name.includes(values[0])) : [] };
   } };
@@ -71,8 +73,33 @@ function setup() {
     if (response.headers.get("set-cookie")) cookie = response.headers.get("set-cookie").split(";")[0];
     return response;
   }
-  return { customers, sessions, request, setUnavailable: () => { unavailable = true; }, originalReads: () => originalReads };
+  return { customers, sessions, request, setUnavailable: () => { unavailable = true; }, originalReads: () => originalReads, customerReads: () => customerReads };
 }
+
+test("fresh customer selection needs no write or NDA lookup; first question verifies it server-side", async () => {
+  const app = setup();
+  assert.equal((await app.request("session?institutionName=银行乙")).status, 200);
+  assert.equal(app.customerReads(), 0);
+  const response = await app.request("session", { institutionName: "银行乙", question: "请提供保密审计报告.pdf" });
+  assert.equal(response.status, 202);
+  assert.equal(app.customerReads(), 1);
+  const state = await response.json();
+  assert.equal(state.customer.confidentialityStatus, false);
+  assert.ok(state.conversationId);
+  const agent = [...app.sessions.values()].find(s => s.jobs.length);
+  await agent.answerQuestion(agent.jobs[0].payload);
+  assert.equal(agent.state.turns[0].answer.notice, CREDIT_NDA_REQUIRED);
+  assert.deepEqual(agent.state.turns[0].answer.files, []);
+});
+
+test("cold-start institution options include the whole list, not just twenty search hits", async () => {
+  const app = setup();
+  for (let i = 0; i < 35; i++) app.customers.set(`测试银行${i}`, { name: `测试银行${i}`, confidentialityStatus: false, reportDate: "2026-09-10" });
+  const response = await app.request("institutions");
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).institutions.length, 37);
+  assert.equal(app.customerReads(), 1);
+});
 
 test("HTTP selection, submit, signed private download and live revocation", async () => {
   const app = setup();
@@ -140,10 +167,14 @@ test("database failures fail closed, and POSTs cannot bypass same-origin validat
   const app = setup();
   assert.equal((await app.request("session/institution", { institutionName: "银行甲" }, "POST", { headers: { origin: "https://other.example" } })).status, 403);
   await app.request("session/institution", { institutionName: "银行甲" });
+  await app.request("session", { institutionName: "银行甲", question: "请提供保密审计报告.pdf" });
+  const agent = [...app.sessions.values()].find(s => s.jobs.length);
+  await agent.answerQuestion(agent.jobs[0].payload);
   app.setUnavailable();
   assert.equal((await app.request("session")).status, 503);
   assert.equal((await app.request("files/" + privateDoc.id + "?turnId=anything")).status, 503);
   assert.equal(app.originalReads(), 0);
+  assert.equal((await app.request("session", { institutionName: "银行甲", question: "再发一遍" })).status, 503);
 });
 
 test("verified users have deterministic isolated sessions and cannot select another user through cookies or headers", async () => {

@@ -66,10 +66,6 @@ async function evaluateHttp(item, progress) {
   // Use only the programmatically verified test account. Fixed user/customer DOs
   // archive the previous test conversation when starting each new case.
   const headers = { origin: base, cookie: httpSession.cookies.header(base), "content-type": "application/json" };
-  const select = await fetch(base + "/api/credit-assistant/session/institution", { method: "POST",
-    headers, body: JSON.stringify({ institutionName }), signal: AbortSignal.timeout(45_000), redirect: "error" });
-  if (!select.ok) throw new Error("选择验收机构失败 HTTP " + select.status);
-  await select.body?.cancel();
   const fresh = await fetch(base + "/api/credit-assistant/session/new", { method: "POST", headers,
     body: JSON.stringify({ institutionName }), signal: AbortSignal.timeout(45_000), redirect: "error" });
   if (!fresh.ok) throw new Error("归档验收会话失败 HTTP " + fresh.status);
@@ -90,5 +86,5 @@ async function evaluateHttp(item, progress) {
   }, 32 * 1024 * 1024);
   if (!state || state.running) throw new Error("SSE 在问答完成前断开，请检查服务日志或重新读取会话");
   const answer = state.turns.at(-1)?.answer;
-  return state.error ? { error: state.error, state, draftEvents } : answer ? { answer, draftEvents } : { error: "任务结束但没有答复", state };
+  return state.error ? { error: state.error, state, draftEvents } : answer ? { answer, draftEvents, activities: state.activities ?? [] } : { error: "任务结束但没有答复", state };
 }

@@ -10,12 +10,13 @@ globalThis.fetch = async () => new Promise(resolve => pending.push(() => resolve
 const Host = await loadComponent("tests/helpers/ChatHost.svelte", `<script>
   import CreditAssistantView from "../../src/lib/credit-assistant/CreditAssistantView.svelte";
   let view = $state("assistant");
+  let customers = [{ name: "测试银行", confidentialityStatus: false, reportDate: "2026-09-09" }];
   export function changeView(next) { view = next; }
 </script>
 <div class="tr-workbench">
   <header><div id="tr-topbar-actions"></div></header>
   <section class="tr-workspace"><main>
-    {#if view === "assistant"}<CreditAssistantView />{:else}<section data-view={view}>其他标签页</section>{/if}
+    {#if view === "assistant"}<CreditAssistantView customerOptions={customers} />{:else}<section data-view={view}>其他标签页</section>{/if}
   </main></section>
 </div>`);
 const app = mount(Host, { target: document.body });
@@ -49,7 +50,8 @@ globalThis.EventSource = class {
   emit(name, value) { this.listeners.get(name)?.({ data: JSON.stringify(value) }); }
 };
 const customer = { name: "测试银行", confidentialityStatus: false, reportDate: "2026-09-09" };
-const running = { ...session, running: true, questionId: "q-1", pendingQuestion: "公司资产是多少", customer, stage: "retrieval", progress: "正在检索材料" };
+const activities = [{ id: 1, stage: "retrieval", message: "正在检索材料", startedAt: Date.now() }];
+const running = { ...session, running: true, questionId: "q-1", pendingQuestion: "公司资产是多少", customer, stage: "retrieval", progress: "正在检索材料", activities };
 const requests = [];
 globalThis.fetch = async (url, options) => { requests.push({ url, options }); return Response.json(running); };
 const streamingApp = mount(Host, { target: document.body });
@@ -58,8 +60,10 @@ await new Promise(resolve => setImmediate(resolve));
 flushSync();
 assert.equal(streams.length, 1);
 assert.match(streams[0].url, /session\/events\?institutionName=/);
-assert.equal(document.querySelectorAll(".credit-stages li").length, 4);
-assert.equal(document.querySelector(".credit-stages [aria-current=step]")?.textContent.includes("检索材料"), true);
+assert.equal(document.querySelector(".credit-stages"), null);
+assert.match(document.querySelector(".activity-summary").textContent, /检索材料/);
+assert.equal(document.querySelector(".activity-details").open, false);
+document.querySelector(".activity-details").open = true;
 assert.equal(document.querySelector("#credit-question").hasAttribute("maxlength"), false);
 streams[0].emit("draft", { questionId: "other-question", text: "迟到的旧内容" });
 flushSync();
@@ -67,9 +71,17 @@ assert.equal(document.querySelector(".streaming-answer"), null);
 streams[0].emit("draft", { questionId: "q-1", text: "公司资产100亿元。" });
 flushSync();
 assert.match(document.querySelector(".streaming-answer").textContent, /公司资产100亿元/);
-streams[0].emit("session", { ...running, stage: "review", completedStages: ["scope", "retrieval", "answer"], progress: "正在复核", draftText: "公司资产100亿元。" });
+activities.push({ id: 2, stage: "review", message: "正在复核", startedAt: Date.now() });
+streams[0].emit("session", { ...running, stage: "review", progress: "正在复核", activities, draftText: "公司资产100亿元。" });
 flushSync();
-assert.match(document.querySelector(".credit-stages [aria-current=step]").textContent, /证据复核/);
+assert.match(document.querySelector(".activity-summary").textContent, /复核答复/);
+activities.push({ id: 3, stage: "retrieval", message: "正在补充查证", startedAt: Date.now() });
+streams[0].emit("session", { ...running, activities, draftText: "" });
+flushSync();
+assert.match(document.querySelector(".activity-summary").textContent, /检索材料 · 第 2 轮/);
+assert.equal(document.querySelector(".activity-details").open, true, "SSE preserves disclosure state");
+assert.deepEqual([...document.querySelectorAll(".activity-label")].map(node => node.textContent), ["检索材料", "复核答复", "检索材料 · 第 2 轮"]);
+assert.equal(document.querySelector(".streaming-answer"), null, "rejected draft is cleared before further retrieval");
 assert.equal(requests.length, 1, "SSE updates must not trigger polling");
 flushSync(() => streamingApp.changeView("weekly"));
 assert.equal(streams[0].closed, true);

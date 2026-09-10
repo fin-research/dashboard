@@ -54,7 +54,6 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
       ...(body ? { method: "POST", body: JSON.stringify(body) } : {}), headers: { origin: "https://test.example", "content-type": "application/json" },
     });
     const customer = { institutionName: "测试银行" };
-    assert.equal((await request("session/institution", customer)).status, 200);
     assert.equal((await request("session", { ...customer, question: "公司资产多少？" })).status, 202);
     const response = await request("session/events?institutionName=" + encodeURIComponent(customer.institutionName));
     assert.equal(response.status, 200);
@@ -68,6 +67,7 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
     const read = () => request("session?institutionName=" + encodeURIComponent(customer.institutionName)).then(response => response.json());
     const saved = await read();
     assert.equal(saved.turns[0].answer.paragraphs[0].text, "公司资产100亿元。");
+    assert.deepEqual(saved.activities.map(activity => activity.stage), ["scope", "retrieval", "review"]);
     const fresh = await request("session/new", customer);
     assert.equal(fresh.status, 200);
     assert.equal((await read()).turns.length, 0);

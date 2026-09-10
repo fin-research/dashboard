@@ -23,7 +23,7 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
       if (request.method !== "GET") return new Response(null, { status: 405, headers: PRIVATE_HEADERS });
       const query = (url.searchParams.get("q") ?? "").trim();
       if (query.length > 200) return Response.json({ error: "客户名称不能超过200字" }, { status: 400, headers: PRIVATE_HEADERS });
-      const institutions = query ? await withPostgres(env.HYPERDRIVE.connectionString, "credit-customer-search", client => findCreditCustomers(client, query)) : [];
+      const institutions = await withPostgres(env.HYPERDRIVE.connectionString, "credit-customer-search", client => findCreditCustomers(client, query));
       return Response.json({ institutions }, { headers: PRIVATE_HEADERS });
     }
     if (["/api/credit-assistant/session", "/api/credit-assistant/session/new", "/api/credit-assistant/session/institution", "/api/credit-assistant/session/events"].includes(url.pathname)) {

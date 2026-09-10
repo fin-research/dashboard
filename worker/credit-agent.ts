@@ -7,6 +7,7 @@ import { findCreditCustomers } from "../src/lib/server/credit-repository.ts";
 import { withPostgres } from "../src/lib/server/postgres.ts";
 import { creditAnswerForTurn, discloseCreditSession, CREDIT_CUSTOMER_REQUIRED, CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
 import { CreditEventHub } from "../src/lib/server/credit-events.ts";
+import { appendCreditActivity } from "../src/lib/credit-assistant/progress.ts";
 
 export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   initialState: CreditSession = { turns: [], running: false, progress: "", error: null, startedAt: 0, pendingQuestion: "", customer: null };
@@ -26,9 +27,9 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   }
 
   private progress(progress: string, stage?: CreditStage) {
-    const completed = new Set(this.state.completedStages ?? []);
-    if (this.state.stage && stage !== this.state.stage) completed.add(this.state.stage);
-    this.save({ ...this.state, progress, stage: stage ?? this.state.stage, completedStages: [...completed] });
+    const currentStage = stage ?? this.state.stage ?? "analysis";
+    this.save({ ...this.state, progress, stage: currentStage,
+      activities: appendCreditActivity(this.state, progress, currentStage) });
   }
 
   private draft(text: string) {
@@ -48,6 +49,9 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   private async visibleState(verifiedCustomer?: CreditCustomer): Promise<CreditSession> {
     if (!this.state.customer) return { ...this.initialState, turns: [],
       error: this.state.turns.length || this.state.pendingQuestion ? "旧对话尚未绑定客户，请新建对话并选择机构。" : null };
+    // Empty, idle sessions contain no material to disclose. Selection is local;
+    // only content access and generation need a fresh business authorization.
+    if (!this.state.turns.length && !this.state.running) return this.state;
     const customer = verifiedCustomer ?? await this.customer(this.state.customer.name)
       ?? { ...this.state.customer, confidentialityStatus: false as const };
     if (!this.state.turns.length) return { ...this.state, customer };
@@ -120,11 +124,12 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
     }
     const parsed = creditQuestionSchema.safeParse(input);
     if (!parsed.success) return Response.json({ error: "请输入问题，并选择客户机构。" }, { status: 400 });
-    if (!this.state.customer) return Response.json({ error: CREDIT_CUSTOMER_REQUIRED }, { status: 400 });
     const id = crypto.randomUUID();
     this.draftText = "";
     this.activeCorpus = undefined;
-    this.save({ ...this.state, customer, running: true, progress: "已收到问题，正在核对客户保密协议与材料", stage: "scope", completedStages: [],
+    const progress = "正在判断问题范围";
+    this.save({ ...this.state, customer, conversationId: this.state.conversationId ?? crypto.randomUUID(), running: true, progress, stage: "scope",
+      activities: appendCreditActivity({ ...this.state, activities: [] }, progress, "scope"),
       questionId: id, error: null, startedAt: Date.now(), pendingQuestion: parsed.data.question });
     try {
       await this.schedule(1, "answerQuestion", { question: parsed.data.question, id }, { idempotent: true });
