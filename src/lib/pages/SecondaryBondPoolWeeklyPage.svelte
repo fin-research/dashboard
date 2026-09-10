@@ -34,7 +34,7 @@
   import type { BondLedgerReport } from "$lib/bond-ledger/types";
   import { listRemoteBondLedgers, loadBondLedgerReport } from "$lib/bond-ledger/upload";
   import BondLedgerUploadButton from "$lib/bond-ledger/BondLedgerUploadButton.svelte";
-  import { WEEKLY_PLEDGED_AMOUNT, yearToLatestLedgerRange } from "$lib/bond-ledger/weekly-report";
+  import { yearToLatestLedgerRange } from "$lib/bond-ledger/weekly-report";
   import { globalMessages } from "$lib/global-messages";
   import { portal } from "$lib/portal";
   import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
@@ -419,13 +419,13 @@
               <div class="secondary-weekly-chart-frame">
                 <ChartHost
                   renderer={renderWeeklyPoolScaleLeverage}
-                  args={[rangePerformance, WEEKLY_PLEDGED_AMOUNT]}
-                  ariaLabel="所选区间业务本金、持仓市值、时间加权本金与杠杆走势，以及最新已质押金额标记"
+                  args={[rangePerformance, analytics.availability.pledgedFaceAmount, analytics.availability.availableFaceAmount]}
+                  ariaLabel="所选区间业务本金、持仓市值、时间加权本金与杠杆走势，以及最新已质押和可用面值金额"
                   className="secondary-weekly-chart secondary-weekly-chart--trend"
                 />
               </div>
               <div class="secondary-weekly-analysis">
-                <p>• <strong>规模概览</strong>：最新业务本金 <strong>{formatYi(current?.principal ?? null)}</strong>，全池持仓市值 <strong>{formatYi(analytics.detailMarketValue)}</strong>，综合杠杆率 <strong>{formatDecimalPercent(calculatedLeverage)}</strong>，<strong>质押/卖出回购{formatYi(WEEKLY_PLEDGED_AMOUNT)}</strong>。</p>
+                <p>• <strong>规模概览</strong>：最新业务本金 <strong>{formatYi(current?.principal ?? null)}</strong>，全池持仓市值 <strong>{formatYi(analytics.detailMarketValue)}</strong>，综合杠杆率 <strong>{formatDecimalPercent(calculatedLeverage)}</strong>，<strong>质押/卖出回购{formatYi(analytics.availability.pledgedFaceAmount)}</strong>，可用 <strong>{formatYi(analytics.availability.availableFaceAmount)}</strong>。</p>
                 <p>• <strong>双户结构</strong>：交易户占全池市值 {formatPercentOne(analytics.detailMarketValue > 0 ? tradingMarketValue / analytics.detailMarketValue : null)}、可供户占 {formatPercentOne(analytics.detailMarketValue > 0 ? availableMarketValue / analytics.detailMarketValue : null)}；可供户纳入全池 DV01 与损益对账。</p>
               </div>
             </ModuleCard>

@@ -232,12 +232,34 @@ function parsePositionRows(
   const column = (name: string) => columns.get(normalizeHeader(name));
   const value = (row: unknown[], name: string) => row[column(name) ?? -1];
   const realizedProfitColumn = column("资本利得");
+  const hasPledgedQuantity = column("今日质押量") !== undefined;
+  const hasAvailableQuantity = column("今日可用量") !== undefined;
+  if (hasPledgedQuantity !== hasAvailableQuantity) {
+    throw new BondLedgerParseError(
+      `${options.sheetLabel}须同时提供“今日质押量”和“今日可用量”`,
+    );
+  }
   const result: LedgerPositionRow[] = [];
   for (const [index, row] of matrix.slice(1).entries()) {
     const reportDate = toIsoDate(value(row, "报表日期"));
     const code = toText(value(row, "债券代码"));
     const name = toText(value(row, "债券名称"));
     if (!reportDate || (!code && !name)) continue;
+    const currentQuantity = toNumber(value(row, "今日持仓量")) ?? 0;
+    const pledgedQuantity = toNumber(value(row, "今日质押量"));
+    const availableQuantity = toNumber(value(row, "今日可用量"));
+    if (hasPledgedQuantity) {
+      const location = `${options.sheetLabel}第${index + 2}行（${code || name}）`;
+      if (pledgedQuantity === null || availableQuantity === null) {
+        throw new BondLedgerParseError(`${location}的今日质押量、今日可用量须填写有效数值`);
+      }
+      if (pledgedQuantity < 0 || availableQuantity < 0) {
+        throw new BondLedgerParseError(`${location}的今日质押量、今日可用量不能为负数`);
+      }
+      if (Math.abs(pledgedQuantity + availableQuantity - currentQuantity) > 0.000001) {
+        throw new BondLedgerParseError(`${location}的今日质押量加今日可用量须等于今日持仓量`);
+      }
+    }
     result.push({
       reportDate,
       rowNumber: options.rowNumberOffset + index + 1,
@@ -252,7 +274,9 @@ function parsePositionRows(
       remainingYears: toNumber(value(row, "剩余期限（年）")),
       interestStartDate: toIsoDate(value(row, "起息日")),
       maturityDate: toIsoDate(value(row, "到期日")),
-      currentQuantity: toNumber(value(row, "今日持仓量")) ?? 0,
+      currentQuantity,
+      pledgedQuantity,
+      availableQuantity,
       previousQuantity: toNumber(value(row, "昨日持仓量")) ?? 0,
       buyQuantity: toNumber(value(row, "当日买量")) ?? 0,
       sellQuantity: toNumber(value(row, "当日卖量")) ?? 0,

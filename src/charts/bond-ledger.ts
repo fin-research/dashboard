@@ -1,5 +1,5 @@
 import { calculateBusinessAnnualizedReturnTrend } from "../lib/bond-ledger/analytics";
-import { formatYield } from "../lib/bond-ledger/format";
+import { formatYi, formatYield } from "../lib/bond-ledger/format";
 import type {
   HoldingTypeStat,
   LedgerTrendAccount,
@@ -77,7 +77,8 @@ function monthlyAxisLabel(
 export function renderWeeklyPoolScaleLeverage(
   host: HTMLElement,
   points: LedgerPerformanceRow[],
-  pledgedAmount: number,
+  pledgedAmount: number | null,
+  availableAmount: number | null,
 ): void {
   if (!points.length) {
     setEmpty(host, "规模与杠杆走势数据暂缺");
@@ -88,12 +89,14 @@ export function renderWeeklyPoolScaleLeverage(
   const lastDate = dates.at(-1) ?? "";
   const latest = points.at(-1);
   const placed: LabelRect[] = [];
+  const pledgedLabel = pledgedAmount === null ? "—" : `${(pledgedAmount / 100_000_000).toFixed(2)} 亿`;
+  const availableLabel = availableAmount === null ? "—" : `${(availableAmount / 100_000_000).toFixed(2)} 亿`;
   setChart(host, {
     animationDuration: 240,
     aria: {
       enabled: true,
       description:
-        `所选区间业务本金、时间加权本金、全池持仓市值与综合杠杆率走势，最新已质押 ${(pledgedAmount / 100_000_000).toFixed(2)} 亿元`,
+        `所选区间业务本金、时间加权本金、全池持仓市值与综合杠杆率走势，最新已质押面值 ${formatYi(pledgedAmount)}，可用面值 ${formatYi(availableAmount)}`,
     },
     color: [...FIN_OPS_CHART_PALETTE],
     title: {
@@ -137,7 +140,7 @@ export function renderWeeklyPoolScaleLeverage(
           `业务本金 ${(point.principal / 100_000_000).toFixed(2)} 亿元`,
           `时间加权本金 ${(point.timeWeightedPrincipal / 100_000_000).toFixed(2)} 亿元`,
           `全池持仓市值 ${(point.marketValue / 100_000_000).toFixed(2)} 亿元`,
-          ...(point.date === lastDate ? [`已质押 ${(pledgedAmount / 100_000_000).toFixed(2)} 亿元`] : []),
+          ...(point.date === lastDate ? [`已质押 ${formatYi(pledgedAmount)}`, `可用 ${formatYi(availableAmount)}`] : []),
           `综合杠杆率 ${(point.leverage * 100).toFixed(2)}%`,
         ].join("<br>");
       },
@@ -328,23 +331,23 @@ export function renderWeeklyPoolScaleLeverage(
             itemStyle: { color: "#0284c7", opacity: 1 },
             label: {
               show: true,
-              formatter: `最新持仓 ${(latest.marketValue / 100_000_000).toFixed(2)} 亿\n本金 ${(latest.principal / 100_000_000).toFixed(2)} 亿\n已质押 ${(pledgedAmount / 100_000_000).toFixed(2)} 亿`,
+              formatter: `最新持仓 ${(latest.marketValue / 100_000_000).toFixed(2)} 亿\n本金 ${(latest.principal / 100_000_000).toFixed(2)} 亿\n已质押 ${pledgedLabel}\n可用 ${availableLabel}`,
               color: "#0f3d6c", fontFamily, fontSize: 10, fontWeight: "bold", lineHeight: 15,
               backgroundColor: "#eff6ff", borderColor: "#bfdbfe", borderWidth: 1, borderRadius: 3, padding: [3, 5],
             },
             labelLine: { show: true, lineStyle: { color: "#0284c7", width: 1 } },
           },
-          {
+          ...(pledgedAmount === null ? [] : [{
             value: [lastDate, pledgedAmount / 100_000_000],
             symbol: "diamond",
             symbolSize: 9,
             itemStyle: { color: "#f79009", opacity: 1 },
             label: {
-              show: true, formatter: `已质押 ${(pledgedAmount / 100_000_000).toFixed(2)} 亿`,
+              show: true, formatter: `已质押 ${pledgedLabel}`,
               color: "#0f3d6c", fontFamily, fontSize: 10, fontWeight: "bold",
             },
             labelLine: { show: false },
-          },
+          }]),
         ] : [],
       },
     ],

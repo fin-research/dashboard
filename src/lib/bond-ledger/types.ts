@@ -57,6 +57,8 @@ export interface LedgerPositionRow {
   interestStartDate: string | null;
   maturityDate: string | null;
   currentQuantity: number;
+  pledgedQuantity: number | null;
+  availableQuantity: number | null;
   previousQuantity: number;
   buyQuantity: number;
   sellQuantity: number;
@@ -156,6 +158,13 @@ export interface ReturnRiskMetrics {
   maxDrawdownTroughDate: string | null;
 }
 
+export interface LedgerAvailability {
+  pledgedQuantity: number | null;
+  availableQuantity: number | null;
+  pledgedFaceAmount: number | null;
+  availableFaceAmount: number | null;
+}
+
 export interface BondLedgerAnalytics {
   selectedLedgers: BondLedgerSource[];
   latestLedger: BondLedgerSource | null;
@@ -192,6 +201,7 @@ export interface BondLedgerAnalytics {
     transactionCount: number | null;
   };
   detailMarketValue: number;
+  availability: LedgerAvailability;
   reconciliationGap: number | null;
   auditChecks: LedgerAuditCheck[];
   auditPassed: boolean;
@@ -219,6 +229,7 @@ export interface BondLedgerReport {
   transactionCount: number;
   metricDeltas: BondLedgerAnalytics["metricDeltas"];
   detailMarketValue: number;
+  availability: LedgerAvailability;
   auditChecks: LedgerAuditCheck[];
   auditPassed: boolean;
   effectiveStartDate: string | null;

@@ -5,6 +5,7 @@ import type {
   CoreHolding,
   HoldingTypeStat,
   LedgerAccountDailySummary,
+  LedgerAvailability,
   LedgerAuditCheck,
   LedgerOperatingTrendPoint,
   LedgerPerformanceRow,
@@ -261,6 +262,7 @@ export function buildBondLedgerAnalytics(
           : null,
     },
     detailMarketValue,
+    availability: summarizePositionAvailability(currentPositionRows),
     reconciliationGap:
       currentPerformance && currentPerformance.marketValue !== 0
         ? (detailMarketValue - currentPerformance.marketValue) /
@@ -296,6 +298,7 @@ export function toBondLedgerReport(
     transactionCount: analytics.transactionCount,
     metricDeltas: analytics.metricDeltas,
     detailMarketValue: analytics.detailMarketValue,
+    availability: analytics.availability,
     auditChecks: analytics.auditChecks,
     auditPassed: analytics.auditPassed,
     effectiveStartDate: analytics.effectiveStartDate,
@@ -305,6 +308,26 @@ export function toBondLedgerReport(
 
 export function emptyBondLedgerReport(): BondLedgerReport {
   return toBondLedgerReport(emptyAnalytics([]));
+}
+
+export function summarizePositionAvailability(
+  positions: LedgerPositionRow[],
+): LedgerAvailability {
+  // 只汇总有持仓的券；任一持仓缺少字段时不把部分汇总冒充全池金额。
+  const holdings = positions.filter((row) => row.currentQuantity > 0 || row.marketValue > 0);
+  if (!holdings.length || holdings.some((row) =>
+    row.pledgedQuantity == null || row.availableQuantity == null
+  )) {
+    return { pledgedQuantity: null, availableQuantity: null, pledgedFaceAmount: null, availableFaceAmount: null };
+  }
+  const pledgedQuantity = sum(holdings.map((row) => row.pledgedQuantity as number));
+  const availableQuantity = sum(holdings.map((row) => row.availableQuantity as number));
+  return {
+    pledgedQuantity,
+    availableQuantity,
+    pledgedFaceAmount: pledgedQuantity * 100,
+    availableFaceAmount: availableQuantity * 100,
+  };
 }
 
 export function weekRange(referenceDate: string): {
@@ -941,6 +964,7 @@ function emptyAnalytics(
       transactionCount: null,
     },
     detailMarketValue: 0,
+    availability: summarizePositionAvailability([]),
     reconciliationGap: null,
     auditChecks: [],
     auditPassed: false,

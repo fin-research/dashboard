@@ -442,6 +442,8 @@ export async function loadBondLedgerReport(
        to_char(interest_start_date, 'YYYY-MM-DD') AS interest_start_date,
        to_char(maturity_date, 'YYYY-MM-DD') AS maturity_date,
        current_quantity::double precision,
+       pledged_quantity::double precision,
+       available_quantity::double precision,
        previous_quantity::double precision,
        buy_quantity::double precision,
        sell_quantity::double precision,
@@ -543,7 +545,8 @@ async function insertPositions(
     `INSERT INTO bond.daily_position (
        report_date, row_number, team, investment_manager, account,
        code, market, name, category, yield_change_bp, remaining_years,
-       interest_start_date, maturity_date, current_quantity, previous_quantity,
+       interest_start_date, maturity_date, current_quantity, pledged_quantity,
+       available_quantity, previous_quantity,
        buy_quantity, sell_quantity, maturity_quantity, coupon_rate,
        valuation_yield, report_yield, full_price, dv01, market_value,
        coupon_income, tax_exempt_income, realized_profit, daily_profit,
@@ -564,6 +567,8 @@ async function insertPositions(
        source.interest_start_date::date,
        source.maturity_date::date,
        source.current_quantity,
+       source.pledged_quantity,
+       source.available_quantity,
        source.previous_quantity,
        source.buy_quantity,
        source.sell_quantity,
@@ -597,6 +602,8 @@ async function insertPositions(
        interest_start_date text,
        maturity_date text,
        current_quantity numeric,
+       pledged_quantity numeric,
+       available_quantity numeric,
        previous_quantity numeric,
        buy_quantity numeric,
        sell_quantity numeric,
@@ -710,6 +717,8 @@ function positionToDatabase(row: LedgerPositionRow) {
     interest_start_date: row.interestStartDate,
     maturity_date: row.maturityDate,
     current_quantity: row.currentQuantity,
+    pledged_quantity: row.pledgedQuantity ?? null,
+    available_quantity: row.availableQuantity ?? null,
     previous_quantity: row.previousQuantity,
     buy_quantity: row.buyQuantity,
     sell_quantity: row.sellQuantity,
@@ -774,6 +783,8 @@ interface PositionRow extends QueryResultRow {
   interest_start_date: string | null;
   maturity_date: string | null;
   current_quantity: number;
+  pledged_quantity: number | null;
+  available_quantity: number | null;
   previous_quantity: number;
   buy_quantity: number;
   sell_quantity: number;
@@ -856,6 +867,8 @@ function positionFromRow(row: PositionRow): LedgerPositionRow {
     interestStartDate: row.interest_start_date,
     maturityDate: row.maturity_date,
     currentQuantity: toFiniteNumber(row.current_quantity),
+    pledgedQuantity: toNullableNumber(row.pledged_quantity),
+    availableQuantity: toNullableNumber(row.available_quantity),
     previousQuantity: toFiniteNumber(row.previous_quantity),
     buyQuantity: toFiniteNumber(row.buy_quantity),
     sellQuantity: toFiniteNumber(row.sell_quantity),
