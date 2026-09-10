@@ -97,6 +97,7 @@ export function seriesLineSegments(
   host: HTMLElement,
   seriesIndex: number,
   values: Array<[string | number, number]>,
+  step?: "end",
 ): LabelLineSegment[] {
   const chart = instances.get(host);
   if (!chart || values.length < 2) return [];
@@ -114,7 +115,12 @@ export function seriesLineSegments(
       const start = pixels[index - 1];
       const end = pixels[index];
       if (!start || !end) continue;
-      segments.push({ x1: start.x, y1: start.y, x2: end.x, y2: end.y });
+      if (step === "end") {
+        segments.push({ x1: start.x, y1: start.y, x2: end.x, y2: start.y });
+        segments.push({ x1: end.x, y1: start.y, x2: end.x, y2: end.y });
+      } else {
+        segments.push({ x1: start.x, y1: start.y, x2: end.x, y2: end.y });
+      }
     }
     return segments;
   } catch {

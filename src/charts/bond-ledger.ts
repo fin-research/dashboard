@@ -17,7 +17,8 @@ import {
   gridLine,
   tooltip,
 } from "./common";
-import { setChart, setEmpty } from "./charting";
+import { seriesLineSegments, setChart, setEmpty } from "./charting";
+import { chooseBestLabelPlacement, type LabelRect } from "../label-placement";
 
 export const FIN_OPS_CHART_PALETTE = [
   "#2f6fed",
@@ -76,6 +77,7 @@ function monthlyAxisLabel(
 export function renderWeeklyPoolScaleLeverage(
   host: HTMLElement,
   points: LedgerPerformanceRow[],
+  pledgedAmount: number,
 ): void {
   if (!points.length) {
     setEmpty(host, "规模与杠杆走势数据暂缺");
@@ -85,12 +87,13 @@ export function renderWeeklyPoolScaleLeverage(
   const firstDate = dates[0] ?? "";
   const lastDate = dates.at(-1) ?? "";
   const latest = points.at(-1);
+  const placed: LabelRect[] = [];
   setChart(host, {
     animationDuration: 240,
     aria: {
       enabled: true,
       description:
-        "所选区间业务本金、时间加权本金、全池持仓市值与综合杠杆率走势",
+        `所选区间业务本金、时间加权本金、全池持仓市值与综合杠杆率走势，最新已质押 ${(pledgedAmount / 100_000_000).toFixed(2)} 亿元`,
     },
     color: [...FIN_OPS_CHART_PALETTE],
     title: {
@@ -134,6 +137,7 @@ export function renderWeeklyPoolScaleLeverage(
           `业务本金 ${(point.principal / 100_000_000).toFixed(2)} 亿元`,
           `时间加权本金 ${(point.timeWeightedPrincipal / 100_000_000).toFixed(2)} 亿元`,
           `全池持仓市值 ${(point.marketValue / 100_000_000).toFixed(2)} 亿元`,
+          ...(point.date === lastDate ? [`已质押 ${(pledgedAmount / 100_000_000).toFixed(2)} 亿元`] : []),
           `综合杠杆率 ${(point.leverage * 100).toFixed(2)}%`,
         ].join("<br>");
       },
@@ -221,30 +225,6 @@ export function renderWeeklyPoolScaleLeverage(
         data: points.map((point) => point.marketValue / 100_000_000),
         lineStyle: { width: 2.4, color: "#0284c7" },
         itemStyle: { color: "#0284c7" },
-        markPoint: latest
-          ? {
-              symbol: "circle",
-              symbolSize: 7,
-              itemStyle: { color: "#0284c7" },
-              label: {
-                show: true,
-                position: "left",
-                distance: 8,
-                formatter: `最新持仓 ${(latest.marketValue / 100_000_000).toFixed(2)} 亿\n本金 ${(latest.principal / 100_000_000).toFixed(2)} 亿`,
-                color: "#0f3d6c",
-                fontFamily,
-                fontSize: 10,
-                fontWeight: "bold",
-                lineHeight: 15,
-                backgroundColor: "#eff6ff",
-                borderColor: "#bfdbfe",
-                borderWidth: 1,
-                borderRadius: 3,
-                padding: [3, 5],
-              },
-              data: [{ coord: [lastDate, latest.marketValue / 100_000_000] }],
-            }
-          : undefined,
       },
       {
         name: "时间加权本金",
@@ -298,6 +278,74 @@ export function renderWeeklyPoolScaleLeverage(
         data: points.map(() => 100),
         lineStyle: { color: colors.red, type: "dotted", width: 1.4 },
         itemStyle: { color: colors.red },
+      },
+      {
+        // 最新时点的两个标记共用规模轴；只在既有五条线的图例中展示线条。
+        id: "weekly-scale-annotations",
+        type: "scatter",
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        symbolSize: 7,
+        z: 10,
+        tooltip: { show: false },
+        labelLayout: (params: { dataIndex?: number; rect: LabelRect; labelRect: LabelRect }) => {
+          const index = params.dataIndex ?? 0;
+          if (index === 0) placed.length = 0;
+          const point = {
+            x: params.rect.x + params.rect.width / 2,
+            y: params.rect.y + params.rect.height / 2,
+          };
+          const lines = [
+            ...seriesLineSegments(host, 0, points.map((row) => [row.date, row.principal / 100_000_000]), "end"),
+            ...seriesLineSegments(host, 1, points.map((row) => [row.date, row.marketValue / 100_000_000])),
+            ...seriesLineSegments(host, 2, points.map((row) => [row.date, row.timeWeightedPrincipal / 100_000_000])),
+          ];
+          const placement = chooseBestLabelPlacement({
+            point,
+            label: { width: params.labelRect.width, height: params.labelRect.height },
+            bounds: { x: 42, y: 58, width: Math.max(0, host.clientWidth - 84), height: Math.max(0, host.clientHeight * 0.43 - 12) },
+            obstacles: placed,
+            lineObstacles: lines,
+            linePadding: 7,
+            preferred: index === 0 ? "top" : "bottom",
+            gap: 10,
+          });
+          placed.push(placement);
+          const edge = [
+            Math.max(placement.x, Math.min(point.x, placement.x + placement.width)),
+            Math.max(placement.y, Math.min(point.y, placement.y + placement.height)),
+          ];
+          return {
+            x: placement.x, y: placement.y, align: "left", verticalAlign: "top",
+            hideOverlap: false,
+            ...(index === 0 ? { labelLinePoints: [[point.x, point.y], edge] } : {}),
+          };
+        },
+        data: latest ? [
+          {
+            value: [lastDate, latest.marketValue / 100_000_000],
+            symbol: "circle",
+            itemStyle: { color: "#0284c7", opacity: 1 },
+            label: {
+              show: true,
+              formatter: `最新持仓 ${(latest.marketValue / 100_000_000).toFixed(2)} 亿\n本金 ${(latest.principal / 100_000_000).toFixed(2)} 亿\n已质押 ${(pledgedAmount / 100_000_000).toFixed(2)} 亿`,
+              color: "#0f3d6c", fontFamily, fontSize: 10, fontWeight: "bold", lineHeight: 15,
+              backgroundColor: "#eff6ff", borderColor: "#bfdbfe", borderWidth: 1, borderRadius: 3, padding: [3, 5],
+            },
+            labelLine: { show: true, lineStyle: { color: "#0284c7", width: 1 } },
+          },
+          {
+            value: [lastDate, pledgedAmount / 100_000_000],
+            symbol: "diamond",
+            symbolSize: 9,
+            itemStyle: { color: "#f79009", opacity: 1 },
+            label: {
+              show: true, formatter: `已质押 ${(pledgedAmount / 100_000_000).toFixed(2)} 亿`,
+              color: "#0f3d6c", fontFamily, fontSize: 10, fontWeight: "bold",
+            },
+            labelLine: { show: false },
+          },
+        ] : [],
       },
     ],
   });

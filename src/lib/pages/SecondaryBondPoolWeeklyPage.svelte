@@ -19,7 +19,6 @@
   import {
     emptyBondLedgerReport,
     isoWeek,
-    previousBusinessWeekRange,
   } from "$lib/bond-ledger/analytics";
   import {
     calendarDays,
@@ -33,22 +32,21 @@
     formatYi,
   } from "$lib/bond-ledger/format";
   import type { BondLedgerReport } from "$lib/bond-ledger/types";
-  import { loadBondLedgerReport } from "$lib/bond-ledger/upload";
+  import { listRemoteBondLedgers, loadBondLedgerReport } from "$lib/bond-ledger/upload";
+  import BondLedgerUploadButton from "$lib/bond-ledger/BondLedgerUploadButton.svelte";
+  import { WEEKLY_PLEDGED_AMOUNT, yearToLatestLedgerRange } from "$lib/bond-ledger/weekly-report";
   import { globalMessages } from "$lib/global-messages";
   import { portal } from "$lib/portal";
   import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
   import { currentReportDate } from "../../report-date";
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
-  const LAST_COMPLETE_WEEK = previousBusinessWeekRange(currentReportDate());
-  const DEFAULT_RANGE = {
-    startDate: `${LAST_COMPLETE_WEEK.endDate.slice(0, 4)}-01-01`,
-    endDate: LAST_COMPLETE_WEEK.endDate,
-  };
+  const DEFAULT_RANGE = yearToLatestLedgerRange(currentReportDate(), []);
 
   let analytics: BondLedgerReport = emptyBondLedgerReport();
   let startDate = DEFAULT_RANGE.startDate;
   let endDate = DEFAULT_RANGE.endDate;
+  let followLatest = true;
   let loading = true;
   let exporting = false;
   let exportLabel = "导出图片";
@@ -136,10 +134,20 @@
     };
   });
 
-  async function refreshReport(): Promise<void> {
+  async function refreshReport(latestImportedDate?: string): Promise<void> {
     const generation = ++syncGeneration;
     loading = true;
     try {
+      if (followLatest) {
+        const inventory = await listRemoteBondLedgers();
+        if (generation !== syncGeneration) return;
+        const range = yearToLatestLedgerRange(currentReportDate(), [
+          ...inventory.databaseDates,
+          ...(latestImportedDate ? [latestImportedDate] : []),
+        ]);
+        startDate = range.startDate;
+        endDate = range.endDate;
+      }
       const report = await loadBondLedgerReport(startDate, endDate);
       if (generation === syncGeneration) analytics = report;
     } catch (error) {
@@ -173,6 +181,7 @@
   }
 
   function selectRangeDate(date: string): void {
+    followLatest = false;
     if (rangePhase === "start") {
       startDate = date;
       endDate = date;
@@ -299,7 +308,7 @@
 
       <div
         class="weekly-report-actions layout-report-screen-only"
-        aria-label="日期范围与导出控制"
+        aria-label="日期范围、台账上传与导出控制"
         use:portal={embedded ? "#tr-topbar-actions" : null}
       >
         <div class="ledger-range-picker">
@@ -308,6 +317,7 @@
             type="button"
             aria-label="选择周报数据范围"
             aria-expanded={rangeOpen}
+            disabled={loading}
             onclick={openRangePicker}
           >
             <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -350,6 +360,8 @@
             </div>
           {/if}
         </div>
+
+        <BondLedgerUploadButton onImported={refreshReport} />
 
         <button
           class="btn btn-primary secondary-weekly-export"
@@ -407,13 +419,13 @@
               <div class="secondary-weekly-chart-frame">
                 <ChartHost
                   renderer={renderWeeklyPoolScaleLeverage}
-                  args={[rangePerformance]}
-                  ariaLabel="所选区间业务本金、持仓市值、时间加权本金与杠杆走势"
+                  args={[rangePerformance, WEEKLY_PLEDGED_AMOUNT]}
+                  ariaLabel="所选区间业务本金、持仓市值、时间加权本金与杠杆走势，以及最新已质押金额标记"
                   className="secondary-weekly-chart secondary-weekly-chart--trend"
                 />
               </div>
               <div class="secondary-weekly-analysis">
-                <p>• <strong>规模概览</strong>：最新业务本金 <strong>{formatYi(current?.principal ?? null)}</strong>，全池持仓市值 <strong>{formatYi(analytics.detailMarketValue)}</strong>，综合杠杆率 <strong>{formatDecimalPercent(calculatedLeverage)}</strong>。报告数字由最新有效交易日时序台账与两户持仓明细交叉核验。</p>
+                <p>• <strong>规模概览</strong>：最新业务本金 <strong>{formatYi(current?.principal ?? null)}</strong>，全池持仓市值 <strong>{formatYi(analytics.detailMarketValue)}</strong>，综合杠杆率 <strong>{formatDecimalPercent(calculatedLeverage)}</strong>，<strong>质押/卖出回购{formatYi(WEEKLY_PLEDGED_AMOUNT)}</strong>。</p>
                 <p>• <strong>双户结构</strong>：交易户占全池市值 {formatPercentOne(analytics.detailMarketValue > 0 ? tradingMarketValue / analytics.detailMarketValue : null)}、可供户占 {formatPercentOne(analytics.detailMarketValue > 0 ? availableMarketValue / analytics.detailMarketValue : null)}；可供户纳入全池 DV01 与损益对账。</p>
               </div>
             </ModuleCard>
@@ -432,7 +444,7 @@
               </div>
               <div class="secondary-weekly-analysis">
                 <p>• <strong>收益率</strong>：含免税年化收益率为 <strong>{formatDecimalPercent(currentOperating?.fullPoolYtdAnnualizedReturn ?? null, 3)}</strong>，不含免税为 <strong>{formatDecimalPercent(currentOperating?.fullPoolYtdExTaxAnnualizedReturn ?? null, 3)}</strong>，平层静态为 <strong>{formatStaticYield(currentOperating?.flatStatic ?? null)}</strong>。</p>
-                <p>• <strong>利润拆分</strong>：累计毛利（含免税）为 <strong>{formatWan(current?.cumulativeProfit ?? null)}</strong>，其中免税增厚贡献 <strong>{formatWan(currentOperating?.cumulativeTaxExemptProfit ?? null)}</strong>。本周区间按报告基准日所在自然周的有效交易日过滤。</p>
+                <p>• <strong>利润拆分</strong>：累计毛利（含免税）为 <strong>{formatWan(current?.cumulativeProfit ?? null)}</strong>，其中免税增厚贡献 <strong>{formatWan(currentOperating?.cumulativeTaxExemptProfit ?? null)}</strong>。</p>
               </div>
             </ModuleCard>
           </div>

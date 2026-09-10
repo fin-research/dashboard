@@ -115,8 +115,10 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
       Promise.all([readFile(new URL("../DESIGN.md", import.meta.url), "utf8"), readFile(new URL("../docs/modules/secondary-bond-pool.md", import.meta.url), "utf8")]).then(parts => parts.join("\n")),
     ]);
 
-  assert.match(page, /LAST_COMPLETE_WEEK = previousBusinessWeekRange\(currentReportDate\(\)\)/);
-  assert.match(page, /startDate: `\$\{LAST_COMPLETE_WEEK\.endDate\.slice\(0, 4\)\}-01-01`/);
+  assert.match(page, /yearToLatestLedgerRange\(currentReportDate\(\), \[/);
+  assert.match(page, /<BondLedgerUploadButton onImported=\{refreshReport\} \/>/);
+  assert.doesNotMatch(page, /报告数字由最新有效交易日|本周区间按报告基准日/);
+  assert.match(page, /质押\/卖出回购\{formatYi\(WEEKLY_PLEDGED_AMOUNT\)\}/);
   assert.match(page, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
   assert.match(page, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
   assert.match(page, /ChartHost from "\.\.\/\.\.\/components\/ChartHost\.svelte"/);
