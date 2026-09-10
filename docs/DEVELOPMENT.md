@@ -39,7 +39,7 @@ git diff --check
 - D1 远端 migration：`pnpm db:migrate:remote`；只在明确的 schema 交付任务中执行。
 - Neon migration：配置直连 `DATABASE_URL` 后运行 `pnpm bond:db:migrate`。
 - 融资择时 schema：配置同一 Neon `DATABASE_URL` 后运行 `pnpm financing-model:db:migrate`。
-- 授信 schema：配置同一 Neon `DATABASE_URL` 后运行 `pnpm credit:db:migrate`。
+- 授信 schema：配置同一 Neon `DATABASE_URL` 后运行 `pnpm credit:db:migrate`。`0009` 依赖融资 `0034_bond_investors.sql`，须先应用融资 migration，并先在生产副本分支核对逐期债券真实值与其它合并结果。
 - 授信导入：先运行 `pnpm credit:import -- --file <xlsx> --date YYYY-MM-DD --dry-run`；确认报告日、目标数据库和汇总后，去掉 `--dry-run` 写入。写入须提供 `--user-id`；同日重导只追加发生变化的字段，未变时不增加 diff 行。
 - 台账回填默认只读；`--apply` 会写数据库，必须先确认目标环境和授权。
 

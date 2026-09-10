@@ -46,7 +46,24 @@ export async function persistCreditWorkbook(client: DatabaseClient, input: Persi
     const inserted = await client.query(`SELECT credit.append_diff($1::date,row.name,row.patch,$3) AS id
       FROM jsonb_to_recordset($2::jsonb) AS row(name text,patch jsonb)`,
       [parsed.reportDate,JSON.stringify(parsed.institutions.map(institution => ({name:institution.institutionName,patch:toCreditImportPatch(institution)}))),input.createdBy ?? null]);
-    const addedDiffCount = inserted.rows.filter(row => row.id != null).length;
+    // Linking runs on INSERT, so calculate residuals after new institutions have their clients.
+    const primary = (await client.query<{institution_name:string; amount:string}>(
+      'SELECT * FROM credit.bond_primary_usage_as_of($1::date)', [parsed.reportDate])).rows;
+    const linked = new Set((await client.query<{institution_name:string}>(
+      'SELECT DISTINCT institution_name FROM credit.institution_client')).rows.map(row => row.institution_name));
+    const residuals = parsed.institutions.filter(row => linked.has(row.institutionName)).map(row => ({
+      name: row.institutionName, patch: { bond_investment_secondary_used: sumAmounts([
+        row.items.find(item => item.type === 'bond_investment')?.usedAmount ?? 0,
+        -Number(primary.find(item => item.institution_name === row.institutionName)?.amount ?? 0)/1e8,
+      ]) },
+    }));
+    if (parsed.institutions.some(row => !linked.has(row.institutionName) && (row.items.find(item => item.type === 'bond_investment')?.usedAmount ?? 0) !== 0)) {
+      throw new CreditDatabaseError(400,'债券投资非零的机构缺少客户关联，无法登记二级买卖差额');
+    }
+    const reconciled = await client.query(`SELECT credit.append_diff($1::date,row.name,row.patch,$3) AS id
+      FROM jsonb_to_recordset($2::jsonb) AS row(name text,patch jsonb)`,
+      [parsed.reportDate,JSON.stringify(residuals),input.createdBy ?? null]);
+    const addedDiffCount = [...inserted.rows,...reconciled.rows].filter(row => row.id != null).length;
     const report = await loadCreditReport(client, parsed.reportDate);
     const warnings = [...(parsed.warnings ?? [])];
     for (const institution of report.institutions) {
@@ -92,12 +109,16 @@ function statesAt(rows: DiffRow[], date: string): Map<string, DiffRow> {
 function institutionView(state: DiffRow, date: string, links: ClientLink[], usage: UsageRow[]): CreditInstitutionView {
   const clients = links.filter(row => row.institution_name === state.institution_name).map(({id,name}) => ({id,name}));
   const items = creditItemTypes.map(type => {
-    const financing = type === 'yield_certificate' || type === 'interbank_lending';
+    const bond = type === 'bond_investment';
+    const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
     const limitAmount = nullableNumber(state[`${type}_limit`]);
-    const usedAmount = financing ? (clients.length ? usage.find(row => row.date === date && row.institution_name === state.institution_name && row.item_type === type)?.amount ?? 0 : null)
+    const onlineAmount = clients.length ? usage.find(row => row.date === date && row.institution_name === state.institution_name && row.item_type === type)?.amount ?? 0 : null;
+    const secondaryUsedAmount = nullableNumber(state.bond_investment_secondary_used) ?? 0;
+    const usedAmount = financing ? (onlineAmount == null ? null : sumAmounts([onlineAmount,bond ? secondaryUsedAmount : 0]))
       : nullableNumber(state[`${type}_used`]);
     return { type,limitAmount,usedAmount,remainingAmount:limitAmount == null || (financing && usedAmount == null) ? null : limitAmount-(usedAmount ?? 0),
-      details: (state[`${type}_detail`] as string | null) ?? null,usageSource:financing ? 'financing' as const : 'credit' as const,linkedClientCount:clients.length };
+      details: (state[`${type}_detail`] as string | null) ?? null,usageSource:bond ? 'bond_investors' as const : financing ? 'financing' as const : 'credit' as const,linkedClientCount:clients.length,
+      ...(bond ? {primaryUsedAmount:onlineAmount,secondaryUsedAmount} : {}) };
   });
   const totalLimit = nullableNumber(state.total);
   const totalUsed = clients.length ? sumAmounts(items.map(item => item.usedAmount)) : null;
@@ -127,7 +148,12 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
   const usageDates = (await client.query<{date:string}>(`SELECT DISTINCT to_char(v.date,'YYYY-MM-DD') AS date
     FROM financing.debt d JOIN credit.institution_client m ON m.client_id=d.client_id
     CROSS JOIN LATERAL (VALUES(d.activated_at),(d.maturity_date),(d.settled_at),(d.closed_at)) v(date)
-    WHERE d.debt_type IN ('收益凭证','同业拆借') AND v.date BETWEEN $1::date AND $2::date ORDER BY date`,[calendarStart,calendarEnd])).rows.map(row => row.date);
+    WHERE d.debt_type IN ('收益凭证','同业拆借') AND v.date BETWEEN $1::date AND $2::date
+    UNION SELECT DISTINCT to_char(v.date,'YYYY-MM-DD') AS date
+    FROM financing.bond b JOIN financing.bond_investors i ON i.bond_id=b.id
+    JOIN credit.institution_client m ON m.client_id=i.investor_id
+    CROSS JOIN LATERAL (VALUES(b.issue_date),(b.maturity_date),(b.settled_at),(b.closed_at)) v(date)
+    WHERE v.date BETWEEN $1::date AND $2::date ORDER BY date`,[calendarStart,calendarEnd])).rows.map(row => row.date);
   const eventDates = new Set(availableDates.filter(date => date <= reportDate || date >= calendarStart && date <= calendarEnd));
   for (const row of rows) if (row.expiry_date) eventDates.add(String(row.expiry_date));
   const snapshotDates = new Set([reportDate,...eventDates,...usageDates,...(previousDate ? [previousDate] : [])]);
@@ -138,7 +164,9 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
     CASE u.debt_type WHEN '收益凭证' THEN 'yield_certificate' ELSE 'interbank_lending' END AS item_type,
     (sum(u.amount)/100000000)::float8 AS amount
     FROM unnest($1::date[]) d(date) CROSS JOIN LATERAL financing.credit_usage_as_of(d.date) u
-    JOIN credit.institution_client m ON m.client_id=u.client_id GROUP BY d.date,m.institution_name,u.debt_type`,[financeDates])).rows;
+    JOIN credit.institution_client m ON m.client_id=u.client_id GROUP BY d.date,m.institution_name,u.debt_type
+    UNION ALL SELECT to_char(d.date,'YYYY-MM-DD'),u.institution_name,'bond_investment',(u.amount/100000000)::float8
+    FROM unnest($1::date[]) d(date) CROSS JOIN LATERAL credit.bond_primary_usage_as_of(d.date) u`,[financeDates])).rows;
   const cache = new Map<string,CreditInstitutionView[]>();
   const snapshot = (date:string) => {
     let value=cache.get(date);
@@ -188,11 +216,18 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
       const prior = before.get(institution.institutionName)?.items.find(row => row.type===item.type);
       // Missing client associations are unknown, not a zero balance.
       if (item.usedAmount == null || prior && prior.usedAmount == null) continue;
-      const delta = item.usedAmount-(prior?.usedAmount ?? 0);
-      if (Math.abs(delta)<=AMOUNT_TOLERANCE) continue;
-      calendarEvents.push({id:`usage:${institution.institutionName}:${item.type}:${date}`,date,type:'usage',kind:'usage',itemType:item.type,institutionName:institution.institutionName,
-        label:`${creditItemLabels[item.type]} · ${delta>=0?'增加':'减少'}${formatCalendarAmount(Math.abs(delta))}亿元`,
-        ...calendarState(date,reportDate,'usage')});
+      const components = item.type === 'bond_investment'
+        ? [{kind:'primary' as const,label:'债券投资——一级发行',delta:(item.primaryUsedAmount ?? 0)-(prior?.primaryUsedAmount ?? 0)},
+          {kind:'secondary' as const,label:'债券投资——二级买卖',delta:(item.secondaryUsedAmount ?? 0)-(prior?.secondaryUsedAmount ?? 0)}]
+        : [{kind:undefined,label:creditItemLabels[item.type],delta:item.usedAmount-(prior?.usedAmount ?? 0)}];
+      for (const component of components) {
+        const delta = component.delta;
+        if (Math.abs(delta)<=AMOUNT_TOLERANCE) continue;
+        calendarEvents.push({id:`usage:${institution.institutionName}:${item.type}:${component.kind ?? 'total'}:${date}`,date,type:'usage',kind:'usage',itemType:item.type,
+          ...(component.kind ? {usageComponent:component.kind} : {}),institutionName:institution.institutionName,
+          label:`${component.label} · ${delta>=0?'增加':'减少'}${formatCalendarAmount(Math.abs(delta))}亿元`,
+          ...calendarState(date,reportDate,'usage')});
+      }
     }
   }
   const weeklyNews=previousDate ? allNews.filter(event => event.reportDate>previousDate && event.reportDate<=reportDate) : [];
@@ -280,6 +315,13 @@ export function compareCreditSnapshots(
       const currentValue = current?.status === "approved"
         ? currentItem?.usedAmount ?? 0
         : 0;
+      if (type === 'bond_investment') {
+        for (const [field,label] of [['primaryUsedAmount','债券投资——一级发行'],['secondaryUsedAmount','债券投资——二级买卖']] as const) {
+          const before = previous?.status === 'approved' ? previousItem?.[field] ?? 0 : 0;
+          const after = current?.status === 'approved' ? currentItem?.[field] ?? 0 : 0;
+          if (different(before,after)) details.push(`${label}已用 ${amountTransition(before,after)}`);
+        }
+      }
       if (different(previousValue, currentValue)) {
         details.push(
           `${creditItemLabels[type]}已用 ${amountTransition(previousValue, currentValue)}`,

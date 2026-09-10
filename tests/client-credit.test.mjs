@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { installBondInvestors } from './helpers/credit-database.mjs';
 import { PGlite } from '@electric-sql/pglite';
 import { loadCreditReport, persistCreditWorkbook, saveCreditInstitution } from '../src/lib/server/credit-repository.ts';
 import { creditInstitutionUpdateSchema } from '../src/lib/credit/update.ts';
@@ -22,6 +23,7 @@ async function database(t, legacy = false) {
     ('^银行-申万宏源证券资产管理有限公司\\(代“申万宏源招行凭证一号单一资产管理计划','pattern',1,'实际投资人'),
     (public.normalize_client_name('银行-申万宏源证券资产管理有限公司（代“申万宏源招行凭证一号单一资产管理计划”）'),'exact',1,'实际投资人'),
     (public.normalize_client_name('银行-信银理财有限责任公司（代中银理财之乐赢稳健和信一年定开5期净值型人民币理财产品）'),'exact',2,'用户确认');`);
+  await installBondInvestors(db);
   for (const name of fs.readdirSync(new URL('../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
     if (!legacy || name < '0005') await db.exec(fs.readFileSync(new URL(`../credit-migrations/${name}`,import.meta.url),'utf8'));
   }
@@ -102,8 +104,9 @@ test('credit import keeps static manual mappings and automatically links clear n
 test('API rejects edits to derived total and financing usage but permits other components',()=>{
   const input=changes=>({reportDate:'2026-09-04',institutionName:'甲',changes});
   for(const type of ['yield_certificate','interbank_lending']) assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type,usedAmount:4}]})).success,false);
+  assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type:'bond_investment',secondaryUsedAmount:-4}]})).success,true);
   assert.equal(creditInstitutionUpdateSchema.safeParse(input({institution:{totalUsed:5}})).success,false);
-  assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type:'bond_investment',usedAmount:4}]})).success,true);
+  assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type:'bond_investment',usedAmount:4}]})).success,false);
 });
 
 test('incremental import preserves old principal, dates, client override, flows and balances, including repeated imports',async t=>{

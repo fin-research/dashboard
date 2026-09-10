@@ -11,11 +11,11 @@ import { investorShare, validInvestorDate } from '../../src/lib/financing/bond-i
 async function database(t) {
   const db = new PGlite(); t.after(() => db.close());
   for (const name of ['0001_financing_postgres.sql', '0007_detach_projects_from_debt.sql', '0015_income_certificate_dates_and_names.sql', '0028_client_master.sql', '0031_bank_client_identity.sql']) await db.exec(fs.readFileSync(new URL(`../../financing-migrations/${name}`, import.meta.url), 'utf8'));
-  for (const name of fs.readdirSync(new URL('../../credit-migrations/', import.meta.url)).filter(name => name.endsWith('.sql')).sort()) await db.exec(fs.readFileSync(new URL(`../../credit-migrations/${name}`, import.meta.url), 'utf8'));
   await db.exec(`CREATE ROLE authenticated; CREATE SCHEMA "authorization";
     CREATE FUNCTION "authorization".has_permission(code text) RETURNS boolean LANGUAGE sql AS $$ SELECT current_setting('test.can_read',true)='on' AND code='financing.data:read' $$;
     GRANT USAGE ON SCHEMA financing,"authorization" TO authenticated;`);
   await db.exec(fs.readFileSync(new URL('../../financing-migrations/0034_bond_investors.sql', import.meta.url), 'utf8'));
+  for (const name of fs.readdirSync(new URL('../../credit-migrations/', import.meta.url)).filter(name => name.endsWith('.sql')).sort()) await db.exec(fs.readFileSync(new URL(`../../credit-migrations/${name}`, import.meta.url), 'utf8'));
   return db;
 }
 async function bond(db, name = '债甲', amount = 300, dates = ['2026-01-01', '2027-01-01']) {

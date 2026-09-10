@@ -455,11 +455,11 @@
 
   function setItemAmount(
     index: number,
-    field: "limitAmount" | "usedAmount",
+    field: "limitAmount" | "usedAmount" | "secondaryUsedAmount",
     event: Event,
   ): void {
     if (!editor?.items[index]) return;
-    if (field === "usedAmount" && ["yield_certificate", "interbank_lending"].includes(editor.items[index].type)) return;
+    if (field === "usedAmount" && ["bond_investment", "yield_certificate", "interbank_lending"].includes(editor.items[index].type)) return;
     editor.items[index][field] = inputAmount(event);
     queueItemChange(index, field);
     scheduleEditorSave();
@@ -485,7 +485,7 @@
 
   function queueItemChange(
     index: number,
-    field: "limitAmount" | "usedAmount" | "details",
+    field: "limitAmount" | "usedAmount" | "secondaryUsedAmount" | "details",
   ): void {
     const item = editor?.items[index];
     if (!item) return;
@@ -858,8 +858,13 @@
                           <fieldset>
                             <legend>{creditItemLabels[item.type]}</legend>
                             <label><span>额度（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>
-                            <label><span>{item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><input class="input" type="number" step="0.000001" readonly={item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
-                            {#if item.type !== "other"}<label><span>可用（亿元）</span><input class="input" readonly value={formatAmount(item.limitAmount == null || (item.usageSource === "financing" && item.usedAmount == null) ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
+                            <label><span>{item.type === "bond_investment" ? "已用合计（亿元）" : item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><input class="input" type="number" step="0.000001" readonly={item.type === "bond_investment" || item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
+                            {#if item.type === "bond_investment"}
+                              <label><span>一级发行存续额（亿元）</span><input class="input" readonly value={formatAmount(item.primaryUsedAmount ?? null)} /></label>
+                              <label><span>债券投资——二级买卖（亿元）</span><input class="input" type="number" step="0.000001" value={item.secondaryUsedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "secondaryUsedAmount", event)} onblur={() => void flushEditor()} /></label>
+                              <p>已用合计＝一级发行存续额＋二级买卖净余额。净买入填正数，净卖出填负数。</p>
+                            {/if}
+                            {#if item.type !== "other"}<label><span>可用（亿元）</span><input class="input" readonly value={formatAmount(item.limitAmount == null || (item.usageSource !== "credit" && item.usedAmount == null) ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
                             <label><span>说明</span><input class="input" value={item.details ?? ""} oninput={(event) => setItemDetails(itemIndex, event)} onblur={() => void flushEditor()} /></label>
                           </fieldset>
                         {/each}

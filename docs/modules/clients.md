@@ -17,7 +17,7 @@
 
 `financing.credit_usage_as_of(date)` 读取已生效、截面日尚未到期/结清/关闭的收益凭证和同业拆借本金（元）。授信 repository 按静态客户关联汇总并转为亿元，未关联保持 NULL。
 
-授信存储与按日截面由 [授信工作台](credit-workbench.md) 维护：`credit.diff` 保存六项额度、四项人工已用及主体资料；两项融资已用不落库，总已用由六项有效分项派生。原 `institution`、`item`、`item_usage`、`institution_usage`、`usage_reconciliation` 已删除。导入时比较原表融资分项与台账余额并警告差异；`reconcile-client-usage.mjs` 输出各历史变更日的派生额及缺失关联，不再从旧表读取独立原始总额。
+授信存储与按日截面由 [授信工作台](credit-workbench.md) 维护：`credit.diff` 保存五项额度、法透/其它人工已用、债券二级买卖净余额及主体资料；债券一级发行、收益凭证和同业拆借使用额在线派生，总已用由五项有效分项合计。债券一级发行通过实际投资人 `bond_investors.investor_id` 使用同一静态客户归属。两融收益权转让归入其它。原 `institution`、`item`、`item_usage`、`institution_usage`、`usage_reconciliation` 已删除。导入时比较原表融资分项与台账余额并警告差异；`reconcile-client-usage.mjs` 输出各历史变更日的派生额及缺失关联，不再从旧表读取独立原始总额。
 
 银行与理财子分别建客户，即使授信合并也不把客户法人合并。营业部客户和具名投资产品可以有客户关联但没有银行授信，这是正常的业务范围差异。原始负债无交易对手时不创建虚拟投资人补齐关联。
 

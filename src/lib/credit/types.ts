@@ -2,7 +2,6 @@ export const creditItemTypes = [
   "bond_investment",
   "yield_certificate",
   "legal_overdraft",
-  "margin_income_rights",
   "interbank_lending",
   "other",
 ] as const;
@@ -13,7 +12,6 @@ export const creditItemLabels: Record<CreditItemType, string> = {
   bond_investment: "债券投资",
   yield_certificate: "收益凭证",
   legal_overdraft: "法透",
-  margin_income_rights: "两融收益权转让",
   interbank_lending: "同业拆借",
   other: "其它",
 };
@@ -66,8 +64,10 @@ export interface ParsedCreditWorkbook {
 }
 
 export interface CreditItemView extends ParsedCreditItem {
+  primaryUsedAmount?: number | null;
+  secondaryUsedAmount?: number | null;
   importedUsedAmount?: number | null;
-  usageSource?: "credit" | "financing";
+  usageSource?: "credit" | "financing" | "bond_investors";
   linkedClientCount?: number | null;
 }
 
@@ -152,6 +152,7 @@ export interface CreditCalendarEvent {
   institutionName: string;
   label: string;
   itemType?: CreditItemType;
+  usageComponent?: "primary" | "secondary";
   status: "upcoming" | "due" | "completed" | "revoked";
   statusLabel: string;
 }

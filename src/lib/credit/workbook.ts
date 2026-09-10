@@ -22,7 +22,6 @@ const itemColumns: Record<CreditItemType, {
   bond_investment: { limit: 9, used: 10, remaining: 11 },
   yield_certificate: { limit: 12, used: 13, remaining: 14 },
   legal_overdraft: { limit: 15, used: 16, remaining: 17 },
-  margin_income_rights: { limit: 18, used: 19, remaining: 20 },
   interbank_lending: { limit: 21, used: 22, remaining: 23 },
   other: { limit: null, used: 24, remaining: null, details: 25 },
 };
@@ -78,6 +77,11 @@ export function parseCreditWorkbook(
 
     const sourceRow = rowIndex + 1;
     const items = creditItemTypes.map((type) => parseItem(row, type));
+    // Legacy Excel keeps its original columns; retired margin-rights amounts belong to other.
+    const other = items.find(item => item.type === 'other')!;
+    other.limitAmount = finiteNumber(row[18]);
+    const marginUsed = finiteNumber(row[19]);
+    if (marginUsed != null) other.usedAmount = sumAmounts([other.usedAmount, marginUsed]);
     const totalLimit = finiteNumber(row[6]);
     const reportedTotalUsed = finiteNumber(row[7]);
     const totalUsed = sumAmounts(items.map((item) => item.usedAmount));

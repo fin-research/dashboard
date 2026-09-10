@@ -17,7 +17,8 @@ export function toCreditDiffPatch(changes: CreditInstitutionUpdateInput['changes
   for (const item of changes.items ?? []) {
     if ('limitAmount' in item) patch[`${item.type}_limit`] = item.limitAmount;
     if ('details' in item) patch[`${item.type}_detail`] = item.details;
-    if ('usedAmount' in item && item.type !== 'yield_certificate' && item.type !== 'interbank_lending') {
+    if (item.type === 'bond_investment' && 'secondaryUsedAmount' in item) patch.bond_investment_secondary_used = item.secondaryUsedAmount;
+    if ('usedAmount' in item && item.type !== 'bond_investment' && item.type !== 'yield_certificate' && item.type !== 'interbank_lending') {
       patch[`${item.type}_used`] = item.usedAmount;
     }
   }
@@ -25,7 +26,7 @@ export function toCreditDiffPatch(changes: CreditInstitutionUpdateInput['changes
 }
 
 export function toCreditImportPatch(institution: ParsedCreditInstitution): Record<string, unknown> {
-  return toCreditDiffPatch({
+  return { ...toCreditDiffPatch({
     institution: Object.fromEntries(Object.keys(institutionDiffFields).map(key =>
       [key, institution[key as keyof ParsedCreditInstitution] ?? null])),
     items: creditItemTypes.map(type => {
@@ -33,5 +34,5 @@ export function toCreditImportPatch(institution: ParsedCreditInstitution): Recor
       return { type, limitAmount: item?.limitAmount ?? null, details: item?.details ?? null,
         ...(type === 'yield_certificate' || type === 'interbank_lending' ? {} : { usedAmount: item?.usedAmount ?? null }) };
     }),
-  });
+  }), bond_investment_used: institution.items.find(item => item.type === 'bond_investment')?.usedAmount ?? null };
 }

@@ -39,12 +39,16 @@ const creditItemChangesSchema = z.object({
   type: z.enum(creditItemTypes),
   limitAmount: nullableLimit.optional(),
   usedAmount: nullableAmount.optional(),
+  secondaryUsedAmount: nullableAmount.optional(),
   details: nullableText(4_000).optional(),
 }).strict().superRefine((value, context) => {
-  if ((value.type === "yield_certificate" || value.type === "interbank_lending") && "usedAmount" in value) {
-    context.addIssue({ code: "custom", path: ["usedAmount"], message: "收益凭证和拆借使用额由融资台账计算，请维护负债数据" });
+  if (["bond_investment", "yield_certificate", "interbank_lending"].includes(value.type) && "usedAmount" in value) {
+    context.addIssue({ code: "custom", path: ["usedAmount"], message: "已用金额由线上数据计算；债券投资请登记二级买卖，收益凭证和拆借请维护负债数据" });
   }
-  if (!("limitAmount" in value) && !("usedAmount" in value) && !("details" in value)) {
+  if ("secondaryUsedAmount" in value && value.type !== "bond_investment") {
+    context.addIssue({ code: "custom", path: ["secondaryUsedAmount"], message: "仅债券投资可登记二级买卖" });
+  }
+  if (!("secondaryUsedAmount" in value) && !("limitAmount" in value) && !("usedAmount" in value) && !("details" in value)) {
     context.addIssue({
       code: "custom",
       message: "授信分项至少需要一个变更字段",
