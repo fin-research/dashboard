@@ -1,5 +1,6 @@
 import { Agent, isDurableObjectCodeUpdateReset, isPlatformTransientError } from "agents";
-import { answerCreditQuestion, recoverQueuedCreditAnswers } from "../src/lib/server/credit-assistant.ts";
+import { tracing } from "cloudflare:workers";
+import { answerCreditQuestion, recoverQueuedCreditAnswers, CREDIT_SCOPE_REFUSAL } from "../src/lib/server/credit-assistant.ts";
 import { loadCreditCorpus } from "../src/lib/server/credit-evidence.ts";
 import { AiGatewayResponseError } from "../src/lib/server/ai-gateway.ts";
 import { creditCustomerSelectionSchema, creditQuestionSchema, type CreditCustomer, type CreditSession, type CreditStage, type CreditCorpus } from "../src/lib/credit-assistant/types.ts";
@@ -10,6 +11,7 @@ import { CreditEventHub } from "../src/lib/server/credit-events.ts";
 import { appendCreditActivity } from "../src/lib/credit-assistant/progress.ts";
 import { CreditExecutionError, creditFailure } from "../src/lib/server/credit-errors.ts";
 import { creditCacheParts, type CreditRunCache } from "../src/lib/server/credit-checkpoint.ts";
+import { CreditTrace, type CreditSpan } from "../src/lib/server/credit-tracing.ts";
 
 export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   initialState: CreditSession = { turns: [], running: false, progress: "", error: null, startedAt: 0, pendingQuestion: "", customer: null };
@@ -171,20 +173,28 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   async answerQuestion(payload: { question: string; id: string }): Promise<void> {
     if (this.state.turns.some(t => t.id === payload.id)) return;
     if (!this.state.running || (this.state.questionId && this.state.questionId !== payload.id) || this.state.pendingQuestion !== payload.question || !this.state.customer) return;
+    const customer = this.state.customer;
+    const agentId = this.ctx.id.toString(); // Opaque DO ID, never the customer name or Auth0 subject.
+    const trace = new CreditTrace(tracing, { agentId, runId: payload.id,
+      conversationId: this.state.conversationId ?? `legacy-${agentId}` });
+    return trace.agent(span => this.executeAnswer(payload, customer, trace, span));
+  }
+
+  private async executeAnswer(payload: { question: string; id: string }, customer: CreditCustomer, trace: CreditTrace, span: CreditSpan): Promise<void> {
     const started = Date.now();
     let modelCalls = 0, searchCalls = 0;
     try {
       if (Date.now() - this.state.startedAt >= 12 * 60_000) throw new CreditExecutionError("deadline", "本次核对已达到总时限");
       // Submission verified this customer. The running turn uses that snapshot.
-      const customer = this.state.customer;
-      const corpus = await loadCreditCorpus(this.env.CREDIT).catch(() => { throw new CreditExecutionError("materials", "材料目录加载失败"); });
+      const corpus = await trace.tool("load_materials", {}, () => loadCreditCorpus(this.env.CREDIT)
+        .catch(() => { throw new CreditExecutionError("materials", "材料目录加载失败"); }));
       this.activeCorpus = corpus;
       console.log(JSON.stringify({ event: "credit_materials_loaded", run_id: payload.id, elapsed_ms: Date.now() - started }));
       const generated = await answerCreditQuestion({ question: payload.question, corpus, customer, history: this.state.turns,
         credentials: { accountId: this.env.CLOUDFLARE_ACCOUNT_ID, gatewayId: this.env.AI_GATEWAY_ID, token: this.env.CF_AIG_TOKEN },
         progress: (progress, stage) => this.progress(progress, stage),
         draft: text => this.draft(text),
-        runId: payload.id,
+        runId: payload.id, trace,
         cache: this.runCache(payload.id), startedAt: this.state.startedAt,
         operation: operation => {
           if (operation.operation === "search") searchCalls += operation.outcome === "cache" ? 0 : 1;
@@ -205,10 +215,14 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
       this.draftText = "";
       this.save({ ...this.state, turns: [...this.state.turns, { id: payload.id, question: payload.question, answer, createdAt: answer.createdAt }],
         running: false, progress: "", error: null, pendingQuestion: "" });
+      span.set({ "credit.outcome": answer.notice === CREDIT_SCOPE_REFUSAL ? "refused_scope"
+        : answer.disclosure?.blocked ? "refused_confidentiality" : answer.status });
     } catch (error) {
+      span.fail(error);
       // The SDK preserves one-shot schedules across platform resets. Do not
       // turn a deploy interruption into a failed user answer or write to a dead isolate.
       if (!(error instanceof AiGatewayResponseError) && isPlatformTransientError(error)) {
+        span.set({ "credit.outcome": "recovering" });
         console.warn(JSON.stringify({ event: "credit_answer_recovering", run_id: payload.id,
           reason: isDurableObjectCodeUpdateReset(error) ? "code_updated" : "platform_reset" }));
         this.events.finish();
@@ -224,6 +238,8 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
       const message = `${failure.message}（错误编号：${payload.id}）`;
       this.draftText = "";
       this.save({ ...this.state, running: false, progress: "", error: message });
+    } finally {
+      span.set({ "credit.model_calls": modelCalls, "credit.search_calls": searchCalls });
     }
   }
 }

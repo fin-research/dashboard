@@ -58,8 +58,8 @@ git diff --check
 
 - `wrangler.jsonc` 显式开启 `observability.traces.enabled`，采样率 `head_sampling_rate: 1`，并以 `persist: true` 保存至 Cloudflare Observability；原有日志配置不变。
 - 此开关作用于整个 `eastmoney-dashboard` Worker，而非仅授信助手。发布后的新请求可产生平台自动追踪（HTTP、binding 和 handler）；不会补录历史请求或把 DO 会话转换成追踪记录。
-- 在 `eastmoney-dashboard → Observability` 查看追踪。授信助手的自定义编排尚未增加 `invoke_agent`、`chat`、`execute_tool` 及 Agent/会话标识埋点；仅开启配置不等于完成“智能体”页面的业务追踪接入。接入要求见 [Cloudflare Agents tracing](https://developers.cloudflare.com/agents/runtime/operations/observability/tracing/#custom-harnesses)。
-- 本配置不增加问题、授信材料正文、提示词、模型输出或工具参数/结果的内容采集，也不配置外部导出目的地；后续自定义埋点默认只记录安全元数据。
+- 在 `eastmoney-dashboard → Observability` 查看平台追踪；授信助手已按 [Cloudflare Agents tracing](https://developers.cloudflare.com/agents/runtime/operations/observability/tracing/#custom-harnesses) 增加 `invoke_agent`、`chat`、`execute_tool` 与 Agent/会话标识，具体节点与边界见 [授信助手运行追踪](CREDIT_ASSISTANT.md#运行追踪)。
+- 追踪不增加问题、授信材料正文、提示词、模型输出或工具参数/结果的内容采集，也不配置外部导出目的地；自定义埋点只记录安全元数据。
 - 当前全量采样用于排障；高流量下可降低采样率以控制追踪事件量，额度与计费以 [Cloudflare Workers tracing](https://developers.cloudflare.com/workers/observability/traces/#limits--pricing) 为准。
 
 ## 文档维护

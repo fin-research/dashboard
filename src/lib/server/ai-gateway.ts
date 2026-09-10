@@ -40,6 +40,25 @@ export interface AiGatewayOptions {
   taskType: AiGatewayTaskType;
   tools?: readonly AiGatewayTool[];
   onTextDelta?: (delta: string) => void;
+  onTelemetry?: (metadata: AiGatewayTelemetry) => void;
+}
+
+/** Optional, payload-free response metadata. Missing usage remains unknown, not zero. */
+export interface AiGatewayTelemetry {
+  status?: number;
+  gatewayLogId: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedInputTokens?: number;
+  reasoningTokens?: number;
+}
+
+function notifyTelemetry(options: AiGatewayOptions, metadata: AiGatewayTelemetry) {
+  try { options.onTelemetry?.(metadata); } catch { /* Tracing cannot change retries or business output. */ }
+}
+
+function tokenCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
 export interface AiGatewayAttemptFailure {
@@ -321,6 +340,7 @@ async function runProvider<OUTPUT>(
   }
 
   const gatewayLogId = response.headers.get("cf-aig-log-id") ?? "";
+  notifyTelemetry(options, { status: response.status, gatewayLogId });
   let responseText: string;
   try {
     const maxBytes = options.taskType === "credit_answer" ? MAX_CREDIT_GATEWAY_RESPONSE_BYTES : MAX_AI_GATEWAY_RESPONSE_BYTES;
@@ -362,6 +382,13 @@ async function runProvider<OUTPUT>(
       `invalid Responses envelope: ${schemaErrorSummary(envelope.error)}`,
     );
   }
+  const usage = envelope.data.usage;
+  const outputDetails = usage?.output_tokens_details;
+  notifyTelemetry(options, { status: response.status, gatewayLogId,
+    inputTokens: tokenCount(usage?.input_tokens), outputTokens: tokenCount(usage?.output_tokens),
+    cachedInputTokens: tokenCount(usage?.input_tokens_details?.cached_tokens),
+    reasoningTokens: tokenCount(isObject(outputDetails) ? outputDetails.reasoning_tokens : undefined),
+  });
   if (envelope.data.status !== "completed") {
     const details =
       envelope.data.error?.message ??

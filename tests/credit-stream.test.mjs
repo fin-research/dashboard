@@ -54,13 +54,18 @@ test("Responses streaming delivers output before completion and excludes reasoni
 
 test("streaming gateway uses the existing provider and validates the completed business schema", async () => {
   const deltas = [];
-  const options = { taskType: "credit_answer", metadata: {}, promptCacheKey: "test-stream", requestTimeoutMs: 1000, onTextDelta: text => deltas.push(text) };
+  const telemetry = [];
+  const options = { taskType: "credit_answer", metadata: {}, promptCacheKey: "test-stream", requestTimeoutMs: 1000,
+    onTextDelta: text => deltas.push(text), onTelemetry: metadata => telemetry.push(metadata) };
   const response = value => new Response(byteStream(event({ type: "response.output_text.delta", delta: JSON.stringify(value) })
-    + event({ type: "response.completed", response: { status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(value) }] }] } })),
+    + event({ type: "response.completed", response: { status: "completed", usage: { input_tokens: 400, output_tokens: 40,
+      input_tokens_details: { cached_tokens: 200 }, output_tokens_details: { reasoning_tokens: 30 } },
+    output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(value) }] }] } })),
   { headers: { "content-type": "text/event-stream", "cf-aig-log-id": "stream-test" } });
   const output = await generateAiGatewayObject(credentials, [{ role: "user", content: "test" }], z.object({ ok: z.boolean() }), "test", options,
     async (url, init) => { assert.match(url, /custom-codex\/responses$/); assert.equal(JSON.parse(init.body).stream, true); return response({ ok: true }); });
   assert.deepEqual(output, { ok: true }); assert.equal(deltas.join(""), '{"ok":true}');
+  assert.deepEqual(telemetry.at(-1), { status: 200, gatewayLogId: "stream-test", inputTokens: 400, outputTokens: 40, cachedInputTokens: 200, reasoningTokens: 30 });
   await assert.rejects(generateAiGatewayObject(credentials, [], z.object({ ok: z.boolean() }), "test", options,
     async () => response({ ok: "wrong" })), /business schema/);
 });

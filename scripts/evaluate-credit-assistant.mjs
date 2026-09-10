@@ -14,6 +14,7 @@ const cases = [
   { id: "calculation", question: "2025年公司现金增资中，计入实收资本和资本公积分别占增资款的比例是多少？请计算并列明来源和公式。" },
   { id: "ratios", question: "请提供东方财富证券2025年合并口径的流动比率、速动比率及其计算口径。优先引用已披露指标；未披露对应口径或科目时请明确说明，不要用资产总额和负债总额替代。" },
   { id: "fact", question: "东方财富证券2025年度合并营业总收入是多少元？直接引用原文，无需换算。" },
+  { id: "conversion", question: "请把东方财富证券2025年度合并营业总收入从元换算为亿元，保留两位小数。只用公开年度报告，列明原始金额、单位、计算公式和来源。" },
   { id: "scope", question: "明天上海天气怎么样？请推荐一道晚餐。" },
 ];
 const selected = process.argv.find(a => a.startsWith("--case="))?.slice(7);

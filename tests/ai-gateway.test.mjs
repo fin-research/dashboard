@@ -48,6 +48,29 @@ function responsesOutput(value, status = "completed") {
   });
 }
 
+test("optional tracing metadata preserves missing usage and cannot turn successful responses into retries", async () => {
+  const received = [];
+  let calls = 0;
+  const result = await generateAiGatewayObject(credentials, [{ role: "user", content: "private question" }], z.object({ ok: z.boolean() }), "test",
+    { ...options, onTelemetry: metadata => { received.push(metadata); throw new Error("tracing collector failed"); } },
+    async () => { calls++; return responsesOutput({ ok: true }); });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(calls, 1);
+  assert.deepEqual(received.at(-1), { status: 200, gatewayLogId: "", inputTokens: undefined, outputTokens: undefined,
+    cachedInputTokens: 1024, reasoningTokens: undefined });
+  assert.doesNotMatch(JSON.stringify(received), /private question|output_text|summary|encrypted/);
+});
+
+test("incomplete Responses retain known token usage without treating invalid token counts as zero", async () => {
+  const received = [];
+  await assert.rejects(generateAiGatewayObject(credentials, [], z.object({ ok: z.boolean() }), "test",
+    { ...options, taskType: "credit_answer", onTelemetry: metadata => received.push(metadata) }, async () => Response.json({
+      status: "incomplete", output: [], usage: { input_tokens: 120, output_tokens: -1, output_tokens_details: { reasoning_tokens: "private text" } },
+    })), AiGatewayResponseError);
+  assert.deepEqual(received.at(-1), { status: 200, gatewayLogId: "", inputTokens: 120, outputTokens: undefined,
+    cachedInputTokens: undefined, reasoningTokens: undefined });
+});
+
 async function withoutAiLogs(run) {
   const originalLog = console.log;
   const originalWarn = console.warn;

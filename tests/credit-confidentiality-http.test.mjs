@@ -5,13 +5,14 @@ import ts from "typescript";
 import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
 import { CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
 import { creditAgentName } from "../src/lib/server/credit-session.ts";
+import { recordingCreditTracing } from "./helpers/credit-trace-recorder.mjs";
 
 // Execute the actual Worker handlers; replace only the Cloudflare runtime,
 // database transport and model transport, not routing or disclosure logic.
 const moduleUrl = code => `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
 const agents = moduleUrl(`export { isDurableObjectCodeUpdateReset, isPlatformTransientError } from ${JSON.stringify(new URL("../node_modules/agents/dist/retries.js", import.meta.url).href)};
 export class Agent {
-  constructor(ctx, env) { this.ctx = { storage: { transactionSync: operation => operation() } }; this.env = env; this.jobs = []; }
+  constructor(ctx, env) { this.ctx = { ...ctx, storage: { transactionSync: operation => operation() } }; this.env = env; this.jobs = []; }
   get state() { return this._state ??= structuredClone(this.initialState); }
   setState(state) { this._state = state; }
   async schedule(_delay, callback, payload) { this.jobs.push({callback,payload}); }
@@ -19,12 +20,13 @@ export class Agent {
   getQueues() { return []; }
 } export async function getAgentByName(binding, name) { return binding.get(name); }`);
 const postgres = moduleUrl("export async function withPostgres(_connection, _application, operation) { return operation(globalThis.creditTestClient); }");
-const assistant = moduleUrl(`export { recoverQueuedCreditAnswers } from ${JSON.stringify(new URL("../src/lib/server/credit-assistant.ts", import.meta.url).href)};
+const assistant = moduleUrl(`export { recoverQueuedCreditAnswers, CREDIT_SCOPE_REFUSAL } from ${JSON.stringify(new URL("../src/lib/server/credit-assistant.ts", import.meta.url).href)};
 export async function answerCreditQuestion(options) { return globalThis.creditTestAnswer(options); }`);
+const workers = moduleUrl(`export const tracing = {enterSpan(...args) {return globalThis.creditTestTracing.enterSpan(...args);}};`);
 async function workerModule(file) {
   const url = new URL(`../worker/${file}`, import.meta.url);
   const source = (await readFile(url, "utf8")).replace(/from "([^"]+)"/g, (_match, specifier) => `from ${JSON.stringify(
-    specifier === "agents" ? agents : specifier.endsWith("/postgres.ts") ? postgres : specifier.endsWith("/credit-assistant.ts") ? assistant : new URL(specifier, url).href)}`);
+    specifier === "agents" ? agents : specifier === "cloudflare:workers" ? workers : specifier.endsWith("/postgres.ts") ? postgres : specifier.endsWith("/credit-assistant.ts") ? assistant : new URL(specifier, url).href)}`);
   return import(moduleUrl(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText));
 }
 const { CreditAgent } = await workerModule("credit-agent.ts");
@@ -38,6 +40,8 @@ const origin = "https://test.example";
 
 const testUser = { id: "access-test", auth0Id: "auth0|test", email: "test@18.cn", issuedAt: 0, expiresAt: 9999999999 };
 function setup() {
+  const { tracing, spans } = recordingCreditTracing();
+  globalThis.creditTestTracing = tracing;
   const customers = new Map([["银行甲", { name: "银行甲", confidentialityStatus: true, reportDate: "2026-09-07" }],
     ["银行乙", { name: "银行乙", confidentialityStatus: false, reportDate: "2026-09-07" }]]);
   let unavailable = false;
@@ -58,7 +62,7 @@ function setup() {
     originalReads++;
     return { body: "file", size: 4, httpEtag: "test-etag", range: { offset: 0, length: 4 } };
   } }, CREDIT_AGENT: { get: name => {
-    if (!sessions.has(name)) { const agent = new CreditAgent({}, env); agent.fetch = request => agent.onRequest(request); sessions.set(name, agent); }
+    if (!sessions.has(name)) { const agent = new CreditAgent({ id: { toString: () => name } }, env); agent.fetch = request => agent.onRequest(request); sessions.set(name, agent); }
     return sessions.get(name);
   } } };
   let cookie = "";
@@ -74,7 +78,7 @@ function setup() {
     if (response.headers.get("set-cookie")) cookie = response.headers.get("set-cookie").split(";")[0];
     return response;
   }
-  return { customers, sessions, request, setUnavailable: () => { unavailable = true; }, originalReads: () => originalReads, customerReads: () => customerReads };
+  return { customers, sessions, request, spans, setUnavailable: () => { unavailable = true; }, originalReads: () => originalReads, customerReads: () => customerReads };
 }
 
 test("fresh customer selection needs no write or NDA lookup; first question verifies it server-side", async () => {
@@ -91,6 +95,13 @@ test("fresh customer selection needs no write or NDA lookup; first question veri
   await agent.answerQuestion(agent.jobs[0].payload);
   assert.equal(agent.state.turns[0].answer.notice, CREDIT_NDA_REQUIRED);
   assert.deepEqual(agent.state.turns[0].answer.files, []);
+  const root = app.spans.find(span => span.name === "invoke_agent CreditAgent");
+  assert.equal(root.attributes["credit.outcome"], "refused_confidentiality");
+  assert.equal(root.attributes["credit.model_calls"], 0);
+  assert.equal(root.attributes["gen_ai.conversation.id"], state.conversationId);
+  assert.equal(root.attributes["credit.run_id"], agent.jobs[0].payload.id);
+  assert.equal(app.spans.some(span => span.name.startsWith("chat ")), false);
+  assert.equal(root.ended, true);
 });
 
 test("a deployment reset is deferred to the SDK instead of becoming a generic failed answer", async () => {
@@ -104,6 +115,32 @@ test("a deployment reset is deferred to the SDK instead of becoming a generic fa
   assert.equal(agent.state.running, true);
   assert.equal(agent.state.error, null);
   assert.equal(agent.state.pendingQuestion, "查公司资产");
+  assert.equal(app.spans[0].attributes["credit.outcome"], "recovering");
+  assert.equal(app.spans[0].attributes["error.type"], "session_storage");
+  assert.equal(app.spans[0].ended, true);
+});
+
+test("turn tracing keeps conversation identity across follow-ups, changes it on new conversation, and marks scope refusal", async () => {
+  const app = setup();
+  globalThis.creditTestAnswer = options => answerCreditQuestion({ ...options, generate: async (_c, _m, schema) =>
+    schema.parse({ inScope: false, queries: [], attachments: [] }) });
+  for (let i = 0; i < 3; i++) {
+    if (i === 2) await app.request("session/new", { institutionName: "银行乙" });
+    await app.request("session", { institutionName: "银行乙", question: "敏感无关问题" });
+    const agent = [...app.sessions.values()].find(session => session.jobs.length);
+    await agent.answerQuestion(agent.jobs.at(-1).payload);
+    const before = app.spans.length;
+    await agent.answerQuestion(agent.jobs.at(-1).payload);
+    assert.equal(app.spans.length, before, "completed duplicate jobs do not create phantom runs");
+  }
+  const roots = app.spans.filter(span => span.name === "invoke_agent CreditAgent");
+  assert.equal(roots.length, 3);
+  assert.equal(roots[0].attributes["gen_ai.conversation.id"], roots[1].attributes["gen_ai.conversation.id"]);
+  assert.notEqual(roots[1].attributes["gen_ai.conversation.id"], roots[2].attributes["gen_ai.conversation.id"]);
+  assert.equal(new Set(roots.map(span => span.attributes["credit.run_id"])).size, 3);
+  assert.equal(new Set(roots.map(span => span.attributes["gen_ai.agent.id"])).size, 1);
+  assert.ok(roots.every(span => span.attributes["credit.outcome"] === "refused_scope"));
+  assert.doesNotMatch(JSON.stringify(app.spans.map(span => span.attributes)), /银行乙|auth0\||test@18.cn|敏感/);
 });
 
 test("cold-start institution options include the whole list, not just twenty search hits", async () => {

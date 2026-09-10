@@ -6,6 +6,7 @@ import { creditCorpusForCustomer, creditHistoryForCustomer, creditNdaRefusal } f
 import { creditDraftText } from "./credit-draft.ts";
 import { CreditExecutionError } from "./credit-errors.ts";
 import { creditCacheKey, type CreditRunCache } from "./credit-checkpoint.ts";
+import { CreditTrace, type CreditSpan } from "./credit-tracing.ts";
 
 export const CREDIT_SCOPE_REFUSAL = "我只能回答授信业务、公司数据及相关资料问题，无法处理与这些内容无关的请求。";
 export const CREDIT_SCOPE_PROMPT = `你是授信助手的请求路由器。一次完成范围判断与首轮检索规划，严格只返回符合Schema的JSON对象（inScope、queries、attachments），不加Markdown或说明文字。
@@ -94,8 +95,9 @@ export async function answerCreditQuestion(options: {
   customer: CreditCustomer;
   semanticSearch?: CreditSearch; progress?: (message: string, stage?: CreditStage) => void; generate?: CreditGenerate;
   draft?: (text: string) => void; runId?: string; operation?: (event: CreditOperation) => void;
-  cache?: CreditRunCache; startedAt?: number;
+  cache?: CreditRunCache; startedAt?: number; trace?: CreditTrace;
 }): Promise<CreditAnswer> {
+  const trace = options.trace ?? new CreditTrace();
   const corpus = creditCorpusForCustomer(options.corpus, options.customer);
   const history = creditHistoryForCustomer(options.history, options.corpus, options.customer).filter(t => t.answer.notice !== CREDIT_SCOPE_REFUSAL);
   const allowedIds = new Set(corpus.documents.map(d => d.id));
@@ -135,12 +137,21 @@ export async function answerCreditQuestion(options: {
         name, prompt: config.promptCacheKey, messages, schema: z.toJSONSchema(schema) });
       const cached = options.cache?.get(key);
       if (cached !== undefined) {
-        const value = schema.parse(JSON.parse(cached));
+        const value = await trace.tool("model_checkpoint", { "credit.stage": operation, "credit.step": metrics.step,
+          "credit.outcome": "cache" }, () => schema.parse(JSON.parse(cached)));
         options.operation?.({ ...metrics, durationMs: Date.now() - started, outcome: "cache" });
         return value;
       }
-      const value = await provider(credentials, messages, schema, name, { ...config,
-        metadata: { ...config.metadata, ...(options.runId ? { credit_run_id: options.runId } : {}) } });
+      const value = await trace.chat({ "credit.stage": operation, "credit.step": metrics.step, "credit.input_chars": metrics.inputChars }, async span => {
+        const value = await provider(credentials, messages, schema, name, { ...config,
+          metadata: { ...config.metadata, ...(options.runId ? { credit_run_id: options.runId } : {}) },
+          onTelemetry: metadata => { span.modelResponse(metadata); config.onTelemetry?.(metadata); },
+        });
+        if (operation === "review" && value && typeof value === "object" && "approved" in value && typeof value.approved === "boolean") {
+          span.set({ "credit.review_approved": value.approved });
+        }
+        return value;
+      });
       options.cache?.put(key, JSON.stringify(value));
       options.operation?.({ ...metrics, durationMs: Date.now() - started, outcome: "ok" });
       return value;
@@ -162,7 +173,8 @@ export async function answerCreditQuestion(options: {
   const warnings = new Set<string>();
   if (scope.attachments.some(restrictedId)) return deny();
   if (!scope.queries.length && scope.attachments.length && scope.attachments.every(id => allowedIds.has(id))) {
-    return release(finalizeCreditAnswer({ status: "complete", paragraphs: [], gaps: [], attachments: scope.attachments }, corpus, opened, calculations));
+    return release(await trace.tool("finalize_answer", {}, () => finalizeCreditAnswer(
+      { status: "complete", paragraphs: [], gaps: [], attachments: scope.attachments }, corpus, opened, calculations)));
   }
   const messages: AiGatewayMessage[] = [{ role: "system", content: CREDIT_PROMPT }, { role: "user", content: JSON.stringify({
     question: options.question, customer: options.customer, history: history.map(t => ({ question: t.question, answer: t.answer.paragraphs,
@@ -177,6 +189,9 @@ export async function answerCreditQuestion(options: {
   const searchCache = new Map<string, CreditBlock[]>();
   let semanticUnavailable = false;
   async function search(query: string) {
+    return trace.tool("search", { "credit.search_round": searchRounds }, span => searchWithinSpan(query, span));
+  }
+  async function searchWithinSpan(query: string, span: CreditSpan) {
     const started = Date.now();
     const key = query.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
     const checkpointKey = creditCacheKey({ kind: "search-v1", corpus: corpus.builtAt, customer: options.customer, key });
@@ -193,18 +208,25 @@ export async function answerCreditQuestion(options: {
       const sources = searchResultEvidence(corpus, parsed.hits);
       if (sources.length) {
         const result = sources;
+        span.set({ "credit.outcome": "cache", "credit.source_count": result.length });
         options.operation?.({ operation: "search", outcome: "cache", durationMs: Date.now() - started, sourceCount: result.length });
         return result;
       }
     }
     const cached = searchCache.get(key);
     if (cached) {
+      span.set({ "credit.outcome": "cache", "credit.source_count": cached.length });
       options.operation?.({ operation: "search", outcome: "cache", durationMs: 0, sourceCount: cached.length });
       return cached;
     }
     if (options.semanticSearch && !semanticUnavailable && checkpoint === undefined) {
       try {
-        const hits = await boundedSearch(options.semanticSearch, query, Math.min(CREDIT_SEARCH_TIMEOUT_MS, requestTimeout()));
+        const semanticSearch = options.semanticSearch;
+        const hits = await trace.tool("ai_search", {}, async searchSpan => {
+          const hits = await boundedSearch(semanticSearch, query, Math.min(CREDIT_SEARCH_TIMEOUT_MS, requestTimeout()));
+          searchSpan.set({ "credit.source_count": hits.length });
+          return hits;
+        });
         options.cache?.put(checkpointKey, JSON.stringify({ hits, fallback: false }));
         const forbidden = searchResultEvidence(restricted, hits);
         forbidden.forEach(b => forbiddenSearchIds.add(b.id));
@@ -213,6 +235,7 @@ export async function answerCreditQuestion(options: {
         if (semantic.length) {
           const sources = semantic;
           searchCache.set(key, sources);
+          span.set({ "credit.source_count": sources.length });
           options.operation?.({ operation: "search", outcome: "ok", durationMs: Date.now() - started, sourceCount: sources.length });
           return sources;
         }
@@ -223,9 +246,17 @@ export async function answerCreditQuestion(options: {
         warnings.add("语义检索暂不可用，本次使用材料全文精确检索。");
       }
     }
-    restrictedMatch ||= lexicalSearch(restricted, query, 1).length > 0;
-    const sources = lexicalSearch(corpus, query, 12);
+    span.set({ "credit.outcome": checkpoint !== undefined ? "cache" : "fallback",
+      "credit.fallback_reason": checkpoint !== undefined ? "checkpoint" : semanticUnavailable ? "unavailable"
+        : options.semanticSearch ? "no_allowed_results" : "not_configured" });
+    const sources = await trace.tool("lexical_search", {}, lexicalSpan => {
+      restrictedMatch ||= lexicalSearch(restricted, query, 1).length > 0;
+      const sources = lexicalSearch(corpus, query, 12);
+      lexicalSpan.set({ "credit.source_count": sources.length });
+      return sources;
+    });
     searchCache.set(key, sources);
+    span.set({ "credit.source_count": sources.length });
     options.operation?.({ operation: "search", outcome: "fallback", durationMs: Date.now() - started, sourceCount: sources.length });
     return sources;
   }
@@ -233,24 +264,27 @@ export async function answerCreditQuestion(options: {
   async function searchMany(queries: string[]) {
     searchRounds++;
     const unique = [...new Map(queries.map(query => [query.normalize("NFKC").replace(/\s+/g, "").toLowerCase(), query])).values()];
-    // At most three independent requests. Promise.allSettled drains all work before returning.
-    const results = await Promise.allSettled(unique.map(query => search(query)));
-    const failure = results.find(result => result.status === "rejected");
-    if (failure?.status === "rejected") throw failure.reason;
-    const batches = results.flatMap(result => result.status === "fulfilled" ? [result.value] : []);
-    const selected = new Map<string, CreditBlock>();
-    // Parallel retrieval must not multiply the model's per-round context budget.
-    // Round-robin across queries keeps their coverage; prefer unseen evidence.
-    // Select whole passages, never truncate text, tables or valid model inputs.
-    for (const fresh of [true, false]) {
-      for (let rank = 0; rank < 12 && selected.size < 12; rank++) {
-        for (const batch of batches) {
-          const block = batch[rank];
-          if (block && (!opened.has(block.id)) === fresh && selected.size < 12) selected.set(block.id, block);
+    return trace.tool("search_many", { "credit.search_round": searchRounds, "credit.query_count": unique.length }, async span => {
+      // At most three independent requests. Promise.allSettled drains all work before returning.
+      const results = await Promise.allSettled(unique.map(query => search(query)));
+      const failure = results.find(result => result.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
+      const batches = results.flatMap(result => result.status === "fulfilled" ? [result.value] : []);
+      const selected = new Map<string, CreditBlock>();
+      // Parallel retrieval must not multiply the model's per-round context budget.
+      // Round-robin across queries keeps their coverage; prefer unseen evidence.
+      // Select whole passages, never truncate text, tables or valid model inputs.
+      for (const fresh of [true, false]) {
+        for (let rank = 0; rank < 12 && selected.size < 12; rank++) {
+          for (const batch of batches) {
+            const block = batch[rank];
+            if (block && (!opened.has(block.id)) === fresh && selected.size < 12) selected.set(block.id, block);
+          }
         }
       }
-    }
-    return read([...selected.values()]);
+      span.set({ "credit.source_count": selected.size });
+      return read([...selected.values()]);
+    });
   }
   options.progress?.("正在定位材料与报告期", "retrieval");
   await searchMany(scope.queries.length ? scope.queries : [options.question]);
@@ -299,20 +333,24 @@ export async function answerCreditQuestion(options: {
       } else if (step.action === "read") {
         if (step.sourceIds.some(restrictedId)) return deny();
         options.progress?.("正在阅读原文与上下文", "read");
-        const blocks = [...new Map([...corpus.blocks, ...opened.values()].filter(b => step.sourceIds.includes(b.id)).map(b => [b.id, b])).values()];
-        const documentBlocks = corpus.blocks.filter(b => step.sourceIds.includes(b.documentId));
-        const relevant = lexicalSearch({ ...corpus, blocks: documentBlocks }, options.question, 8);
-        const neighbors = relevant.flatMap(block => {
-          const index = documentBlocks.findIndex(candidate => candidate.id === block.id);
-          return documentBlocks.slice(Math.max(0, index - 1), index + 2).filter(candidate => candidate.documentId === block.documentId);
+        await trace.tool("read", { "credit.step": turn + 1 }, span => {
+          const blocks = [...new Map([...corpus.blocks, ...opened.values()].filter(b => step.sourceIds.includes(b.id)).map(b => [b.id, b])).values()];
+          const documentBlocks = corpus.blocks.filter(b => step.sourceIds.includes(b.documentId));
+          const relevant = lexicalSearch({ ...corpus, blocks: documentBlocks }, options.question, 8);
+          const neighbors = relevant.flatMap(block => {
+            const index = documentBlocks.findIndex(candidate => candidate.id === block.id);
+            return documentBlocks.slice(Math.max(0, index - 1), index + 2).filter(candidate => candidate.documentId === block.documentId);
+          });
+          const sources = read([...new Map([...blocks, ...neighbors].map(block => [block.id, block])).values()]);
+          toolResults.push({ tool: "read", sourceIds: sources.map(source => source.id),
+            directory: documentBlocks.map(b => ({ sourceId: b.id, locator: b.locator, preview: b.text.slice(0, 180) })) });
+          span.set({ "credit.source_count": sources.length });
         });
-        const sources = read([...new Map([...blocks, ...neighbors].map(block => [block.id, block])).values()]);
-        toolResults.push({ tool: "read", sourceIds: sources.map(source => source.id),
-          directory: documentBlocks.map(b => ({ sourceId: b.id, locator: b.locator, preview: b.text.slice(0, 180) })) });
       } else if (step.action === "calculate") {
         if (step.calculation.inputs.some(i => restrictedId(i.sourceId))) return deny();
         options.progress?.("正在复算并记录数据来源", "calculate");
-        const result = calculateCredit(step.calculation, opened, `calc-${calculations.length + 1}`);
+        const result = await trace.tool("calculate", { "credit.step": turn + 1, "credit.calculation_index": calculations.length + 1,
+          "credit.input_count": step.calculation.inputs.length }, () => calculateCredit(step.calculation, opened, `calc-${calculations.length + 1}`));
         calculations.push(result);
         toolResults.push({ tool: "calculate", resultId: result.id });
       } else {
@@ -326,13 +364,20 @@ export async function answerCreditQuestion(options: {
           if (step.calculations.some(calculation => calculation.inputs.some(input => restrictedId(input.sourceId)))) return deny();
           options.progress?.("正在批量核算指标与来源", "calculate");
           // Validate the whole batch before committing it to the run evidence.
-          const batch = step.calculations.map((calculation, index) => calculateCredit(calculation, opened, `calc-${calculations.length + index + 1}`));
-          const resolved = calculatedCreditDraft(step.answer, [...calculations, ...batch]);
-          calculations.push(...batch);
-          step.answer = resolved;
+          await trace.tool("calculate_batch", { "credit.step": turn + 1, "credit.calculation_count": step.calculations.length }, async () => {
+            const batch: CreditCalculation[] = [];
+            for (const calculation of step.calculations) {
+              const index = calculations.length + batch.length + 1;
+              batch.push(await trace.tool("calculate", { "credit.calculation_index": index, "credit.input_count": calculation.inputs.length },
+                () => calculateCredit(calculation, opened, `calc-${index}`)));
+            }
+            const resolved = calculatedCreditDraft(step.answer, [...calculations, ...batch]);
+            calculations.push(...batch);
+            step.answer = resolved;
+          });
         }
         if (step.answer.attachments.some(restrictedId) || step.answer.paragraphs.some(p => p.citations.some(c => restrictedId(c.sourceId)))) return deny();
-        const answer = finalizeCreditAnswer(step.answer, corpus, opened, calculations);
+        const answer = await trace.tool("finalize_answer", { "credit.step": turn + 1 }, () => finalizeCreditAnswer(step.answer, corpus, opened, calculations));
         options.draft?.(answer.paragraphs.map(p => p.text).join("\n\n"));
         if (answer.paragraphs.length) {
           if (reviews >= 2) return insufficient("答复未通过证据复核，尚不能确认指标口径或数值，请补充相应报表及计算说明。");

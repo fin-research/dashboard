@@ -66,6 +66,20 @@ AI Search 没有可用结果、不可用或超时时，才使用 Worker 内存�
 
 流动比率/速动比率优先引用材料已披露值及其口径，直接引用不强制重算。自行计算时必须有相应科目和剔除项证据；未区分流动/非流动或未披露定义时明确缺口，不用总资产/总负债冒充流动比率。此优化不降低指定模型的max推理级别。
 
+## 运行追踪
+
+`worker/credit-agent.ts` 使用 Workers 原生 `tracing.enterSpan`，由 `src/lib/server/credit-tracing.ts` 包装自定义编排，不改用 AI SDK、Think 或其他模型 Provider。配置中的追踪开关与持久化必须保持开启。
+
+- 每个实际执行的问答 attempt 建立 `invoke_agent CreditAgent`，包含材料目录加载至最终答复保存的全过程。已完成或已失效的重复任务不建立虚假运行记录。
+- 范围规划、每个决策步骤及独立复核建立 `chat gpt-5.6-luna`，以 `credit.stage` 和 `credit.step` 区分。跨度覆盖完整响应读取、SSE 消费与业务 Schema 校验，而非只计首个响应头。只在上游实际提供时记录输入/输出、缓存输入和推理 token 数；缺失用量不写成零。
+- `execute_tool` 覆盖 `load_materials`、`search_many`、单查询 `search`、`ai_search`、`lexical_search`、`read`、`calculate`、`calculate_batch`、`finalize_answer` 和 `model_checkpoint`。多轮检索有轮次与查询数量，并行查询为同一检索轮下的兄弟节点；批量计算下每项确定性计算有单独节点，批量校验失败仍保持原有原子性。
+- 检查点复用模型输出记为 `model_checkpoint`，不伪造新的 `chat` 或重复计算 token 用量。检索检查点、语义检索空结果和故障回退分别标明；被拒绝的证据校验/计算只记录安全错误类别。
+- 根节点、模型及工具节点共享 `gen_ai.agent.name=CreditAgent`、`gen_ai.agent.id`（平台不透明 DO ID）、`gen_ai.conversation.id`（现有会话 UUID）及 `credit.run_id`（问题 UUID）。连续追问保持会话标识，新对话切换标识；旧会话缺少 UUID 时以 DO ID 的 `legacy-` 前缀作为稳定回退。模型保留 Gateway log ID，用于关联已有运行日志。
+- 根节点区分完成、部分答复、材料不足、范围拒答、保密拒答、异常与平台恢复。平台重置后的新 attempt 使用同一会话与问题编号；不会声称跨 alarm/重启的多次执行是一条连续 trace。原先单次模型尝试、总时限、权限判断、SSE 与持久化策略不变。
+- 不记录用户/客户名称、Auth0 subject、邮箱、问题、文件名/路径、材料原文、提示词、推理或答复文本、计算表达式/输入/结果、上游错误正文。自定义 span 只带固定标签、计数、耗时、安全错误类别和不透明标识。业务异常不穿过 `enterSpan` 回调，以免平台自动附带异常正文；关闭节点后原异常仍按原业务路径处理。埋点失败不重试业务回调、不吞掉原业务错误。
+
+发布后的新问答在 Cloudflare 智能体页面按 `CreditAgent` 识别；完整平台瀑布图在对应 Worker 的 Observability 查看。历史会话不补录，追踪不是无损聊天记录，也不提供正文回放。采样、平台限额和保留期仍适用，接口读取或页面验收未执行时不能以本地单元测试代替线上可见性验证。
+
 ## 证据规则
 
 - PDF 按实际文件页码定位，原生文本使用保留布局的提取；扫描页 OCR 后标记 `ocr`。Word 保留原文段落/表格顺序，引用“段落 N”或“表 N 第 M 行”；不虚构 Word 页码。Excel/XLS 按工作表、行和单元格地址保存，重复表头与单位上下文。XLSX 同时保留公式及缓存值，缺失缓存不当作零。
