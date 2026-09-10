@@ -70,6 +70,22 @@ test("pure material requests are routed directly without search or an answer/rev
   assert.equal(calls, 1); assert.equal(answer.files[0].id, doc.id);
 });
 
+test("three parallel queries share twelve complete evidence passages instead of tripling model context", async () => {
+  const queryCounts = new Map();
+  await answerCreditQuestion({ ...base, semanticSearch: async query => Array.from({ length: 12 }, (_, index) => ({ key: block.searchKey, text: `${query}: ${index}\n${text}` })),
+    generate: async (_credentials, messages, schema, name) => {
+      if (name === "credit_scope") return schema.parse(plan);
+      const sources = JSON.parse(messages[2].content).sources;
+      assert.equal(sources.length, 12);
+      for (const source of sources) {
+        assert.ok(source.text.endsWith(text));
+        const query = source.text.split(":")[0]; queryCounts.set(query, (queryCounts.get(query) ?? 0) + 1);
+      }
+      return schema.parse({ step: { action: "answer", answer: attachmentAnswer } });
+    } });
+  assert.deepEqual([...queryCounts.values()], [4, 4, 4]);
+});
+
 test("repeated searches are cached, evidence is not duplicated, and a stalled run must finalize", async () => {
   let searches = 0, decisions = 0;
   await answerCreditQuestion({ ...base, semanticSearch: async () => { searches++; return [{ key: block.searchKey, text }]; },
@@ -157,6 +173,22 @@ test("batch calculations cannot access a restricted source even when the model i
   assert.deepEqual(answer.calculations, []); assert.deepEqual(answer.files, []);
 });
 
+test("an answer that must become a fixed NDA refusal skips unnecessary model review", async () => {
+  const privateDoc = { ...doc, id: "private-doc", title: "内部数据.pdf", relativePath: "内部材料/内部数据.pdf", originalKey: "originals/内部材料/内部数据.pdf" };
+  const privateBlock = { ...block, id: "private-source", documentId: privateDoc.id };
+  let calls = 0;
+  const answer = await answerCreditQuestion({ ...base, corpus: { ...corpus, documents: [doc, privateDoc], blocks: [block, privateBlock] },
+    generate: async (_credentials, _messages, schema, name) => {
+      calls++;
+      if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
+      assert.equal(name, "credit_step", "no review call for a fixed refusal");
+      return schema.parse({ step: { action: "answer", answer: { status: "partial", paragraphs: [{ text: "流动资产120亿元", citations: [{ sourceId: block.id, quote: text }] }],
+        gaps: ["缺少进一步口径"], attachments: [] } } });
+    } });
+  assert.equal(calls, 2); assert.equal(answer.disclosure.blocked, true);
+  assert.deepEqual(answer.paragraphs, []);
+});
+
 test("failure messages distinguish upstream failures from material/deadline issues without exposing details", () => {
   for (const [status, message, code] of [[429, "token=secret", "model_busy"], [504, "timeout", "model_timeout"], [403, "private body", "model_configuration"], [200, "bad JSON", "model_output"], [502, "secret", "model_unavailable"]]) {
     const failure = creditFailure(new AiGatewayResponseError({ provider: "custom-codex", status, gatewayLogId: "log", retryable: true, message }));
@@ -191,6 +223,21 @@ test("a resumed run reuses successful model and search checkpoints but not an in
 test("recovery retains the original total deadline", async () => {
   await assert.rejects(answerCreditQuestion({ ...base, startedAt: Date.now() - 12 * 60_000,
     generate: async () => assert.fail("must not start another model budget") }), { code: "deadline" });
+});
+
+test("a completed review checkpoint is reusable after a restart despite the new completion timestamp", async t => {
+  t.mock.timers.enable({ apis: ["Date"] });
+  const stored = new Map();
+  const cache = { get: key => stored.get(key), put: (key, value) => stored.set(key, value) };
+  const first = await answerCreditQuestion({ ...base, cache, generate: async (_credentials, _messages, schema, name) => {
+    if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
+    if (name === "credit_review") return schema.parse({ approved: true, issues: [] });
+    return schema.parse({ step: { action: "answer", answer: { ...attachmentAnswer, paragraphs: [{ text: "流动资产120亿元", citations: [{ sourceId: block.id, quote: text }] }] } } });
+  } });
+  t.mock.timers.tick(1000);
+  const second = await answerCreditQuestion({ ...base, cache, generate: async () => assert.fail("all model results have already been checkpointed") });
+  assert.deepEqual(second.paragraphs, first.paragraphs);
+  assert.notEqual(second.createdAt, first.createdAt);
 });
 
 test("checkpoint chunks preserve Unicode and remain small enough for SQL values", () => {
