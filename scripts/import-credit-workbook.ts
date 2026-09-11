@@ -35,6 +35,7 @@ if (options.dryRun) {
     weeklyTotalUsed: parsed.weeklyTotalUsed,
     weeklyTotalAvailable: parsed.weeklyTotalAvailable,
     warnings: parsed.warnings,
+    amountSemantics: "空白不覆盖线上已登记金额；取消额度或清零已用请明确填0",
   }, null, 2));
   process.exit(0);
 }

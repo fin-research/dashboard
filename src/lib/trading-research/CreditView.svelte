@@ -24,6 +24,7 @@
     type CreditWeeklyNewsItem,
   } from "../credit/types.ts";
   import { compareCreditInstitutionOrder, matchesCreditStatus } from "../credit/presentation.ts";
+  import { creditEffectiveStatus, isCreditEffective, type CreditEffectiveStatus } from "../credit/validity.ts";
   import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
   import { creditInstitutionUpdateSchema } from "../credit/update.ts";
   import type {
@@ -64,7 +65,7 @@
   let loading = $state(true);
   let errorMessage = $state("");
   let query = $state("");
-  let statusFilter = $state<CreditStatus | "active" | "all">("active");
+  let statusFilter = $state<CreditEffectiveStatus | "active" | "all">("active");
   let riskFilter = $state("all");
   let expandedInstitution = $state<string | null>(null);
   let editor = $state<CreditInstitutionView | null>(null);
@@ -133,12 +134,12 @@
             .toLocaleLowerCase("zh-CN")
             .includes(normalizedQuery);
         const matchesStatus =
-          matchesCreditStatus(institution.status, statusFilter);
+          matchesCreditStatus(creditEffectiveStatus(institution), statusFilter);
         const matchesRisk =
           riskFilter === "all" ||
-          (riskFilter === "attention" && (institution.utilization ?? 0) >= 60) ||
-          (riskFilter === "warning" && (institution.utilization ?? 0) >= 80) ||
-          (riskFilter === "expiry" &&
+          (riskFilter === "attention" && isCreditEffective(institution) && (institution.utilization ?? 0) >= 60) ||
+          (riskFilter === "warning" && isCreditEffective(institution) && (institution.utilization ?? 0) >= 80) ||
+          (riskFilter === "expiry" && isCreditEffective(institution) &&
             Boolean(
               institution.expiryDate &&
                 daysBetween(currentReport.summary.reportDate, institution.expiryDate) >= 0 &&
@@ -176,7 +177,7 @@
     (report?.institutions ?? [])
       .filter(
         (institution) =>
-          institution.status === "approved" &&
+          isCreditEffective(institution) &&
           institution.utilization != null &&
           institution.totalLimit != null &&
           institution.totalLimit > 0,
@@ -203,7 +204,7 @@
     const alerts: CreditAlert[] = [];
     for (const institution of currentReport.institutions) {
       const utilization = institution.utilization ?? 0;
-      if (institution.status === "approved" && utilization >= 60) {
+      if (isCreditEffective(institution) && utilization >= 60) {
         alerts.push({
           id: `usage-${institution.institutionName}`,
           level: utilization >= 80 ? "critical" : "medium",
@@ -212,7 +213,7 @@
           text: `${institution.institutionName}授信额度使用率达到${utilization.toFixed(1)}%，${utilization >= 80 ? "已超过80%预警线" : "已超过60%关注线"}`,
         });
       }
-      if (institution.expiryDate) {
+      if (institution.expiryDate && isCreditEffective(institution)) {
         const remainingDays = daysBetween(
           currentReport.summary.reportDate,
           institution.expiryDate,
@@ -598,7 +599,7 @@
     institution: CreditInstitutionView,
     key: SortKey,
   ): string | number | null {
-    if (key === "status") return statusLabel(institution.status);
+    if (key === "status") return statusLabel(creditEffectiveStatus(institution));
     return institution[key];
   }
 
@@ -626,17 +627,19 @@
     window.print();
   }
 
-  function statusLabel(status: CreditStatus): string {
+  function statusLabel(status: CreditEffectiveStatus): string {
     return {
       approved: "已获批",
       applying: "申请中",
       revoked: "已撤销",
+      expired: "已到期",
+      pending: "未生效",
     }[status];
   }
 
-  function statusTone(status: CreditStatus): "success" | "warning" | "neutral" {
+  function statusTone(status: CreditEffectiveStatus): "success" | "warning" | "neutral" {
     if (status === "approved") return "success";
-    if (status === "applying") return "warning";
+    if (status === "applying" || status === "expired") return "warning";
     return "neutral";
   }
 
@@ -807,6 +810,8 @@
               <option value="active">未撤销</option>
               <option value="all">全部状态</option>
               <option value="approved">已获批</option>
+              <option value="expired">已到期</option>
+              <option value="pending">未生效</option>
               <option value="applying">申请中</option>
               <option value="revoked">已撤销</option>
             </select>
@@ -846,7 +851,7 @@
                 <td>{index + 1}</td>
                 <th scope="row">{institution.institutionName}</th>
                 <td>{institution.institutionType}</td>
-                <td><Badge tone={statusTone(institution.status)}>{statusLabel(institution.status)}</Badge></td>
+                <td><Badge tone={statusTone(creditEffectiveStatus(institution))}>{statusLabel(creditEffectiveStatus(institution))}</Badge></td>
                 <td class="is-numeric">{formatAmount(institution.totalLimit)}</td>
                 <td class="is-numeric">{formatAmount(institution.totalUsed)}</td>
                 <td class="is-numeric">{formatAmount(institution.availableAmount)}</td>
@@ -865,7 +870,8 @@
                       </div>
                       <div class="tr-credit-editor-grid">
                         <label><span>机构性质</span><input class="input" value={editor.institutionType} oninput={(event) => setEditorText("institutionType", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>授信状态</span><select class="select" value={editor.status} onchange={setEditorStatus}><option value="approved">已获批</option><option value="applying">申请中</option><option value="revoked">已撤销</option></select></label>
+                        <label><span>审批状态</span><select class="select" value={editor.status} onchange={setEditorStatus}><option value="approved">已获批</option><option value="applying">申请中</option><option value="revoked">已撤销</option></select></label>
+                        <label><span>截至所选日状态</span><input class="input" readonly value={statusLabel(creditEffectiveStatus(editor))} /></label>
                         <label class="tr-credit-checkbox"><input class="checkbox checkbox-primary" type="checkbox" checked={editor.confidentialityStatus} onchange={setEditorConfidentiality} /><span>已签署保密协议</span></label>
                         <label><span>授信总额（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={editor.totalLimit ?? ""} oninput={(event) => setEditorAmount("totalLimit", event)} onblur={() => void flushEditor()} /></label>
                         <label><span>已用额度（亿元）</span><input class="input" readonly value={formatAmount(editor.totalUsed)} /></label>
@@ -881,6 +887,7 @@
                         {#each editor.items as item, itemIndex (item.type)}
                           <fieldset>
                             <legend>{creditItemLabels[item.type]}</legend>
+                            <p>取消额度请填0；清零已用或二级净余额也请填0。空白不修改已登记金额。</p>
                             <label><span>额度（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>
                             <label><span>{item.type === "bond_investment" ? "已用合计（亿元）" : item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><input class="input" type="number" step="0.000001" readonly={item.type === "bond_investment" || item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
                             {#if item.type === "bond_investment"}

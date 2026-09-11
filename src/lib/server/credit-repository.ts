@@ -5,6 +5,7 @@ import { creditItemLabels, creditItemTypes, type CreditAmountChange, type Credit
 import { toCreditDiffPatch, toCreditImportPatch } from '../credit/diff.ts';
 import type { CreditInstitutionUpdateInput } from '../credit/update.ts';
 import { compareCreditInstitutionOrder } from '../credit/presentation.ts';
+import { creditEffectiveStatus, isCreditEffective } from '../credit/validity.ts';
 import { creditCustomerSchema, type CreditCustomer } from '../credit-assistant/types.ts';
 import type { DatabaseClient } from './postgres.ts';
 
@@ -69,6 +70,11 @@ export async function persistCreditWorkbook(client: DatabaseClient, input: Persi
     for (const institution of report.institutions) {
       const source = parsed.institutions.find(row => row.institutionName === institution.institutionName);
       if (!source) continue;
+      for (const item of institution.items) {
+        if (source.items.find(value => value.type === item.type)?.limitAmount == null && item.limitAmount != null && item.limitAmount !== 0) {
+          warnings.push(`${institution.institutionName}：${creditItemLabels[item.type]}额度原表空白，保留线上${item.limitAmount}亿元；取消额度请明确填0`);
+        }
+      }
       for (const type of ['yield_certificate','interbank_lending'] as const) {
         const actual = institution.items.find(item => item.type === type)?.usedAmount;
         const imported = source.items.find(item => item.type === type)?.usedAmount;
@@ -93,7 +99,7 @@ type ClientLink = { institution_name: string; id: string; name: string };
 type UsageRow = { date: string; institution_name: string; item_type: CreditItemType; amount: number };
 const auditFields = new Set(['id','institution_name','effective_on','created_at','created_by','updated_at']);
 
-function institutionView(state: DiffRow, date: string, clients: Array<{id:string;name:string}>, usage: Map<string,number>): CreditInstitutionView {
+function institutionView(state: DiffRow, date: string, clients: Array<{id:string;name:string}>, usage: Map<string,number>, previousPeriod?: CreditInstitutionView['previousPeriod']): CreditInstitutionView {
   const items = creditItemTypes.map(type => {
     const bond = type === 'bond_investment';
     const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
@@ -109,7 +115,9 @@ function institutionView(state: DiffRow, date: string, clients: Array<{id:string
   const totalLimit = nullableNumber(state.total);
   const totalUsed = clients.length ? sumAmounts(items.map(item => item.usedAmount)) : null;
   const availableAmount = totalLimit == null || totalUsed == null ? null : totalLimit-totalUsed;
-  return { reportDate:date,institutionName:state.institution_name,institutionType:state.institution_type as string,
+  const period = {reportDate:date,previousPeriod,status:state.status as CreditInstitutionView['status'],
+    effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null};
+  return { ...period,effectiveStatus:creditEffectiveStatus(period),institutionName:state.institution_name,institutionType:state.institution_type as string,
     confidentialityStatus:state.confidentiality_status === true,status:state.status as CreditInstitutionView['status'],
     totalLimit,totalUsed,totalRemaining:availableAmount,availableAmount,utilization:totalLimit && totalUsed != null ? totalUsed/totalLimit*100 : null,
     effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null,
@@ -162,6 +170,7 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
   // Walk sparse changes once in date order. Each rendered view is independent of later states.
   const cache = new Map<string,CreditInstitutionView[]>();
   const states = new Map<string,DiffRow>();
+  const priorPeriods = new Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>();
   let rowIndex = 0;
   for (const date of [...snapshotDates].sort()) {
     while (rowIndex < rows.length) {
@@ -169,12 +178,20 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
       if (!row || row.effective_on > date) break;
       rowIndex++;
       const state = states.get(row.institution_name) ?? {} as DiffRow;
+      if (state.status === 'approved' && state.effective_date && state.expiry_date &&
+        (row.effective_date != null && row.effective_date !== state.effective_date || row.expiry_date != null && row.expiry_date !== state.expiry_date)) {
+        const periods = priorPeriods.get(row.institution_name) ?? [];
+        periods.push({effectiveDate:String(state.effective_date),expiryDate:String(state.expiry_date)});
+        priorPeriods.set(row.institution_name,periods);
+      }
+      if (row.status === 'revoked' || row.status === 'applying') priorPeriods.delete(row.institution_name);
       for (const [key,value] of Object.entries(row)) {
         if (auditFields.has(key) || value != null) state[key] = value;
       }
       states.set(row.institution_name,state);
     }
-    cache.set(date,[...states.values()].map(state => institutionView(state,date,clientsByInstitution.get(state.institution_name) ?? [],usageByKey)));
+    cache.set(date,[...states.values()].map(state => institutionView(state,date,clientsByInstitution.get(state.institution_name) ?? [],usageByKey,
+      priorPeriods.get(state.institution_name)?.slice().reverse().find(period => period.effectiveDate <= date && period.expiryDate >= date))));
   }
   const snapshot = (date:string) => cache.get(date) ?? [];
   const current = snapshot(reportDate).sort(compareCreditInstitutionOrder);
@@ -251,11 +268,17 @@ export async function saveCreditInstitution(client: DatabaseClient,input: Credit
   await client.query('BEGIN');
   try {
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('credit.excel_import',0))");
-    const existing = await client.query('SELECT id FROM credit.state_as_of($1::date) WHERE institution_name=$2',[input.reportDate,input.institutionName]);
+    const existing = await client.query('SELECT * FROM credit.state_as_of($1::date) WHERE institution_name=$2',[input.reportDate,input.institutionName]);
     if (!create && !existing.rows.length) throw new CreditDatabaseError(404,'该授信记录不存在');
     if (create && existing.rows.length) throw new CreditDatabaseError(409,'该授信机构已存在，请在详情中维护');
+    const patch = toCreditDiffPatch(input.changes);
+    for (const [field,value] of Object.entries(patch)) {
+      if (value === null && (field === 'total' || field.endsWith('_limit') || field.endsWith('_used')) && existing.rows[0]?.[field] != null) {
+        throw new CreditDatabaseError(400,'空白不修改已登记金额；取消额度或清零已用请填0');
+      }
+    }
     await client.query('SELECT credit.append_diff($1::date,$2,$3::jsonb,$4) AS id',
-      [input.reportDate,input.institutionName,JSON.stringify(toCreditDiffPatch(input.changes)),createdBy]);
+      [input.reportDate,input.institutionName,JSON.stringify(patch),createdBy]);
     const report=await loadCreditReport(client,input.reportDate);
     await client.query('COMMIT');
     return {institution:report.institutions.find(row=>row.institutionName===input.institutionName)!,summary:report.summary,
@@ -313,16 +336,16 @@ export function compareCreditSnapshots(
     for (const type of creditItemTypes) {
       const previousItem = previous?.items.find((item) => item.type === type);
       const currentItem = current?.items.find((item) => item.type === type);
-      const previousValue = previous?.status === "approved"
+      const previousValue = previous && isCreditEffective(previous)
         ? previousItem?.usedAmount ?? 0
         : 0;
-      const currentValue = current?.status === "approved"
+      const currentValue = current && isCreditEffective(current)
         ? currentItem?.usedAmount ?? 0
         : 0;
       if (type === 'bond_investment') {
         for (const [field,label] of [['primaryUsedAmount','债券投资——一级发行'],['secondaryUsedAmount','债券投资——二级买卖']] as const) {
-          const before = previous?.status === 'approved' ? previousItem?.[field] ?? 0 : 0;
-          const after = current?.status === 'approved' ? currentItem?.[field] ?? 0 : 0;
+          const before = previous && isCreditEffective(previous) ? previousItem?.[field] ?? 0 : 0;
+          const after = current && isCreditEffective(current) ? currentItem?.[field] ?? 0 : 0;
           if (different(before,after)) details.push(`${label}已用 ${amountTransition(before,after)}`);
         }
       }
@@ -493,7 +516,7 @@ function toSummary(
   reportDate: string,
   institutions: CreditInstitutionView[],
 ): CreditSummaryView {
-  const approved = institutions.filter((institution) => institution.status === "approved");
+  const approved = institutions.filter(isCreditEffective);
   const totalLimit = sumAmounts(approved.map((institution) => institution.totalLimit));
   const totalUsed = sumAmounts(approved.map((institution) => institution.totalUsed));
   const totalAvailable = sumAmounts(
@@ -519,7 +542,7 @@ function amountForMode(
   institution: CreditInstitutionView | undefined,
   mode: "limit" | "usage",
 ): number {
-  if (institution?.status !== "approved") return 0;
+  if (!institution || !isCreditEffective(institution)) return 0;
   return mode === "limit"
     ? institution.totalLimit ?? 0
     : institution.totalUsed ?? 0;

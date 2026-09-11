@@ -1,4 +1,5 @@
-import type { CreditInstitutionView, CreditStatus } from './types.ts';
+import type { CreditInstitutionView } from './types.ts';
+import type { CreditEffectiveStatus } from './validity.ts';
 
 // Accept the existing workbook labels as aliases of the same business category.
 const typeOrder: Record<string, number> = {
@@ -24,6 +25,6 @@ export function compareCreditInstitutionOrder(
     || left.institutionName.localeCompare(right.institutionName, 'zh-CN', { numeric: true });
 }
 
-export function matchesCreditStatus(status: CreditStatus, filter: CreditStatus | 'active' | 'all' = 'active'): boolean {
+export function matchesCreditStatus(status: CreditEffectiveStatus, filter: CreditEffectiveStatus | 'active' | 'all' = 'active'): boolean {
   return filter === 'all' || (filter === 'active' ? status !== 'revoked' : status === filter);
 }
