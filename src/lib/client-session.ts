@@ -19,6 +19,12 @@ export function createClientSession(
     value = next;
     store.set(next);
   }
+  function seedFromServer(next: ClientSessionData) {
+    // A page load is not a new login. Keep the login's presentation permissions
+    // until a new token/session or an explicit refresh supplies a new snapshot.
+    if (value?.user && next.user?.id === value.user.id && next.expiresAt === value.expiresAt) return;
+    seed(next);
+  }
   function current() {
     if (value?.user && (!value.expiresAt || value.expiresAt * 1000 <= now())) return null;
     return value;
@@ -45,5 +51,5 @@ export function createClientSession(
     })().finally(() => { pending = null; });
     return pending;
   }
-  return { subscribe: store.subscribe, seed, current, load };
+  return { subscribe: store.subscribe, seed, seedFromServer, current, load };
 }

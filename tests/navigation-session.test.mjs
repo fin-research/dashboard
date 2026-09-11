@@ -181,3 +181,12 @@ test('popup login resumes the requested SPA route once and rechecks newly acquir
     assert.equal(cancelled, 1); assert.equal(resumed.length, permissions.length ? 1 : 0); assert.equal(errors.length, permissions.length ? 0 : 1);
   }
 });
+
+test('ordinary SSR refresh preserves login permissions, while a new token replaces the snapshot', () => {
+  const state=createClientSession(authenticated,async()=>{throw Error('no session fetch expected')},()=>1000000);
+  state.seedFromServer({...authenticated,permissions:[]});
+  assert.deepEqual(state.current().permissions,authenticated.permissions);
+  state.seedFromServer({...authenticated,expiresAt:authenticated.expiresAt+60,permissions:['account.profile:read']});
+  assert.deepEqual(state.current().permissions,['account.profile:read']);
+  state.seedFromServer(anonymous);assert.equal(state.current().user,null);
+});

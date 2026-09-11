@@ -44,7 +44,7 @@
 
 `src/lib/permissions.ts` 与 `route-permissions.ts` 是 Gateway 生成的前端展示契约，供菜单与导航使用；不可作为服务端授权输入。修改权限在 Gateway 完成，再同步契约。`locals.user.id` 与 `auth0Id` 均为 Auth0 subject，业务负责人只用 Auth0 ID，不能按邮箱/姓名关联。
 
-客户端会话只由根 layout 实例持有，不跨 SSR 请求共享，不写 localStorage。公开首屏经 `/auth/session` 初始化一次，普通导航复用展示快照；过期和明确角色变更时刷新。其他终端的旧菜单不构成服务端授权，Gateway 对每个业务请求实时核对账号/角色和权限。
+客户端会话只由根 layout 实例持有，不跨 SSR 请求共享，不写 localStorage。公开首屏经 `/auth/session` 初始化一次，普通导航复用展示快照；过期和明确角色变更时刷新。相同 token 的 SSR 导航不覆盖登录时的权限展示快照，403 不额外刷新会话。角色成员变更后从个人资料页“刷新登录状态”重新走授权码流程取得新 token，或重新登录。其他终端的旧菜单不构成服务端授权；Gateway 使用已签名 JWT 的角色，每个业务请求实时查询 permission 表（内测全权限例外保留），普通准入不查询 Auth0 Management API。
 
 Dashboard 不持有 `AUTHORIZATION_DB` 或 Auth0 管理 Secret。`/management/people` 保留界面、草稿、版本和错误响应，通过私有 Gateway 服务读写。Gateway 在无缓存权限连接中完成角色锁、版本检查和事务，未知角色/权限失败关闭；配置不会改变当前 beta-open 模式。
 

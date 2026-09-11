@@ -76,6 +76,7 @@
   <header class="profile-header">
     <a class="btn btn-ghost btn-square profile-back" href="/" aria-label="返回市场研究门户"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4-6 6 6 6" /></svg></a>
     <h1>个人管理</h1>
+    <a class="btn btn-outline profile-button" href="/auth/login?returnTo=%2Fprofile">刷新登录状态</a>
     <form class="logout-form" method="post" action="/auth/logout"><button class="btn btn-outline profile-button" type="submit">退出登录</button></form>
   </header>
   <main class="profile-content">

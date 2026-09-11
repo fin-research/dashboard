@@ -21,7 +21,7 @@
   setContext(CLIENT_SESSION_CONTEXT, session);
   setContext('site-account', () => $session?.account ?? null);
   setContext('site-account-checking', () => $session === null);
-  $effect(() => { if (data.session) session.seed(data.session); });
+  $effect(() => { if (data.session) session.seedFromServer(data.session); });
 
   beforeNavigate(createClientNavigationGuard(session, {
     origin: () => page.url.origin,

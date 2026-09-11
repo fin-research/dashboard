@@ -98,8 +98,8 @@ export function withAuthInteraction(fetcher: typeof fetch, currentUrl: () => str
     if (response.status === 403 && ui) {
       const error = await response.clone().json().catch(() => null);
       ui.error(error?.detail || '当前角色无权执行此操作');
-      // Permissions can be revoked while the page is open. Refresh presentation only.
-      void ui.session.load(true).catch(() => {});
+      // The server has the current permission table. Keep the login snapshot
+      // until the user explicitly refreshes login state; never retry a denied write.
       if (isData || headers.get('x-sveltekit-action') === 'true') return failure(403, error?.detail || '当前角色无权执行此操作', 'ACCESS_DENIED');
     }
     return response;
