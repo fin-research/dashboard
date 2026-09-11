@@ -11,7 +11,7 @@ import {
   type AiGatewayCredentials,
 } from "./ai-gateway.ts";
 
-const AI_SEARCH_MCP_URL = "https://search.hasbai.xyz/mcp";
+const AI_SEARCH_MCP_URL = "https://research.hasbai.xyz/mcp";
 const AI_SEARCH_MAX_RESULTS = 50 as const;
 const MAX_MCP_RESPONSE_BYTES = 6 * 1024 * 1024;
 const MAX_SOURCE_DOCUMENTS = 24;

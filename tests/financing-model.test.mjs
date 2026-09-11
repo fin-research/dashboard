@@ -19,6 +19,7 @@ import {
 } from "../src/lib/server/financing-model-repository.ts";
 import {
   aiSearchPeriod,
+  generateFinancingModelResearch,
   buildAiSearchToolCall,
   parseAiSearchResponse,
 } from "../src/lib/server/financing-model-research.ts";
@@ -724,3 +725,16 @@ function chunk(source, title, text) {
     },
   };
 }
+
+
+test("sell-side calls the current research MCP and reports upstream failures", async () => {
+  const calls = [];
+  await assert.rejects(generateFinancingModelResearch(snapshot(), {}, async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body) });
+    return new Response("unavailable", { status: 503 });
+  }), /HTTP 503/);
+  assert.equal(calls[0].url, "https://research.hasbai.xyz/mcp");
+  assert.equal(calls[0].body.params.name, "search");
+  assert.equal(calls[0].body.params.arguments.ai_search_options.retrieval.max_num_results, 50);
+  assert.deepEqual(calls[0].body.params.arguments.ai_search_options.retrieval.filters.type, { $eq: "研报" });
+});

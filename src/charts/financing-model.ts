@@ -147,8 +147,8 @@ export function renderFinancingGauge(
           lineStyle: {
             width: 12,
             color: [
-              [0.25, "#74bdb3"],
-              [0.5, "#edc27a"],
+              [1 / 3, "#74bdb3"],
+              [2 / 3, "#edc27a"],
               [1, "#de8a84"],
             ],
           },

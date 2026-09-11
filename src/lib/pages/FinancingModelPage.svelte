@@ -26,19 +26,11 @@
     timingDecisionRecordSchema,
     type FinancingModelConclusion,
     type FinancingModelReport,
-    type FinancingModelVersion,
     type TimingDecisionRecord,
   } from "$lib/financing-model";
   import { globalMessages } from "$lib/global-messages";
   import { portal } from "$lib/portal";
   import type { MetricIconName } from "../../view-model";
-
-  const VERSION_TIME_FORMATTER = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
 
   let report: FinancingModelReport | null = null;
   let loading = true;
@@ -471,7 +463,7 @@
     end: string | null,
   ): string {
     if (!start || !end) return "—";
-    return `${start.replaceAll("-", ".")}–${end.replaceAll("-", ".")}`;
+    return `${start.slice(0, 7).replace("-", "/")}\n${end.slice(0, 7).replace("-", "/")}`;
   }
 
   function displayDate(value: string): string {
@@ -479,16 +471,6 @@
     return `${year}年${Number(month)}月${Number(day)}日`;
   }
 
-  function versionLabel(
-    version: FinancingModelVersion,
-    availableVersions: FinancingModelVersion[],
-  ): string {
-    const sameDateCount = availableVersions.filter(
-      (candidate) => candidate.asOfDate === version.asOfDate,
-    ).length;
-    if (sameDateCount === 1) return version.asOfDate;
-    return `${version.asOfDate} · ${VERSION_TIME_FORMATTER.format(new Date(version.generatedAt))}`;
-  }
 
 </script>
 
@@ -518,7 +500,7 @@
           disabled={loadingVersion}
         >
           {#each versions as version (version.runId)}
-            <option value={version.runId}>{versionLabel(version, versions)}</option>
+            <option value={version.runId}>{version.asOfDate}</option>
           {/each}
         </select>
       </label>
@@ -669,16 +651,18 @@
             </ModuleCard>
             <ModuleCard class="product-result" labelledBy="product-result-title">
               <PanelHeading id="product-result-title" title="模型推荐" />
-              <strong class="product-result-name">{productRecommendation.recommended_product}</strong>
-              {#if recommendedScenario}
-                <span class={`recommendation-badge recommendation-badge--${recommendedScenario.recommendation}`}>
-                  {recommendedScenario.recommendation_label}
-                </span>
-                <p>
-                  相对同类债中位数 {formatSigned(recommendedScenario.pred_bp, 2)} bp · 历史
-                  P{recommendedScenario.historical_percentile.toFixed(0)}
-                </p>
-              {/if}
+              <div class="product-result-body">
+                <strong class="product-result-name">{productRecommendation.recommended_product}</strong>
+                {#if recommendedScenario}
+                  <span class={`recommendation-badge recommendation-badge--${recommendedScenario.recommendation}`}>
+                    {recommendedScenario.recommendation_label}
+                  </span>
+                  <dl class="product-result-metrics">
+                    <div><dt>相对同类债中位数</dt><dd>{formatSigned(recommendedScenario.pred_bp, 2)} <span>bp</span></dd></div>
+                    <div><dt>历史分位</dt><dd>P{recommendedScenario.historical_percentile.toFixed(0)}</dd></div>
+                  </dl>
+                {/if}
+              </div>
             </ModuleCard>
           </div>
         </section>
@@ -751,7 +735,7 @@
                     </span>
                   </button>
                 </div>
-                <dd>{metric.value}</dd>
+                <dd class:sample-range={metric.label === "样本区间"}>{metric.value}</dd>
               </div>
             {/each}
             </dl>
@@ -1163,7 +1147,7 @@
   }
 
   .decision-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .driver-grid {
@@ -1171,11 +1155,11 @@
   }
 
   .product-layout {
-    grid-template-columns: minmax(0, 2.25fr) minmax(260px, 0.75fr);
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
   }
 
   .supporting-grid {
-    grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.8fr);
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
   }
 
   .window-card-body {
@@ -1229,6 +1213,7 @@
     font-size: 0.875rem;
     font-weight: bold;
     line-height: 1;
+    white-space: nowrap;
   }
 
   .recommendation-badge--strong_buy {
@@ -1246,7 +1231,7 @@
     background: #fef3f2;
   }
 
-  .conclusion-card {
+  :global(.conclusion-card) {
     display: grid;
     align-content: start;
     gap: 12px;
@@ -1257,7 +1242,7 @@
     margin-top: 4px;
   }
 
-  .chart-card {
+  :global(.chart-card) {
     min-width: 0;
   }
 
@@ -1284,14 +1269,45 @@
     margin-top: 8px;
   }
 
-  .product-result {
+  :global(.product-result) {
+    display: flex;
+    flex-direction: column;
+    border-color: color-mix(in srgb, var(--brand) 30%, var(--line));
+    background: color-mix(in srgb, var(--brand-soft) 32%, var(--surface));
+  }
+
+  .product-result-body {
     display: grid;
     align-content: center;
     justify-items: start;
-    gap: 14px;
-    border-color: color-mix(in srgb, #2f6fed 30%, var(--line));
-    background: color-mix(in srgb, #eaf1fd 46%, var(--surface));
+    flex: 1;
+    gap: 16px;
+    padding-block: 16px;
   }
+
+  .product-result-metrics {
+    display: grid;
+    width: 100%;
+    gap: 16px;
+    margin: 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .product-result-metrics dt {
+    color: var(--text-2);
+    font-size: 0.875rem;
+  }
+
+  .product-result-metrics dd {
+    margin: 4px 0 0;
+    color: var(--brand-deep);
+    font-size: 1.25rem;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .product-result-metrics dd span { font-size: 0.875rem; }
 
   .product-result-name {
     color: #173b78;
@@ -1304,11 +1320,11 @@
     align-items: center;
   }
 
-  .forecast-panel {
+  :global(.forecast-panel) {
     min-width: 0;
   }
 
-  .validation-panel {
+  :global(.validation-panel) {
     display: grid;
     align-content: start;
     gap: 14px;
@@ -1316,36 +1332,43 @@
 
   .validation-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: 0;
     margin: 0;
   }
 
   .validation-grid > div {
+    display: flex;
     min-width: 0;
-    padding: 12px;
-    border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--panel) 72%, var(--surface));
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-block: 4px;
+    border-bottom: 1px solid var(--border-color);
   }
 
-  .validation-label {
-    gap: 4px;
-  }
+  .validation-grid > div:last-child { border-bottom: 0; }
+
+  .validation-label { gap: 0; }
 
   .validation-grid dt {
-    color: var(--text-3);
+    color: var(--text-2);
     font-size: 0.875rem;
-    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  .validation-grid dd.sample-range {
+    white-space: pre-line;
+    font-size: 0.875rem;
   }
 
   .validation-grid dd {
-    margin: 6px 0 0;
-    color: #173b78;
+    margin: 0;
+    color: var(--brand-deep);
     font-size: 1.125rem;
-    font-weight: bolder;
+    font-weight: bold;
     font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
+    text-align: right;
   }
 
   .info-tip {
@@ -1706,6 +1729,7 @@
     }
 
     .decision-grid,
+    .driver-grid,
     .product-layout,
     .supporting-grid {
       grid-template-columns: 1fr;
@@ -1805,15 +1829,15 @@
     }
 
     .decision-grid {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .product-layout {
-      grid-template-columns: minmax(0, 2.25fr) minmax(260px, 0.75fr);
+      grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
     }
 
     .supporting-grid {
-      grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.8fr);
+      grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
     }
 
     .business-metric-grid {
