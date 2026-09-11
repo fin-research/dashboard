@@ -10,8 +10,9 @@ export async function creditDatabase(t, beforeDiff = false, beforeBond = false) 
     await db.exec(fs.readFileSync(new URL(`../../financing-migrations/${name}`,import.meta.url),'utf8'));
   }
   await installBondInvestors(db);
+  await db.exec('CREATE SCHEMA IF NOT EXISTS credit; CREATE TABLE credit.schema_migration(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
   for (const name of fs.readdirSync(new URL('../../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
-    if ((!beforeDiff || name < '0008') && (!beforeBond || name < '0009')) await db.exec(fs.readFileSync(new URL(`../../credit-migrations/${name}`,import.meta.url),'utf8'));
+    if ((!beforeDiff || name < '0008') && (!beforeBond || name < '0009')) await applyCreditMigration(db,name);
   }
   return db;
 }
@@ -29,4 +30,13 @@ export async function seedCredit(db,date='2026-08-21',name='甲银行',patch={})
     institution_type:'股份行',status:'approved',confidentiality_status:false,total:10,
     bond_investment_secondary_used:3,bond_investment_limit:4,effective_date:'2026-01-01',expiry_date:'2026-08-30',...patch
   }),'auth0|test']);
+}
+
+export async function applyCreditMigration(db,name) {
+  await db.exec('BEGIN');
+  try {
+    await db.exec(fs.readFileSync(new URL(`../../credit-migrations/${name}`,import.meta.url),'utf8'));
+    await db.query('INSERT INTO credit.schema_migration(name) VALUES ($1)',[name]);
+    await db.exec('COMMIT');
+  } catch(error) { await db.exec('ROLLBACK');throw error; }
 }

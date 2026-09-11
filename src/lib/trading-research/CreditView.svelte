@@ -25,6 +25,7 @@
   } from "../credit/types.ts";
   import { compareCreditInstitutionOrder, matchesCreditStatus } from "../credit/presentation.ts";
   import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
+  import { creditInstitutionUpdateSchema } from "../credit/update.ts";
   import type {
     CreditInstitutionChanges,
     CreditInstitutionUpdateInput,
@@ -339,6 +340,17 @@
 
   async function flushEditor(): Promise<void> {
     if (saveInFlight || !editor || !hasPendingChanges()) return;
+    // Native date inputs emit change while the year/month/day is still being typed.
+    if (document.activeElement?.matches('[data-credit-date]')) return;
+    const validation = creditInstitutionUpdateSchema.safeParse({
+      reportDate: editor.reportDate, institutionName: editor.institutionName,
+      changes: { institution: pendingInstitutionChanges, items: [...pendingItemChanges.values()] },
+    });
+    if (!validation.success || editor.effectiveDate && editor.expiryDate && editor.effectiveDate > editor.expiryDate) {
+      saveState = "error";
+      saveMessage = !validation.success ? "请填写完整有效的授信日期或金额" : "授信到期日不能早于生效日，请继续调整起止日期";
+      return;
+    }
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = null;
     const target = {
@@ -414,7 +426,7 @@
     if (!editor) return;
     const value = (event.currentTarget as HTMLInputElement | HTMLTextAreaElement).value;
     if (field === "institutionType") editor[field] = value;
-    else editor[field] = value === "" ? null : value;
+    else editor[field] = value;
     queueInstitutionChange(field, editor[field]);
     scheduleEditorSave();
   }
@@ -429,14 +441,26 @@
     scheduleEditorSave();
   }
 
-  function setEditorDate(
-    field: "effectiveDate" | "expiryDate",
-    event: Event,
-  ): void {
+  function editDate(): void {
+    // Preserve the in-progress input if an earlier save completes while typing.
+    editorVersion += 1;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+
+  function setEditorDate(field: "effectiveDate" | "expiryDate", event: Event): void {
     if (!editor) return;
-    editor[field] = (event.currentTarget as HTMLInputElement).value || null;
-    queueInstitutionChange(field, editor[field]);
-    scheduleEditorSave(true);
+    const input = event.currentTarget as HTMLInputElement;
+    const value = input.value;
+    if (!value || !input.validity.valid) {
+      input.value = editor[field] ?? "";
+      saveState = "error";
+      saveMessage = "请填写完整有效的日期；已登记日期只能修改";
+      return;
+    }
+    editor[field] = value;
+    queueInstitutionChange(field, value);
+    scheduleEditorSave();
   }
 
   function setEditorStatus(event: Event): void {
@@ -468,7 +492,7 @@
   function setItemDetails(index: number, event: Event): void {
     if (!editor?.items[index]) return;
     const value = (event.currentTarget as HTMLInputElement).value;
-    editor.items[index].details = value === "" ? null : value;
+    editor.items[index].details = value;
     queueItemChange(index, "details");
     scheduleEditorSave();
   }
@@ -846,8 +870,8 @@
                         <label><span>授信总额（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={editor.totalLimit ?? ""} oninput={(event) => setEditorAmount("totalLimit", event)} onblur={() => void flushEditor()} /></label>
                         <label><span>已用额度（亿元）</span><input class="input" readonly value={formatAmount(editor.totalUsed)} /></label>
                         <label><span>可用额度（亿元）</span><input class="input" readonly value={formatAmount(editor.totalLimit == null || editor.totalUsed == null ? null : editor.totalLimit - editor.totalUsed)} /></label>
-                        <label><span>生效日</span><input class="input" type="date" value={editor.effectiveDate ?? ""} onchange={(event) => setEditorDate("effectiveDate", event)} /></label>
-                        <label><span>到期日</span><input class="input" type="date" value={editor.expiryDate ?? ""} onchange={(event) => setEditorDate("expiryDate", event)} /></label>
+                        <label><span>生效日</span><input class="input" type="date" data-credit-date oninput={editDate} value={editor.effectiveDate ?? ""} onblur={(event) => setEditorDate("effectiveDate", event)} /></label>
+                        <label><span>到期日</span><input class="input" type="date" data-credit-date oninput={editDate} value={editor.expiryDate ?? ""} onblur={(event) => setEditorDate("expiryDate", event)} /></label>
                         <label><span>关联客户</span><input class="input" readonly value={editor.clients?.map(client => client.name).join("、") || "待维护"} /></label>
                         <label><span>银行经办机构</span><input class="input" value={editor.bankOffice ?? ""} oninput={(event) => setEditorText("bankOffice", event)} onblur={() => void flushEditor()} /></label>
                         <label><span>我司申请部门</span><input class="input" value={editor.applyingDepartment ?? ""} oninput={(event) => setEditorText("applyingDepartment", event)} onblur={() => void flushEditor()} /></label>

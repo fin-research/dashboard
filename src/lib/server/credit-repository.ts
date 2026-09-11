@@ -87,11 +87,11 @@ export async function persistCreditWorkbook(client: DatabaseClient, input: Persi
 
 type DiffRow = Record<string, unknown> & {
   id: number; institution_name: string; effective_on: string; created_at: string;
-  created_by: string | null; updated_at: string | null; cleared_fields: string[];
+  created_by: string | null; updated_at: string | null;
 };
 type ClientLink = { institution_name: string; id: string; name: string };
 type UsageRow = { date: string; institution_name: string; item_type: CreditItemType; amount: number };
-const auditFields = new Set(['id','institution_name','effective_on','created_at','created_by','updated_at','cleared_fields']);
+const auditFields = new Set(['id','institution_name','effective_on','created_at','created_by','updated_at']);
 
 function institutionView(state: DiffRow, date: string, clients: Array<{id:string;name:string}>, usage: Map<string,number>): CreditInstitutionView {
   const items = creditItemTypes.map(type => {
@@ -170,7 +170,7 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
       rowIndex++;
       const state = states.get(row.institution_name) ?? {} as DiffRow;
       for (const [key,value] of Object.entries(row)) {
-        if (auditFields.has(key) || value != null || row.cleared_fields.includes(key)) state[key] = value;
+        if (auditFields.has(key) || value != null) state[key] = value;
       }
       states.set(row.institution_name,state);
     }

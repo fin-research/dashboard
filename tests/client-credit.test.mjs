@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { installBondInvestors } from './helpers/credit-database.mjs';
+import { installBondInvestors, applyCreditMigration } from './helpers/credit-database.mjs';
 import { PGlite } from '@electric-sql/pglite';
 import { loadCreditReport, persistCreditWorkbook, saveCreditInstitution } from '../src/lib/server/credit-repository.ts';
 import { creditInstitutionUpdateSchema } from '../src/lib/credit/update.ts';
@@ -24,8 +24,9 @@ async function database(t, legacy = false) {
     (public.normalize_client_name('银行-申万宏源证券资产管理有限公司（代“申万宏源招行凭证一号单一资产管理计划”）'),'exact',1,'实际投资人'),
     (public.normalize_client_name('银行-信银理财有限责任公司（代中银理财之乐赢稳健和信一年定开5期净值型人民币理财产品）'),'exact',2,'用户确认');`);
   await installBondInvestors(db);
+  await db.exec('CREATE SCHEMA IF NOT EXISTS credit; CREATE TABLE credit.schema_migration(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
   for (const name of fs.readdirSync(new URL('../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
-    if (!legacy || name < '0005') await db.exec(fs.readFileSync(new URL(`../credit-migrations/${name}`,import.meta.url),'utf8'));
+    if (!legacy || name < '0005') await applyCreditMigration(db,name);
   }
   return db;
 }
@@ -34,7 +35,7 @@ async function institution(db, date='2026-09-04', name='合并授信') {
   const current=(await db.query("SELECT to_regclass('credit.diff') AS name")).rows[0].name;
   if (current) {
     await db.query('SELECT credit.append_diff($1,$2,$3,$4)',[date,name,JSON.stringify({institution_type:'银行',confidentiality_status:false,status:'approved',total:20,
-      ...Object.fromEntries(creditItemTypes.map(type=>[type+'_limit',20])),other_used:2,bond_investment_used:0,legal_overdraft_used:0,margin_income_rights_used:0}),'auth0|test']);
+      ...Object.fromEntries(creditItemTypes.map(type=>[type+'_limit',20])),other_used:2,bond_investment_used:0,legal_overdraft_used:0}),'auth0|test']);
   } else {
     await db.query(`INSERT INTO credit.institution(report_date,institution_name,institution_type,confidentiality_status,status,total_limit,total_used)
       VALUES ($1,$2,'银行',false,'approved',20,10)`,[date,name]);
@@ -298,7 +299,7 @@ test('known product names resolve through account-holder text without guessing u
 
 test('alias migration removes redundant exact and regex rules, keeps ownership exceptions, and drops obsolete columns', async t => {
   const db=await database(t,true);
-  for(const name of ['0005_static_clients_and_usage_totals.sql','0006_bank_asset_management_clients.sql']) await db.exec(fs.readFileSync(new URL(`../credit-migrations/${name}`,import.meta.url),'utf8'));
+  for(const name of ['0005_static_clients_and_usage_totals.sql','0006_bank_asset_management_clients.sql']) await applyCreditMigration(db,name);
   await db.query(`INSERT INTO public.client_alias(alias,match_kind,client_id,notes) VALUES
     ('招商银行','exact',1,'重复名称'),('银行-招商银行股份有限公司','exact',1,'重复前缀'),
     ('^银行-中银理财.*','pattern',2,'旧正则'),('特殊主体','exact',3,'保留特殊')`);

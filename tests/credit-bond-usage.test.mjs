@@ -43,7 +43,7 @@ test('一级和二级同日抵消仍逐项展示，二级编辑进入总已用�
   assert.ok(r.calendarEvents.some(e=>e.usageComponent==='secondary'&&e.label==='债券投资——二级买卖 · 减少2亿元'));
   assert.equal(r.usageChanges.length,1);assert.equal(r.usageChanges[0].deltaAmount,0);
   assert.ok(r.usageChanges[0].details.some(d=>d.includes('二级买卖')));
-  await saveCreditInstitution(db,{...patch,reportDate:'2026-08-22',changes:{items:[{type:'bond_investment',secondaryUsedAmount:null}]}},'auth0|test');
+  await saveCreditInstitution(db,{...patch,reportDate:'2026-08-22',changes:{items:[{type:'bond_investment',secondaryUsedAmount:0}]}},'auth0|test');
   assert.equal(bond(await loadCreditReport(db,'2026-08-22')).usedAmount,2);
 });
 

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { applyCreditMigration } from '../helpers/credit-database.mjs';
 import { PGlite } from '@electric-sql/pglite';
 import * as XLSX from 'xlsx';
 import { importBondInvestors } from '../../scripts/financing/lib/bond-investor-import.mjs';
@@ -15,7 +16,8 @@ async function database(t) {
     CREATE FUNCTION "authorization".has_permission(code text) RETURNS boolean LANGUAGE sql AS $$ SELECT current_setting('test.can_read',true)='on' AND code='financing.data:read' $$;
     GRANT USAGE ON SCHEMA financing,"authorization" TO authenticated;`);
   await db.exec(fs.readFileSync(new URL('../../financing-migrations/0034_bond_investors.sql', import.meta.url), 'utf8'));
-  for (const name of fs.readdirSync(new URL('../../credit-migrations/', import.meta.url)).filter(name => name.endsWith('.sql')).sort()) await db.exec(fs.readFileSync(new URL(`../../credit-migrations/${name}`, import.meta.url), 'utf8'));
+  await db.exec('CREATE SCHEMA IF NOT EXISTS credit; CREATE TABLE credit.schema_migration(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
+  for (const name of fs.readdirSync(new URL('../../credit-migrations/', import.meta.url)).filter(name => name.endsWith('.sql')).sort()) await applyCreditMigration(db,name);
   return db;
 }
 async function bond(db, name = '债甲', amount = 300, dates = ['2026-01-01', '2027-01-01']) {

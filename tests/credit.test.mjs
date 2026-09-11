@@ -459,16 +459,16 @@ test('授信布尔协议契约拒绝字符串及已删除的周报标记', () =>
 test('稀疏变更正确继承 false、零和清空，补录历史不覆盖后续显式变更',async t=>{
   const db=await creditDatabase(t);await seedCredit(db,'2026-08-21','甲银行',{confidentiality_status:true,notes:'旧备注'});
   await saveCreditInstitution(db,{reportDate:'2026-08-23',institutionName:'甲银行',changes:{institution:{totalLimit:12,notes:'后续备注'}}},'auth0|test');
-  await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{institution:{confidentialityStatus:false,totalLimit:0,notes:null},items:[{type:'bond_investment',secondaryUsedAmount:0}]}},'auth0|test');
+  await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{institution:{confidentialityStatus:false,totalLimit:0,notes:''},items:[{type:'bond_investment',secondaryUsedAmount:0}]}},'auth0|test');
   const before=(await loadCreditReport(db,'2026-08-21')).institutions[0];
   const middle=(await loadCreditReport(db,'2026-08-22')).institutions[0];
   const after=(await loadCreditReport(db,'2026-08-25')).institutions[0];
-  assert.equal(before.notes,'旧备注');assert.equal(middle.notes,null);assert.equal(middle.totalLimit,0);assert.equal(middle.confidentialityStatus,false);
+  assert.equal(before.notes,'旧备注');assert.equal(middle.notes,'');assert.equal(middle.totalLimit,0);assert.equal(middle.confidentialityStatus,false);
   assert.equal(after.totalLimit,12);assert.equal(after.notes,'后续备注');assert.equal(after.totalUsed,0);
   const sql=(await db.query("SELECT notes,total::float8,confidentiality_status FROM credit.state_as_of('2026-08-25')")).rows[0];
   assert.deepEqual(sql,{notes:'后续备注',total:12,confidentiality_status:false});
-  const row=(await db.query("SELECT cleared_fields,total FROM credit.diff WHERE effective_on='2026-08-22'")).rows[0];
-  assert.deepEqual(row.cleared_fields,['notes']);assert.equal(Number(row.total),0);
+  const row=(await db.query("SELECT total,notes FROM credit.diff WHERE effective_on='2026-08-22'")).rows[0];
+  assert.equal(row.notes,'');assert.equal(Number(row.total),0);
 });
 
 test('拆借和收益凭证按实际生效、到期和提前结清日期显示逐项变动',async t=>{
@@ -550,7 +550,7 @@ test('只改额度描述和机构资料不生成额度事件，数值分项变�
 });
 
 test('五个已用分项的日历事件均带稳定类型，金额使用增加减少文字',async t=>{
-  const db=await creditDatabase(t);await seedCredit(db,'2026-08-21','甲银行',{other_used:0,legal_overdraft_used:0,margin_income_rights_used:0});
+  const db=await creditDatabase(t);await seedCredit(db,'2026-08-21','甲银行',{other_used:0,legal_overdraft_used:0});
   await saveCreditInstitution(db,{reportDate:'2026-09-04',institutionName:'甲银行',changes:{items:[
     {type:'bond_investment',secondaryUsedAmount:2.5},{type:'other',usedAmount:0.0245},
     {type:'legal_overdraft',usedAmount:1},

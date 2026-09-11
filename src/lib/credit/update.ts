@@ -5,15 +5,16 @@ import {
   creditStatuses,
 } from "./types.ts";
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期必须是完整的 YYYY-MM-DD 格式").refine((value) => {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return false;
   const [, yearText, monthText, dayText] = match;
   const year = Number(yearText);
   const month = Number(monthText);
   const day = Number(dayText);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toISOString().slice(0, 10) === value;
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  return year > 0 && date.toISOString().slice(0, 10) === value;
 }, "日期无效");
 const nullableDate = isoDate.nullable();
 const nullableText = (max: number) => z.string().trim().max(max).nullable();

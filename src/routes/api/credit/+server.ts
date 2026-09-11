@@ -79,7 +79,7 @@ export const PATCH: RequestHandler = async ({ platform, request, locals }) => {
       error instanceof BondLedgerUploadError || error instanceof CreditDatabaseError
         ? error.message
         : status === 400
-          ? "授信数据格式无效"
+          ? `授信数据格式无效：${error instanceof z.ZodError ? error.issues.map(issue => `${issue.path.join(".")}：${issue.message}`).join("；") : "请求无效"}`
           : "授信数据保存失败，请稍后重试";
     return Response.json(
       { error: message },
