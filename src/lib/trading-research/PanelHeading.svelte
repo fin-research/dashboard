@@ -6,6 +6,7 @@
     title,
     wrap = false,
     controlsInline = false,
+    controlsBesideTitle = false,
     accent = "",
     variant = "default",
     children,
@@ -14,6 +15,7 @@
     title: string;
     wrap?: boolean;
     controlsInline?: boolean;
+    controlsBesideTitle?: boolean;
     accent?: string;
     variant?: "default" | "report";
     children?: Snippet;
@@ -23,6 +25,7 @@
 <div
   class:tr-panel-heading--wrap={wrap}
   class:tr-panel-heading--controls-inline={controlsInline}
+  class:tr-panel-heading--controls-beside-title={controlsBesideTitle}
   class:tr-panel-heading--report={variant === "report"}
   class="tr-panel-heading"
   style={accent ? `--panel-heading-accent: ${accent}` : ""}
@@ -90,6 +93,18 @@
 
   .tr-panel-heading--controls-inline .tr-panel-heading__controls {
     justify-content: flex-end;
+  }
+
+  .tr-panel-heading--controls-beside-title {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .tr-panel-heading--controls-beside-title .tr-panel-heading__controls {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
   }
 
   .tr-panel-heading--report {

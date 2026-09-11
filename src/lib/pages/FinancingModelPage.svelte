@@ -670,7 +670,7 @@
 
       <section class="supporting-grid" aria-label="未来发行窗口与模型验证">
         <ModuleCard class="forecast-panel" labelledBy="window-title">
-          <PanelHeading id="window-title" title="未来发行窗口">
+          <PanelHeading id="window-title" title="未来发行窗口" controlsBesideTitle>
             <button
               class="btn btn-ghost window-details-toggle"
               type="button"
@@ -743,10 +743,10 @@
       </section>
 
       <ModuleCard class="decision-history-section" labelledBy="decision-history-title">
-        <PanelHeading id="decision-history-title" title="历史择时决策记录">
+        <PanelHeading id="decision-history-title" title="历史择时决策记录" controlsBesideTitle>
           {#if !editingDecision}
-            <button class="btn btn-primary primary-button" type="button" onclick={() => openDecisionEditor()}>
-              录入当前决策
+            <button class="btn btn-ghost icon-button" type="button" aria-label="录入当前决策" title="录入当前决策" onclick={() => openDecisionEditor()}>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
             </button>
           {/if}
         </PanelHeading>
@@ -814,8 +814,8 @@
       </ModuleCard>
 
       <ModuleCard class="sell-side-section" labelledBy="sell-side-title">
-        <PanelHeading id="sell-side-title" title="卖方观点">
-          <div class="section-actions">
+        <PanelHeading id="sell-side-title" title="卖方观点" controlsBesideTitle>
+          <div class="section-actions heading-icon-actions">
             {#if report.sellSide && !editingSellSide}
               <button class="btn btn-ghost icon-button" type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -823,8 +823,15 @@
                 </svg>
               </button>
             {/if}
-            <button class="btn btn-primary primary-button research-button" type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}>
-              {generatingResearch ? "生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
+            <button class="btn btn-primary icon-button ai-generate-button" class:is-loading={generatingResearch} type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}
+              aria-label={generatingResearch ? "AI 生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
+              title={generatingResearch ? "AI 生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
+              aria-busy={generatingResearch}
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m10 2 1.1 4.2L15 8l-3.9 1.8L10 14l-1.1-4.2L5 8l3.9-1.8L10 2Z" />
+                <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
+              </svg>
             </button>
           </div>
         </PanelHeading>
@@ -1555,9 +1562,11 @@
     text-align: center !important;
   }
 
-  .research-button {
-    min-width: 158px;
-  }
+  .section-actions.heading-icon-actions { flex-wrap: nowrap; }
+
+  .ai-generate-button { padding: 3px; }
+  .ai-generate-button svg { width: 16px; height: 16px; stroke-width: 1.5; }
+  .ai-generate-button.is-loading svg { animation: spin 1.2s linear infinite; }
 
   .sell-side-summary-card {
     padding: 18px;
@@ -1793,10 +1802,6 @@
       justify-content: flex-end;
     }
 
-    .research-button {
-      min-width: 0;
-      padding-inline: 12px;
-    }
 
     .sell-side-grid {
       grid-template-columns: 1fr;
@@ -1875,6 +1880,7 @@
       transition: none;
     }
 
-    .spinner { animation: none; }
+    .spinner,
+    .ai-generate-button.is-loading svg { animation: none; }
   }
 </style>
