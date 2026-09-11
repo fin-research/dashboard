@@ -11,10 +11,11 @@
   let pending: Promise<boolean> | null = null;
   let popup: ReturnType<typeof createLoginPopup> | undefined;
   function finish(result: boolean) {
+    const resolve = resolveLogin;
+    resolveLogin = null; pending = null;
     popup?.stop();
     dialog?.close();
-    resolveLogin?.(result);
-    resolveLogin = null; pending = null;
+    resolve?.(result);
   }
   export function open(): Promise<boolean> {
     if (pending) return pending;

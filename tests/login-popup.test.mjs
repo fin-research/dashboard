@@ -53,3 +53,10 @@ test('blocked popup stays on the current page and allows retry without leaving l
   assert.match(errors[0], /拦截/); assert.equal(f.handlers.size, 0);
   popup.stop();
 });
+
+test('the mounted dialog shares pending login, preserves successful completion through close events and retains the page', async () => {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const { stdout } = await promisify(execFile)(process.execPath, ['--conditions=browser', 'tests/helpers/login-dialog.mjs'], { cwd: new URL('../', import.meta.url), timeout: 30000 });
+  assert.match(stdout, /Login dialog cancellation, retry and completion preserve the page/);
+});
