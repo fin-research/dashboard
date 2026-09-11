@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { prefersReducedMotion } from "svelte/motion";
+  import { fly } from "svelte/transition";
   import {
     FOCUS_STORAGE_PREFIX,
     LEGACY_FOCUS_STORAGE_PREFIX,
@@ -28,6 +30,8 @@
   let html = "";
   let empty = true;
   let appliedBriefing: MarketBriefing | null = null;
+
+  $: currentProgress = summaries.at(-1) ?? { id: `status:${progressText}`, text: progressText };
 
   $: if (
     reportDate &&
@@ -79,21 +83,6 @@
       // The generated text remains editable if browser storage is unavailable.
     }
     onBriefingApplied(generatedBriefing);
-  }
-
-  function followProgress(node: HTMLDivElement, _summaries: typeof summaries) {
-    let following = true;
-    let frame = 0;
-    const onScroll = () => { following = node.scrollHeight - node.scrollTop - node.clientHeight < 32; };
-    node.addEventListener("scroll", onScroll);
-    return {
-      update(_next: typeof summaries) {
-        if (!following) return;
-        cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(() => { node.scrollTop = node.scrollHeight; });
-      },
-      destroy() { cancelAnimationFrame(frame); node.removeEventListener("scroll", onScroll); },
-    };
   }
 
   function save(): void {
@@ -166,15 +155,21 @@
 </script>
 
 {#if generating}
-  <div use:followProgress={summaries} class="focus-editor focus-progress" role="status" aria-live="polite" aria-label="今日聚焦生成进度">
-    <div class="focus-progress-label"><span class="loading loading-spinner loading-xs" aria-hidden="true"></span>{progressText}</div>
-    {#each summaries as summary (summary.id)}
-      <p class="focus-summary">{summary.text}</p>
-    {/each}
+  <div class="focus-progress" role="status" aria-live="polite" aria-atomic="true" aria-label="今日聚焦生成进度">
+    <span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+    <div class="focus-progress-copy">
+      {#key currentProgress.id}
+        <span
+          class="focus-progress-message"
+          title={currentProgress.text}
+          in:fly={{ y: prefersReducedMotion.current ? 0 : 6, duration: prefersReducedMotion.current ? 0 : 180, delay: prefersReducedMotion.current ? 0 : 120 }}
+          out:fly={{ y: prefersReducedMotion.current ? 0 : -6, duration: prefersReducedMotion.current ? 0 : 120 }}
+        >{currentProgress.text}</span>
+      {/key}
+    </div>
   </div>
 {/if}
 <div
-  hidden={generating}
   bind:this={editor}
   class="focus-editor"
   contenteditable="true"
@@ -194,9 +189,25 @@
 ></div>
 
 <style>
-  .focus-progress { cursor: default; max-height: 24rem; }
-  .focus-progress-label { display: flex; align-items: center; gap: 0.5rem; color: var(--color-primary); font-size: 0.875rem; }
-  .focus-summary { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 0.75rem; animation: summary-in 180ms ease-out; }
-  @keyframes summary-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-  @media (prefers-reduced-motion: reduce) { .focus-summary { animation: none; } }
+  .focus-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-block: 0.5rem;
+    color: var(--color-primary);
+    font-size: 0.875rem;
+  }
+  .focus-progress > .loading { flex-shrink: 0; }
+  .focus-progress-copy { display: grid; flex: 1; min-width: 0; overflow: hidden; }
+  .focus-progress-message {
+    grid-area: 1 / 1;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
 </style>
