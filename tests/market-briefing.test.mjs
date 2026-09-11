@@ -8,16 +8,13 @@ import {
   MARKET_BRIEFING_SYSTEM,
 } from "../src/lib/server/market-briefing.ts";
 
-test("用户提示词仅允许补充必要的信息缺口，不要求联网核验", () => {
-  const prompt = buildMarketBriefingPrompt("2026-08-10", "【1】正文");
-  assert.equal(
-    prompt,
-    "请使用随附的 market-briefing skill，根据以下 2026-08-10 当天新闻撰写今日市场聚焦。" +
-      "优先使用给定材料；联网搜索必须少用、慎用，" +
-      "仅在缺少形成核心判断所必需的信息时补充搜索。材料足够时直接写作，不为核验给定材料而联网。" +
-      "如需搜索，只围绕必要的信息缺口，获得所需信息后立即停止。不得补写缺乏材料或搜索结果支持的事实。" +
-      "严格遵守 skill 的输出格式，最终只返回两条正文。\n\n【1】正文",
-  );
+test("用户提示词只包含新闻，稳定 instructions 不含日期或 skill 包装", () => {
+  assert.equal(buildMarketBriefingPrompt("【1】正文"), "【1】正文");
+  assert.doesNotMatch(MARKET_BRIEFING_SYSTEM, /skill|技能|name:|输出格式|JSON|1、|2、|\d{4}-\d{2}-\d{2}/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /120—200字/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /联网搜索必须少用、慎用/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /不为核验给定材料/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /搜索获得必要信息后立即停止/);
 });
 
 test("过滤和截断今日聚焦新闻素材", () => {
@@ -40,18 +37,6 @@ test("过滤和截断今日聚焦新闻素材", () => {
       "【3】2026-08-18 08:05:00 保留新闻\n标签：宏观\n正文：\n保留正文",
     ].join("\n\n"),
   );
-});
-
-test("系统提示完整包含 market-briefing skill 的输出规范", () => {
-  assert.ok(
-    MARKET_BRIEFING_SYSTEM.includes("固定输出 `1、[股市内容]` 和 `2、[债市内容]`"),
-  );
-  assert.match(MARKET_BRIEFING_SYSTEM, /每条以120—200字为宜/);
-  assert.match(MARKET_BRIEFING_SYSTEM, /## 输出前自检/);
-  assert.match(MARKET_BRIEFING_SYSTEM, /联网搜索必须少用、慎用/);
-  assert.match(MARKET_BRIEFING_SYSTEM, /仅当缺少形成核心判断所必需的信息时/);
-  assert.match(MARKET_BRIEFING_SYSTEM, /不为核验给定材料/);
-  assert.match(MARKET_BRIEFING_SYSTEM, /搜索获得必要信息后立即停止/);
 });
 
 test("生成流程从后端取数并直连 provider-specific Responses 结构化输出", async () => {
@@ -120,7 +105,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
                 {
                   type: "output_text",
                   text: JSON.stringify({
-                    content: "1、股市结论。\n2、债市结论。",
+                    stock: "股市结论。", bond: "债市结论。",
                   }),
                 },
               ],
@@ -143,7 +128,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     const result = await generateMarketBriefing(env, "2026-08-10");
     assert.deepEqual(result, {
       report_date: "2026-08-10",
-      content: "1、股市结论。\n2、债市结论。",
+      stock: "股市结论。", bond: "债市结论。",
       news_count: 2,
     });
     assert.equal(dataCalls.length, 3);
@@ -156,7 +141,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(headers.get("cf-aig-request-timeout"), "300000");
     assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
       report_date: "2026-08-10",
-      prompt_version: "market-briefing-v6-search-when-needed",
+      prompt_version: "market-briefing-v7-structured-stream",
       tags: "market-briefing,manual-generation,web-search",
       ai_model: "gpt-5.6-luna",
       ai_provider: "custom-codex",
@@ -167,7 +152,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(Object.hasOwn(query, "store"), false);
     assert.equal(
       query.prompt_cache_key,
-      "market-briefing:market-briefing-v6-search-when-needed",
+      "market-briefing:market-briefing-v7-structured-stream",
     );
     assert.deepEqual(query.reasoning, {
       effort: "max",
@@ -179,15 +164,12 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(query.text.format.type, "json_schema");
     assert.equal(query.text.format.name, "market_briefing");
     assert.equal(query.text.format.strict, true);
-    assert.deepEqual(query.text.format.schema.required, ["content"]);
+    assert.deepEqual(query.text.format.schema.required, ["stock", "bond"]);
     assert.ok(aiCalls[0].init.signal instanceof AbortSignal);
-    assert.match(query.instructions, /^---\nname: market-briefing/);
-    assert.match(query.instructions, /响应 JSON 的 content 字段/);
+    assert.equal(query.instructions, MARKET_BRIEFING_SYSTEM);
     assert.doesNotMatch(query.instructions, /2026-08-10|股市收盘正文/);
-    assert.match(
-      query.input[0].content,
-      /根据以下 2026-08-10 当天新闻撰写今日市场聚焦/,
-    );
+    assert.match(query.input[0].content, /^【1】/);
+    assert.equal(query.input.length, 1);
     assert.match(query.input[0].content, /【1】2026-08-10 15:00:00 A股收评/);
     assert.match(query.input[0].content, /股市收盘正文/);
     assert.match(query.input[0].content, /【2】2026-08-10 14:30:00 债市要闻/);

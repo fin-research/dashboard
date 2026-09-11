@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readSse } from "./lib/sse.ts";
 
 import {
   DataApiRequestError,
@@ -32,6 +33,7 @@ import {
 } from "./market-report-resources.ts";
 import type {
   MarketBriefing,
+  MarketBriefingProgress,
   MarketReportLoadResult,
   MarketReportResource,
   MarketReportResourceIssue,
@@ -56,7 +58,8 @@ const RESOURCE_ORDER: MarketReportResource[] = [
 
 const marketBriefingSchema = z.object({
   report_date: z.string(),
-  content: z.string(),
+  stock: z.string().trim().min(1),
+  bond: z.string().trim().min(1),
   news_count: z.number().int().nonnegative(),
 });
 
@@ -159,17 +162,44 @@ function sortResourceIssues(
   );
 }
 
-export function generateMarketBriefing(
+const briefingProgressSchema = z.union([
+  z.object({ type: z.enum(["status", "reset"]), text: z.string() }),
+  z.object({ type: z.literal("summary"), id: z.string(), text: z.string() }),
+]);
+
+export async function generateMarketBriefing(
   reportDate: string,
   signal?: AbortSignal,
+  onProgress?: (event: MarketBriefingProgress) => void,
 ): Promise<MarketBriefing> {
   const query = new URLSearchParams({ date: reportDate });
-  return getJson(
-    `/api/market-briefing?${query}`,
-    marketBriefingSchema,
-    signal,
-    "POST",
-  );
+  const url = `/api/market-briefing?${query}`;
+  const response = await fetch(url, {
+    method: "POST", signal, credentials: "same-origin",
+    headers: { Accept: "text/event-stream" },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new DataApiRequestError(response.status, formatDataApiError(url, response.status, payload));
+  }
+  if (!response.headers.get("content-type")?.includes("text/event-stream"))
+    return marketBriefingSchema.parse(await response.json());
+  if (!response.body) throw new Error("生成连接未建立，请重试");
+  let result: MarketBriefing | undefined;
+  await readSse(response.body, ({ event, data }) => {
+    signal?.throwIfAborted();
+    if (event === "ping") return;
+    const payload: unknown = JSON.parse(data);
+    if (event === "progress") onProgress?.(briefingProgressSchema.parse(payload));
+    if (event === "complete") result = marketBriefingSchema.parse(payload);
+    if (event === "error") {
+      const error = z.object({ error: z.string() }).parse(payload);
+      throw new Error(error.error);
+    }
+  }, 2 * 1024 * 1024);
+  signal?.throwIfAborted();
+  if (!result || result.report_date !== reportDate) throw new Error("生成连接中断，请重试");
+  return result;
 }
 
 export async function fetchReport(

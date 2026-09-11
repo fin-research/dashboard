@@ -4,7 +4,7 @@ import {
 } from "$lib/server/market-briefing";
 import type { RequestHandler } from "./$types";
 
-export const POST: RequestHandler = async ({ platform, url }) => {
+export const POST: RequestHandler = async ({ platform, url, request }) => {
   if (
     !platform?.env.CLOUDFLARE_ACCOUNT_ID ||
     !platform.env.AI_GATEWAY_ID ||
@@ -17,7 +17,39 @@ export const POST: RequestHandler = async ({ platform, url }) => {
   }
   try {
     const reportDate = resolveDate(url);
-    const result = await generateMarketBriefing(platform.env, reportDate);
+    if (request.headers.get("accept")?.includes("text/event-stream")) {
+      const env = platform.env;
+      const abort = new AbortController();
+      const signal = AbortSignal.any([request.signal, abort.signal]);
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const send = (event: string, data: unknown) => {
+            if (!signal.aborted) controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+          };
+          const heartbeat = setInterval(() => send("ping", {}), 15_000);
+          try {
+            const result = await generateMarketBriefing(env, reportDate, {
+              signal,
+              onProgress: (event) => send("progress", event),
+            });
+            send("complete", result);
+          } catch (error) {
+            send("error", { error: publicErrorMessage(error, 500) });
+          } finally {
+            clearInterval(heartbeat);
+            if (!abort.signal.aborted) controller.close();
+          }
+        },
+        cancel() { abort.abort(); },
+      });
+      return new Response(body, { headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-store, no-transform",
+        "X-Accel-Buffering": "no",
+      } });
+    }
+    const result = await generateMarketBriefing(platform.env, reportDate, { signal: request.signal });
     return Response.json(result, {
       headers: { "Cache-Control": "no-store" },
     });

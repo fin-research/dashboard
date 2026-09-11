@@ -593,24 +593,6 @@ h2 {
   white-space: nowrap;
 }
 
-.focus-save-button {
-  display: inline-grid;
-  width: var(--report-control-size);
-  min-width: var(--report-control-size);
-  place-items: center;
-  padding: 3px;
-}
-
-.focus-save-button svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-}
-
 .focus-generate-button svg {
   width: 16px;
   height: 16px;
@@ -625,19 +607,7 @@ h2 {
   animation: rotate 1.2s linear infinite;
 }
 
-.focus-generation-error {
-  margin: 0;
-  padding: 5px 10px;
-  border-bottom: 1px solid #f0c7c3;
-  color: #a33a33;
-  background: #fff4f2;
-  font-size: 0.8125rem;
-  line-height: 1.3;
-}
-
 .is-export-capture .focus-generate-button,
-.is-export-capture .focus-save-button,
-.is-export-capture .focus-generation-error,
 .is-export-capture .text-report__toolbar,
 .is-export-capture .report-account,
 .is-export-capture .titlebar-actions {
@@ -1389,7 +1359,6 @@ h2 {
   .hero-date,
   .view-toggle button,
   .focus-generate-button,
-  .focus-save-button,
   .error-state button {
     min-height: 44px;
     touch-action: manipulation;

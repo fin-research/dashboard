@@ -39,6 +39,9 @@ export interface AiGatewayOptions {
   requestTimeoutMs: number;
   taskType: AiGatewayTaskType;
   tools?: readonly AiGatewayTool[];
+  signal?: AbortSignal;
+  onAttempt?: (attempt: "primary" | "retry") => void;
+  onReasoningSummary?: (summary: { id: string; text: string }) => void;
   onTextDelta?: (delta: string) => void;
   onTelemetry?: (metadata: AiGatewayTelemetry) => void;
 }
@@ -166,6 +169,7 @@ export async function generateAiGatewayObject<OUTPUT>(
   options: AiGatewayOptions,
   fetcher: typeof fetch = fetch,
 ): Promise<OUTPUT> {
+  options.signal?.throwIfAborted();
   const normalizedCredentials = validateCredentials(credentials);
   const normalizedSchemaName = requiredConfig("schema name", schemaName);
   const normalizedPromptCacheKey = requiredConfig(
@@ -188,6 +192,7 @@ export async function generateAiGatewayObject<OUTPUT>(
     options,
     fetcher,
   );
+  options.signal?.throwIfAborted();
   if (primary.ok) return primary.value;
   // Keep the existing single-attempt budget for credit answers.
   if (options.taskType === "credit_answer") throw primary.error;
@@ -215,6 +220,7 @@ export async function generateAiGatewayObject<OUTPUT>(
     options,
     fetcher,
   );
+  options.signal?.throwIfAborted();
   if (retry.ok) return retry.value;
   throw new AiGatewayRetryError([
     primary.error.toFailure(),
@@ -282,6 +288,9 @@ async function runProvider<OUTPUT>(
   options: AiGatewayOptions,
   fetcher: typeof fetch,
 ): Promise<OUTPUT> {
+  options.signal?.throwIfAborted();
+  options.onAttempt?.(attempt);
+  const streaming = Boolean(options.onTextDelta || options.onReasoningSummary);
   const prompt = splitInstructions(messages);
   const reasoningEffort = AI_GATEWAY_REASONING_EFFORT_BY_TASK[options.taskType];
   const url =
@@ -325,9 +334,9 @@ async function runProvider<OUTPUT>(
           },
         },
         input: prompt.input,
-        ...(options.onTextDelta ? { stream: true } : {}),
+        ...(streaming ? { stream: true } : {}),
       }),
-      signal: AbortSignal.timeout(options.requestTimeoutMs + 5_000),
+      signal: AbortSignal.any([AbortSignal.timeout(options.requestTimeoutMs + 5_000), ...(options.signal ? [options.signal] : [])]),
     });
   } catch (error) {
     throw new AiGatewayResponseError({
@@ -344,8 +353,8 @@ async function runProvider<OUTPUT>(
   let responseText: string;
   try {
     const maxBytes = options.taskType === "credit_answer" ? MAX_CREDIT_GATEWAY_RESPONSE_BYTES : MAX_AI_GATEWAY_RESPONSE_BYTES;
-    responseText = response.ok && options.onTextDelta && response.body && response.headers.get("content-type")?.includes("text/event-stream")
-      ? JSON.stringify(await readResponsesStream(response.body, options.onTextDelta, maxBytes))
+    responseText = response.ok && streaming && response.body && response.headers.get("content-type")?.includes("text/event-stream")
+      ? JSON.stringify(await readResponsesStream(response.body, options.onTextDelta ?? (() => {}), maxBytes, options.onReasoningSummary))
       : await readTextBounded(response, maxBytes);
   } catch (error) {
     throw new AiGatewayResponseError({

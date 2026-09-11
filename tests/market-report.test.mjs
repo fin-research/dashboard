@@ -184,3 +184,18 @@ test("过大的定稿快照在写入 R2 前被拒绝", async () => {
   );
   assert.equal(bucket.objects.size, 0);
 });
+
+test("合并导出保存仍只上传原 JSON 定稿数据与今日聚焦", async () => {
+  const { saveMarketReport: saveFromBrowser } = await import('../src/api.ts');
+  const original = globalThis.fetch;
+  const report = reportData();
+  globalThis.fetch = async (url, init) => {
+    assert.equal(url, '/api/market-report?date=2026-08-25');
+    assert.equal(init.method, 'PUT');
+    assert.equal(init.headers['Content-Type'], 'application/json');
+    assert.deepEqual(JSON.parse(init.body), { report, focusText: '股债正文' });
+    return Response.json({ ...report, focus_text: '股债正文', cached_at: '2026-08-25T15:00:00Z', finalized_at: '2026-08-25T15:00:00Z' });
+  };
+  try { await saveFromBrowser(report, '股债正文'); }
+  finally { globalThis.fetch = original; }
+});

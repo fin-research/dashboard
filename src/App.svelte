@@ -1,6 +1,6 @@
 <script lang="ts">
   import AuthMenu from '$lib/AuthMenu.svelte';
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
 
   import {
     fetchReport,
@@ -64,6 +64,7 @@
     inventory: [],
   };
   let reportSurface: HTMLElement;
+  let textReport: TextReport | undefined;
   let dateInput: HTMLInputElement;
   let selectedDate = "";
   let data: ReportData | null = null;
@@ -71,13 +72,13 @@
   let loading = true;
   let errorMessage = "";
   let exporting = false;
-  let exportLabel = "导出图片";
+  let exportLabel = "导出&保存";
   let activeRequest: AbortController | null = null;
   let briefingRequest: AbortController | null = null;
   let generatedBriefing: MarketBriefing | null = null;
   let briefingLoading = false;
-  let briefingError = "";
-  let exportTimer: number | null = null;
+  let briefingProgress = "";
+  let briefingSummaries: Array<{ id: string; text: string }> = [];
   let activeView: ReportView = "visual";
   let focusText = "";
   let savedFocusText = "";
@@ -111,15 +112,18 @@
   onDestroy(() => {
     activeRequest?.abort();
     briefingRequest?.abort();
-    if (exportTimer !== null) window.clearTimeout(exportTimer);
+
   });
 
   async function loadReport(refresh: boolean): Promise<void> {
     if (!selectedDate) return;
     activeRequest?.abort();
     briefingRequest?.abort();
+    briefingRequest = null;
+    generatedBriefing = null;
     briefingLoading = false;
-    briefingError = "";
+    briefingProgress = "";
+    briefingSummaries = [];
     const request = new AbortController();
     activeRequest = request;
     const requestedDate = selectedDate;
@@ -166,33 +170,47 @@
     );
   }
 
-  async function createMarketBriefing(): Promise<void> {
-    if (!data || briefingLoading) return;
+  function cancelBriefing(): void {
     briefingRequest?.abort();
-    briefingRequest = new AbortController();
+    briefingRequest = null;
+    briefingLoading = false;
+    briefingSummaries = [];
+  }
+
+  async function createMarketBriefing(): Promise<void> {
+    if (!data || briefingLoading || exporting || savingFocus) return;
+    const request = new AbortController();
+    briefingRequest = request;
+    const date = data.report_date;
     briefingLoading = true;
-    briefingError = "";
+    briefingProgress = "正在读取新闻";
+    briefingSummaries = [];
     try {
-      generatedBriefing = await generateMarketBriefing(
-        data.report_date,
-        briefingRequest.signal,
-      );
+      const result = await generateMarketBriefing(date, request.signal, (event) => {
+        if (briefingRequest !== request || request.signal.aborted) return;
+        if (event.type === "summary") {
+          const existing = briefingSummaries.findIndex((summary) => summary.id === event.id);
+          briefingSummaries = existing < 0 ? [...briefingSummaries, event]
+            : briefingSummaries.map((summary, index) => index === existing ? event : summary);
+        } else {
+          briefingProgress = event.text;
+          if (event.type === "reset") briefingSummaries = [];
+        }
+      });
+      if (briefingRequest === request && !request.signal.aborted && data?.report_date === date) generatedBriefing = result;
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        briefingError = error instanceof Error ? error.message : String(error);
-      }
+      if (!request.signal.aborted && briefingRequest === request)
+        globalMessages.error(error instanceof Error ? error.message : String(error), { key: "market-briefing-generate" });
     } finally {
-      briefingLoading = false;
+      if (briefingRequest === request) {
+        briefingLoading = false;
+        briefingRequest = null;
+      }
     }
   }
 
   function handleBriefingApplied(briefing: MarketBriefing): void {
     if (generatedBriefing === briefing) generatedBriefing = null;
-  }
-
-  async function saveFocus(): Promise<void> {
-    if (!data) return;
-    await persistReport(data, focusText);
   }
 
   async function persistReport(
@@ -203,6 +221,7 @@
     savingFocus = true;
     try {
       const snapshot = await saveMarketReport(report, nextFocusText);
+      if (data?.report_date !== snapshot.report_date) return;
       data = snapshot;
       focusText = snapshot.focus_text;
       savedFocusText = snapshot.focus_text;
@@ -251,22 +270,33 @@
   }
 
   async function exportImage(): Promise<void> {
-    if (!data || exporting) return;
+    if (!data || exporting || briefingLoading || savingFocus) return;
+    if (activeView === "text" && !textReport?.prepareExport()) return;
+    await tick();
+    const report = data;
+    const exportedFocus = focusText;
     exporting = true;
     exportLabel = "正在导出";
+    let downloaded = false;
     try {
-      await exportReportImage(reportSurface, data.report_date, {
-        captureClass: true,
-      });
-      exportLabel = "导出完成";
+      await exportReportImage(reportSurface, report.report_date, { captureClass: true });
+      downloaded = true;
+      exportLabel = "正在保存";
+      const snapshot = await saveMarketReport(report, exportedFocus);
+      if (data?.report_date === snapshot.report_date) {
+        data = snapshot;
+        focusText = snapshot.focus_text;
+        savedFocusText = snapshot.focus_text;
+        focusFinalizedAt = snapshot.finalized_at;
+        savedDataJson = JSON.stringify(snapshot);
+      }
+      globalMessages.success(`${snapshot.report_date} 图片已导出，市场点评定稿已保存`, { key: "market-report-export" });
     } catch (error) {
-      console.error("导出图片失败", error);
-      exportLabel = "导出失败";
+      const detail = error instanceof Error ? error.message : String(error);
+      globalMessages.error(`${downloaded ? "图片已导出，云端保存失败" : "图片导出失败"}：${detail}`, { key: "market-report-export" });
     } finally {
-      exportTimer = window.setTimeout(() => {
-        exporting = false;
-        exportLabel = "导出图片";
-      }, 1200);
+      exporting = false;
+      exportLabel = "导出&保存";
     }
   }
 
@@ -312,6 +342,7 @@
               class:btn-primary={activeView === "visual"}
               type="button"
               aria-pressed={activeView === "visual"}
+              disabled={exporting || savingFocus || briefingLoading}
               onclick={() => selectView("visual")}
             >
               可视化
@@ -321,6 +352,7 @@
               class:btn-primary={activeView === "text"}
               type="button"
               aria-pressed={activeView === "text"}
+              disabled={exporting || savingFocus || briefingLoading}
               onclick={() => selectView("text")}
             >
               文字版
@@ -330,7 +362,7 @@
             class:is-loading={loading}
             class="btn refresh-button"
             type="button"
-            disabled={loading}
+            disabled={loading || exporting || savingFocus}
             onclick={() => loadReport(true)}
           >
             <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -343,7 +375,7 @@
             class:is-exporting={exporting}
             class="btn btn-primary export-button"
             type="button"
-            disabled={!data || loading || exporting}
+            disabled={!data || loading || exporting || briefingLoading || savingFocus}
             onclick={exportImage}
           >
             <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -361,6 +393,7 @@
             class="input hero-date__input"
             type="date"
             aria-label="选择报告日期"
+            disabled={exporting || savingFocus}
             bind:value={selectedDate}
             onclick={openDatePicker}
             onchange={() => loadReport(false)}
@@ -419,35 +452,22 @@
               class:is-loading={briefingLoading}
               class="btn btn-primary focus-generate-button"
               type="button"
-              disabled={briefingLoading}
-              aria-label="根据当天新闻生成今日聚焦"
-              onclick={createMarketBriefing}
+              disabled={exporting || savingFocus}
+              aria-label={briefingLoading ? "取消生成今日聚焦" : "根据当天新闻生成今日聚焦"}
+              onclick={briefingLoading ? cancelBriefing : createMarketBriefing}
             >
               <svg viewBox="0 0 20 20" aria-hidden="true">
                 <path d="m10 2 1.1 4.2L15 8l-3.9 1.8L10 14l-1.1-4.2L5 8l3.9-1.8L10 2Z" />
                 <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
               </svg>
-              <span>{briefingLoading ? "生成中" : "生成聚焦"}</span>
-            </button>
-            <button
-              class:is-loading={savingFocus}
-              class="btn btn-primary focus-save-button"
-              type="button"
-              disabled={savingFocus}
-              aria-label="保存当天市场点评定稿"
-              title="保存定稿"
-              onclick={saveFocus}
-            >
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <path d="M4 3.5h10.5L17 6v10.5H4z" />
-                <path d="M7 3.5v4h6v-4M7 16.5v-5h6v5" />
-              </svg>
+              <span>{briefingLoading ? "取消生成" : "生成聚焦"}</span>
             </button>
           </header>
-          {#if briefingError}
-            <p class="focus-generation-error" role="alert">{briefingError}</p>
-          {/if}
           <FocusEditor
+            generating={briefingLoading}
+            disabled={exporting || savingFocus}
+            progressText={briefingProgress}
+            summaries={briefingSummaries}
             reportDate={data.report_date}
             {generatedBriefing}
             initialText={focusText}
@@ -638,11 +658,13 @@
           aria-labelledby="text-report-tab"
         >
           <TextReport
+            bind:this={textReport}
+            disabled={exporting}
             data={data}
             {focusText}
             {missingResources}
             dirty={reportDirty}
-            saving={savingFocus}
+            saving={savingFocus || exporting}
             onDataChange={handleTextReportDataChange}
             onSave={saveTextReport}
           />

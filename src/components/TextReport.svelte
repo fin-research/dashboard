@@ -15,6 +15,7 @@
   export let missingResources: MarketReportResource[] = [];
   export let dirty = false;
   export let saving = false;
+  export let disabled = false;
   export let onDataChange: (
     data: ReportData,
     focusText: string,
@@ -43,6 +44,8 @@
     currentValue = normalizeTextReport(editor.innerText);
     draftDirty = currentValue !== generatedValue;
   }
+
+  export function prepareExport(): boolean { return applyDraft() !== null; }
 
   function applyDraft(): ReturnType<typeof applyTextReportEdits> | null {
     if (!draftDirty) return { data, focusText, issues: [] };
@@ -171,6 +174,7 @@
     bind:innerHTML={html}
     class="text-report__editor"
     contenteditable="true"
+    inert={disabled}
     role="textbox"
     aria-label="编辑文字版境内市场点评"
     aria-multiline="true"
