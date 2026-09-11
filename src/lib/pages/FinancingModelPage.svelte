@@ -1231,7 +1231,7 @@
     background: #fef3f2;
   }
 
-  :global(.conclusion-card) {
+  .report-stack :global(.conclusion-card) {
     display: grid;
     align-content: start;
     gap: 12px;
@@ -1242,7 +1242,7 @@
     margin-top: 4px;
   }
 
-  :global(.chart-card) {
+  .report-stack :global(.chart-card) {
     min-width: 0;
   }
 
@@ -1269,7 +1269,7 @@
     margin-top: 8px;
   }
 
-  :global(.product-result) {
+  .report-stack :global(.product-result) {
     display: flex;
     flex-direction: column;
     border-color: color-mix(in srgb, var(--brand) 30%, var(--line));
@@ -1320,11 +1320,11 @@
     align-items: center;
   }
 
-  :global(.forecast-panel) {
+  .report-stack :global(.forecast-panel) {
     min-width: 0;
   }
 
-  :global(.validation-panel) {
+  .report-stack :global(.validation-panel) {
     display: grid;
     align-content: start;
     gap: 14px;
@@ -1828,7 +1828,8 @@
     min-height: 64px;
     }
 
-    .decision-grid {
+    .decision-grid,
+    .driver-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
