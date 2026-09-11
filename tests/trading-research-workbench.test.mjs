@@ -118,8 +118,8 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
   assert.match(page, /yearToLatestLedgerRange\(currentReportDate\(\), \[/);
   assert.match(page, /<BondLedgerUploadButton onImported=\{refreshReport\} \/>/);
   assert.doesNotMatch(page, /报告数字由最新有效交易日|本周区间按报告基准日/);
-  assert.match(page, /质押\/卖出回购\{formatYi\(analytics.availability.pledgedFaceAmount\)\}/);
-  assert.match(page, /formatYi\(analytics.availability.availableFaceAmount\)/);
+  assert.match(page, /已质押持仓市值 <strong>\{formatYi\(analytics.availability.pledgedMarketValue\)\}/);
+  assert.match(page, /formatYi\(analytics.availability.availableMarketValue\)/);
   assert.doesNotMatch(page, /WEEKLY_PLEDGED_AMOUNT/);
   assert.match(page, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
   assert.match(page, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);

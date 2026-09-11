@@ -239,7 +239,7 @@ function isBondLedgerReport(value: unknown): value is BondLedgerReport {
     isRecord(value.metricDeltas) &&
     typeof value.detailMarketValue === "number" &&
     isRecord(value.availability) &&
-    ["pledgedQuantity", "availableQuantity", "pledgedFaceAmount", "availableFaceAmount"].every((key) => {
+    ["pledgedQuantity", "availableQuantity", "pledgedMarketValue", "availableMarketValue", "pledgedFaceAmount", "availableFaceAmount"].every((key) => {
       const amount = (value.availability as Record<string, unknown>)[key];
       return amount === null || (typeof amount === "number" && Number.isFinite(amount) && amount >= 0);
     }) &&

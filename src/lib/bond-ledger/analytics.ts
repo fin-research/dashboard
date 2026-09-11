@@ -318,13 +318,29 @@ export function summarizePositionAvailability(
   if (!holdings.length || holdings.some((row) =>
     row.pledgedQuantity == null || row.availableQuantity == null
   )) {
-    return { pledgedQuantity: null, availableQuantity: null, pledgedFaceAmount: null, availableFaceAmount: null };
+    return {
+      pledgedQuantity: null, availableQuantity: null,
+      pledgedMarketValue: null, availableMarketValue: null,
+      pledgedFaceAmount: null, availableFaceAmount: null,
+    };
   }
   const pledgedQuantity = sum(holdings.map((row) => row.pledgedQuantity as number));
   const availableQuantity = sum(holdings.map((row) => row.availableQuantity as number));
+  // 使用原表全价市值按单券数量占比分拆，兼容估值全价为空或为零的 ETF。
+  // 有市值却没有有效持仓数量时无法分拆，不输出部分汇总或无穷值。
+  const canSplitMarketValue = holdings.every((row) =>
+    Number.isFinite(row.currentQuantity) && row.currentQuantity > 0 &&
+    Number.isFinite(row.marketValue) && row.marketValue >= 0
+  );
   return {
     pledgedQuantity,
     availableQuantity,
+    pledgedMarketValue: canSplitMarketValue
+      ? sum(holdings.map((row) => row.marketValue * ((row.pledgedQuantity as number) / row.currentQuantity)))
+      : null,
+    availableMarketValue: canSplitMarketValue
+      ? sum(holdings.map((row) => row.marketValue * ((row.availableQuantity as number) / row.currentQuantity)))
+      : null,
     pledgedFaceAmount: pledgedQuantity * 100,
     availableFaceAmount: availableQuantity * 100,
   };

@@ -161,7 +161,11 @@ export interface ReturnRiskMetrics {
 export interface LedgerAvailability {
   pledgedQuantity: number | null;
   availableQuantity: number | null;
+  pledgedMarketValue: number | null;
+  availableMarketValue: number | null;
+  /** @deprecated 兼容旧客户端的数量 × 100 元折算，不用于周报展示。 */
   pledgedFaceAmount: number | null;
+  /** @deprecated 兼容旧客户端的数量 × 100 元折算，不用于周报展示。 */
   availableFaceAmount: number | null;
 }
 

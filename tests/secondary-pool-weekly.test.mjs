@@ -48,7 +48,7 @@ test("新版规模标记在容器缩放后避开曲线，质押只有最新点�
     assert.equal(annotations.data.length, 2);
     assert.deepEqual(annotations.data[1].value, [points.at(-1).date, 55.201]);
     assert.equal(annotations.data[1].labelLine.show, false);
-    assert.match(annotations.data[0].label.formatter, /已质押 55.20 亿\n可用 18.80 亿/);
+    assert.match(annotations.data[0].label.formatter, /已质押持仓市值 55.20 亿\n可用持仓市值 18.80 亿/);
     assert.deepEqual(option.legend.flatMap(legend => legend.data), ["业务本金", "全池持仓市值", "时间加权本金", "全池综合杠杆率", "平层基准（100%）"]);
     const locations = [];
     for (const size of [[480, 372], [320, 430], [720, 430]]) {
@@ -75,11 +75,11 @@ test("新版规模标记在容器缩放后避开曲线，质押只有最新点�
     }
     assert.notDeepEqual(locations[0], locations[1]);
     renderWeeklyPoolScaleLeverage(host, [points.at(-1)], 0, 6_000_000_000);
-    assert.match(host.textContent, /已质押 0.00 亿/);
+    assert.match(host.textContent, /已质押持仓市值 0.00 亿/);
     renderWeeklyPoolScaleLeverage(host, points, null, null);
     const historical = chart.getOption().series.find(series => series.id === "weekly-scale-annotations");
     assert.equal(historical.data.length, 1);
-    assert.match(historical.data[0].label.formatter, /已质押 —\n可用 —/);
+    assert.match(historical.data[0].label.formatter, /已质押持仓市值 —\n可用持仓市值 —/);
   } finally {
     disposeChart(host);
     host.remove();
