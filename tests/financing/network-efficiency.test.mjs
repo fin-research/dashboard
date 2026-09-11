@@ -104,10 +104,10 @@ test('data administration gets its endpoint with the private token request', asy
 	assert.match(client, /dataApiUrl\?: string/);
 	assert.match(client, /parsed\.protocol !== 'https:'/);
 	assert.doesNotMatch(page, /import DataAdminTable|<DataAdminTable/);
-	assert.match(page, /<FinanceParametersPanel permissions=\{data.permissions\} \/>/);
+	assert.match(page, /<FinanceParametersPanel permissions=\{permissions\} \/>/);
 	assert.match(parameters, /new NeonDataApi\(\)/);
 	assert.doesNotMatch(parameters.slice(parameters.indexOf('async function save()')), /api\.list\(|loadRows\(\);|invalidateAll/);
-	assert.match(page, /hasPermission\(data\.permissions, 'financing.data:read'\)/);
+	assert.match(page, /hasPermission\(permissions, 'financing.data:read'\)/);
 	assert.match(page, /<DebtImportPanel \/>/);
 	assert.match(table, /new NeonDataApi\(\)/);
 	assert.doesNotMatch(page, /dataApiUrl/);

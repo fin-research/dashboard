@@ -1,4 +1,6 @@
 <script lang="ts">
+import { getContext } from 'svelte';
+import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 	import './weekly-report.css';
 	import { withBase } from '$lib/financing/app-paths';
 	import { FileText } from '@lucide/svelte';
@@ -14,9 +16,11 @@
 	import ReportStackedBarChart from '../../../charts/financing/ReportStackedBarChart.svelte';
 
 	let { data } = $props();
+	const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
+	const permissions = $derived($session?.permissions ?? data.permissions);
 	let report = $derived(data.report ?? emptyLiabilityWeeklyReport(data.selectedReportDate));
 	let hasSnapshot = $derived(Boolean(data.hasSnapshot));
-	let canGenerate = $derived(hasPermission(data.permissions, 'financing.report:generate'));
+	let canGenerate = $derived(hasPermission(permissions, 'financing.report:generate'));
 	let currentEvents = $derived((report?.events ?? []).filter((item: any) => item.week === 'current' && isDynamicEvent(item)));
 	let nextEvents = $derived((report?.events ?? []).filter((item: any) => item.week === 'next' && isDynamicEvent(item)));
 	let dynamicProjects = $derived((report?.projects ?? []).filter((item: any) => !['同业拆借', '浮动收益凭证'].includes(String(item.debtType ?? ''))));

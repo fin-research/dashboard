@@ -1,8 +1,9 @@
 <script lang="ts">
+import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 	import '../../management.css';
 	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
-	import { tick, untrack } from 'svelte';
+	import { getContext, tick, untrack } from 'svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import {
 		ArrowLeft,
@@ -30,6 +31,8 @@
 	};
 
 	let { data, form } = $props();
+	const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
+	const permissions = $derived($session?.permissions ?? data.permissions);
 	const initialData = untrack(() => data);
 	let template = $state({
 		...initialData.template,
@@ -51,8 +54,8 @@
 	let dragChanged = $state(false);
 	let keyboardGrabbedId = $state<string | null>(null);
 	let reorderAnnouncement = $state('');
-	const canManage = $derived(hasPermission(data?.permissions, 'financing.sop:update'));
-	const canDelete = $derived(hasPermission(data?.permissions, 'financing.sop:delete'));
+	const canManage = $derived(hasPermission(permissions, 'financing.sop:update'));
+	const canDelete = $derived(hasPermission(permissions, 'financing.sop:delete'));
 	$effect(() => {
 		if (!form?.message || suppressFormFeedback || handledForm === form) return;
 		handledForm = form;

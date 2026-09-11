@@ -1,4 +1,6 @@
 <script lang="ts">
+import { getContext } from 'svelte';
+import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import './layout.css';
 import { Bell } from '@lucide/svelte';
 import { navigating, page } from '$app/state';
@@ -7,6 +9,8 @@ import type { WorkbenchIconName } from '$lib/trading-research/demo-data';
 import { hasPermission } from '$lib/permissions';
 import { withBase, withoutBase } from '$lib/financing/app-paths';
 let { data, children } = $props();
+const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
+const permissions = $derived($session?.permissions ?? data.permissions);
 let navigationSlow = $state(false);
 let remindersMenu = $state<HTMLDetailsElement>();
 $effect(() => { page.url.pathname; if (remindersMenu) remindersMenu.open = false; });
@@ -19,10 +23,10 @@ $effect(() => {
 const views = $derived([
   { id: 'overview', href: '/financing/', label: '仪表盘', icon: 'overview' as WorkbenchIconName },
   { id: 'liability-report', href: '/financing/liability-report', label: '负债周报', icon: 'file' as WorkbenchIconName },
-  ...(hasPermission(data.permissions, 'financing.data:read') ? [{ id: 'bond-investors', href: '/financing/bond-investors', label: '债券投资人', icon: 'user' as WorkbenchIconName }] : []),
+  ...(hasPermission(permissions, 'financing.data:read') ? [{ id: 'bond-investors', href: '/financing/bond-investors', label: '债券投资人', icon: 'user' as WorkbenchIconName }] : []),
   { id: 'projects', href: '/financing/projects', label: '项目进度', icon: 'workflow' as WorkbenchIconName },
   { id: 'sop', href: '/financing/sop', label: 'SOP 管理', icon: 'check' as WorkbenchIconName },
-  ...(hasPermission(data.permissions, 'financing.data:read') ? [{ id: 'data', href: '/financing/data', label: '融资数据', icon: 'database' as WorkbenchIconName }] : [])
+  ...(hasPermission(permissions, 'financing.data:read') ? [{ id: 'data', href: '/financing/data', label: '融资数据', icon: 'database' as WorkbenchIconName }] : [])
 ]);
 const path = $derived(withoutBase(page.url.pathname));
 const activeViewId = $derived(path === '/' || path.startsWith('/debts/') ? 'overview' : path.split('/')[1] ?? 'overview');
@@ -50,7 +54,7 @@ const activeLabel = $derived(path.startsWith('/projects/') ? '项目详情' : pa
     </details>
     {#if isLiabilityReport}
       {#await import('$lib/financing/LiabilityReportActions.svelte') then module}
-        <module.default permissions={data.permissions} />
+        <module.default permissions={permissions} />
       {/await}
     {/if}
   {/snippet}

@@ -1,9 +1,10 @@
 <script lang="ts">
+import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { untrack } from 'svelte';
+	import { getContext, untrack } from 'svelte';
 	import {
 		ArrowLeft,
 		CalendarDays,
@@ -20,6 +21,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	import { withBase } from '$lib/financing/app-paths';
 
 	let { data: routeData, form } = $props();
+	const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
+	const permissions = $derived($session?.permissions ?? routeData.permissions);
 	const initialRouteData = untrack(() => routeData);
 	let data = $state(initialRouteData);
 	let loadedProjectId = $state(String(initialRouteData.project.id));
@@ -33,11 +36,11 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	let suppressFormFeedback = $state(false);
 	let handledForm = $state<unknown>(null);
 	const pendingAction = $derived(pendingActions.at(-1) ?? '');
-	const canManage = $derived(hasPermission(data?.permissions, 'financing.task:update'));
-	const canManageProject = $derived(hasPermission(data?.permissions, 'financing.project:update'));
-	const canCreateTask = $derived(hasPermission(data?.permissions, 'financing.task:create'));
+	const canManage = $derived(hasPermission(permissions, 'financing.task:update'));
+	const canManageProject = $derived(hasPermission(permissions, 'financing.project:update'));
+	const canCreateTask = $derived(hasPermission(permissions, 'financing.task:create'));
 	const canUpdateTaskStatus = (task: any) => canManage || (
-		hasPermission(data?.permissions, 'financing.task:update_own') && task.assigneeId === data?.user?.personId
+		hasPermission(permissions, 'financing.task:update_own') && task.assigneeId === data?.user?.personId
 	);
 	$effect(() => {
 		if (!form?.message || suppressFormFeedback || handledForm === form) return;

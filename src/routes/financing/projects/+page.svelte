@@ -1,9 +1,10 @@
 <script lang="ts">
+import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import ModuleCard from '../../../components/ModuleCard.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { untrack } from 'svelte';
+	import { getContext, untrack } from 'svelte';
 	import {
 		ArrowRight,
 		CalendarDays,
@@ -29,6 +30,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	import { buildProjectPageData } from '$lib/financing/project-page.js';
 
 	let { data } = $props();
+	const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
+	const permissions = $derived($session?.permissions ?? data.permissions);
 	let selectedTypes = $state<string[]>([]);
 	const initialOwnerSelection = () =>
 		data?.viewContext?.defaultOwnProjects && data?.viewContext?.personName
@@ -50,9 +53,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	let actionState = $state<{ key: string; status: 'idle' | 'pending' }>({
 		key: '', status: 'idle'
 	});
-	const canManage = $derived(hasPermission(data?.permissions, 'financing.project:update'));
-	const canCreate = $derived(hasPermission(data?.permissions, 'financing.project:create'));
-	const canDelete = $derived(hasPermission(data?.permissions, 'financing.project:delete'));
+	const canManage = $derived(hasPermission(permissions, 'financing.project:update'));
+	const canCreate = $derived(hasPermission(permissions, 'financing.project:create'));
+	const canDelete = $derived(hasPermission(permissions, 'financing.project:delete'));
 
 	function showAutoSaved(message: string) {
 		globalMessages.success(message, { key: 'project-list-auto-save', duration: 3000, title: '项目已同步' });

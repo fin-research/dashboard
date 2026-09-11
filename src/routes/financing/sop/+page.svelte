@@ -1,10 +1,11 @@
 <script lang="ts">
+import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
 import ModuleCard from '../../../components/ModuleCard.svelte';
 	import '../management.css';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { untrack } from 'svelte';
+	import { getContext, untrack } from 'svelte';
 	import {
 		ArrowRight,
 		BellRing,
@@ -23,6 +24,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	import { hasPermission } from '$lib/permissions';
 
 	let { data } = $props();
+	const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
+	const permissions = $derived($session?.permissions ?? data.permissions);
 	let reminderDialog = $state<HTMLDialogElement>();
 	let sopDialog = $state<HTMLDialogElement>();
 	let reminderRecipientMode = $state('assignee');
@@ -42,9 +45,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		displayedSettings = data?.settings ?? fallback;
 	});
 	const settings = $derived(displayedSettings);
-	const canManage = $derived(hasPermission(data?.permissions, 'financing.sop:update'));
-	const canCreateSop = $derived(hasPermission(data?.permissions, 'financing.sop:create'));
-	const canCreateReminder = $derived(hasPermission(data?.permissions, 'financing.reminder:create'));
+	const canManage = $derived(hasPermission(permissions, 'financing.sop:update'));
+	const canCreateSop = $derived(hasPermission(permissions, 'financing.sop:create'));
+	const canCreateReminder = $derived(hasPermission(permissions, 'financing.reminder:create'));
 	const activeSopTemplates = $derived(
 		settings.sopTemplates.filter((sop: { isActive: boolean }) => sop.isActive)
 	);
