@@ -1,34 +1,64 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { withLoginRedirect, LoginRequiredError, requireClientLogin, redirectToLogin } from '../src/lib/auth-client.ts';
+import { withAuthInteraction, installAuthInteraction, requireClientLogin, requestLogin } from '../src/lib/auth-client.ts';
 import { loginUrl, pageRequiresLogin } from '../src/lib/auth-navigation.ts';
 import { dashboardAccessFailure, dashboardRequiresLogin } from '../src/lib/server/dashboard-access.ts';
 import { AccessError } from '../src/lib/server/access.ts';
 import { createClientSession } from '../src/lib/client-session.ts';
 
 const current = 'https://eastmoney.hasbai.xyz/fund-report?upload=1#history';
-test('all same-origin 401 responses redirect before parsing or exposing generic failures', async () => {
-  for (const input of ['/api/fund-report', new URL('https://eastmoney.hasbai.xyz/api/credit'), new Request('https://eastmoney.hasbai.xyz/data/news')]) {
-    const redirects = [];
-    const fetcher = withLoginRedirect(async () => new Response('not-json', { status: 401 }), () => current, (path) => redirects.push(path));
-    await assert.rejects(fetcher(input), LoginRequiredError);
-    assert.deepEqual(redirects, ['/fund-report?upload=1#history']);
+const anonymous = { user: null, account: null, roles: [], permissions: [], expiresAt: null };
+const authenticated = { ...anonymous, user: { email: 'test@18.cn' }, permissions: ['credit.institution:read', 'fund.report:upload'], expiresAt: Date.now() / 1000 + 3600 };
+
+test('anonymous writes wait for login, recheck permission and send exactly once', async () => {
+  const state = createClientSession(anonymous);
+  let requests = 0, logins = 0;
+  const cleanup = installAuthInteraction({ session: state, login: async () => { logins++; state.seed(authenticated); return true; }, error: assert.fail });
+  try {
+    const fetcher = withAuthInteraction(async () => { requests++; return Response.json({ ok: true }); }, () => current);
+    assert.equal((await fetcher('/api/fund-report', { method: 'POST', body: 'file' })).status, 200);
+    assert.equal(requests, 1); assert.equal(logins, 1);
+  } finally { cleanup(); }
+});
+
+test('cancelled login and denied permissions never send the protected operation', async () => {
+  for (const session of [anonymous, { ...authenticated, permissions: [] }]) {
+    const errors = [];
+    const cleanup = installAuthInteraction({ session: createClientSession(session), login: async () => false, error: message => errors.push(message) });
+    try {
+      const fetcher = withAuthInteraction(async () => assert.fail('must not send'), () => current);
+      assert.equal((await fetcher('/api/fund-report', { method: 'POST' })).status, 403);
+      assert.equal(errors.length, session.user ? 1 : 0);
+    } finally { cleanup(); }
   }
 });
 
-test('success, validation, permission and upstream failures keep their original response and request', async () => {
-  for (const status of [200, 201, 400, 403, 409, 500, 503]) {
-    const response = Response.json({ status }, { status });
-    const request = new Request('https://eastmoney.hasbai.xyz/api/fund-report', { method: 'POST', body: 'file' });
-    const fetcher = withLoginRedirect(async (input) => { assert.equal(input, request); return response; }, () => current, () => assert.fail('must not redirect'));
-    assert.equal(await fetcher(request), response);
+test('expired read and SvelteKit login redirect recover with one retry; writes are never replayed', async () => {
+  for (const scenario of ['read', 'data', 'write']) {
+    const state = createClientSession(authenticated);
+    let requests = 0, logins = 0;
+    const cleanup = installAuthInteraction({ session: state, login: async () => { logins++; state.seed(authenticated); return true; }, error: () => {} });
+    try {
+      const fetcher = withAuthInteraction(async () => {
+        requests++;
+        if (requests === 2) return Response.json({ ok: true });
+        return scenario === 'data' ? Response.json({ type: 'redirect', location: '/auth/login?returnTo=%2Fprofile' }) : new Response(null, { status: 401 });
+      }, () => current);
+      const response = await fetcher(scenario === 'data' ? '/credit-workbench/__data.json' : '/api/fund-report', { method: scenario === 'write' ? 'POST' : 'GET' });
+      assert.equal(response.status, scenario === 'write' ? 401 : 200);
+      assert.equal(requests, scenario === 'write' ? 1 : 2); assert.equal(logins, 1);
+    } finally { cleanup(); }
   }
 });
 
-test('unrelated external 401s do not log users out of dashboard', async () => {
-  const response = new Response(null, { status: 401 });
-  const fetcher = withLoginRedirect(async () => response, () => current, () => assert.fail('external identity is unrelated'));
-  assert.equal(await fetcher('https://external.test/api'), response);
+test('public and external requests, session bootstrap and unrelated errors are not intercepted', async () => {
+  const cleanup = installAuthInteraction({ session: createClientSession(anonymous), login: async () => assert.fail('must not login'), error: assert.fail });
+  try {
+    for (const [url, status] of [['/api/market-report', 200], ['/auth/session', 401], ['https://external.test/api', 401], ['/api/market-report', 503]]) {
+      const response = Response.json({ status }, { status });
+      assert.equal(await withAuthInteraction(async () => response, () => current)(url), response);
+    }
+  } finally { cleanup(); }
 });
 
 test('private page guard covers child routes and agrees with the server', () => {
@@ -56,22 +86,27 @@ test('login destinations preserve local queries and reject encoded loops or exte
   assert.equal(loginUrl('/profile?tab=email'), '/auth/login?returnTo=%2Fprofile%3Ftab%3Demail');
 });
 
-test('preflight login checks fail closed and concurrent redirects cause only one navigation', async (t) => {
-  const redirects = [];
-  const anonymous = { user: null, account: null, roles: [], permissions: [], expiresAt: null };
-  t.mock.method(globalThis, 'fetch', async () => Response.json({ ...anonymous, user: { email: 'test@18.cn' }, expiresAt: Date.now() / 1000 + 60 }));
-  assert.equal(await requireClientLogin('/profile', createClientSession()), true);
-  t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
-  await assert.rejects(requireClientLogin('/profile', createClientSession()), /登录状态暂时无法读取/);
-  const original = globalThis.window;
-  globalThis.window = { location: { pathname: '/', search: '', hash: '', assign: (url) => redirects.push(url) } };
+test('preflight login checks fail closed and recover in-place through the installed dialog', async () => {
+  let logins = 0;
+  const state = createClientSession(anonymous);
+  const cleanup = installAuthInteraction({ session: state, login: async () => { logins++; state.seed(authenticated); return true; }, error: assert.fail });
   try {
-    t.mock.method(globalThis, 'fetch', async () => Response.json({ user: null, enabled: true }));
-    assert.equal(await requireClientLogin('/fund-report?upload=1', createClientSession(anonymous)), false);
-    redirectToLogin('/profile');
-    assert.deepEqual(redirects, [loginUrl('/fund-report?upload=1')]);
-  } finally {
-    if (original === undefined) delete globalThis.window;
-    else globalThis.window = original;
-  }
+    assert.equal(await requireClientLogin('/fund-report?upload=1', state), true);
+    assert.equal(await requestLogin('/profile'), true);
+    assert.equal(logins, 2);
+    await assert.rejects(requireClientLogin('/profile', createClientSession(null, async () => new Response(null, { status: 503 }))), /登录状态暂时无法读取/);
+  } finally { cleanup(); }
+});
+
+test('cancelled data navigation stays on the original route and enhanced writes receive a failure result', async () => {
+  const state = createClientSession(authenticated);
+  const cleanup = installAuthInteraction({ session: state, login: async () => false, error() {} });
+  try {
+    const fetcher = withAuthInteraction(async () => new Response(null, { status: 401 }), () => current);
+    const response = await fetcher('/credit-workbench/__data.json');
+    assert.deepEqual(await response.json(), { type: 'redirect', location: '/fund-report?upload=1#history' });
+    state.seed(authenticated);
+    const action = await fetcher('/financing/projects?/createProject', { method: 'POST', headers: { 'x-sveltekit-action': 'true' } });
+    assert.equal((await action.json()).type, 'failure');
+  } finally { cleanup(); }
 });

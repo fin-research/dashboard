@@ -24,7 +24,7 @@ function setupGuard(state) {
   const guard = createClientNavigationGuard(state, {
     origin: () => origin,
     navigate: async url => calls.resumed.push(url.href),
-    error: message => calls.errors.push(message), login: path => calls.logins.push(path),
+    error: message => calls.errors.push(message), login: path => { calls.logins.push(path); },
   });
   function visit(path, id) {
     const event = navigation(path, id);
@@ -83,7 +83,7 @@ test('public or external navigation supersedes a pending protected navigation', 
   }
 });
 
-test('anonymous state is cached and redirects without a session request; denied roles and unknown routes stay closed', () => {
+test('anonymous state is cached and opens login without a session request; denied roles and unknown routes stay closed', () => {
   let requests = 0;
   const fetcher = async () => { requests++; throw Error('unexpected'); };
   const anon = setupGuard(createClientSession(anonymous, fetcher));
@@ -164,5 +164,20 @@ test('client GET catalogue preserves static permissions and dynamic aliases', ()
   }
   for (const [path, permission] of [['/trading-research/secondary-bond-pool', 'bond.ledger:read'], ['/trading%2dresearch/credit', 'credit.institution:read'], ['/trading-research/credit-assistant/__data.json', 'credit.assistant:read']]) {
     assert.equal(pagePermission(path, '/trading-research/[view]'), permission);
+  }
+});
+
+test('popup login resumes the requested SPA route once and rechecks newly acquired permissions', async () => {
+  for (const permissions of [authenticated.permissions, []]) {
+    const state = createClientSession(anonymous, async () => assert.fail('snapshot already seeded'), () => 1000000);
+    const resumed = [], errors = [];
+    const guard = createClientNavigationGuard(state, {
+      origin: () => origin, navigate: async url => resumed.push(url.pathname), error: value => errors.push(value),
+      login: async () => { state.seed({ ...authenticated, permissions }); return true; },
+    });
+    let cancelled = 0;
+    guard({ to: { url: new URL('/trading-research/research', origin), route: { id: '/trading-research/[view]' } }, cancel: () => cancelled++ });
+    await setImmediate();
+    assert.equal(cancelled, 1); assert.equal(resumed.length, permissions.length ? 1 : 0); assert.equal(errors.length, permissions.length ? 0 : 1);
   }
 });
