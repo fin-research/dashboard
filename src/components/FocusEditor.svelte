@@ -30,8 +30,10 @@
   let html = "";
   let empty = true;
   let appliedBriefing: MarketBriefing | null = null;
+  let wasGenerating = false;
 
   $: currentProgress = summaries.at(-1) ?? { id: `status:${progressText}`, text: progressText };
+  $: progressMessage = currentProgress.text.replace(/\*\*/g, "");
 
   $: if (
     reportDate &&
@@ -62,6 +64,23 @@
       html = "";
       empty = true;
       onTextChange("");
+    }
+  }
+
+  $: if (generating !== wasGenerating) {
+    wasGenerating = generating;
+    if (generating) clearForGeneration();
+  }
+
+  function clearForGeneration(): void {
+    html = "";
+    empty = true;
+    onTextChange("");
+    try {
+      window.localStorage.removeItem(`${FOCUS_STORAGE_PREFIX}${reportDate}`);
+      window.localStorage.removeItem(`${LEGACY_FOCUS_STORAGE_PREFIX}${reportDate}`);
+    } catch {
+      // Clearing the editor does not depend on browser storage availability.
     }
   }
 
@@ -156,15 +175,14 @@
 
 {#if generating}
   <div class="focus-progress" role="status" aria-live="polite" aria-atomic="true" aria-label="今日聚焦生成进度">
-    <span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
     <div class="focus-progress-copy">
       {#key currentProgress.id}
         <span
           class="focus-progress-message"
-          title={currentProgress.text}
+          title={progressMessage}
           in:fly={{ y: prefersReducedMotion.current ? 0 : 6, duration: prefersReducedMotion.current ? 0 : 180, delay: prefersReducedMotion.current ? 0 : 120 }}
           out:fly={{ y: prefersReducedMotion.current ? 0 : -6, duration: prefersReducedMotion.current ? 0 : 120 }}
-        >{currentProgress.text}</span>
+        >{progressMessage}</span>
       {/key}
     </div>
   </div>
@@ -179,7 +197,7 @@
   aria-keyshortcuts="Control+B Meta+B Control+I Meta+I Control+U Meta+U Control+Shift+H Meta+Shift+H"
   aria-multiline="true"
   data-empty={empty}
-  data-placeholder={PLACEHOLDER}
+  data-placeholder={generating ? "" : PLACEHOLDER}
   spellcheck="false"
   tabindex="0"
   bind:innerHTML={html}
@@ -195,9 +213,9 @@
     gap: 0.5rem;
     padding-block: 0.5rem;
     color: var(--color-primary);
-    font-size: 0.875rem;
+    font-family: var(--font);
+    font-size: 1rem;
   }
-  .focus-progress > .loading { flex-shrink: 0; }
   .focus-progress-copy { display: grid; flex: 1; min-width: 0; overflow: hidden; }
   .focus-progress-message {
     grid-area: 1 / 1;

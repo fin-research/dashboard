@@ -79,6 +79,6 @@ test('浏览器逐帧接收摘要，拒绝断流、空正文和日期错配', as
   } finally { globalThis.fetch = original; }
 });
 
-test('今日聚焦实际组件隔离摘要和草稿，取消恢复，完成由前端编号', async () => {
+test('今日聚焦开始生成清空草稿，进度去除加粗标记，完成由前端编号', async () => {
   await promisify(execFile)(process.execPath, ['--conditions=browser', 'tests/helpers/market-focus-lifecycle.mjs'], { cwd: new URL('../', import.meta.url), timeout: 20000, maxBuffer: 20000 });
 });
