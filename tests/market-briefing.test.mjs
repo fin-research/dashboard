@@ -8,13 +8,14 @@ import {
   MARKET_BRIEFING_SYSTEM,
 } from "../src/lib/server/market-briefing.ts";
 
-test("用户提示词允许 Web Search 补充核验且禁止无证据补写", () => {
+test("用户提示词仅允许补充必要的信息缺口，不要求联网核验", () => {
   const prompt = buildMarketBriefingPrompt("2026-08-10", "【1】正文");
   assert.equal(
     prompt,
     "请使用随附的 market-briefing skill，根据以下 2026-08-10 当天新闻撰写今日市场聚焦。" +
-      "优先使用给定材料，并使用已启用的 Web Search 补充和核验关键行情与驱动；" +
-      "不得补写未经给定材料或联网证据验证的事实。" +
+      "优先使用给定材料；联网搜索必须少用、慎用，" +
+      "仅在缺少形成核心判断所必需的信息时补充搜索。材料足够时直接写作，不为核验给定材料而联网。" +
+      "如需搜索，只围绕必要的信息缺口，获得所需信息后立即停止。不得补写缺乏材料或搜索结果支持的事实。" +
       "严格遵守 skill 的输出格式，最终只返回两条正文。\n\n【1】正文",
   );
 });
@@ -47,6 +48,10 @@ test("系统提示完整包含 market-briefing skill 的输出规范", () => {
   );
   assert.match(MARKET_BRIEFING_SYSTEM, /每条以120—200字为宜/);
   assert.match(MARKET_BRIEFING_SYSTEM, /## 输出前自检/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /联网搜索必须少用、慎用/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /仅当缺少形成核心判断所必需的信息时/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /不为核验给定材料/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /搜索获得必要信息后立即停止/);
 });
 
 test("生成流程从后端取数并直连 provider-specific Responses 结构化输出", async () => {
@@ -151,7 +156,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(headers.get("cf-aig-request-timeout"), "300000");
     assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
       report_date: "2026-08-10",
-      prompt_version: "market-briefing-v5-web-search",
+      prompt_version: "market-briefing-v6-search-when-needed",
       tags: "market-briefing,manual-generation,web-search",
       ai_model: "gpt-5.6-luna",
       ai_provider: "custom-codex",
@@ -162,7 +167,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(Object.hasOwn(query, "store"), false);
     assert.equal(
       query.prompt_cache_key,
-      "market-briefing:market-briefing-v5-web-search",
+      "market-briefing:market-briefing-v6-search-when-needed",
     );
     assert.deepEqual(query.reasoning, {
       effort: "max",

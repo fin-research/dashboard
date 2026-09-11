@@ -4,7 +4,7 @@ import { formatDataApiError } from "../../data-api-error.ts";
 import type { MarketBriefing } from "../../types";
 import { generateAiGatewayObject } from "./ai-gateway.ts";
 
-const PROMPT_VERSION = "market-briefing-v5-web-search";
+const PROMPT_VERSION = "market-briefing-v6-search-when-needed";
 const DATA_TIMEOUT_MS = 60_000;
 const marketBriefingOutputSchema = z
   .object({ content: z.string().min(1).describe("只包含两条市场聚焦正文") })
@@ -45,7 +45,7 @@ const TRUNCATE_RULES = [
 ] as const;
 
 /**
- * market-briefing skill 全文，与后端旧版 Codex 生成时挂载的 SKILL.md 逐字一致。
+ * 基于 market-briefing skill 的写作规范；本模块维护市场聚焦的检索约束。
  */
 export const MARKET_BRIEFING_SYSTEM = `---
 name: market-briefing
@@ -62,8 +62,9 @@ description: 为专业金融从业者撰写或改写A股与债市的当日市场
 
 ### 1. 获取必要信息
 
-- 用户提供的资讯足以判断时，直接分析，不额外搜索。
-- 资讯不足时，只补充能解释核心行情的材料：政策或宏观事件、产业和公司催化、资金面、跨资产联动、拥挤度或止盈压力。
+- 联网搜索必须少用、慎用。给定材料足以形成核心判断时，直接分析和写作，不进行联网搜索。
+- 仅当缺少形成核心判断所必需的信息时，才针对该信息缺口补充搜索；不为核验给定材料、重复确认已知行情或扩充背景而搜索。
+- 搜索获得必要信息后立即停止；仍无法获得的信息保留不确定性，不反复检索或补写未经支持的事实。
 - 优先寻找与当日结构分化直接对应的证据。例如，科技独跌时核对产业链消息和财报；超长债弱于10Y时核对资金面、权益联动、供给和持仓拥挤。
 - 不为追求“全面”搜集并罗列所有指数、板块、期限和合约数据。
 
@@ -137,7 +138,7 @@ description: 为专业金融从业者撰写或改写A股与债市的当日市场
 `;
 
 /**
- * 用户提示词：以 Data Worker 材料为主，并允许模型联网补充核验。
+ * 用户提示词：以 Data Worker 材料为主，联网仅用于补充必要的信息缺口。
  */
 export function buildMarketBriefingPrompt(
   reportDate: string,
@@ -145,8 +146,9 @@ export function buildMarketBriefingPrompt(
 ): string {
   return (
     `请使用随附的 market-briefing skill，根据以下 ${reportDate} ` +
-    "当天新闻撰写今日市场聚焦。优先使用给定材料，并使用已启用的 Web Search 补充和核验关键行情与驱动；" +
-    "不得补写未经给定材料或联网证据验证的事实。" +
+    "当天新闻撰写今日市场聚焦。优先使用给定材料；联网搜索必须少用、慎用，" +
+    "仅在缺少形成核心判断所必需的信息时补充搜索。材料足够时直接写作，不为核验给定材料而联网。" +
+    "如需搜索，只围绕必要的信息缺口，获得所需信息后立即停止。不得补写缺乏材料或搜索结果支持的事实。" +
     "严格遵守 skill 的输出格式，最终只返回两条正文。\n\n" +
     newsText
   );

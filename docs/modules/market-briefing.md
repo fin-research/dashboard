@@ -4,6 +4,7 @@
 
 ## 接口
 
+- `POST /api/market-briefing?date=YYYY-MM-DD`：读取该日新闻并通过 AI Gateway 生成两条市场聚焦；模型保持 `gpt-5.6-luna`、`reasoning.effort=max`。
 - `GET /api/market-report?date=YYYY-MM-DD`：读取并校验该日期完整 R2 定稿。无定稿返回 404 `REPORT_NOT_FINALIZED`，浏览器据此回退到 Data REST 原始资源重新生成。
 - `PUT /api/market-report?date=YYYY-MM-DD`：仅在用户手动保存时，同源接收浏览器已加工并经 Schema 裁剪的规范报告与今日聚焦，覆盖当天对象；完整文字版不得写入 R2，原始上游响应不得写入 R2，序列化快照上限为 512 KiB。
 
@@ -12,6 +13,7 @@
 
 ## 业务规则
 
+- 今日聚焦优先使用给定新闻，联网搜索必须少用、慎用，仅在缺少形成核心判断所必需的信息时补充；材料足够时直接写作，不要求联网核验给定材料。获得必要信息后停止搜索，缺乏支持的判断保留不确定性。Web Search 工具保持可用，系统与用户提示词共同约束搜索范围。
 - 报告日期按 `Asia/Shanghai` 解释；开盘前默认日期逻辑由 `src/report-date.ts` 统一维护。
 - 浏览器直接请求公开只读 `/data/*` 的单一上游映射 REST 资源，在 `src/market-report-resources.ts` 完成筛选、合并和口径换算；市场数据不经过 Dashboard Worker，也不使用 Data GraphQL 做报告聚合。单一资源请求失败不得阻断整份报告，依赖该资源的视觉模块与文字段落明确显示“数据缺失”，其余模块保持正常数据。
 - 利率债列表中的个别收益率缺失按 `null` 接收，保留其他有效行情；规范报告继续保留空收益率，不转为零，也不将整批国债行情标记为资源失败。
