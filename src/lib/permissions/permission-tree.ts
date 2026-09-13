@@ -24,3 +24,9 @@ export function permissionTree(granted: readonly string[], query = '', grantedOn
     })).filter(resource => resource.actions.length) };
   }).filter(group => group.resources.length);
 }
+
+const ROLE_LABELS: Record<string, string> = {
+  authenticated: '基础用户', financing: '融资组', 'financing:admin': '融资管理员',
+  'financing:handler': '融资经办', 'financing:reviewer': '融资复核',
+};
+export function roleLabel(name: string) { return ROLE_LABELS[name] ?? name; }

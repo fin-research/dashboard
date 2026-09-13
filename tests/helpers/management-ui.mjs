@@ -17,7 +17,7 @@ flushSync(()=>document.querySelectorAll('.role-list button')[1].click());
 assert.equal(document.querySelectorAll('.action-granted').length,0);
 const search=document.querySelector('input[aria-label="搜索权限"]');
 flushSync(()=>{search.value='没有的权限';search.dispatchEvent(new window.Event('input',{bubbles:true}));});
-assert.ok(document.querySelector('.permission-editor').textContent.includes('没有匹配的权限'));
+assert.ok(document.querySelector('.permission-editor').textContent.includes('无匹配权限'));
 await unmount(app);
 globalMessages.clear();
 

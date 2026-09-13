@@ -27,14 +27,14 @@
   <div class="permission-tree">
     {#each visible as group}
       <section class="scope-section" aria-label={group.label}>
-        <div class="scope-heading"><span class="scope-icon"><Layers size={18} aria-hidden="true" /></span><h3>{group.label}</h3><code>{group.scope}</code><span class="scope-count">{group.resources.length} 个资源</span></div>
+        <div class="scope-heading"><span class="scope-icon"><Layers size={18} aria-hidden="true" /></span><h3>{group.label}</h3><span class="scope-count">{group.resources.length} 个资源</span></div>
         <div class="resource-grid">
           {#each group.resources as resource}
             <div class="resource-row">
-              <div class="resource-heading"><h4>{resource.name}</h4><code>{resource.id}</code></div>
+              <div class="resource-heading"><h4>{resource.name}</h4></div>
               <ul class="action-list" aria-label={`${resource.name}的操作`}>
                 {#each resource.actions as action}
-                  <li class:action-granted={action.granted} class:action-denied={!action.granted} title={`${action.description} · ${action.code}`}>
+                  <li class:action-granted={action.granted} class:action-denied={!action.granted}>
                     {#if action.granted}<Check size={15} aria-hidden="true" />{:else}<Minus size={15} aria-hidden="true" />{/if}
                     <span>{action.name}</span><span class="sr-only">：{action.granted ? '已授权' : '未授权'}，{action.code}</span>
                   </li>
@@ -45,15 +45,15 @@
         </div>
       </section>
     {/each}
-    {#if !visible.length}<p class="permission-empty" role="status">{query || scope ? '没有匹配的权限，请调整筛选条件。' : '当前没有已授权的业务权限。'}</p>{/if}
+    {#if !visible.length}<p class="permission-empty" role="status">{query || scope ? '无匹配权限' : '暂无权限'}</p>{/if}
   </div>
 </div>
 
 <style>
   .permission-explorer { display: grid; gap: 1rem; min-width: 0; }
   .permission-overview { display: flex; flex-wrap: wrap; gap: .75rem 1.75rem; padding: 1rem; background: var(--brand-soft); border-radius: var(--radius-control); }
-  .permission-overview > span { display: flex; align-items: center; gap: .5rem; color: var(--muted); font-size: .875rem; }
-  .permission-overview strong { color: var(--text); font-size: 1.25rem; }
+  .permission-overview > span { display: flex; align-items: center; gap: .5rem; color: var(--text-1); font-size: 1rem; }
+  .permission-overview strong { color: var(--text-1); font-size: 1.25rem; }
   .permission-overview :global(svg) { color: var(--brand); }
   .permission-search { width: 100%; }
   .scope-filters { display: flex; flex-wrap: wrap; gap: .375rem; }
@@ -62,8 +62,7 @@
   .scope-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .625rem; padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
   .scope-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-control); background: var(--brand-soft); color: var(--brand); }
   .scope-heading h3 { margin: 0; font-size: 1.125rem; font-weight: bold; }
-  code { font-family: inherit; color: var(--muted); font-size: .8125rem; overflow-wrap: anywhere; }
-  .scope-count { margin-left: auto; color: var(--muted); font-size: .875rem; }
+  .scope-count { margin-left: auto; color: var(--text-1); font-size: 1rem; }
   .resource-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 0 1.5rem; }
   .resource-row { min-width: 0; display: grid; align-content: start; gap: .75rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
   .resource-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: .5rem; }

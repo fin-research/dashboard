@@ -7,6 +7,8 @@
   import { globalMessages } from '$lib/global-messages';
   import { isLoginRedirecting } from '$lib/auth-client';
   import { type AccountProfile } from '$lib/profile';
+  import { RefreshCw, ShieldCheck } from '@lucide/svelte';
+  import { roleLabel } from '$lib/permissions/permission-tree';
   import PermissionExplorer from '$lib/permissions/PermissionExplorer.svelte';
   import { readPreferences, savePreferences, type MarketColorConvention } from '$lib/preferences';
   import type { PageData } from './$types';
@@ -14,14 +16,13 @@
   let { data }: { data: PageData } = $props();
   let permissions = $state<string[]>([]);
   let permissionsLoading = $state(false);
-  let permissionUpdatedAt = $state<number | null>(null);
   async function loadPermissions() {
     permissionsLoading = true;
     try {
       const response = await fetch('/auth/permissions', { cache: 'no-store' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || '权限读取失败');
-      permissions = result.permissions; permissionUpdatedAt = result.updatedAt;
+      permissions = result.permissions;
       await invalidate('site:session');
     } catch (error) { globalMessages.error(error instanceof Error ? error.message : '权限读取失败'); }
     finally { permissionsLoading = false; }
@@ -119,17 +120,17 @@
       <ModuleCard labelledBy="profile-email-title">
         <PanelHeading id="profile-email-title" title="登录邮箱" accent="var(--color-accent)" />
         <form class="profile-form" onsubmit={(event) => { event.preventDefault(); void submit('email'); }}>
-          <label for="profile-email">邮箱地址 {#if profile}<span class="field-status">{profile.emailVerified ? '已验证' : '待验证'}</span>{/if}</label>
-          <input class="input" id="profile-email" name="email" type="email" autocomplete="email" bind:value={email} required maxlength="254" pattern="[^@\s]+@18\.[cC][nN]" disabled={!profile || pending !== null} aria-describedby="email-help" />
-          <p class="profile-help" id="email-help">仅支持 18.cn 邮箱。修改后请验证新邮箱，并重新登录。</p>
-          <label class="profile-choice"><input class="checkbox checkbox-primary" type="checkbox" bind:checked={confirmed} disabled={!profile || pending !== null} /><span>确认修改登录邮箱</span></label>
+          <label for="profile-email">邮箱地址 · @18.cn {#if profile}<span class="field-status">{profile.emailVerified ? '已验证' : '待验证'}</span>{/if}</label>
+          <input class="input" id="profile-email" name="email" type="email" autocomplete="email" bind:value={email} required maxlength="254" pattern="[^@\s]+@18\.[cC][nN]" disabled={!profile || pending !== null} />
+          <label class="profile-choice"><input class="checkbox checkbox-primary" type="checkbox" bind:checked={confirmed} disabled={!profile || pending !== null} /><span>确认修改邮箱并重新验证</span></label>
           <div class="profile-actions"><button class="btn btn-primary profile-button primary" type="submit" disabled={!profile || pending !== null || !confirmed || email.trim().toLowerCase() === profile.email.toLowerCase()}>{pending === 'email' ? '正在更新' : '更新邮箱并退出登录'}</button></div>
         </form>
       </ModuleCard>
       <ModuleCard labelledBy="profile-password-title">
         <PanelHeading id="profile-password-title" title="登录密码" accent="var(--color-warning-content)" />
         <div class="profile-form">
-          <p class="profile-help">向当前登录邮箱发送密码重置邮件，在邮件中的安全页面设置新密码。</p>
+          <label for="password-recipient">收件邮箱</label>
+          <input class="input" id="password-recipient" value={profile?.email || data.email} readonly />
           <div class="profile-actions"><button class="btn btn-outline profile-button" type="button" disabled={!profile || pending !== null} onclick={() => submit('password')}>{pending === 'password' ? '正在请求' : '发送密码重置邮件'}</button></div>
         </div>
       </ModuleCard>
@@ -140,20 +141,23 @@
             <label class="profile-choice"><input class="radio radio-primary" type="radio" name="marketColorConvention" bind:group={marketColorConvention} value="red-up-green-down" /><span>红涨绿跌（默认）</span></label>
             <label class="profile-choice"><input class="radio radio-primary" type="radio" name="marketColorConvention" bind:group={marketColorConvention} value="green-up-red-down" /><span>绿涨红跌</span></label>
           </fieldset>
-          <p class="profile-help">沿用此浏览器已保存的配置，保存后立即生效。</p>
           <div class="profile-actions"><button class="btn btn-primary profile-button primary" type="submit">保存个性化配置</button></div>
         </form>
       </ModuleCard>
       <div class="profile-permissions">
         <ModuleCard labelledBy="profile-permissions-title">
-          <PanelHeading id="profile-permissions-title" title="账号权限" />
-          <h3>已分配角色</h3>
+          <PanelHeading id="profile-permissions-title" title="账号权限" controlsInline>
+            <button class="btn btn-ghost" type="button" disabled={permissionsLoading} onclick={loadPermissions} aria-label="刷新我的权限">
+              {#if permissionsLoading}<span class="loading loading-spinner loading-sm" aria-hidden="true"></span>{:else}<RefreshCw size={18} aria-hidden="true" />{/if}
+              {permissionsLoading ? '刷新中' : '刷新'}
+            </button>
+          </PanelHeading>
           {#if profile}
-            {#if profile.roles.length}<ul class="permission-list">{#each profile.roles as role}<li>{role.name}{#if role.description && role.description !== role.name}<span>{role.description}</span>{/if}</li>{/each}</ul>{:else}<p class="profile-help">未分配业务角色</p>{/if}
-            <div class="profile-actions"><button class="btn btn-outline profile-button" type="button" disabled={permissionsLoading} onclick={loadPermissions}>{permissionsLoading ? '正在读取…' : '刷新我的权限'}</button>{#if permissionUpdatedAt}<span class="profile-help">授权缓存更新于 {new Date(permissionUpdatedAt).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai',hour12:false})}</span>{/if}</div>
+            <ul class="permission-roles" aria-label="已分配角色">
+              {#each profile.roles as role}<li><ShieldCheck size={16} aria-hidden="true" /><span>{roleLabel(role.name)}</span></li>{:else}<li>暂无角色</li>{/each}
+            </ul>
             <PermissionExplorer {permissions} grantedOnly />
-            <p class="profile-help">权限由 Auth0 统一管理，展示与访问检查使用 Gateway 当前授权缓存。角色成员变更后请刷新登录角色。</p>
-          {:else}<p class="profile-help">{loading ? '正在读取角色与权限…' : '角色与权限暂时无法读取，请重新读取个人信息'}</p>{/if}
+          {:else}<div class="permission-status" role="status">{#if loading}<span class="loading loading-spinner" aria-label="加载权限"></span>{:else}<button class="btn btn-outline" type="button" onclick={() => loadProfile()}>重新加载</button>{/if}</div>{/if}
         </ModuleCard>
       </div>
     </div>
