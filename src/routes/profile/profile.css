@@ -3,7 +3,6 @@
 .profile-header h1 { margin: 0; font-size: 1.5rem; font-weight: bolder; }
 .profile-back { display: grid; place-items: center; width: 44px; height: 44px; }
 .profile-back svg, .profile-avatar svg { width: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.logout-form { margin-left: auto; }
 .profile-content { width: min(100%, 1040px); margin: 28px auto 0; }
 .profile-summary { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
 .profile-avatar { display: grid; flex-shrink: 0; place-items: center; width: 56px; height: 56px; border-radius: var(--radius-card); color: var(--brand-deep); background: var(--brand-soft); }
@@ -30,3 +29,6 @@
 .permission-roles li { display: inline-flex; align-items: center; gap: .5rem; min-height: 36px; padding: .375rem .75rem; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--color-base-200); font-size: 1rem; color: var(--text-1); }
 .permission-roles svg { color: var(--brand); flex-shrink: 0; }
 .permission-status { display: grid; place-items: center; min-height: 80px; }
+
+.permission-footer { display: flex; justify-content: flex-end; padding-top: 1.25rem; margin-top: 1.25rem; border-top: 1px solid var(--line); }
+.profile-footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; }

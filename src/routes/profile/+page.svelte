@@ -15,9 +15,7 @@
 
   let { data }: { data: PageData } = $props();
   let permissions = $state<string[]>([]);
-  let permissionsLoading = $state(false);
   async function loadPermissions() {
-    permissionsLoading = true;
     try {
       const response = await fetch('/auth/permissions', { cache: 'no-store' });
       const result = await response.json();
@@ -25,7 +23,6 @@
       permissions = result.permissions;
       await invalidate('site:session');
     } catch (error) { globalMessages.error(error instanceof Error ? error.message : '权限读取失败'); }
-    finally { permissionsLoading = false; }
   }
   let profile = $state<AccountProfile | null>(null);
   let loading = $state(true);
@@ -92,8 +89,6 @@
   <header class="profile-header">
     <a class="btn btn-ghost btn-square profile-back" href="/" aria-label="返回市场研究门户"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4-6 6 6 6" /></svg></a>
     <h1>个人管理</h1>
-    <a class="btn btn-outline profile-button" href="/auth/login?returnTo=%2Fprofile">刷新登录角色</a>
-    <form class="logout-form" method="post" action="/auth/logout"><button class="btn btn-outline profile-button" type="submit">退出登录</button></form>
   </header>
   <main class="profile-content">
     <div class="profile-summary">
@@ -146,20 +141,19 @@
       </ModuleCard>
       <div class="profile-permissions">
         <ModuleCard labelledBy="profile-permissions-title">
-          <PanelHeading id="profile-permissions-title" title="账号权限" controlsInline>
-            <button class="btn btn-ghost" type="button" disabled={permissionsLoading} onclick={loadPermissions} aria-label="刷新我的权限">
-              {#if permissionsLoading}<span class="loading loading-spinner loading-sm" aria-hidden="true"></span>{:else}<RefreshCw size={18} aria-hidden="true" />{/if}
-              {permissionsLoading ? '刷新中' : '刷新'}
-            </button>
-          </PanelHeading>
+          <PanelHeading id="profile-permissions-title" title="账号权限" />
           {#if profile}
             <ul class="permission-roles" aria-label="已分配角色">
               {#each profile.roles as role}<li><ShieldCheck size={16} aria-hidden="true" /><span>{roleLabel(role.name)}</span></li>{:else}<li>暂无角色</li>{/each}
             </ul>
             <PermissionExplorer {permissions} grantedOnly />
+            <div class="permission-footer">
+              <a class="btn btn-outline profile-button" href="/auth/login?returnTo=%2Fprofile"><RefreshCw size={18} aria-hidden="true" />刷新权限</a>
+            </div>
           {:else}<div class="permission-status" role="status">{#if loading}<span class="loading loading-spinner" aria-label="加载权限"></span>{:else}<button class="btn btn-outline" type="button" onclick={() => loadProfile()}>重新加载</button>{/if}</div>{/if}
         </ModuleCard>
       </div>
     </div>
+    <div class="profile-footer"><form method="post" action="/auth/logout"><button class="btn btn-outline profile-button" type="submit">退出登录</button></form></div>
   </main>
 </div>

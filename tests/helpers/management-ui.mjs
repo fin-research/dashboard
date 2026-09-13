@@ -21,6 +21,28 @@ assert.ok(document.querySelector('.permission-editor').textContent.includes('无
 await unmount(app);
 globalMessages.clear();
 
+const profileSource=(await readFile(new URL('../../src/routes/profile/+page.svelte',import.meta.url),'utf8'))
+  .replace("import { invalidate } from '$app/navigation';", "const invalidate=async()=>{};")
+  .replace("import { isLoginRedirecting } from '$lib/auth-client';", "const isLoginRedirecting=()=>false;");
+const ProfilePage=await loadComponent('src/routes/profile/+page.svelte',profileSource);
+globalThis.fetch=async url=>Response.json(String(url)==='/auth/permissions'
+  ? {permissions:[PERMISSION_CODES[0]],updatedAt:Date.now()}
+  : {name:'测试人员',email:'test@18.cn',emailVerified:true,roles:[{name:'authenticated'},{name:'financing:admin'}],permissions:[]});
+const profileApp=mount(ProfilePage,{target:document.body,props:{data:{email:'test@18.cn',account:{name:'测试人员',department:'资金管理部'}}}});
+flushSync();
+for(let i=0;i<10&&!document.querySelector('.permission-roles');i++){await new Promise(resolve=>setTimeout(resolve,0));flushSync();}
+assert.deepEqual([...document.querySelectorAll('.permission-roles li')].map(node=>node.textContent.trim()),['基础用户','融资管理员']);
+const refreshLinks=[...document.querySelectorAll('a')].filter(node=>node.textContent.trim()==='刷新权限');
+assert.equal(refreshLinks.length,1);
+assert.ok(refreshLinks[0].closest('.permission-footer'));
+assert.equal(refreshLinks[0].getAttribute('href'),'/auth/login?returnTo=%2Fprofile');
+assert.equal(document.querySelector('.profile-permissions .tr-panel-heading button'),null);
+assert.equal(document.querySelector('.profile-permissions .tr-panel-heading a'),null);
+assert.equal(document.querySelector('.profile-header form'),null);
+assert.doesNotMatch(document.body.textContent,/刷新登录角色|刷新我的权限|授权缓存更新于|权限由 Auth0|仅支持 18.cn/);
+await unmount(profileApp);
+globalThis.fetch=async()=>Response.json({user:null,account:null});
+
 const AccountHost=await loadComponent('tests/helpers/AccountHost.svelte',`<script>
 import {setContext} from 'svelte';
 import AuthMenu from '../../src/lib/AuthMenu.svelte';
