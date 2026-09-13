@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 
 const mutationPages = [
-	'src/routes/management/people/+page.svelte',
 	'src/routes/financing/projects/+page.svelte',
 	'src/routes/financing/projects/[id]/+page.svelte',
 	'src/routes/financing/sop/+page.svelte',
@@ -11,13 +10,6 @@ const mutationPages = [
 ];
 
 const incrementalContracts = [
-	{
-		name: 'role permissions',
-		server: 'src/routes/management/people/+page.server.ts',
-		client: 'src/routes/management/people/+page.svelte',
-		response: /success: true, roleId, configuration/,
-		apply: /result\.data\?\.configuration/
-	},
 	{
 		name: 'projects',
 		server: 'src/routes/financing/projects/+page.server.ts',
@@ -116,19 +108,22 @@ test('only global identity or reminder data is invalidated after relevant deltas
 	assert.match(layout, /depends\('financing:identity', 'financing:permissions', 'financing:reminders'\)/);
 	assert.match(projects, /invalidate\('financing:reminders'\)/);
 	assert.match(projectDetail, /invalidate\('financing:reminders'\)/);
-	assert.match(people, /configurations\[id\] = result.data.configuration/);
+	assert.match(people, /invalidate\('auth:permissions'\)/);
 	assert.match(settings, /result.name/);
 	assert.doesNotMatch(people, /invalidateAll/);
 });
 
-test('role permission changes return and apply one confirmed role delta', async () => {
-	const [server, client] = await Promise.all([
-		readFile(new URL('../../src/routes/management/people/+page.server.ts', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/routes/management/people/+page.svelte', import.meta.url), 'utf8')
-	]);
-	assert.match(server, /success: true, roleId, configuration/);
-	assert.match(client, /result\.data\?\.configuration/);
-	assert.match(client, /drafts\[id\] = \[\.\.\.configurations\[id\].permissions\]/);
+test('role view delegates edits to Auth0 and only refreshes the Gateway cache', async () => {
+  const [server, client] = await Promise.all([
+    readFile(new URL('../../src/routes/management/people/+page.server.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../../src/routes/management/people/+page.svelte', import.meta.url), 'utf8')
+  ]);
+  assert.doesNotMatch(server, /export const actions|saveRolePermissions/);
+  assert.match(server, /depends\('auth:permissions'\)/);
+  assert.match(client, /manage.auth0.com/);
+  assert.match(client, /auth\/permissions\/refresh/);
+  assert.match(client, /PermissionExplorer/);
+  assert.doesNotMatch(client, /drafts|saveRolePermissions/);
 });
 
 test('project and SOP edit forms auto-save without per-item save buttons', async () => {

@@ -7,11 +7,25 @@
   import { globalMessages } from '$lib/global-messages';
   import { isLoginRedirecting } from '$lib/auth-client';
   import { type AccountProfile } from '$lib/profile';
-  import { PERMISSION_DOMAINS } from '$lib/permissions';
+  import PermissionExplorer from '$lib/permissions/PermissionExplorer.svelte';
   import { readPreferences, savePreferences, type MarketColorConvention } from '$lib/preferences';
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
+  let permissions = $state<string[]>([]);
+  let permissionsLoading = $state(false);
+  let permissionUpdatedAt = $state<number | null>(null);
+  async function loadPermissions() {
+    permissionsLoading = true;
+    try {
+      const response = await fetch('/auth/permissions', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail || '权限读取失败');
+      permissions = result.permissions; permissionUpdatedAt = result.updatedAt;
+      await invalidate('site:session');
+    } catch (error) { globalMessages.error(error instanceof Error ? error.message : '权限读取失败'); }
+    finally { permissionsLoading = false; }
+  }
   let profile = $state<AccountProfile | null>(null);
   let loading = $state(true);
   let loadError = $state('');
@@ -63,6 +77,7 @@
     marketColorConvention = readPreferences().marketColorConvention;
     const controller = new AbortController();
     void loadProfile(controller.signal);
+    void loadPermissions();
     return () => controller.abort();
   });
 </script>
@@ -76,7 +91,7 @@
   <header class="profile-header">
     <a class="btn btn-ghost btn-square profile-back" href="/" aria-label="返回市场研究门户"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4-6 6 6 6" /></svg></a>
     <h1>个人管理</h1>
-    <a class="btn btn-outline profile-button" href="/auth/login?returnTo=%2Fprofile">刷新登录状态</a>
+    <a class="btn btn-outline profile-button" href="/auth/login?returnTo=%2Fprofile">刷新登录角色</a>
     <form class="logout-form" method="post" action="/auth/logout"><button class="btn btn-outline profile-button" type="submit">退出登录</button></form>
   </header>
   <main class="profile-content">
@@ -135,11 +150,9 @@
           <h3>已分配角色</h3>
           {#if profile}
             {#if profile.roles.length}<ul class="permission-list">{#each profile.roles as role}<li>{role.name}{#if role.description && role.description !== role.name}<span>{role.description}</span>{/if}</li>{/each}</ul>{:else}<p class="profile-help">未分配业务角色</p>{/if}
-            <h3>当前有效权限</h3>
-            {#if profile.permissions.length}
-              <ul class="permission-list">{#each profile.permissions as permission}<li><strong>{permission.description || permission.name}</strong><span>{permission.name}</span><span>{PERMISSION_DOMAINS[permission.resource] ?? permission.resource}</span></li>{/each}</ul>
-            {:else}<p class="profile-help">未分配额外业务权限</p>{/if}
-            <p class="profile-help">角色及成员由 Auth0 管理，应用权限由管理中心统一配置。</p>
+            <div class="profile-actions"><button class="btn btn-outline profile-button" type="button" disabled={permissionsLoading} onclick={loadPermissions}>{permissionsLoading ? '正在读取…' : '刷新我的权限'}</button>{#if permissionUpdatedAt}<span class="profile-help">授权缓存更新于 {new Date(permissionUpdatedAt).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai',hour12:false})}</span>{/if}</div>
+            <PermissionExplorer {permissions} grantedOnly />
+            <p class="profile-help">权限由 Auth0 统一管理，展示与访问检查使用 Gateway 当前授权缓存。角色成员变更后请刷新登录角色。</p>
           {:else}<p class="profile-help">{loading ? '正在读取角色与权限…' : '角色与权限暂时无法读取，请重新读取个人信息'}</p>{/if}
         </ModuleCard>
       </div>

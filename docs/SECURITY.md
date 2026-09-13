@@ -4,7 +4,7 @@
 
 - 生成式 AI 只通过 `src/lib/server/ai-gateway.ts`；传输、重试、BYOK 和 AI 日志规则只在 [共享 AI](../../eastmoney/docs/AI.md) 维护。业务代码不读取上游 API Key。
 - `CF_AIG_TOKEN` 只通过 Worker Secret 注入；`CLOUDFLARE_ACCOUNT_ID`、`AI_GATEWAY_ID` 和数据服务基址是非敏感配置，但仍应通过 Worker/Vite 配置读取。
-- Neon 直连 `DATABASE_URL` 只供本地 migration、回填和授信 Excel 导入脚本使用；本地 `pnpm dev` 通过未跟踪的 `.env.local` 注入 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`，生产 Dashboard Worker 仅使用 `HYPERDRIVE` 业务连接；Gateway 使用 `AUTHORIZATION_DB` 权限连接，见下文权限边界。
+- Neon 直连 `DATABASE_URL` 只供本地 migration、回填和授信 Excel 导入脚本使用；本地 `pnpm dev` 通过未跟踪的 `.env.local` 注入 `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`，生产 Dashboard Worker 仅使用 `HYPERDRIVE` 业务连接；Gateway 使用 Cache API 权限 JSON 缓存，见下文权限边界。
 - quant 在本机使用 `DATABASE_URL` 追加融资择时模型快照；连接串不得经 dashboard 页面或 API 暴露。
 - Neon 开发直连从 `.env.local.example` 创建未跟踪的 `.env.local`。不要提交该文件。
 
@@ -44,8 +44,8 @@
 
 `src/lib/permissions.ts` 与 `route-permissions.ts` 是 Gateway 生成的前端展示契约，供菜单与导航使用；不可作为服务端授权输入。修改权限在 Gateway 完成，再同步契约。`locals.user.id` 与 `auth0Id` 均为 Auth0 subject，业务负责人只用 Auth0 ID，不能按邮箱/姓名关联。
 
-客户端会话只由根 layout 实例持有，不跨 SSR 请求共享，不写 localStorage。公开首屏经 `/auth/session` 初始化一次，普通导航复用展示快照；过期和明确角色变更时刷新。相同 token 的 SSR 导航不覆盖登录时的权限展示快照，403 不额外刷新会话。角色成员变更后从个人资料页“刷新登录状态”重新走授权码流程取得新 token，或重新登录。其他终端的旧菜单不构成服务端授权；Gateway 使用已签名 JWT 的角色，每个业务请求实时查询 permission 表（内测全权限例外保留），普通准入不查询 Auth0 Management API。
+客户端会话只由根 layout 实例持有，不跨 SSR 请求共享，不写 localStorage。公开首屏经 `/auth/session` 初始化一次，普通导航复用展示快照；过期和明确角色变更时刷新。相同 token 的 SSR 导航不覆盖登录时的权限展示快照，403 不额外刷新会话。角色成员变更后从个人资料页“刷新登录角色”重新走授权码流程取得新 token，或重新登录。其他终端的旧菜单不构成服务端授权；Gateway 使用已签名 JWT 的角色，每个业务请求读取 Gateway 的授权 JSON 缓存（TTL 1 小时，无内测旁路），普通准入不查询 Auth0 Management API。
 
-Dashboard 不持有 `AUTHORIZATION_DB` 或 Auth0 管理 Secret。`/management/people` 保留界面、草稿、版本和错误响应，通过私有 Gateway 服务读写。Gateway 在无缓存权限连接中完成角色锁、版本检查和事务，未知角色/权限失败关闭；配置不会改变当前 beta-open 模式。
+Dashboard 不持有 `AUTHORIZATION_DB` 或 Auth0 管理 Secret。`/management/people` 经私有 Gateway 服务读取缓存中的角色授权，只读展示并链接 Auth0 管理。个人页与角色页复用 scope/resource/action 权限组件；个人 `GET /auth/permissions` 获取自己的缓存权限，管理员 `POST /auth/permissions/refresh` 在同源及权限检查后更新当前 Cloudflare 节点缓存。其他节点最长 1 小时后按需更新。角色与权限以 Auth0 为唯一来源，内测所有用户持有基础 authenticated 角色，全部角色授予全部本站权限。
 
 融资数据后台继续使用表/字段白名单、参数化 SQL、完整主键与乐观条件。事务用 Gateway 已确认的 Auth0 ID、permissions 和 operation 设置 `request.auth.*` 后 `SET LOCAL ROLE authenticated`；提交/回滚清除上下文。RLS 保留 read/create/update/delete 及记录归属约束，不接受浏览器提供的权限集合。

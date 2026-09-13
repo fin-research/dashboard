@@ -1,6 +1,6 @@
 # 当前所有权
 
-认证、权限策略、Auth0 目录、角色权限配置和权限连接已移交 [Gateway](../../gateway/docs/DEVELOPMENT.md)。Dashboard 仅保留管理页面与业务 RLS。以下为首次统一权限迁移记录，不能用于重新启用 Access 或回放权限播种。
+认证、权限策略、Auth0 目录和权限 JSON 缓存由 [Gateway](../../gateway/docs/DEVELOPMENT.md)。Auth0 统一管理角色权限，Gateway Cache API 缓存 1 小时；Dashboard 仅保留个人/角色分层查看、管理员缓存刷新与业务 RLS。以下为首次统一权限迁移记录，不能用于重新启用 Access 或回放权限播种。
 
 # 统一权限系统
 

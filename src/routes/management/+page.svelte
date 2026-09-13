@@ -3,7 +3,7 @@
   import ModuleCard from '../../components/ModuleCard.svelte';
   import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
   const entries = [
-    { href: '/management/people', title: '角色权限', icon: ShieldCheck, tone: 'primary', actionClass: 'btn-info', items: ['业务权限配置', '角色授权范围', '分组检索与批量选择'] },
+    { href: '/management/people', title: '角色权限', icon: ShieldCheck, tone: 'primary', actionClass: 'btn-info', items: ['Auth0 统一管理', '分层查看角色授权', '刷新 Gateway 授权缓存'] },
     { href: '/profile', title: '个人管理', icon: UserRound, tone: 'secondary', actionClass: 'btn-soft btn-secondary', items: ['个人资料与登录邮箱', '密码与账号安全', '行情显示偏好'] },
     { href: '/fund-report?upload=1', title: '资金日报', icon: FileUp, tone: 'accent', actionClass: 'btn-success', items: ['上传日报文件', '历史日报归档', '查看报告'] }
   ];
