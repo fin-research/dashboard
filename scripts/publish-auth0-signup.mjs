@@ -1,3 +1,5 @@
+throw new Error('Retired pre-Gateway command. Signup profile Auth0 configuration is owned by Gateway; use the Gateway Auth0 deployment workflow.');
+
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
