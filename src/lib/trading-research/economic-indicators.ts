@@ -169,8 +169,8 @@ export const ALL_ECONOMIC_INDICATORS = uniqueIndicatorDefinitions([
   indicator('shibor-3m', 'SHIBOR 3M', 'E1300079', '%', 4, '日频'),
   indicator('shibor-1w', 'SHIBOR 1W', 'DM_SHIBOR_1W', '%', 4, '日频'),
   indicator('shibor-on', 'SHIBOR O/N', 'DM_SHIBOR_ON', '%', 4, '日频'),
-  indicator('cdb-3y', '国开债3Y', 'E1707108', '%', 4, '日频'),
-  indicator('cdb-10y', '国开债10Y', 'E1707114', '%', 4, '日频'),
+  indicator('cdb-3y', '国开债3Y', 'E1701708', '%', 4, '日频'),
+  indicator('cdb-10y', '国开债10Y', 'E1701714', '%', 4, '日频'),
   indicator('corporate-aaa-3y', 'AAA企业债3Y', 'E1000413', '%', 4, '日频'),
 ]);
 

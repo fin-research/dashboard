@@ -54,7 +54,10 @@ export async function fetchQuantMarketInputs(request:DataApiRequest,spec:QuantRe
         const index=EQUITY_CODES.indexOf(String(raw.code));
         if(index<0)throw new Error('Unexpected equity code');
         target=EQUITY_FIELDS[index]!;
-      }else if(spec.id==='equity-valuation')target=VALUATION_FIELDS[field]!;
+      }else if(spec.id==='equity-valuation'){
+        if(raw.code!=='800004.EI')throw new Error('Unexpected valuation code');
+        target=VALUATION_FIELDS[field]!;
+      }
       const value=inputValue(spec.dataset,target,date,raw[field],'choice-api',spec.id,hash,entity);
       if(value)inputs.push(value);
     }
@@ -64,24 +67,27 @@ export async function fetchQuantMarketInputs(request:DataApiRequest,spec:QuantRe
 
 // Only missing spreads are requested. Invalid codes are isolated rather than
 // retrying the full paid batch; other upstream errors remain failures.
-export async function fetchIssueSpreads(request:DataApiRequest,bonds:Array<{code:string;date:string}>):Promise<QuantInput[]> {
-  if(!bonds.length)return [];
+export async function fetchIssueSpreads(request:DataApiRequest,bonds:Array<{code:string;date:string}>):Promise<{rows:QuantInput[];invalidCodes:string[]}> {
+  if(!bonds.length)return {rows:[],invalidCodes:[]};
   let payload:z.infer<typeof tableSchema>;
   try {
     payload=tableSchema.parse(await request('/choice/css',new URLSearchParams({codes:bonds.map(x=>x.code).join(','),indicators:'ISSUECREDITSPREAD'})));
   }catch(error) {
     if(!/10003008|invalid stock code/i.test(String(error)))throw error;
-    if(bonds.length===1)return [];
+    if(bonds.length===1)return {rows:[],invalidCodes:[bonds[0]!.code]};
     const middle=Math.ceil(bonds.length/2);
-    return [...await fetchIssueSpreads(request,bonds.slice(0,middle)),...await fetchIssueSpreads(request,bonds.slice(middle))];
+    const left=await fetchIssueSpreads(request,bonds.slice(0,middle));
+    const right=await fetchIssueSpreads(request,bonds.slice(middle));
+    return {rows:[...left.rows,...right.rows],invalidCodes:[...left.invalidCodes,...right.invalidCodes]};
   }
   if(payload.function!=='CSS')throw new Error('Unexpected spread table');
   const dates=new Map(bonds.map(x=>[x.code,x.date]));
   const hash=createHash('sha256').update(JSON.stringify(payload.rows)).digest('hex');
-  return payload.rows.flatMap(row=>{
+  const rows=payload.rows.flatMap(row=>{
     const code=String(row.code),date=dates.get(code);
     if(!date)return [];
     const value=inputValue('issue','ISSUECREDITSPREAD',date,row.ISSUECREDITSPREAD,'choice-api','issue-spread',hash,code);
     return value?[value]:[];
   });
+  return {rows,invalidCodes:[]};
 }

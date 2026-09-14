@@ -6,6 +6,7 @@ import { persistQuantInputs, recordQuantSync } from '../src/lib/server/quant-inp
 import { parseQuantFundReport } from '../src/lib/server/quant-fund-report.ts';
 import { withPostgres } from '../src/lib/server/postgres.ts';
 import { MAX_FUND_REPORT_BYTES } from '../src/lib/fund-report.ts';
+import { EQUITY_FIELDS, VALUATION_FIELDS } from '../src/lib/server/quant-input-contract.ts';
 
 export async function runQuantInputSync(step:Pick<WorkflowStep,'do'>,env:Pick<Cloudflare.Env,'HYPERDRIVE'|'EASTMONEY'>,
   scheduledTime:number,request:DataApiRequest) {
@@ -22,8 +23,9 @@ export async function runQuantInputSync(step:Pick<WorkflowStep,'do'>,env:Pick<Cl
         ()=>fetchQuantMarketInputs(request,spec,startDate,endDate));
       stored+=await step.do(`quant persist ${spec.id}`,()=>db(async client=>{
         const count=await persistQuantInputs(client,rows);
-        const missing=spec.fields.filter(field=>!rows.some(row=>row.field===field));
-        const partial=rows.length===0 || (spec.dataset!=='equity' && missing.length>0);
+        const expected=spec.id==='equity-close'?EQUITY_FIELDS:spec.id==='equity-valuation'?Object.values(VALUATION_FIELDS):spec.fields.filter(field=>field!=='ISSUE_DATE');
+        const missing=expected.filter(field=>!rows.some(row=>row.field===field));
+        const partial=rows.length===0 || missing.length>0;
         await recordQuantSync(client,spec.id,rows[0]?.sourceHash??'',partial?'partial':'complete',rows.length,
           rows.length===0?'No observations returned':partial?`Missing fields: ${missing.join(',')}`:'');
         return count;
@@ -47,12 +49,13 @@ export async function runQuantInputSync(step:Pick<WorkflowStep,'do'>,env:Pick<Cl
         ORDER BY date DESC LIMIT 64`);return result.rows;
     }));
     if(bonds.length) {
-      const rows=await step.do('quant fetch issuance spreads',{retries:{limit:0,delay:'1 second'},timeout:'2 minutes'},()=>fetchIssueSpreads(request,bonds));
+      const {rows,invalidCodes}=await step.do('quant fetch issuance spreads v2',{retries:{limit:0,delay:'1 second'},timeout:'2 minutes'},()=>fetchIssueSpreads(request,bonds));
+      if(rows.length<bonds.length)failures.push({source:'issue-spread',error:`${bonds.length-rows.length} spreads unavailable; ${invalidCodes.length} invalid codes excluded from automatic retries`});
       stored+=await step.do('quant persist issuance spreads',()=>db(async client=>{
         const count=await persistQuantInputs(client,rows);
-        for (const bond of bonds.filter(bond=>!rows.some(row=>row.entityKey===bond.code))) {
+        for (const bond of bonds.filter(bond=>invalidCodes.includes(bond.code))) {
           await recordQuantSync(client,`issue-spread/${bond.code}/${bond.date}`,'','partial',0,
-            'Source returned no valid spread; excluded from automatic paid retries.');
+            'Source rejected the bond code; excluded from automatic paid retries.');
         }
         await recordQuantSync(client,'issue-spread',rows[0]?.sourceHash??'',rows.length===bonds.length?'complete':'partial',rows.length);
         return count;

@@ -3,7 +3,7 @@ export const FUNDING_FIELDS = ['dr007', 'r007', 'shibor3m', 'omo7d', 'cgb1y', 'c
 export const FUNDING_EDB: Record<string, string> = {
   dr007: 'E1300004', r007: 'E1704420', omo7d: 'E1715081',
   cgb1y: 'E1000172', cgb3y: 'E1000174', cgb10y: 'E1000180',
-  shibor3m: 'E1300079', cdb3y: 'E1707108', cdb10y: 'E1707114', aaa3y: 'E1000413',
+  shibor3m: 'E1300079', cdb3y: 'E1701708', cdb10y: 'E1701714', aaa3y: 'E1000413',
 };
 export const EQUITY_CODES = ['000001.SH','399001.SZ','000300.SH','000852.SH','399006.SZ','000688.SH','800004.EI','VIX.GI'];
 export const EQUITY_FIELDS = ['sse_close','szse_close','csi300_close','csi1000_close','chinext_close','star50_close','all_a_close','vix_close'];

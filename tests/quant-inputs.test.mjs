@@ -2,18 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {inputValue} from '../src/lib/server/quant-input-contract.ts';
+import {inputValue,FUNDING_EDB} from '../src/lib/server/quant-input-contract.ts';
 import {persistQuantInputs} from '../src/lib/server/quant-input-repository.ts';
 import {parseQuantFundReport} from '../src/lib/server/quant-fund-report.ts';
-import {quantMarketRequests,fetchQuantMarketInputs} from '../src/lib/server/quant-market-sync.ts';
+import {quantMarketRequests,fetchQuantMarketInputs,fetchIssueSpreads} from '../src/lib/server/quant-market-sync.ts';
 import {fetchDmFundingRateRows} from '../src/lib/server/economic-indicator-sync.ts';
 
 test('Shibor selects lastPrice, preserves zero, and skips absent quotes',async()=>{
+  assert.equal(FUNDING_EDB.cdb3y,'E1701708');
+  assert.equal(FUNDING_EDB.cdb10y,'E1701714');
   const result=await fetchDmFundingRateRows(async()=>({hasNextPage:false,rows:[
     {bondCode:'Shibor3M',capitalTime:Date.parse('2026-09-10T00:00:00Z'),weightedYield:null,lastPrice:1.4},
     {bondCode:'Shibor3M',capitalTime:Date.parse('2026-09-11T00:00:00Z'),weightedYield:9,lastPrice:null},
   ]}),'incremental',new Date('2026-09-14T00:00:00Z'),['Shibor3M']);
   assert.deepEqual(result.rows,[{code:'E1300079',date:'2026-09-10',observationDate:'2026-09-10',value:1.4}]);
+});
+
+test('unpublished spreads remain retryable while explicit invalid codes are isolated',async()=>{
+  const fetch=async(_path,params)=>{
+    if(params.get('codes').includes('invalid'))throw new Error('10003008 invalid stock code');
+    return {function:'CSS',fields:['code','ISSUECREDITSPREAD'],rows:[{code:'new',ISSUECREDITSPREAD:null}]};
+  };
+  const result=await fetchIssueSpreads(fetch,[{code:'invalid',date:'2026-09-10'},{code:'new',date:'2026-09-10'}]);
+  assert.deepEqual(result,{rows:[],invalidCodes:['invalid']});
 });
 
 test('normalized inputs preserve online rows on seed replay and roll back invalid batches',async()=>{
