@@ -254,12 +254,12 @@
 
 	<div class="table-toolbar">
 		<form class="search-form" onsubmit={(event) => { event.preventDefault(); applySearch(); }}>
-			<label><span class="sr-only">搜索{activeConfig.label}</span><Search size={18} /><input class="input" bind:value={search} type="search" placeholder={`搜索${activeConfig.label}`} /></label>
+			<label><span class="sr-only">搜索{activeConfig.label}</span><Search size={18} /><input class="input" bind:value={search} type="search" /></label>
 			<button class="btn" type="submit">查询</button>
 		</form>
 		<div class="table-meta">
 			<strong>{total.toLocaleString('zh-CN')} 条</strong>
-			<button type="button" class="btn btn-ghost icon-action" aria-label="刷新数据" title="刷新数据" onclick={() => void loadRows()} disabled={loading}><RefreshCw size={18} class={loading ? 'spin' : ''} /></button>
+			<button type="button" class="btn btn-ghost icon-action" aria-label="刷新数据" onclick={() => void loadRows()} disabled={loading}><RefreshCw size={18} class={loading ? 'spin' : ''} /></button>
 		</div>
 	</div>
 
@@ -282,8 +282,8 @@
 							<td>{#if canEditField(field, 'create')}{@render fieldEditor(field)}{:else}—{/if}</td>
 						{/each}
 						<td class="row-actions"><div>
-							<button class="btn" type="button" aria-label="保存新增行" title="保存" onclick={() => void saveRow()} disabled={savingKey === '__new__'}>{#if savingKey === '__new__'}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
-							<button class="btn" type="button" aria-label="取消新增" title="取消" onclick={cancelEdit} disabled={savingKey === '__new__'}><X size={17} /></button>
+							<button class="btn" type="button" aria-label="保存新增行" onclick={() => void saveRow()} disabled={savingKey === '__new__'}>{#if savingKey === '__new__'}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
+							<button class="btn" type="button" aria-label="取消新增" onclick={cancelEdit} disabled={savingKey === '__new__'}><X size={17} /></button>
 						</div></td>
 					</tr>
 				{/if}
@@ -306,11 +306,11 @@
 							{/each}
 							<td class="row-actions"><div>
 								{#if editing}
-									<button class="btn" type="button" aria-label="保存本行" title="保存" onclick={() => void saveRow()} disabled={savingKey === identityKey}>{#if savingKey === identityKey}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
-									<button class="btn" type="button" aria-label="取消编辑" title="取消" onclick={cancelEdit} disabled={savingKey === identityKey}><X size={17} /></button>
+									<button class="btn" type="button" aria-label="保存本行" onclick={() => void saveRow()} disabled={savingKey === identityKey}>{#if savingKey === identityKey}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
+									<button class="btn" type="button" aria-label="取消编辑" onclick={cancelEdit} disabled={savingKey === identityKey}><X size={17} /></button>
 								{:else}
-									<button class="btn" type="button" aria-label="编辑本行" title="编辑" onclick={() => void beginEdit(row.original)}><Pencil size={17} /></button>
-									{#if activeConfig.canDelete}<button type="button" class="btn btn-error danger" aria-label="删除本行" title="删除" onclick={() => void deleteRow(row.original)} disabled={savingKey === identityKey}><Trash2 size={17} /></button>{/if}
+									<button class="btn" type="button" aria-label="编辑本行" onclick={() => void beginEdit(row.original)}><Pencil size={17} /></button>
+									{#if activeConfig.canDelete}<button type="button" class="btn btn-error danger" aria-label="删除本行" onclick={() => void deleteRow(row.original)} disabled={savingKey === identityKey}><Trash2 size={17} /></button>{/if}
 								{/if}
 							</div></td>
 						</tr>
@@ -328,7 +328,7 @@
 </section>
 
 {#if activeConfig.canCreate && !activeConfig.readOnly}
-	<button class="btn btn-primary floating-create-button data-create" type="button" aria-label="新增一行" title="新增一行" onclick={() => void beginCreate()} disabled={loading || editorMode !== null}><Plus size={24} /></button>
+	<button class="btn btn-primary floating-create-button data-create" type="button" aria-label="新增一行" onclick={() => void beginCreate()} disabled={loading || editorMode !== null}><Plus size={24} /></button>
 {/if}
 
 <style>

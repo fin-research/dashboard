@@ -133,7 +133,7 @@
         <PanelHeading id="profile-preferences-title" title="个性化配置" accent="var(--color-secondary)" />
         <form class="profile-form" onsubmit={(event) => { event.preventDefault(); persistPreferences(); }}>
           <fieldset class="fieldset"><legend class="fieldset-legend">行情颜色逻辑</legend>
-            <label class="profile-choice"><input class="radio radio-primary" type="radio" name="marketColorConvention" bind:group={marketColorConvention} value="red-up-green-down" /><span>红涨绿跌（默认）</span></label>
+            <label class="profile-choice"><input class="radio radio-primary" type="radio" name="marketColorConvention" bind:group={marketColorConvention} value="red-up-green-down" /><span>红涨绿跌</span></label>
             <label class="profile-choice"><input class="radio radio-primary" type="radio" name="marketColorConvention" bind:group={marketColorConvention} value="green-up-red-down" /><span>绿涨红跌</span></label>
           </fieldset>
           <div class="profile-actions"><button class="btn btn-primary profile-button primary" type="submit">保存个性化配置</button></div>

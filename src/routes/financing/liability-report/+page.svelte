@@ -150,10 +150,8 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 		<h1 id="report-empty-title">暂无 {data.selectedReportDate} 负债周报</h1>
 		{#if data.snapshotError}
 			<p role="alert">周报快照读取失败：{data.snapshotError}</p>
-		{:else}
-			<p>当前报告日还没有数据快照。</p>
 		{/if}
-		<p>{canGenerate ? '请点击右上角“生成本期周报”获取数据。' : '当前角色没有周报生成权限，请联系权限配置人员。'}</p>
+		{#if !canGenerate}<p>无周报生成权限</p>{/if}
 	</section>
 {:else}
 {#key data.snapshotVersion}
@@ -167,7 +165,7 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 
 	<section class="report-section" aria-labelledby="section-1-title">
 	<div class="card-head"><div class="section-title-wrap"><span class="section-tag">第一部分</span><h2 id="section-1-title" class="section-title">近期负债发行与到期动态</h2></div></div>
-	<div class="bento-card dynamic-card"><div class="dynamic-grid">{#each [{ label: '本周', items: currentEvents, issueLabel: '负债缴款' }, { label: '下周', items: nextEvents, issueLabel: '负债发行' }] as group}<div class="template-week-card"><div class="week-summary">{group.label}{group.issueLabel} <strong class="positive">{amount(sumEvents(group.items, ['issue']))}</strong> 亿元，到期 <strong class="negative-text">{amount(sumEvents(group.items, ['maturity']))}</strong> 亿元，付息 <strong class="negative-text">{amount(sumEvents(group.items, ['interest']))}</strong> 亿元</div><div class="table-scroll"><table class="event-table"><tbody>{#each group.items as item}<tr><td>{weekdayDate(item.date)}</td><td><span class={`event-kind event-${item.kind}`}>{eventLabel(item.kind)}</span>：【{item.name}】</td><td>{amount(item.amountYi, 4)}E</td></tr>{:else}<tr><td colspan="3" class="table-empty">{hasSnapshot ? '暂无符合口径的动态' : '暂无可靠数据'}</td></tr>{/each}</tbody></table></div></div>{/each}</div><div class="template-plan-card"><div class="plan-title">推进中的融资计划</div><div class="table-scroll"><table class="plan-table"><thead><tr><th>品种</th><th>规模</th><th>期限</th><th>预计利率区间</th><th>发行/簿记日期</th></tr></thead><tbody>{#each dynamicProjects as project}<tr><td>{project.name}</td><td>{project.amountDescription ?? `${amount(project.amountYi)}E`}</td><td>{project.tenorDescription ?? '数据缺失'}</td><td>{projectRate(project)}</td><td>{dateLabel(project.plannedIssueDate)}</td></tr>{:else}<tr><td colspan="5" class="table-empty">{hasSnapshot ? '暂无符合口径的融资计划' : '暂无可靠数据'}</td></tr>{/each}</tbody></table></div></div></div>
+	<div class="bento-card dynamic-card"><div class="dynamic-grid">{#each [{ label: '本周', items: currentEvents, issueLabel: '负债缴款' }, { label: '下周', items: nextEvents, issueLabel: '负债发行' }] as group}<div class="template-week-card"><div class="week-summary">{group.label}{group.issueLabel} <strong class="positive">{amount(sumEvents(group.items, ['issue']))}</strong> 亿元，到期 <strong class="negative-text">{amount(sumEvents(group.items, ['maturity']))}</strong> 亿元，付息 <strong class="negative-text">{amount(sumEvents(group.items, ['interest']))}</strong> 亿元</div><div class="table-scroll"><table class="event-table"><tbody>{#each group.items as item}<tr><td>{weekdayDate(item.date)}</td><td><span class={`event-kind event-${item.kind}`}>{eventLabel(item.kind)}</span>：【{item.name}】</td><td>{amount(item.amountYi, 4)}E</td></tr>{:else}<tr><td colspan="3" class="table-empty">{hasSnapshot ? '暂无动态' : '暂无可靠数据'}</td></tr>{/each}</tbody></table></div></div>{/each}</div><div class="template-plan-card"><div class="plan-title">推进中的融资计划</div><div class="table-scroll"><table class="plan-table"><thead><tr><th>品种</th><th>规模</th><th>期限</th><th>预计利率区间</th><th>发行/簿记日期</th></tr></thead><tbody>{#each dynamicProjects as project}<tr><td>{project.name}</td><td>{project.amountDescription ?? `${amount(project.amountYi)}E`}</td><td>{project.tenorDescription ?? '数据缺失'}</td><td>{projectRate(project)}</td><td>{dateLabel(project.plannedIssueDate)}</td></tr>{:else}<tr><td colspan="5" class="table-empty">{hasSnapshot ? '暂无融资计划' : '暂无可靠数据'}</td></tr>{/each}</tbody></table></div></div></div>
 </section>
 
 <section class="report-section" aria-labelledby="section-2-title">

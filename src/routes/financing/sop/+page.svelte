@@ -15,7 +15,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		Plus,
 		Trash2,
 		UserRound,
-		Users,
 		Workflow
 	} from '@lucide/svelte';
 	import { globalMessages } from '$lib/global-messages';
@@ -140,16 +139,15 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 									{sop.isActive ? '启用' : '停用'}
 								</span>
 							</div>
-							<p>{sop.description}</p>
+							{#if sop.description}<p>{sop.description}</p>{/if}
 							<div class="sop-meta">
 								<span><GitBranch size={13} /> {sop.nodeCount} 个节点</span>
-								<span><Users size={13} /> 按默认角色分工</span>
 							</div>
 						</div>
 						<ArrowRight size={16} />
 					</a>
 				{:else}
-					<p class="empty-state">尚未配置 SOP。未配置品种不会生成首页付息和到期事件。</p>
+					<p class="empty-state">尚未配置 SOP</p>
 				{/each}
 			</div>
 		</ModuleCard>
@@ -203,7 +201,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		type="button"
 		onclick={() => sopDialog?.showModal()}
 		aria-label="新建 SOP"
-		title="新建 SOP"
 	>
 		<Plus size={23} />
 	</button>
@@ -217,7 +214,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				<div>
 					<p class="eyebrow">REMINDER RULE</p>
 					<h2>配置邮件提醒</h2>
-					<p>一条规则可关联多个 SOP 节点，并配置多个提前提醒周期。</p>
 				</div>
 				<button class="btn" type="button" aria-label="关闭" onclick={() => reminderDialog?.close()}>×</button>
 			</div>
@@ -227,9 +223,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					<input class="input" name="name" required value="任务到期提醒" />
 				</label>
 				<fieldset class="wide rule-fieldset node-selector">
-					<legend>关联 SOP 节点（可多选）</legend>
-					<p id="node-selector-help">仅展示已启用 SOP，提醒只匹配由所选节点生成的项目任务。</p>
-					<div class="node-groups" aria-describedby="node-selector-help">
+					<legend>关联 SOP 节点</legend>
+					<div class="node-groups">
 						{#each activeSopTemplates as sop}
 							<section class="node-group">
 								<strong>{sop.name}<span>{sop.debtType}</span></strong>
@@ -250,9 +245,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					</div>
 				</fieldset>
 				<fieldset class="wide rule-fieldset period-editor">
-					<legend>提醒周期（可多选）</legend>
+					<legend>提醒周期</legend>
 					<div class="fieldset-heading">
-						<p>整天周期在对应日期 09:00（上海时间）提醒；包含小时的周期按节点到期日 00:00 倒推到实际整点。</p>
 						<button type="button" class="btn add-period" onclick={addReminderPeriod} disabled={reminderPeriods.length >= MAX_REMINDER_PERIODS}><Plus size={14} /> 添加周期</button>
 					</div>
 					<div class="period-list">
@@ -273,7 +267,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 									onclick={() => removeReminderPeriod(period.key)}
 									disabled={reminderPeriods.length === 1}
 									aria-label={`删除第 ${index + 1} 个提醒周期`}
-									title="删除周期"
 								><Trash2 size={15} /></button>
 							</div>
 						{/each}
@@ -290,7 +283,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				{#if reminderRecipientMode === 'custom'}
 					<label class="wide">
 						<span>指定邮箱</span>
-						<input class="input" name="recipients" type="text" required placeholder="多个邮箱使用逗号分隔" />
+						<input class="input" name="recipients" type="email" multiple required />
 					</label>
 				{/if}
 			</div>
@@ -313,14 +306,13 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				<div>
 					<p class="eyebrow">SOP TEMPLATE</p>
 					<h2>新建负债品种 SOP</h2>
-					<p>{canManage ? '保存后再编排节点、默认角色和相对日期。' : '模板创建后，可由有权限的角色编排节点。'}</p>
 				</div>
 				<button class="btn" type="button" aria-label="关闭" onclick={() => sopDialog?.close()}>×</button>
 			</div>
 			<div class="form-grid">
 				<label class="wide">
 					<span>SOP 名称</span>
-					<input class="input" name="name" required placeholder="例如：收益凭证发行 SOP" />
+					<input class="input" name="name" required />
 				</label>
 				<label class="wide">
 					<span>负债品种</span>
@@ -336,7 +328,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				</label>
 				<label class="wide">
 					<span>说明</span>
-					<textarea class="textarea" name="description" rows="3" placeholder="说明适用范围和关键控制要求"></textarea>
+					<textarea class="textarea" name="description" rows="3"></textarea>
 				</label>
 			</div>
 			<div class="modal-actions">
@@ -456,14 +448,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		color: #344054;
 	}
 
-	.rule-fieldset > p,
-	.fieldset-heading p {
-		margin: 0.25rem 0 0;
-		font-size: 0.75rem;
-		line-height: 1.5;
-		color: #667085;
-	}
-
 	.node-groups,
 	.period-list {
 		display: grid;
@@ -528,10 +512,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		align-items: flex-start;
 		justify-content: space-between;
 		gap: 0.75rem;
-	}
-
-	.fieldset-heading p {
-		flex: 1;
 	}
 
 	.add-period {

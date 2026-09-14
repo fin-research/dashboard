@@ -198,7 +198,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	<article>
 		<span><CalendarDays size={18} /> 计划簿记</span>
 		<strong>{data.project.plannedIssueDate ?? '待安排'}</strong>
-		<small>与 SOP 的计划发行当日一致</small>
 	</article>
 	<article>
 		<span><UserRound size={18} /> 项目负责人</span>
@@ -216,9 +215,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	<main>
 		<section class="panel">
 			<header>
-				<div>
-					<h2>任务节点</h2>
-					<p>{canManage ? '修改后自动保存' : '仅可修改分配给自己的节点状态'}</p>
+					<div>
+						<h2>任务节点</h2>
 				</div>
 			</header>
 			<div class="task-list">
@@ -259,14 +257,14 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						</div>
 					</form>
 				{:else}
-					<p class="empty-state">{canManage ? '尚无任务节点，可在下方添加第一个任务。' : '尚无任务节点。'}</p>
+					<p class="empty-state">尚无任务节点。</p>
 				{/each}
 			</div>
 			{#if canCreateTask}
 			<form method="post" action="?/addTask" use:enhance={enhanceForm('add-task', { resetOnSuccess: true })} class="add-task">
 				<label>
 					<span>任务名称</span>
-					<input class="input" name="name" maxlength="120" required placeholder="例如：发行方案内部确认" />
+					<input class="input" name="name" maxlength="120" required />
 				</label>
 				<label>
 					<span>负责人</span>
@@ -291,9 +289,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	<aside>
 		<section class="panel">
 			<header>
-				<div>
-					<h2>基本信息</h2>
-					<p>{canManageProject ? '修改后自动保存' : '当前为只读视图'}</p>
+					<div>
+						<h2>基本信息</h2>
 				</div>
 			</header>
 			<form
@@ -322,7 +319,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 				</label>
 				<label>
 					<span>项目说明</span>
-					<textarea class="textarea" name="notes" rows="5" placeholder="补充项目背景、风险或执行说明" disabled={!canManageProject}>{data.project.notes ?? ''}</textarea>
+					<textarea class="textarea" name="notes" rows="5" disabled={!canManageProject}>{data.project.notes ?? ''}</textarea>
 				</label>
 			</form>
 			<dl class="metadata">
@@ -340,7 +337,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<header>
 				<div>
 					<h2>项目成员</h2>
-					<p>由项目负责人和任务执行人实时汇总</p>
 				</div>
 				<UsersRound size={20} />
 			</header>
@@ -473,11 +469,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		margin: 0;
 		font-size: 1.125rem;
 		color: #1d2939;
-	}
-	.panel header p {
-		margin: 0.2rem 0 0;
-		font-size: 0.75rem;
-		color: var(--subtle);
 	}
 	.task-list {
 		display: grid;

@@ -363,7 +363,7 @@
           onfocus={() => { showCustomers = true; }} onblur={() => { showCustomers = false; }}
           type="text" role="combobox" aria-autocomplete="list" aria-expanded={showCustomers} aria-controls="credit-customers"
           aria-activedescendant={showCustomers && activeCustomer >= 0 && customers[activeCustomer] ? `credit-customer-${activeCustomer}` : undefined}
-          autocomplete="off" maxlength="200" placeholder="搜索并选择请求材料的机构" disabled={busy} />
+          autocomplete="off" maxlength="200" disabled={busy} />
         {#if showCustomers}
           <div class="customer-options">
             <ul id="credit-customers" role="listbox" aria-label="匹配机构">
@@ -377,7 +377,7 @@
             </ul>
             {#if searching}<p role="status">正在加载机构列表…</p>
             {:else if searchError}<p role="alert">{searchError}<button class="btn btn-ghost" type="button" onpointerdown={event => event.preventDefault()} onclick={() => void loadCustomers()}>重新加载</button></p>
-            {:else if !customers.length}<p role="status">未找到机构，请调整名称或先在授信一览表中维护机构。</p>{/if}
+            {:else if !customers.length}<p role="status">未找到机构</p>{/if}
           </div>
         {/if}
       </div>
@@ -385,10 +385,9 @@
     </div>
     <form class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
-      <textarea class="textarea textarea-ghost" id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows="2" placeholder="输入问题，或告诉我需要哪份材料…" disabled={creating} aria-describedby="credit-composer-hint"></textarea>
+      <textarea class="textarea textarea-ghost" id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows="2" disabled={creating}></textarea>
       <div class="composer-actions">
-        <span id="credit-composer-hint">Enter 发送<span class="keyboard-hint"> · Shift + Enter 换行</span></span>
-        <button class="btn btn-primary chat-button chat-button--send" type="submit" disabled={!selectedCustomer || !question.trim() || busy} aria-label={busy ? "正在处理消息" : "发送消息"} title={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
+        <button class="btn btn-primary chat-button chat-button--send" type="submit" disabled={!selectedCustomer || !question.trim() || busy} aria-label={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
       </div>
     </form>
   </div>
@@ -455,8 +454,7 @@
   textarea { display: block; width: 100%; max-height: 180px; padding: 0; border: 0; box-shadow: none; resize: none; min-height: 56px; }
   .chat-composer textarea:focus-visible { outline: none; }
   textarea::placeholder { color: var(--text-3); }
-  .composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px; }
-  .composer-actions > span { color: var(--text-3); font-size: .875rem; }
+  .composer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-top: 8px; }
   .chat-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; padding: 8px 14px; }
   .chat-button :global(svg) { width: 18px; height: 18px; }
   .chat-button--copy { padding-inline: 10px; margin-left: -10px; }
@@ -469,7 +467,6 @@
     .chat-composer { padding: 12px; }
     .message--user { max-width: 92%; }
     .chat-turn { gap: 22px; }
-    .keyboard-hint { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { .chat-button, .file-attachment, .chat-composer { transition: none; } }
 </style>

@@ -160,7 +160,7 @@
     <div class="cloud-list" aria-label="完整热点列表">
       {#each items as word, index (word.keyword)}
         <button class="btn btn-ghost" type="button" aria-pressed={selectedKeyword === word.keyword}
-          aria-label={`${word.keyword}，热度 ${word.heat}，点击查看解释`} onclick={() => onSelect(word)}>
+          aria-label={`${word.keyword}，热度 ${word.heat}`} onclick={() => onSelect(word)}>
           <strong style:color={wordColor(index, { ...word, text: word.keyword, size: 18 })}>{word.keyword}</strong>
           <span>热度 {word.heat}</span>
         </button>
@@ -172,7 +172,7 @@
     <svg
       viewBox={`0 0 ${width} ${height}`}
       role="group"
-      aria-label="词语字号表示相对热度；点击词语查看详细解释"
+      aria-label="热点词云"
       preserveAspectRatio="xMidYMid meet"
     >
       <g transform={`translate(${width / 2} ${height / 2})`}>
@@ -183,7 +183,7 @@
             role="button"
             aria-pressed={selectedKeyword === word.keyword}
             tabindex="0"
-            aria-label={`${word.keyword}，热度 ${word.heat}，点击查看解释`}
+            aria-label={`${word.keyword}，热度 ${word.heat}`}
             transform={`translate(${word.x ?? 0} ${word.y ?? 0}) rotate(${word.rotate ?? 0})`}
             onclick={() => selectWord(word)}
             onkeydown={(event) => handleKeydown(event, word)}

@@ -751,10 +751,10 @@
     <section aria-labelledby="credit-metrics-title">
       <SectionHeading id="credit-metrics-title" title="授信总览" />
       <div class="tr-metric-grid tr-metric-grid--five">
-        <MetricCard label="授信总额" value={report.summary.totalLimit.toFixed(1)} unit="亿元" detail={`涵盖${report.summary.institutionCount}家机构`} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
-        <MetricCard label="已用额度" value={report.summary.totalUsed.toFixed(1)} unit="亿元" detail={`可用 ${report.summary.totalAvailable.toFixed(1)}亿元`} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
-        <MetricCard label="可用额度" value={report.summary.totalAvailable.toFixed(1)} unit="亿元" detail="可支持后续业务安排" iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
-        <MetricCard label="30日内到期" value={String(report.summary.expiringWithin30Days)} unit="笔" detail="需关注续作安排" iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="red" compact />
+        <MetricCard label="授信总额" value={report.summary.totalLimit.toFixed(1)} unit="亿元" detail={`${report.summary.institutionCount}家机构`} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
+        <MetricCard label="已用额度" value={report.summary.totalUsed.toFixed(1)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
+        <MetricCard label="可用额度" value={report.summary.totalAvailable.toFixed(1)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
+        <MetricCard label="30日内到期" value={String(report.summary.expiringWithin30Days)} unit="笔" iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="red" compact />
         <MetricCard label="授信额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" detail={report.previousSummary ? `${report.summary.utilization - report.previousSummary.utilization >= 0 ? "+" : ""}${(report.summary.utilization - report.previousSummary.utilization).toFixed(1)}个百分点较上期` : `${report.summary.approvedCount}家已获批`} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact />
       </div>
     </section>
@@ -802,7 +802,7 @@
           <label class="tr-search-control">
             <span class="sr-only">搜索授信机构</span>
             <WorkbenchIcon name="search" />
-            <input class="input" bind:value={query} type="search" placeholder="机构、性质、经办部门或人员" />
+            <input class="input" bind:value={query} type="search" />
           </label>
           <label>
             <span class="sr-only">授信状态</span>
@@ -887,13 +887,11 @@
                         {#each editor.items as item, itemIndex (item.type)}
                           <fieldset>
                             <legend>{creditItemLabels[item.type]}</legend>
-                            <p>取消额度请填0；清零已用或二级净余额也请填0。空白不修改已登记金额。</p>
                             <label><span>额度（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>
                             <label><span>{item.type === "bond_investment" ? "已用合计（亿元）" : item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><input class="input" type="number" step="0.000001" readonly={item.type === "bond_investment" || item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
                             {#if item.type === "bond_investment"}
                               <label><span>一级发行存续额（亿元）</span><input class="input" readonly value={formatAmount(item.primaryUsedAmount ?? null)} /></label>
                               <label><span>债券投资——二级买卖（亿元）</span><input class="input" type="number" step="0.000001" value={item.secondaryUsedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "secondaryUsedAmount", event)} onblur={() => void flushEditor()} /></label>
-                              <p>已用合计＝一级发行存续额＋二级买卖净余额。净买入填正数，净卖出填负数。</p>
                             {/if}
                             {#if item.type !== "other"}<label><span>可用（亿元）</span><input class="input" readonly value={formatAmount(item.limitAmount == null || (item.usageSource !== "credit" && item.usedAmount == null) ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
                             <label><span>说明</span><input class="input" value={item.details ?? ""} oninput={(event) => setItemDetails(itemIndex, event)} onblur={() => void flushEditor()} /></label>
@@ -939,7 +937,7 @@
               <time datetime={cell.date}>{cell.day}</time>
               <div class="tr-credit-calendar-events">
                 {#each cell.events as event (event.id)}
-                  <article class={`tr-credit-calendar-event tr-credit-calendar-event--${event.type} tr-credit-calendar-event--${event.status}`} title={`${event.institutionName} · ${event.label} · ${event.statusLabel}`}>
+                  <article class={`tr-credit-calendar-event tr-credit-calendar-event--${event.type} tr-credit-calendar-event--${event.status}`} title={`${event.institutionName} · ${event.label} · ${event.statusLabel}`} aria-label={`${event.institutionName} · ${event.label} · ${event.statusLabel}`}>
                     <strong>{event.institutionName}</strong>
                     <span>{event.label}</span>
                   </article>
@@ -967,7 +965,7 @@
       <ModuleCard labelledBy="credit-news-title">
         <PanelHeading id="credit-news-title" title="本周授信快讯" />
         {#if !report.previousDate}
-          <p class="tr-credit-muted">需要至少两个报表日才能生成本周变化。</p>
+          <p class="tr-credit-muted">暂无周度变化</p>
         {:else if weeklyNews.length === 0}
           <p class="tr-credit-muted">本期无新增、续作、扩额、到期或撤销事项。</p>
         {:else}
@@ -1001,7 +999,7 @@
         <PanelHeading id="credit-detail-title" title="授信明细" />
         <div class="tr-table-scroll">
           <table class="tr-data-table tr-credit-weekly-detail-table">
-            <caption class="sr-only">按银行性质合并展示的授信额度明细</caption>
+            <caption class="sr-only">授信额度明细</caption>
             <thead>
               <tr><th rowspan="2">银行性质</th><th rowspan="2">银行名称</th><th colspan="3" class="is-centered">授信额度</th></tr>
               <tr><th class="is-numeric">总额度（亿）</th><th class="is-numeric">可用额度（亿）</th><th class="is-numeric">使用率</th></tr>

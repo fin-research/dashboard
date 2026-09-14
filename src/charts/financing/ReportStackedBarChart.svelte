@@ -121,7 +121,7 @@
 </script>
 
 {#if labels.length && totals.some((value) => value > 0)}
-	<ChartHost {option} ariaLabel={`${title}，按 ${types.join('、')} 堆叠展示${horizontal ? '，按总发行规模降序排列并在条形内标注数值' : '，最大合计值标红'}`} height={height / 16} />
+	<ChartHost {option} ariaLabel={title} height={height / 16} />
 {:else}
 	<div class="chart-empty">暂无可靠分类数据</div>
 {/if}

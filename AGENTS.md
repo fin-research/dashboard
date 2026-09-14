@@ -28,6 +28,7 @@
 
 - 修改前先搜索现有页面、组件、图表、派生函数和测试；优先复用，不建立平行实现。
 - UI 变更必须读取 `DESIGN.md`；保持既有桌面布局和移动端模块顺序，不自行引入新设计体系。
+- 前端禁止解释性小字和口径扩写，保持简洁标签；交互说明通过控件、状态与布局表达，不另加提示文案。
 - 跨服务路由、DATA / InternalData 与身份所有权遵循 [共享架构](../eastmoney/docs/ARCHITECTURE.md)；只改页面时按模块索引读取，不预读其他仓库。
 - 市场点评 REST 编排与视觉/文字共用契约、旧资源兼容边界见 [市场点评模块](docs/modules/market-briefing.md)；业务加工留在 Dashboard。
 - Data 消费端使用 `src/data-contracts.ts` 的 Zod Schema 校验最小 DTO；字段投影与分页遵循 [Data API 契约](../data/docs/API.md)，不透传上游 envelope。债券动态代码与类型筛选见市场点评模块。

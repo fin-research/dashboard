@@ -778,7 +778,7 @@
             <ChartHost
               renderer={renderHoldingDistribution}
               args={[analytics.holdingTypes]}
-              ariaLabel="按债券类型统计的持仓分布饼图"
+              ariaLabel="持仓分布饼图"
               className="ledger-chart ledger-chart--category"
             />
           </ModuleCard>
@@ -788,7 +788,7 @@
             <ChartHost
               renderer={renderMaturityDistribution}
               args={[analytics.maturityBuckets]}
-              ariaLabel="按剩余期限统计的持仓规模直方图"
+              ariaLabel="持仓剩余期限分布图"
               className="ledger-chart ledger-chart--maturity"
             />
           </ModuleCard>

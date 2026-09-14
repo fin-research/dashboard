@@ -96,7 +96,7 @@ export function renderWeeklyPoolScaleLeverage(
     aria: {
       enabled: true,
       description:
-        `所选区间业务本金、时间加权本金、全池持仓市值与综合杠杆率走势，最新已质押持仓市值 ${formatYi(pledgedMarketValue)}，可用持仓市值 ${formatYi(availableMarketValue)}`,
+        `所选区间业务本金、时间加权本金、全池持仓市值与综合杠杆率走势，最新已质押 ${formatYi(pledgedMarketValue)}，可用 ${formatYi(availableMarketValue)}`,
     },
     color: [...FIN_OPS_CHART_PALETTE],
     title: {
@@ -140,7 +140,7 @@ export function renderWeeklyPoolScaleLeverage(
           `业务本金 ${(point.principal / 100_000_000).toFixed(2)} 亿元`,
           `时间加权本金 ${(point.timeWeightedPrincipal / 100_000_000).toFixed(2)} 亿元`,
           `全池持仓市值 ${(point.marketValue / 100_000_000).toFixed(2)} 亿元`,
-          ...(point.date === lastDate ? [`已质押持仓市值 ${formatYi(pledgedMarketValue)}`, `可用持仓市值 ${formatYi(availableMarketValue)}`] : []),
+          ...(point.date === lastDate ? [`已质押 ${formatYi(pledgedMarketValue)}`, `可用 ${formatYi(availableMarketValue)}`] : []),
           `综合杠杆率 ${(point.leverage * 100).toFixed(2)}%`,
         ].join("<br>");
       },
@@ -331,7 +331,7 @@ export function renderWeeklyPoolScaleLeverage(
             itemStyle: { color: "#0284c7", opacity: 1 },
             label: {
               show: true,
-              formatter: `最新持仓 ${(latest.marketValue / 100_000_000).toFixed(2)} 亿\n本金 ${(latest.principal / 100_000_000).toFixed(2)} 亿\n已质押持仓市值 ${pledgedLabel}\n可用持仓市值 ${availableLabel}`,
+              formatter: `最新持仓 ${(latest.marketValue / 100_000_000).toFixed(2)} 亿\n本金 ${(latest.principal / 100_000_000).toFixed(2)} 亿\n已质押 ${pledgedLabel}\n可用 ${availableLabel}`,
               color: "#0f3d6c", fontFamily, fontSize: 10, fontWeight: "bold", lineHeight: 15,
               backgroundColor: "#eff6ff", borderColor: "#bfdbfe", borderWidth: 1, borderRadius: 3, padding: [3, 5],
             },
@@ -343,7 +343,7 @@ export function renderWeeklyPoolScaleLeverage(
             symbolSize: 9,
             itemStyle: { color: "#f79009", opacity: 1 },
             label: {
-              show: true, formatter: `已质押持仓市值 ${pledgedLabel}`,
+              show: true, formatter: `已质押 ${pledgedLabel}`,
               color: "#0f3d6c", fontFamily, fontSize: 10, fontWeight: "bold",
             },
             labelLine: { show: false },
@@ -370,7 +370,7 @@ export function renderWeeklyYieldProfitTrend(
     aria: {
       enabled: true,
       description:
-        "所选区间全池含免税及不含免税年化收益率、平层静态、累计毛利与免税增厚走势",
+        "收益率与累计创收走势",
     },
     color: [...FIN_OPS_CHART_PALETTE],
     title: {
@@ -536,7 +536,7 @@ export function renderWeeklyTradingAllocation(
   }
   setChart(host, {
     animationDuration: 220,
-    aria: { enabled: true, description: "按交易户市值统计的资产类别结构" },
+    aria: { enabled: true, description: "交易户资产类别结构" },
     title: {
       text: `图3A：交易户资产类别结构（${(valid.reduce((sum, stat) => sum + stat.marketValue, 0) / 100_000_000).toFixed(2)}亿元）`,
       top: 0,
@@ -619,7 +619,7 @@ export function renderWeeklyTradingMaturity(
   }
   setChart(host, {
     animationDuration: 220,
-    aria: { enabled: true, description: "按交易户市值统计的八档剩余期限分布" },
+    aria: { enabled: true, description: "交易户剩余期限分布" },
     title: {
       text: "图3B：交易户期限分布",
       top: 0,
@@ -722,7 +722,7 @@ export function renderBondScaleReturnTrend(
     animationDuration: 240,
     aria: {
       enabled: true,
-      description: `二级资金池规模面积图与业务口径${returnLabel}双轴折线图，所选日期范围使用强调色`,
+      description: `二级资金池规模与${returnLabel}走势`,
     },
     color: [...FIN_OPS_CHART_PALETTE],
     grid: { left: 18, right: 18, top: 28, bottom: 4, containLabel: true },
@@ -847,7 +847,7 @@ export function renderHoldingDistribution(
     animationDuration: 220,
     aria: {
       enabled: true,
-      description: "按债券类型统计全价市值的持仓分布饼图",
+      description: "持仓分布饼图",
     },
     color: [...FIN_OPS_CHART_PALETTE],
     legend: {
@@ -918,7 +918,7 @@ export function renderMaturityDistribution(
     animationDuration: 220,
     aria: {
       enabled: true,
-      description: "按八个剩余期限区间统计持仓全价市值的直方图",
+      description: "持仓剩余期限分布图",
     },
     color: [...FIN_OPS_CHART_PALETTE],
     grid: { left: 8, right: 8, top: 28, bottom: 4, containLabel: true },

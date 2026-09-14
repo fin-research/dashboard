@@ -206,7 +206,6 @@
         label="当日交易笔数"
         value={String(tradingSummary.tradeCount)}
         unit="笔"
-        detail="两类业务合计"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "trading" }}
         tone="orange"
@@ -215,7 +214,6 @@
         label="同业拆借"
         value={tradingSummary.interbankAmount.toFixed(1)}
         unit="亿元"
-        detail="纯信用 · 当日成交"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "funds" }}
         tone="blue"
@@ -224,7 +222,6 @@
         label="质押回购拆出"
         value={tradingSummary.repoLendAmount.toFixed(1)}
         unit="亿元"
-        detail="当日成交"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "credit" }}
         tone="purple"
@@ -233,7 +230,6 @@
         label="纯信用占比"
         value={tradingSummary.interbankShare.toFixed(1)}
         unit="%"
-        detail="按成交金额计算"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "research" }}
         tone="green"
@@ -242,7 +238,6 @@
         label="待确认"
         value={String(tradingSummary.pendingCount)}
         unit="笔"
-        detail="需人工复核"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "warning" }}
         tone="red"
@@ -256,7 +251,7 @@
         <label class="tr-search-control">
           <span class="sr-only">搜索交易</span>
           <WorkbenchIcon name="search" />
-          <input class="input" bind:value={query} type="search" placeholder="编号、对手、业务类型" />
+          <input class="input" bind:value={query} type="search" />
         </label>
         <label>
           <span class="sr-only">业务品种</span>
@@ -366,7 +361,6 @@
           id="trade-parser-input"
           bind:value={tradeText}
           rows="8"
-          placeholder="例如：融出1.5亿元14D质押式回购，利率1.82%，交易对手招商银行，质押券为国债"
         ></textarea>
         <button class="btn btn-primary tr-primary-action" type="button" onclick={parseTradeText}>规则解析</button>
         <aside class="tr-collateral-checklist" aria-label="押券检查项">

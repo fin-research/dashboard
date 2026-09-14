@@ -204,7 +204,7 @@
   <title>市场热点图谱 · 资金管理部</title>
   <meta
     name="description"
-    content="基于可配置研报证据范围生成的市场热点交互词云"
+    content="市场热点图谱"
   />
   <meta name="theme-color" content="#f6f8fb" />
 {/if}
@@ -241,7 +241,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6" />
           </svg>
-          <span><small>证据范围</small>{scopeLabel}</span>
+          <span><span class="scope-label">证据范围</span>{scopeLabel}</span>
         </button>
         {#if configurationOpen}
           <button
@@ -296,7 +296,6 @@
                   />
                   <span>篇</span>
                 </div>
-                <small>按发布时间倒序，默认取最近 20 篇已完成特征抽取的文章。</small>
               </label>
             {:else}
               <div class="range-fields">
@@ -308,7 +307,6 @@
                   <span>结束日期</span>
                   <input class="input" type="date" bind:value={endDate} />
                 </label>
-                <small>日期范围最多读取最近 100 篇文章。</small>
               </div>
             {/if}
             <button class="btn apply-scope-button" type="button" onclick={applyConfiguration}>
@@ -338,7 +336,6 @@
         <span class="loading-ring" aria-hidden="true"></span>
         <div>
           <strong>{regenerating ? "正在按所选范围生成热点" : "正在读取最近一次生成的热点"}</strong>
-          <p>{regenerating ? "完成后将保存为新的最新快照。" : "证据范围与热点内容来自同一次生成。"}</p>
         </div>
       </section>
     {:else if errorMessage}
@@ -609,7 +606,7 @@
     white-space: nowrap;
   }
 
-  .scope-button small {
+  .scope-label {
     color: var(--text-3);
     font-size: 0.75rem;
     font-weight: bold;
@@ -696,14 +693,6 @@
     padding: 0 11px;
   }
 
-  .scope-field small,
-  .range-fields > small {
-    color: var(--text-3);
-    font-size: 0.875rem;
-    font-weight: normal;
-    line-height: 1.55;
-  }
-
   .number-field {
     position: relative;
   }
@@ -723,11 +712,6 @@
   .range-fields {
     grid-template-columns: 1fr 1fr;
     gap: 0 10px;
-  }
-
-  .range-fields > small {
-    grid-column: 1 / -1;
-    margin-top: 8px;
   }
 
   .apply-scope-button {
@@ -1145,7 +1129,7 @@
     }
 
     .eyebrow,
-    .scope-button small {
+    .scope-label {
       display: none;
     }
 

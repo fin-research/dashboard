@@ -115,7 +115,7 @@
   async function generateCommentary(policy: PolicyEvent): Promise<void> {
     if (policy.commentary && !window.confirm("重新生成将覆盖当前点评初版，是否继续？")) return;
     generatingPolicyId = policy.id;
-    globalMessages.info("正在根据政策资讯和联网资料生成点评初版，关联研报（如有）也会一并参考，可能需要数分钟", {
+    globalMessages.info("正在生成政策点评，可能需要数分钟", {
       key: `policy-commentary-${policy.id}`,
       duration: 300_000,
     });
@@ -319,7 +319,6 @@
                       type="button"
                       disabled={generatingPolicyId === policy.id}
                       aria-label={generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
-                      title={generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
                       onclick={() => generateCommentary(policy)}
                     >
                       <svg viewBox="0 0 20 20" aria-hidden="true">

@@ -57,7 +57,6 @@
         class:tr-economic-card__change--down={change !== null && change < 0}
         class="tr-economic-card__change"
         aria-label={`较上一期变化 ${displayChange}${indicator.unit ? ` ${indicator.unit}` : ""}`}
-        title="较上一期变化"
       >
         {displayChange}{#if change !== null && indicator.unit}<small>{indicator.unit}</small>{/if}
       </span>

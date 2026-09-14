@@ -227,7 +227,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 <section class="toolbar" aria-label="甘特图筛选">
 	<label class="input search-field">
 		<Search size={15} />
-		<input aria-label="搜索项目" placeholder="搜索项目名称或编号" />
+		<input aria-label="搜索项目" />
 	</label>
 	<div class="select-group">
 		<Filter size={14} />
@@ -311,7 +311,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 							<button class="btn btn-ghost btn-square"
 								type="button"
 								aria-label={`编辑 ${project.name}`}
-								title="编辑项目"
 								onclick={() => openEditProject(project)}
 							>
 								<Pencil size={15} />
@@ -331,7 +330,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 									type="submit"
 									class="btn btn-ghost btn-square danger-action"
 									aria-label={`删除 ${project.name}`}
-									title="删除项目"
 									disabled={actionState.status === 'pending'}
 								>
 									<Trash2 size={15} />
@@ -411,7 +409,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		type="button"
 		onclick={openNewProject}
 		aria-label="新建项目"
-		title="新建项目"
 	>
 		<Plus size={23} />
 	</button>
@@ -437,12 +434,13 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				<span>融资品种 / SOP</span>
 				<select class="select" name="sopTemplateId" required disabled={projectOptionsStatus !== 'ready'}>
 					<option value="">
-						{projectOptionsStatus === 'loading' ? '正在加载选项…' : '请选择融资品种'}
+						{projectOptionsStatus === 'loading' ? '正在加载选项…' : projectOptionsStatus === 'error' ? '选项加载失败' : projectOptions.projectSops.length === 0 ? '暂无启用 SOP' : '请选择融资品种'}
 					</option>
 					{#each projectOptions.projectSops as sop}
 						<option value={sop.id}>{sop.debtType} · {sop.name}</option>
 					{/each}
 				</select>
+				{#if projectOptionsStatus === 'error'}<button class="btn btn-ghost" type="button" onclick={() => void ensureProjectOptions()}>重试</button>{/if}
 			</label>
 			<label>
 				<span>项目规模（亿元）</span>
@@ -465,20 +463,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				<span>项目说明</span>
 				<textarea class="textarea" name="notes" rows="3" maxlength="4000"></textarea>
 			</label>
-		</div>
-		<div class="modal-note">
-			{#if projectOptionsStatus === 'loading'}<LoaderCircle class="spin" size={15} />{:else}<CheckCircle2 size={15} />{/if}
-			<span>
-				{#if projectOptionsStatus === 'loading'}
-					正在按需加载人员和 SOP 选项…
-				{:else if projectOptionsStatus === 'error'}
-					选项加载失败，请关闭后重试。
-				{:else if projectOptions.projectSops.length === 0}
-					暂无启用中的 SOP，请先在 SOP 管理中启用至少一个模板。
-				{:else}
-					创建后会按所选 SOP 生成项目节点，现有负债数据保持不变。
-				{/if}
-			</span>
 		</div>
 		<div class="modal-actions">
 			<button class="btn" type="button" disabled={actionState.status === 'pending'} onclick={() => newProjectDialog.close()}>取消</button>
@@ -549,7 +533,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				</label>
 			</div>
 			<div class="modal-actions">
-				<p class="auto-save-status">修改后自动保存</p>
 				<button class="btn" type="button" onclick={() => editProjectDialog.close()}>关闭</button>
 			</div>
 		</form>
@@ -1181,17 +1164,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		resize: vertical;
 	}
 
-	.modal-note {
-		display: flex;
-		align-items: center;
-		gap: 0.4375rem;
-		padding: 0.5625rem 0.625rem;
-		border-radius: 0.4375rem;
-		font-size: 0.75rem;
-		color: var(--color-primary);
-		background: #eff4ff;
-	}
-
 	.modal-actions {
 		display: flex;
 		align-items: center;
@@ -1202,12 +1174,6 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.modal-actions > button:not(.primary-action) {
 		padding: 0 0.8125rem;
-	}
-
-	.auto-save-status {
-		margin: 0 auto 0 0;
-		font-size: 0.75rem;
-		color: #067647;
 	}
 
 	@media (max-width: 75rem) {

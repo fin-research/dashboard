@@ -277,7 +277,7 @@ test('weekly page renders the complete report directly in the workspace', () => 
 	assert.match(source, /<td>\{approvalRule\(item\)\}<\/td>/);
 	assert.match(source, /hasSnapshot \? amount\(compositionTotal\) : '数据缺失'/);
 	assert.match(source, /sumEvents[\s\S]*hasSnapshot/);
-	assert.match(source, /\{#if !hasSnapshot\}[\s\S]*当前报告日还没有数据快照[\s\S]*生成本期周报/);
+	assert.match(source, /\{#if !hasSnapshot\}[\s\S]*暂无 \{data.selectedReportDate\} 负债周报/);
 	assert.match(source, /\{#key data\.snapshotVersion\}/);
 	assert.doesNotMatch(source, /数据缺失与来源状态|数据源：public\.edb ｜ 每日更新|历史周报快照/);
 	assert.equal((source.match(/class="report-section"/g) ?? []).length, 7);

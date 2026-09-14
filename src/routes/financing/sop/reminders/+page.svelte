@@ -110,7 +110,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<input aria-label="提醒关键词"
 				name="query"
 				value={data.filters.query}
-				placeholder="规则、目标、邮箱或失败原因"
 			/>
 		</label>
 	</div>
@@ -147,14 +146,12 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 					<div class:error-copy={row.status === 'failed'}>
 						{#if row.status === 'failed'}
 							<strong>{row.errorMessage ?? '未记录失败原因'}</strong>
-							<span>请修正配置后重新执行提醒任务</span>
 						{:else if row.status === 'sent'}
 							<strong>Resend 已接受</strong>
 							<span>{row.providerMessageId ?? '未返回消息编号'}</span>
-						{:else}
-							<strong>等待发送</strong>
-							<span>配置密钥后执行发送任务</span>
-						{/if}
+					{:else}
+						<strong>等待发送</strong>
+					{/if}
 					</div>
 				</article>
 			{/each}
@@ -171,7 +168,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		<div class="empty-state">
 			<Mail size={24} />
 			<strong>没有匹配的提醒记录</strong>
-			<p>可调整筛选条件后查看；提醒发送后，记录会显示在这里。</p>
 		</div>
 	{/if}
 </section>
@@ -422,10 +418,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		color: #344054;
 	}
 
-	.empty-state p {
-		margin: 0;
-		font-size: 0.75rem;
-	}
 
 	@media (max-width: 64rem) {
 		.summary-grid {

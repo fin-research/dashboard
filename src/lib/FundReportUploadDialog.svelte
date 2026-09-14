@@ -127,14 +127,6 @@
           uploadFundReport();
         }}
       >
-        <div class="upload-note">
-          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M10 9v5M10 6.5h.01" /></svg>
-          <p>
-            文件名末尾的日期会自动转换为 <strong>YYYY-MM-DD.html</strong>；例如
-            <span>资金日报驾驶舱交互版_20260824.html</span> 将保存为 <span>2026-08-24.html</span>。
-          </p>
-        </div>
-
         <input
           bind:this={fileInput}
           class="upload-file-input"
@@ -161,7 +153,6 @@
           </span>
           <span class="file-picker-copy">
             <strong>{selectedFile ? selectedFile.name : "选择资金日报 HTML"}</strong>
-            <small>{selectedFile ? "文件已就绪，点击可重新选择" : "点击选择单个文件，最大 20 MB"}</small>
           </span>
           <span class="file-picker-action">{selectedFile ? "重新选择" : "选择文件"}</span>
         </button>
@@ -186,7 +177,7 @@
         {/if}
 
         <footer class="upload-actions">
-          <span>{selectedFile ? `即将发布 ${fundReportFileName(selectedDate)}` : "选择文件后即可上传发布"}</span>
+          {#if selectedFile}<span>即将发布 {fundReportFileName(selectedDate)}</span>{/if}
           <button class="btn btn-ghost cancel-button" type="button" disabled={uploading} onclick={() => dialog.close()}>取消</button>
           <button class="btn btn-primary upload-button" type="submit" disabled={!selectedFile || uploading}>
             {#if uploading}<span class="button-spinner" aria-hidden="true"></span>{/if}
@@ -206,41 +197,11 @@
   .close-button { width: 44px; height: 44px; display: grid; place-items: center; }
   .close-button svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
   .cancel-button { padding: 10px 16px; }
-  .upload-note svg, .file-picker-icon svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .file-picker-icon svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .upload-form {
     display: grid;
     gap: 20px;
     padding: 24px;
-  }
-
-  .upload-note {
-    display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
-    align-items: start;
-    gap: 10px;
-    padding: 14px 16px;
-    border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line));
-    border-radius: var(--radius-inner);
-    color: var(--text-2);
-    background: color-mix(in srgb, var(--brand-soft) 44%, var(--surface));
-  }
-
-  .upload-note svg {
-    width: 20px;
-    margin-top: 2px;
-    color: var(--brand-deep);
-  }
-
-  .upload-note p {
-    margin: 0;
-    font-size: 1rem;
-    line-height: 1.55;
-  }
-
-  .upload-note strong,
-  .upload-note span {
-    color: var(--ink);
-    font-weight: bold;
   }
 
   .upload-file-input {
@@ -314,11 +275,6 @@
     font-size: 1.125rem;
     font-weight: bold;
     overflow-wrap: anywhere;
-  }
-
-  .file-picker-copy small {
-    color: var(--muted);
-    font-size: 0.875rem;
   }
 
   .file-picker-action {

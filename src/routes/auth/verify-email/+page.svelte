@@ -15,14 +15,7 @@
       <div class="verification-message">
         <span class="mail-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></span>
         <h1 id="verification-title">请检查验证邮件</h1>
-        <p>注册已成功，完成邮箱验证后即可登录。</p>
-        <ol>
-          <li>打开注册时使用的邮箱，找到验证邮件。</li>
-          <li>点击邮件中的验证链接，完成邮箱验证。</li>
-          <li>回到此页面，点击下方按钮继续登录。</li>
-        </ol>
         <a class="login-button" data-sveltekit-reload href="/auth/login?returnTo=%2Fprofile">我已验证，继续登录</a>
-        <p class="mail-help">没有找到邮件？请检查垃圾邮件文件夹，或稍后刷新收件箱。</p>
       </div>
     </ModuleCard>
   </div>
@@ -36,11 +29,8 @@
   .mail-icon { display: grid; width: 56px; height: 56px; place-items: center; border-radius: var(--radius-control); color: var(--brand); background: var(--brand-soft); }
   svg { width: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   h1 { margin: 0; font-size: 1.5rem; font-weight: bolder; }
-  p, ol { margin: 0; font-size: 1rem; line-height: 1.7; }
-  ol { display: grid; gap: 12px; padding-left: 24px; }
   .login-button { display: flex; min-height: 44px; align-items: center; justify-content: center; padding: 10px 16px; border-radius: var(--radius-control); color: white; background: var(--brand); text-decoration: none; font-weight: bold; }
   .login-button:hover { background: var(--brand-deep); }
-  .mail-help { color: var(--muted); font-size: .875rem; }
   a:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
   @media (max-width: 480px) { .verification-message { padding: 4px; } }
 </style>

@@ -577,7 +577,7 @@ test("卖方逻辑汇总编辑采用追加快照并保留检索证据", async ()
   assert.equal(revised.updatedAt, updatedAt);
 });
 
-test("融资模型页面按决策三行展示并提供品种推荐和验证说明", async () => {
+test("融资模型页面按决策三行展示并提供品种推荐和验证指标", async () => {
   const [page, research, chart] = await Promise.all([
     readFile(
       new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url),
@@ -606,7 +606,7 @@ test("融资模型页面按决策三行展示并提供品种推荐和验证说�
   assert.match(page, /title="因子贡献"/);
   assert.doesNotMatch(page, /因子贡献（\+ 支持发行）/);
   assert.match(page, /窗口处于\{snapshot\.prediction\.window_zone\}区间/);
-  assert.match(page, /正值支持发行/);
+  assert.doesNotMatch(page, /正值支持发行/);
   assert.match(page, /aria-label="融资择时模型日期版本"/);
   assert.match(page, /\/api\/financing-model\?run=/);
   assert.doesNotMatch(page, /刷新数据/);
@@ -638,10 +638,10 @@ test("融资模型页面按决策三行展示并提供品种推荐和验证说�
     assert.ok(currentIndex > previousIndex, `${label} 应按指定顺序展示`);
     previousIndex = currentIndex;
   }
-  assert.match(page, /aria-describedby=\{`validation-tip-\$\{index\}`\}/);
-  assert.match(page, /role="tooltip"/);
+  assert.doesNotMatch(page, /validation-tip/);
+  assert.doesNotMatch(page, /role="tooltip"/);
   assert.match(page, /validation\.tscv\.sample_count \?\? validation\.tscv\.validation_samples/);
-  assert.match(chart, /name: "正号代表支持发行（融资成本低）"/);
+  assert.match(chart, /name: "发行贡献（bp）"/);
   assert.match(chart, /financingDriverRadarScale\(rows\)/);
   assert.match(chart, /min: scale\.min/);
   assert.match(chart, /max: scale\.max/);

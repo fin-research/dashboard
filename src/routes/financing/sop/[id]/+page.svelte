@@ -281,8 +281,8 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 		<a href={withBase('/sop')}><ArrowLeft size={18} /> 返回 SOP 管理</a>
 		{#if canManage}
 			<form method="post" action="?/toggleTemplate" use:enhance={enhanceForm('toggle')}>
-				<button class:active={template.isActive} class="btn btn-ghost toggle-button" type="submit" disabled={pendingAction !== ''}>
-					{pendingAction === 'toggle' ? '更新中…' : template.isActive ? '已启用 · 点击停用' : '已停用 · 点击启用'}
+				<button class:active={template.isActive} class="btn btn-ghost toggle-button" type="submit" disabled={pendingAction !== ''} aria-pressed={template.isActive} aria-label={template.isActive ? '停用 SOP' : '启用 SOP'}>
+					{pendingAction === 'toggle' ? '更新中…' : template.isActive ? '停用' : '启用'}
 				</button>
 			</form>
 		{:else}
@@ -303,7 +303,6 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 				<header>
 					<div>
 						<h2>流程节点</h2>
-						<p>{canManage ? '修改自动保存；拖拽节点左侧手柄调整顺序' : '当前为只读视图，节点配置由管理员维护'}</p>
 					</div>
 					<GitBranch size={20} />
 				</header>
@@ -318,7 +317,6 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 									type="button"
 									aria-label={`拖拽排序 ${node.name}，当前第 ${index + 1} 项`}
 									aria-pressed={keyboardGrabbedId === node.id}
-									title="拖拽排序；键盘按空格抓取后使用上下方向键"
 									disabled={!canManage || pendingAction !== ''}
 									onpointerdown={(event) => beginPointerDrag(event, node.id)}
 									onpointermove={continuePointerDrag}
@@ -353,7 +351,7 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 								</div>
 								<label class="node-description">
 									<span>节点说明</span>
-									<input class="input" name="description" bind:value={node.description} placeholder="可选：说明交付物或控制要求" disabled={!canManage} />
+									<input class="input" name="description" bind:value={node.description} disabled={!canManage} />
 								</label>
 							</form>
 							{#if canDelete}
@@ -367,14 +365,14 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 								}}
 							>
 								<input type="hidden" name="nodeId" value={node.id} />
-								<button class="btn" type="submit" aria-label={`删除 ${node.name}`} title="删除节点" disabled={pendingAction !== ''}>
+								<button class="btn" type="submit" aria-label={`删除 ${node.name}`} disabled={pendingAction !== ''}>
 									<Trash2 size={16} />
 								</button>
 							</form>
 							{/if}
 						</article>
 					{:else}
-						<p class="empty-state">尚未配置流程节点，请使用右下角加号添加。</p>
+						<p class="empty-state">尚未配置流程节点。</p>
 					{/each}
 				</div>
 			</section>
@@ -385,7 +383,6 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 				<header>
 					<div>
 						<h2>模板信息</h2>
-						<p>{canManage ? '修改后自动保存' : '当前为只读视图'}</p>
 					</div>
 				</header>
 				<form method="post" action="?/updateTemplate" use:autoSave use:enhance={enhanceForm('template', { autoSave: true })} class="template-form">
@@ -399,26 +396,16 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 					</label>
 					<label>
 						<span>模板说明</span>
-						<textarea class="textarea" name="description" rows="6" placeholder="说明适用范围和关键控制要求" bind:value={template.description} disabled={!canManage}></textarea>
+					<textarea class="textarea" name="description" rows="6" bind:value={template.description} disabled={!canManage}></textarea>
 					</label>
 				</form>
 			</section>
 
-			<section class="guidance panel">
-				<h2>相对日期规则</h2>
-				<ul>
-					<li><strong>负数</strong>：计划簿记日（T）前，例如 -30 表示提前 30 个自然日。</li>
-					<li><strong>0</strong>：计划簿记当日。</li>
-					<li><strong>正数</strong>：计划簿记日后，例如 5 表示簿记后 5 个自然日。</li>
-					<li><strong>时段</strong>：分别配置启动和完成偏移，例如 T-10 至 T-3；启动不能晚于完成。</li>
-					<li>模板用于新建项目；已有项目可在任务节点中调整起止日期。提醒以完成时点为准。</li>
-				</ul>
-			</section>
 		</aside>
 	</div>
 
 	{#if canManage}
-		<button class="btn btn-primary floating-create-button" type="button" onclick={openAddNode} aria-label="添加流程节点" title="添加流程节点">
+		<button class="btn btn-primary floating-create-button" type="button" onclick={openAddNode} aria-label="添加流程节点">
 			<Plus size={23} />
 		</button>
 
@@ -429,14 +416,13 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 				<div>
 					<p class="eyebrow">SOP NODE</p>
 					<h2>添加流程节点</h2>
-					<p>新节点会添加到流程末尾，保存后可直接拖拽排序。</p>
 				</div>
-				<button class="btn" type="button" aria-label="关闭" title="关闭" onclick={() => addNodeDialog?.close()}><X size={18} /></button>
+				<button class="btn" type="button" aria-label="关闭" onclick={() => addNodeDialog?.close()}><X size={18} /></button>
 			</div>
 			<div class="form-grid">
 				<label class="wide">
 					<span>节点名称</span>
-					<input class="input" bind:this={addNodeNameInput} name="name" maxlength="120" required placeholder="例如：发行结果确认" />
+					<input class="input" bind:this={addNodeNameInput} name="name" maxlength="120" required />
 				</label>
 				<label>
 					<span>默认角色</span>
@@ -448,7 +434,7 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 				<div class="wide"><ScheduleFields relative endValue={0} /></div>
 				<label class="wide">
 					<span>节点说明</span>
-					<input class="input" name="description" placeholder="可选：说明交付物或控制要求" />
+					<input class="input" name="description" />
 				</label>
 			</div>
 			<div class="modal-actions">
@@ -476,7 +462,6 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 	.panel { overflow: hidden; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--surface); box-shadow: var(--shadow); }
 	.panel > header { display: flex; min-height: 4.5rem; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.875rem 1rem; border-bottom: 1px solid var(--line); }
 	h2 { margin: 0; font-size: 1.125rem; color: #1d2939; }
-	.panel header p { margin: 0.2rem 0 0; font-size: 0.75rem; color: var(--subtle); }
 	.reorder-form { display: none; }
 	.node-card { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr) 2.75rem; gap: 0.75rem; padding: 1rem; border-bottom: 1px solid var(--line); background: #fff; transition: border-color 180ms ease, background 180ms ease, opacity 180ms ease; }
 	.node-card.read-only { grid-template-columns: 3.25rem minmax(0, 1fr); }
@@ -493,9 +478,6 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 	.delete-form { align-self: end; margin-bottom: 0.1rem; }
 	.delete-form button { display: grid; width: 2.75rem; place-items: center; }
 	.template-form { display: grid; gap: 0.875rem; padding: 1rem; }
-	.guidance { padding: 1rem; }
-	.guidance ul { display: grid; gap: 0.65rem; margin: 0.75rem 0 0; padding-left: 1.25rem; }
-	.guidance li { font-size: 1rem; line-height: 1.55; color: var(--muted); }
 	.empty-state { margin: 0; padding: 1.25rem; font-size: 1rem; color: var(--muted); text-align: center; }
 	.sop-detail-page .config-modal { max-height: min(90dvh, 42rem); overflow: auto; }
 	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

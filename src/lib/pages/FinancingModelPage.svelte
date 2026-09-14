@@ -69,7 +69,6 @@
           value: formatRatioPercent(company?.ef_lcr),
           unit: "%",
           tone: "teal",
-          detail: lcrInsight(company?.ef_lcr),
           icon: "liquidity" as MetricIconName,
         },
         {
@@ -77,7 +76,6 @@
           value: formatRatioPercent(company?.ef_nsfr),
           unit: "%",
           tone: "blue",
-          detail: nsfrInsight(company?.ef_nsfr),
           icon: "leverage" as MetricIconName,
         },
         {
@@ -85,7 +83,6 @@
           value: formatSignedNullable(company?.ef_funding_gap, 1),
           unit: "亿元",
           tone: "orange",
-          detail: fundingGapInsight(company?.ef_funding_gap),
           icon: "bank" as MetricIconName,
         },
         {
@@ -93,7 +90,6 @@
           value: formatNullable(company?.ef_subject_spread_bp, 2),
           unit: "bp",
           tone: "purple",
-          detail: subjectSpreadInsight(company?.ef_subject_spread_pctile),
           icon: "issuance" as MetricIconName,
         },
       ]
@@ -103,7 +99,6 @@
         {
           label: "样本量",
           value: `${validation.tscv.sample_count ?? validation.tscv.validation_samples} 笔`,
-          tip: "最终预测模型实际使用的全部有效历史发行样本数。",
         },
         {
           label: "样本区间",
@@ -111,22 +106,18 @@
             validation.tscv.sample_start_date,
             validation.tscv.sample_end_date,
           ),
-          tip: "最终预测模型全部有效历史样本的最早至最晚发行日期。",
         },
         {
           label: "胜率",
           value: `${(validation.timing_value.win_rate * 100).toFixed(1)}%`,
-          tip: "模型推荐样本中，实际发行利差偏离低于零的记录占比。",
         },
         {
           label: "历史节约",
           value: `${formatSigned(validation.timing_value.cost_saving_bp, 2)} bp`,
-          tip: "全样本实际偏离均值减去模型推荐样本实际偏离均值，正值表示节约。",
         },
         {
           label: "信息系数",
           value: validation.tscv.ic.toFixed(3),
-          tip: "各时序验证折内预测偏离与实际偏离相关系数的平均值。",
         },
         {
           label: "平均误差",
@@ -134,7 +125,6 @@
             validation.tscv.mae === null
               ? "—"
               : `${validation.tscv.mae.toFixed(2)} bp`,
-          tip: "所有样本外预测与实际发行利差偏离之差的平均绝对值。",
         },
       ]
     : [];
@@ -430,34 +420,6 @@
     return value === null || value === undefined ? "—" : (value * 100).toFixed(1);
   }
 
-  function lcrInsight(value: number | null | undefined): string {
-    if (value === null || value === undefined) return "流动性数据暂缺";
-    if (value >= 1.5) return "流动性宽裕";
-    if (value >= 1) return "流动性充足";
-    return "流动性偏紧";
-  }
-
-  function nsfrInsight(value: number | null | undefined): string {
-    if (value === null || value === undefined) return "稳定资金数据暂缺";
-    if (value >= 1.2) return "稳定资金充足";
-    if (value >= 1) return "稳定资金达标";
-    return "稳定资金承压";
-  }
-
-  function fundingGapInsight(value: number | null | undefined): string {
-    if (value === null || value === undefined) return "资金缺口数据暂缺";
-    if (value < -100) return "资金缺口较大";
-    if (value > 50) return "资金较为宽裕";
-    return "资金缺口可控";
-  }
-
-  function subjectSpreadInsight(value: number | null | undefined): string {
-    if (value === null || value === undefined) return "主体利差分位暂缺";
-    if (value <= 0.33) return "主体利差相对低位";
-    if (value >= 0.67) return "主体利差相对高位";
-    return "主体利差处于中枢";
-  }
-
   function formatDateRange(
     start: string | null,
     end: string | null,
@@ -598,13 +560,13 @@
         </ModuleCard>
       </section>
 
-      <section class="driver-grid" aria-label="模型驱动解释">
+      <section class="driver-grid" aria-label="模型驱动">
         <ModuleCard class="chart-card" labelledBy="driver-structure-title">
           <PanelHeading id="driver-structure-title" title="驱动结构" />
           <ChartHost
             renderer={renderFinancingDriverRadar}
             args={[snapshot.driver_structure]}
-            ariaLabel="按六类因子汇总的 SHAP 发行支持度雷达图"
+            ariaLabel="六类因子 SHAP 发行支持度雷达图"
             className="driver-radar-chart"
           />
         </ModuleCard>
@@ -613,7 +575,7 @@
           <ChartHost
             renderer={renderFinancingDriverContributions}
             args={[marketDrivers]}
-            ariaLabel="当前预测 Top 5 因子贡献，正值支持发行"
+            ariaLabel="当前预测 Top 5 因子贡献"
             className="driver-contribution-chart"
           />
         </ModuleCard>
@@ -627,7 +589,6 @@
               label={metric.label}
               value={metric.value}
               unit={metric.unit}
-              detail={metric.detail}
               tone={financingMetricTone(metric.tone)}
               iconComponent={MetricIcon}
               iconProps={{ icon: metric.icon }}
@@ -721,20 +682,9 @@
         <ModuleCard class="validation-panel" labelledBy="validation-title">
           <PanelHeading id="validation-title" title="模型验证" />
           <dl class="validation-grid">
-            {#each validationMetrics as metric, index}
+            {#each validationMetrics as metric}
               <div>
-                <div class="validation-label">
-                  <dt>{metric.label}</dt>
-                  <button class="btn info-tip" type="button" aria-label={`${metric.label}指标含义`} aria-describedby={`validation-tip-${index}`}>
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      <circle cx="10" cy="10" r="7.5" />
-                      <path d="M10 9v5M10 6.3h.01" />
-                    </svg>
-                    <span class="metric-tooltip" id={`validation-tip-${index}`} role="tooltip">
-                      {metric.tip}
-                    </span>
-                  </button>
-                </div>
+                <dt>{metric.label}</dt>
                 <dd class:sample-range={metric.label === "样本区间"}>{metric.value}</dd>
               </div>
             {/each}
@@ -745,7 +695,7 @@
       <ModuleCard class="decision-history-section" labelledBy="decision-history-title">
         <PanelHeading id="decision-history-title" title="历史择时决策记录" controlsBesideTitle>
           {#if !editingDecision}
-            <button class="btn btn-ghost icon-button" type="button" aria-label="录入当前决策" title="录入当前决策" onclick={() => openDecisionEditor()}>
+            <button class="btn btn-ghost icon-button" type="button" aria-label="录入当前决策" onclick={() => openDecisionEditor()}>
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
             </button>
           {/if}
@@ -825,7 +775,6 @@
             {/if}
             <button class="btn btn-primary icon-button ai-generate-button" class:is-loading={generatingResearch} type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}
               aria-label={generatingResearch ? "AI 生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
-              title={generatingResearch ? "AI 生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
               aria-busy={generatingResearch}
             >
               <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -1322,11 +1271,6 @@
     font-weight: bolder;
   }
 
-  .validation-label {
-    display: flex;
-    align-items: center;
-  }
-
   .report-stack :global(.forecast-panel) {
     min-width: 0;
   }
@@ -1356,8 +1300,6 @@
 
   .validation-grid > div:last-child { border-bottom: 0; }
 
-  .validation-label { gap: 0; }
-
   .validation-grid dt {
     color: var(--text-2);
     font-size: 0.875rem;
@@ -1376,48 +1318,6 @@
     font-weight: bold;
     font-variant-numeric: tabular-nums;
     text-align: right;
-  }
-
-  .info-tip {
-    position: relative;
-    display: grid;
-    width: 44px;
-    height: 44px;
-    flex: 0 0 44px;
-    place-items: center;
-    padding: 0;
-  }
-
-  .info-tip svg {
-    width: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.7;
-  }
-
-  .metric-tooltip {
-    position: absolute;
-    z-index: 12;
-    top: calc(100% + 6px);
-    left: 50%;
-    display: none;
-    width: min(260px, calc(100vw - 40px));
-    padding: 8px 10px;
-    border-radius: 6px;
-    color: #fff;
-    background: rgba(23, 32, 51, 0.96);
-    box-shadow: 0 8px 24px rgba(23, 32, 51, 0.2);
-    font-size: 0.875rem;
-    font-weight: normal;
-    line-height: 1.45;
-    transform: translateX(-50%);
-  }
-
-  .info-tip:hover .metric-tooltip,
-  .info-tip:focus-visible .metric-tooltip {
-    display: block;
   }
 
   :global(.forecast-chart) {

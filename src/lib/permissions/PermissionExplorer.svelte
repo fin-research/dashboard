@@ -17,7 +17,7 @@
     <span><Box size={18} aria-hidden="true" /><strong>{resources}</strong>资源</span>
     <span><ShieldCheck size={18} aria-hidden="true" /><strong>{actions}</strong>已授权操作</span>
   </div>
-  <label class="input permission-search"><Search size={18} aria-hidden="true" /><input type="search" bind:value={query} placeholder="查找业务、资源或操作" aria-label="搜索权限" /></label>
+  <label class="input permission-search"><Search size={18} aria-hidden="true" /><input type="search" bind:value={query} aria-label="搜索权限" /></label>
   <div class="scope-filters" aria-label="业务范围筛选">
     <button type="button" class="btn btn-ghost" class:btn-active={!scope} aria-pressed={!scope} onclick={() => scope = ''}>全部范围</button>
     {#each tree as group}

@@ -77,7 +77,6 @@
         label="融入融出合计"
         value={fundingOverview.total.toFixed(1)}
         unit="亿元"
-        detail="融入余额 + 融出余额"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "funds" }}
         tone="orange"
@@ -104,7 +103,7 @@
         label="当日成交加权利率"
         value={tradingSummary.weightedRate.toFixed(3)}
         unit="%"
-        detail={`${tradingSummary.tradeCount}笔 · 按成交金额加权`}
+        detail={`${tradingSummary.tradeCount}笔`}
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "research" }}
         tone="purple"
@@ -119,7 +118,7 @@
         label="授信总额度"
         value={creditSummary.totalLimit.toFixed(1)}
         unit="亿元"
-        detail={`涵盖${creditSummary.institutionCount}家机构`}
+        detail={`${creditSummary.institutionCount}家机构`}
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "credit" }}
         tone="blue"
@@ -152,7 +151,6 @@
         label="业务本金"
         value={secondaryPoolSnapshot.principal.toFixed(2)}
         unit="亿元"
-        detail="交易户 + 可供户"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "bond" }}
         tone="blue"
@@ -170,7 +168,6 @@
         label="年化收益率（含免税）"
         value={secondaryPoolSnapshot.annualizedReturn.toFixed(2)}
         unit="%"
-        detail="按业务本金计算"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "research" }}
         tone="green"
@@ -179,7 +176,6 @@
         label="当日营收"
         value={secondaryPoolSnapshot.dailyRevenue.toFixed(2)}
         unit="万元"
-        detail="含免税"
         iconComponent={WorkbenchIcon}
         iconProps={{ name: "funds" }}
         tone="orange"

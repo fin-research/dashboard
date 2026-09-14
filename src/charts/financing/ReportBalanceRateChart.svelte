@@ -137,7 +137,7 @@
 </script>
 
 {#if values.length}
-	<ChartHost {option} ariaLabel="2021年以来公司融资余额与综合融资利率趋势，面积为融资余额，折线为综合融资利率，并标注每年节点" height={20} />
+	<ChartHost {option} ariaLabel="2021年以来公司融资余额与综合融资利率趋势" height={20} />
 {:else}
 	<div class="chart-empty">暂无可靠的历史余额与利率数据</div>
 {/if}

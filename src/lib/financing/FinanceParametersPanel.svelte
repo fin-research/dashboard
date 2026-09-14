@@ -105,7 +105,7 @@
 	{:else if loadError}
 		<p class="error-message" role="alert">{loadError}</p>
 	{:else if !rows.length}
-		<p class="empty-state">暂无月度数据，点击右下角加号新增月份。</p>
+		<p class="empty-state">暂无月度数据</p>
 	{:else}
 		<div class="month-toolbar">
 			<label><span>数据月份</span><select class="select" bind:value={selectedPeriod}>{#each rows as row (String(row.period_end))}<option value={String(row.period_end)}>{String(row.period_end).slice(0, 7)}</option>{/each}</select></label>
@@ -123,7 +123,7 @@
 			</div>
 			{#if reconciliation?.difference != null}
 				<p class="reconciliation" class:mismatch={Math.abs(reconciliation.difference) > 0.00015}>
-					{#if Math.abs(reconciliation.difference) <= 0.00015}勾稽一致：总资产 − 总负债 = 证券净资产。{:else}待核对：总资产 − 总负债与证券净资产相差 {financialValue(reconciliation.difference)}，请核对是否为同一主体及合并口径。{/if}
+					{#if Math.abs(reconciliation.difference) <= 0.00015}勾稽一致。{:else}待核对：相差 {financialValue(reconciliation.difference)}，请核对证券净资产与资产负债。{/if}
 				</p>
 			{/if}
 			{#if selected.notes}<p class="parameter-notes">{String(selected.notes)}</p>{/if}
@@ -133,7 +133,7 @@
 </ModuleCard>
 
 {#if !loading && !loadError}
-	{#if canCreate}<button class="btn btn-primary floating-create-button" type="button" aria-label="新增月份" title="新增月份" onclick={() => openEditor()}><Plus size={24} /></button>{/if}
+	{#if canCreate}<button class="btn btn-primary floating-create-button" type="button" aria-label="新增月份" onclick={() => openEditor()}><Plus size={24} /></button>{/if}
 {/if}
 
 <dialog class="modal" bind:this={dialog} aria-labelledby="parameter-editor-title" oncancel={(event) => { if (saving) event.preventDefault(); }}>
@@ -152,10 +152,9 @@
 		<div class="ratio-preview" aria-live="polite">
 			<p>资产负债率：<strong>{financialValue(preview.asset_liability_ratio, true)}</strong></p>
 			<p>扣代理买卖后：<strong>{financialValue(preview.adjusted_asset_liability_ratio, true)}</strong></p>
-			<small>比率由总资产、总负债和代理买卖证券款计算；缺少输入或分母为零时留空。空白金额表示缺失，不按零处理。</small>
 			{#if preview.difference != null && Math.abs(preview.difference) > 0.00015}<p class="mismatch">勾稽差额：{financialValue(preview.difference)}，请核对证券净资产与资产负债的主体和口径。</p>{/if}
 		</div>
-		{#if saveError}<p class="error-message" role="alert">{saveError}。输入已保留；如有并发冲突，请取消后刷新。</p>{/if}
+		{#if saveError}<p class="error-message" role="alert">{saveError}</p>{/if}
 		<div class="modal-actions"><button class="btn" type="button" onclick={() => dialog.close()} disabled={saving}>取消</button><button class="btn btn-primary" type="submit" disabled={saving}>{#if saving}<LoaderCircle size={17} class="spin" />{/if}{saving ? '保存中…' : '保存'}</button></div>
 	</form>
 </div>
@@ -186,7 +185,6 @@
 	fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 	.ratio-preview { padding: .75rem; border-radius: .5rem; background: var(--canvas); }
 	.ratio-preview p { margin: 0 0 .5rem; }
-	.ratio-preview small { color: var(--muted); font-size: .75rem; }
 	.config-modal .error-message { padding-inline: 0; }
 	input, select, textarea { min-width: 0; }
 	@media (max-width: 75rem) { .parameter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -106,7 +106,7 @@ test('online import uses client Protobuf plus idempotent Workflow and no databas
 	assert.match(browserWorker, /parseDebtWorkbookData\(event\.data\.workbookData/);
 	assert.match(browserWorker, /encodeDebtImportPayload\(transformed\)/);
 	assert.match(browserWorker, /brotli\.compress\(protobuf, \{ quality: 10 \}\)/);
-	assert.match(panel, /原始 Excel 不上传/);
+	assert.doesNotMatch(panel, /原始 Excel 不上传/);
 	assert.match(migration, /DROP TABLE IF EXISTS financing\.debt_import_payloads/);
 	assert.match(migration, /DROP TABLE IF EXISTS financing\.debt_import_runs/);
 });

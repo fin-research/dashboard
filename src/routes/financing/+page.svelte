@@ -201,8 +201,8 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 			{#each regulatoryItems as item}
 				<div class="regulatory-cell">
 					<div class="regulatory-title">
-						<span title={item.label}>{item.shortLabel}</span>
-						<span class={`financing-status-light ${item.tone}`} role="img" aria-label={toneLabel(item.tone)} title={toneLabel(item.tone)}></span>
+						<span>{item.shortLabel}</span>
+						<span class={`financing-status-light ${item.tone}`} role="img" aria-label={toneLabel(item.tone)}></span>
 					</div>
 					<div class="regulatory-value-row"><strong class:financing-muted-value={item.value === '待配置'}>{item.value}</strong><span>上限 {item.limit}</span></div>
 					<div class="regulatory-details">
@@ -231,7 +231,7 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 		<PanelHeading id="financing-panel-3" title="推进中的融资项目" accent="var(--violet)" controlsInline></PanelHeading>
 		<div class="financing-table-scroll" role="region" aria-label="推进中的融资项目明细" use:scrollableRegion>
 		<table class="table"><thead><tr><th>融资方式</th><th>融资金额</th><th>期限</th><th>融资成本</th><th>落地时间</th></tr></thead><tbody>
-			{#each dashboard.projects as project}<tr><td><a href={withBase(`/projects/${project.id}`)}>{project.debtType}</a><small>{project.name}</small></td><td>{project.amountYi.toFixed(2)}</td><td>{project.tenor}</td><td>{project.cost}</td><td>{#if project.landingDate}<time class="financing-date" datetime={project.landingDate}>{dateLabel(project.landingDate)}</time><small>簿记</small>{:else}待定{/if}</td></tr>{/each}
+			{#each dashboard.projects as project}<tr><td><a href={withBase(`/projects/${project.id}`)}>{project.debtType}</a><span class="project-name">{project.name}</span></td><td>{project.amountYi.toFixed(2)}</td><td>{project.tenor}</td><td>{project.cost}</td><td>{#if project.landingDate}<time class="financing-date" datetime={project.landingDate}>{dateLabel(project.landingDate)}</time>{:else}待定{/if}</td></tr>{/each}
 		</tbody><tfoot><tr><th>合计</th><th>{projectTableAmountYi.toFixed(2)}</th><th colspan="3"></th></tr></tfoot></table>
 		</div>
 	</ModuleCard>
@@ -253,7 +253,7 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 		</tbody><tfoot><tr><th>合计</th><th>{dashboard.limitTotals.limitYi.toFixed(2)}</th><th>{dashboard.limitTotals.issuedYi.toFixed(2)}</th><th>{dashboard.limitTotals.remainingYi.toFixed(2)}</th><th></th><th></th></tr></tfoot></table>
 		</div>
 		{#if dashboard.financeParameterReminder}
-			<div class="parameter-reminder" role="status"><CircleAlert size={18} /><span>请在本月初更新“上月末净资本”，收益凭证可发行额度按其 60% 计算。</span><a class="btn btn-ghost" href={withBase('/data')}>去配置</a></div>
+			<div class="parameter-reminder" role="status"><CircleAlert size={18} /><span>净资本待更新</span><a class="btn btn-ghost" href={withBase('/data')}>去配置</a></div>
 		{/if}
 	</ModuleCard>
 
@@ -262,8 +262,8 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 		<div class="simulator-form">
 			<label><span>拟发行品种</span><select class="select" bind:value={simulationType}>{#each dashboard.limits as item}<option>{item.debtType}</option>{/each}</select></label>
 			<label><span>起息日</span><input class="input" type="date" bind:value={simulationDate} /></label>
-			<label><span>规模（亿元）</span><input class="input" type="number" min="0.01" step="0.01" bind:value={simulationAmount} placeholder="0.00" /></label>
-			<label><span>期限</span><input class="input" bind:value={simulationTenor} placeholder="例如 3Y/5Y" /></label>
+			<label><span>规模（亿元）</span><input class="input" type="number" min="0.01" step="0.01" bind:value={simulationAmount} /></label>
+			<label><span>期限</span><input class="input" bind:value={simulationTenor} /></label>
 		</div>
 		{#if simulationLimit}
 			<dl class="simulation-baseline" aria-label="当前品种额度，单位亿元">
@@ -273,7 +273,7 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 			</dl>
 		{/if}
 		<div class="simulation-results">
-			<div class:pass={simulationResult?.pass} class:fail={simulationResult && !simulationResult.pass}><Landmark size={18} /><span><strong>负债额度</strong>{simulationResult?.message ?? '输入发行规模后自动校验'}</span></div>
+			<div class:pass={simulationResult?.pass} class:fail={simulationResult && !simulationResult.pass}><Landmark size={18} /><span><strong>负债额度</strong>{simulationResult?.message ?? '待试算'}</span></div>
 		</div>
 	</ModuleCard>
 

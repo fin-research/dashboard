@@ -146,7 +146,6 @@
       class="btn text-report__action"
       type="button"
       aria-label="复制文字版报告"
-      title="复制文字版报告"
       onclick={copyReport}
     >
       <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -160,7 +159,6 @@
       type="button"
       disabled={saving}
       aria-label="保存市场点评定稿"
-      title="保存定稿"
       onclick={saveReport}
     >
       <svg viewBox="0 0 20 20" aria-hidden="true">

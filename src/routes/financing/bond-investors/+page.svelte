@@ -51,7 +51,6 @@
       {/snippet}
     </InvestorChartTable>
   {/if}
-  <details><summary>统计口径</summary><p>累计规模汇总2020年起至统计日已起息债券的一级发行认购金额。存续规模为其中统计日尚未到期、结清或关闭的债券认购金额，不反映二级市场转让。机构分类读取客户主表；“未知”保留来源未明确的实际投资人。到期日当天不计存续，分母为零时占比显示“—”。</p></details>
 </div>
 
 <style>
@@ -59,6 +58,5 @@
   .investor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
   .investor-toolbar input { width: auto; }
   .investor-toolbar span { margin-left: auto; }
-  details p { line-height: 1.6; }
   @media (max-width: 720px) { .investor-toolbar span { margin-left: 0; } }
 </style>

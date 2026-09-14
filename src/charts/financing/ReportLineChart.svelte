@@ -120,7 +120,7 @@
 </script>
 
 {#if series.length}
-	<ChartHost {option} ariaLabel={`${title}，包含 ${series.map((item) => item.name).join('、')} 趋势`} height={height / 16} />
+	<ChartHost {option} ariaLabel={title} height={height / 16} />
 {:else}
 	<div class:compact class="chart-empty">暂无可靠历史序列</div>
 {/if}

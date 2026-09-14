@@ -386,7 +386,6 @@
     {:else if !analytics.hasData}
       <section class="secondary-weekly-state">
         <h2>所选范围暂无二级池数据</h2>
-        <p>请在页头选择其他日期范围。</p>
       </section>
     {:else if !analytics.auditPassed}
       <section class="secondary-weekly-state secondary-weekly-state--audit">
@@ -420,13 +419,13 @@
                 <ChartHost
                   renderer={renderWeeklyPoolScaleLeverage}
                   args={[rangePerformance, analytics.availability.pledgedMarketValue, analytics.availability.availableMarketValue]}
-                  ariaLabel="所选区间业务本金、持仓市值、时间加权本金与杠杆走势，以及最新已质押持仓市值和可用持仓市值"
+                  ariaLabel="所选区间业务本金、持仓市值、时间加权本金与杠杆走势，以及最新已质押和可用"
                   className="secondary-weekly-chart secondary-weekly-chart--trend"
                 />
               </div>
               <div class="secondary-weekly-analysis">
-                <p>• <strong>规模概览</strong>：最新业务本金 <strong>{formatYi(current?.principal ?? null)}</strong>，全池持仓市值 <strong>{formatYi(analytics.detailMarketValue)}</strong>，综合杠杆率 <strong>{formatDecimalPercent(calculatedLeverage)}</strong>，已质押持仓市值 <strong>{formatYi(analytics.availability.pledgedMarketValue)}</strong>，可用持仓市值 <strong>{formatYi(analytics.availability.availableMarketValue)}</strong>。</p>
-                <p>• <strong>双户结构</strong>：交易户占全池市值 {formatPercentOne(analytics.detailMarketValue > 0 ? tradingMarketValue / analytics.detailMarketValue : null)}、可供户占 {formatPercentOne(analytics.detailMarketValue > 0 ? availableMarketValue / analytics.detailMarketValue : null)}；可供户纳入全池 DV01 与损益对账。</p>
+                <p>• <strong>规模概览</strong>：最新业务本金 <strong>{formatYi(current?.principal ?? null)}</strong>，全池持仓市值 <strong>{formatYi(analytics.detailMarketValue)}</strong>，综合杠杆率 <strong>{formatDecimalPercent(calculatedLeverage)}</strong>，已质押 <strong>{formatYi(analytics.availability.pledgedMarketValue)}</strong>，可用 <strong>{formatYi(analytics.availability.availableMarketValue)}</strong>。</p>
+                <p>• <strong>双户结构</strong>：交易户占全池市值 {formatPercentOne(analytics.detailMarketValue > 0 ? tradingMarketValue / analytics.detailMarketValue : null)}、可供户占 {formatPercentOne(analytics.detailMarketValue > 0 ? availableMarketValue / analytics.detailMarketValue : null)}。</p>
               </div>
             </ModuleCard>
 
@@ -471,7 +470,7 @@
                 </div>
               </div>
               <div class="secondary-weekly-analysis">
-                <p>• <strong>资产类别</strong>：按交易户市值计算，主要类别为 {categorySummary || "—"}。</p>
+                <p>• <strong>资产类别</strong>：主要类别为 {categorySummary || "—"}。</p>
                 <p>• <strong>期限结构</strong>：交易户中 1 年以内资产占比约 <strong>{formatPercentOne(oneYearShare)}</strong>；最新修正久期 <strong>{current?.modifiedDuration === null || current?.modifiedDuration === undefined ? "—" : `${current.modifiedDuration.toFixed(4)} 年`}</strong>，合并 DV01 <strong>{formatWan(currentOperating?.dv01 ?? null, 2)}/BP</strong>。</p>
               </div>
             </ModuleCard>
@@ -513,7 +512,7 @@
         </div>
     {/if}
 
-    <footer class="secondary-weekly-footer">资金管理部 · 二级债券池内部报告 | 数据基于输入台账，发送前请复核审计摘要</footer>
+    <footer class="secondary-weekly-footer">资金管理部 · 二级债券池内部报告</footer>
 {/snippet}
 
 {#if embedded}

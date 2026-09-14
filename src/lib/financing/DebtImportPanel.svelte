@@ -336,7 +336,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	</PanelHeading>
 
 	<div class="import-body">
-		<p class="import-help">原始 Excel 不上传；仅加入增量，历史记录由管理员手动维护。</p>
 		{#if selectedFile && !activeRun}
 			<div class="selected-file" aria-live="polite">
 				<FileSpreadsheet size={18} />
@@ -406,7 +405,6 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	.file-picker.disabled { cursor: not-allowed; opacity: .55; }
 	.file-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 	.file-picker:focus-within { outline: 3px solid var(--brand-soft); outline-offset: 2px; }
-	.import-help { margin: 1rem 0 0; color: var(--muted); font-size: .875rem; }
 	.import-body { display: grid; gap: .75rem; padding: 0; border-top: 1px solid var(--line); }
 	.selected-file { display: flex; min-width: 0; align-items: center; gap: .5rem; margin-top: 1rem; padding: .75rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--blue-soft); }
 	.selected-file strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

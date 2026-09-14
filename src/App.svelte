@@ -416,7 +416,6 @@
         <span class="loading-orbit" aria-hidden="true"></span>
         <div>
           <strong>正在汇集市场数据</strong>
-          <p>各市场数据正在对齐。</p>
         </div>
       </div>
     {:else if errorMessage}

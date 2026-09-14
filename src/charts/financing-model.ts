@@ -32,7 +32,7 @@ export function renderFinancingForecast(
     aria: {
       enabled: true,
       description:
-        "未来发行窗口预测图，折线表示相对可比债中位数的预测偏离，柱形表示相对窗口中位数的成本变化",
+        "未来发行窗口预测图",
     },
     color: [chartBlue, chartTeal],
     legend: {
@@ -123,7 +123,7 @@ export function renderFinancingGauge(
     animationDuration: 180,
     aria: {
       enabled: true,
-      description: `当前预测发行利差偏离处于历史 P${prediction.historical_percentile.toFixed(0)}，窗口处于${prediction.window_zone}区间`,
+      description: `发行利差偏离 P${prediction.historical_percentile.toFixed(0)}，窗口${prediction.window_zone}区间`,
     },
     tooltip: {
       ...tooltip,
@@ -201,7 +201,7 @@ export function renderFinancingDriverRadar(
     animationDuration: 180,
     aria: {
       enabled: true,
-      description: `融资择时六维驱动结构雷达图，五十分为中性，越高越支持发行；当前坐标范围为${scale.min}至${scale.max}，原始分数未调整`,
+      description: "融资择时六维驱动结构雷达图",
     },
     color: [chartBlue, colors.zero],
     legend: {
@@ -298,7 +298,7 @@ export function renderFinancingDriverContributions(
     animationDuration: 180,
     aria: {
       enabled: true,
-      description: "本次预测的前五项 SHAP 因子贡献，横轴正号代表支持发行",
+      description: "本次预测前五项 SHAP 因子贡献",
     },
     grid: { left: 12, right: 78, top: 8, bottom: 48, containLabel: true },
     tooltip: {
@@ -321,7 +321,7 @@ export function renderFinancingDriverContributions(
       type: "value",
       min: -bound,
       max: bound,
-      name: "正号代表支持发行（融资成本低）",
+      name: "发行贡献（bp）",
       nameLocation: "middle",
       nameGap: 32,
       axisLine: { lineStyle: { color: colors.line } },
@@ -382,7 +382,7 @@ export function renderFinancingProductComparison(
     animationDuration: 180,
     aria: {
       enabled: true,
-      description: `四种发行方案相对各自同类债中位数的预测偏离对比，模型推荐${recommendation?.recommended_product ?? ""}`,
+      description: `发行方案预测偏离，推荐${recommendation?.recommended_product ?? "—"}`,
     },
     grid: { left: 12, right: 130, top: 8, bottom: 26, containLabel: true },
     tooltip: {

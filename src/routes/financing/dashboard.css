@@ -175,7 +175,7 @@
 	color: #1d4ed8;
 }
 
-:where(.financing-scope) .financing-panel td small {
+:where(.financing-scope) .financing-panel td .project-name {
 	display: block;
 	margin-top: 0.125rem;
 	font-size: 0.875rem;

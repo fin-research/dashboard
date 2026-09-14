@@ -23,8 +23,6 @@
   export let onTextChange: (value: string) => void = () => {};
   export let onBriefingApplied: (value: MarketBriefing) => void = () => {};
 
-  const PLACEHOLDER =
-    "1. 输入流动性、固收或权益市场的关键判断\n2. 每条聚焦一个结论，建议保留 2–3 条";
   let editor: HTMLDivElement;
   let loadedSource = "";
   let html = "";
@@ -197,7 +195,7 @@
   aria-keyshortcuts="Control+B Meta+B Control+I Meta+I Control+U Meta+U Control+Shift+H Meta+Shift+H"
   aria-multiline="true"
   data-empty={empty}
-  data-placeholder={generating ? "" : PLACEHOLDER}
+  data-placeholder=""
   spellcheck="false"
   tabindex="0"
   bind:innerHTML={html}

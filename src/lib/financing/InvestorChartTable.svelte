@@ -19,7 +19,7 @@
   </PanelHeading>
   <div class="investor-pair">
     <div class:scroll class="investor-chart" role="region" aria-label={`${title}图表滚动区域`}>
-      {#if empty}<p class="empty-chart" role="status">所选范围暂无投资金额</p>{:else}<ChartHost {option} height={chartHeight} ariaLabel={`${title}，金额单位亿元，完整数值见右侧表格`} />{/if}
+      {#if empty}<p class="empty-chart" role="status">所选范围暂无投资金额</p>{:else}<ChartHost {option} height={chartHeight} ariaLabel={`${title}，金额单位亿元`} />{/if}
     </div>
     <div class:scroll class="investor-table" role="region" aria-label={`${title}数据表格`}>
       <table class="table">

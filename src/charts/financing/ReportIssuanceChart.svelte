@@ -94,7 +94,7 @@
 </script>
 
 {#if months.length && rows.some((row) => Number(row.amountYi) > 0)}
-	<ChartHost {option} ariaLabel="近一年公司债券按短融、三年和五年公募债、三年和五年次级债展示发行规模，各品种同色折线展示加权发行利率并标注末值" height={19} />
+	<ChartHost {option} ariaLabel="近一年公司债券发行规模与加权发行利率" height={19} />
 {:else}
 	<div class="chart-empty">近一年暂无可靠公司债发行数据</div>
 {/if}
