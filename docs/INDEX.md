@@ -51,3 +51,6 @@
 [融资合并记录](FINANCING_MERGE.md)、`docs/history/` 与 [授信需求底稿](授信管理需求文档.md) 仅按迁移排查或需求溯源读取，不作为当前运行状态。原 Financing checkout 不再作为生产源码或规范来源。
 
 权限架构、权限范围与匿名/测试账号程序化验收 → [共享 AUTH](../../eastmoney/docs/AUTH.md)。禁止 browser；本仓库覆盖范围与命令见 AUTH 的测试表。
+# 债券模型输入维护
+
+新增市场/公司原始输入、EDB 历史回填、SHIBOR 与 R2 日报规范化 → [Quant 输入](modules/quant-inputs.md)。

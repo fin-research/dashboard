@@ -3,6 +3,7 @@ import {
   choiceRequestBatches, fetchDmFundingRateRows,
   normalizeChoiceEconomicIndicatorRows, parseChoiceEconomicIndicatorTable,
   type DataApiRequest, type ChoiceEconomicIndicatorRawRow,
+  dmFundingRateCodeMap,
 } from "../src/lib/server/economic-indicator-sync.ts";
 import type { EconomicIndicatorSyncRow } from "../src/lib/server/economic-indicators-repository.ts";
 import {
@@ -49,10 +50,10 @@ export function economicIndicatorRequests(scheduledTime: number): RequestSpec[] 
     return { id: `choice-${index + 1}`, source: "choice-edb", path: "/choice/edb", codes,
       parameters: { edbIds: codes.join(","), startDate: batch.startDate, endDate, options: "IsPublishDate=1,FixDate=0" } };
   });
-  const dm = [["DR001", "E1300003"], ["DR007", "E1300004"], ["R007", "E1704420"]].map(([bondCode, code]): RequestSpec => ({
+  const dm = [...dmFundingRateCodeMap].map(([bondCode, code]): RequestSpec => ({
     id: `dm-${bondCode!}`, source: "dm-funding-history", path: "/cfets-histories", codes: [code!],
     parameters: { bondCode: bondCode!, endCapitalTime: String(scheduledTime), limit: "100",
-      fields: "bondCode,capitalTime,weightedYield,weightedYieldUpDownValueBp" },
+      fields: "bondCode,capitalTime,weightedYield,lastPrice,weightedYieldUpDownValueBp" },
   }));
   return [...choice, ...dm];
 }

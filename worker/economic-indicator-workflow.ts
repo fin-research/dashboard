@@ -5,19 +5,26 @@ import { persistEconomicIndicators } from "../src/lib/server/economic-indicators
 import { requestEconomicIndicatorData } from "../src/lib/server/economic-indicator-request.ts";
 import { withPostgres } from "../src/lib/server/postgres.ts";
 import { runEconomicIndicatorSync } from "./economic-indicator-run.ts";
+import { runQuantInputSync } from './quant-input-run.ts';
 export type { EconomicIndicatorSyncResult } from "./economic-indicator-run.ts";
 
 export class EconomicIndicatorSyncWorkflow extends WorkflowEntrypoint<Cloudflare.Env, EconomicIndicatorSyncParams> {
   async run(event: Readonly<WorkflowEvent<EconomicIndicatorSyncParams>>, step: WorkflowStep) {
     const scheduledTime = event.payload?.scheduledTime ?? event.schedule?.scheduledTime ?? event.timestamp.getTime();
+    if (event.payload?.quantOnly) {
+      return { quant: await runQuantInputSync(step, this.env, scheduledTime,
+        (path, parameters) => requestEconomicIndicatorData(this.env.DATA, path, parameters)) };
+    }
     const result = await runEconomicIndicatorSync(step, event.instanceId, scheduledTime,
       (path, parameters) => requestEconomicIndicatorData(this.env.DATA, path, parameters),
       (rows) => withPostgres(this.env.HYPERDRIVE?.connectionString, "eastmoney-edb-workflow",
         (client) => persistEconomicIndicators(client, rows)));
+    const quant = await runQuantInputSync(step, this.env, scheduledTime,
+      (path, parameters) => requestEconomicIndicatorData(this.env.DATA, path, parameters));
     if (result.status === "failed") {
       // All branches have settled and the durable summary is already saved.
       throw new Error(JSON.stringify(result));
     }
-    return result;
+    return { ...result, quant };
   }
 }

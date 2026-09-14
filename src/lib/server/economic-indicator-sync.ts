@@ -10,6 +10,7 @@ export type EconomicIndicatorSyncMode = "full" | "incremental";
 
 export type EconomicIndicatorSyncParams = {
   scheduledTime: number;
+  quantOnly?: boolean;
 };
 
 export type DataApiRequest = (
@@ -21,12 +22,18 @@ export const DM_FUNDING_RATE_CODES = new Set([
   "E1300003", // DR001
   "E1300004", // DR007
   "E1704420", // R007
+  'E1300079', // SHIBOR 3M from DM lastPrice
+  'DM_SHIBOR_1W',
+  'DM_SHIBOR_ON',
 ]);
 
-const dmFundingRateCodeMap = new Map([
+export const dmFundingRateCodeMap = new Map([
   ["DR001", "E1300003"],
   ["DR007", "E1300004"],
   ["R007", "E1704420"],
+  ['Shibor3M', 'E1300079'],
+  ['Shibor1W', 'DM_SHIBOR_1W'],
+  ['ShiborO/N', 'DM_SHIBOR_ON'],
 ]);
 
 export const CHOICE_ECONOMIC_INDICATORS = ALL_ECONOMIC_INDICATORS.filter(
@@ -46,6 +53,7 @@ const dmHistorySchema = z.object({
       bondCode: z.string(),
       capitalTime: z.union([z.number(), z.string()]),
       weightedYield: z.union([z.number(), z.string(), z.null()]),
+      lastPrice: z.union([z.number(), z.string(), z.null()]).optional(),
     }),
   ),
 });
@@ -167,6 +175,7 @@ export function normalizeChoiceEconomicIndicatorRows(
         : null;
     const date = publishedDate ?? fallbackDate;
     if (!date || date > endDate) continue;
+    if (row.RESULT === null || row.RESULT === undefined || row.RESULT === '') continue;
     const value = numericField(row, "RESULT");
     if (
       knownInvalidChoiceObservations.has(
@@ -231,18 +240,21 @@ export async function fetchDmFundingRateRows(
             endCapitalTime: String(endCapitalTime),
             limit: "100",
             fields:
-              "bondCode,capitalTime,weightedYield,weightedYieldUpDownValueBp",
+              "bondCode,capitalTime,weightedYield,lastPrice,weightedYieldUpDownValueBp",
           }),
         ),
       );
       pageCount += 1;
       let minimumCapitalTime = Number.POSITIVE_INFINITY;
       for (const row of payload.rows) {
-        if (row.bondCode !== bondCode || row.weightedYield === null) continue;
+        if (row.bondCode.toUpperCase() !== bondCode.toUpperCase()) continue;
         const capitalTime = Number(row.capitalTime);
-        const value = Number(row.weightedYield);
-        if (!Number.isFinite(capitalTime) || !Number.isFinite(value)) continue;
+        if (!Number.isFinite(capitalTime)) continue;
         minimumCapitalTime = Math.min(minimumCapitalTime, capitalTime);
+        const rawValue = bondCode.startsWith('Shibor') ? row.lastPrice : row.weightedYield;
+        if (rawValue === null || rawValue === undefined || rawValue === '') continue;
+        const value = Number(rawValue);
+        if (!Number.isFinite(value)) continue;
         const observationDate = shanghaiDate(new Date(capitalTime));
         if (mode === "incremental" && observationDate < incrementalStartDate) {
           continue;

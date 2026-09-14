@@ -33,7 +33,7 @@ function harness(t) {
         ...(code === 'EMM00590832' ? {} : { PUBLISHDATE: '20260909' }),
       })),
     };
-    return { hasNextPage: true, rows: [{ bondCode: params.get('bondCode'), capitalTime: Date.parse('2026-09-09T08:00:00Z'), weightedYield: 1.42 }] };
+    return { hasNextPage: true, rows: [{ bondCode: params.get('bondCode'), capitalTime: Date.parse('2026-09-09T08:00:00Z'), weightedYield: 1.42, lastPrice: 1.43 }] };
   };
   const persist = async rows => { saved.push(...rows); return { rowCount: rows.length, asOf: '2026-09-09' }; };
   return { step, request, persist, attempts, delays, history, saved, requests };
@@ -53,7 +53,7 @@ test('one DM interface exhausts 2 retries while all other requests persist once'
   assert.match(result.failures[0].error.message, /maintenance code=E503/);
   assert.deepEqual(h.delays.map(x => x.delay), [60_000, 120_000]);
   assert.equal(h.requests.length, economicIndicatorRequests(scheduledTime).length - 1);
-  assert.equal(result.storedRows, 53);
+  assert.equal(result.storedRows, 59);
   assert.ok(h.saved.some(x => x.code === 'E1300004'));
   assert.ok(h.saved.some(x => x.code === 'E1704420'));
   assert.ok(!h.saved.some(x => x.code === 'E1300003'));
@@ -78,7 +78,7 @@ test('a stalled Choice request does not delay DM writes, and all requests launch
   });
   await dmSaved.promise;
   assert.equal(calls, economicIndicatorRequests(scheduledTime).length);
-  assert.ok(h.saved.every(x => ['E1300003', 'E1300004', 'E1704420'].includes(x.code)));
+  assert.ok(h.saved.every(x => ['E1300003', 'E1300004', 'E1704420', 'E1300079', 'DM_SHIBOR_1W', 'DM_SHIBOR_ON'].includes(x.code)));
   hold.resolve();
   assert.equal((await run).status, 'complete');
 });
@@ -92,7 +92,7 @@ test('only a failing Choice batch retries; recovered attempts retain their error
     return h.request(path, params);
   }, h.persist);
   assert.equal(result.status, 'complete');
-  assert.equal(result.storedRows, 54);
+  assert.equal(result.storedRows, 60);
   assert.equal(calls, 3);
   assert.equal(h.requests.length, economicIndicatorRequests(scheduledTime).length);
   assert.equal(h.history.filter(x => x.error?.includes('10000009')).length, 2);
@@ -108,7 +108,7 @@ test('persist failures do not refetch paid data or prevent other transactions', 
   assert.equal(persistCalls, 3);
   assert.equal(h.requests.length, economicIndicatorRequests(scheduledTime).length);
   assert.equal(result.status, 'partial');
-  assert.equal(result.storedRows, 53);
+  assert.equal(result.storedRows, 59);
   assert.match(result.failures[0].step, /^persist dm-DR001/);
   assert.match(result.failures[0].error.message, /57014/);
 });

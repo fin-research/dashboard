@@ -308,7 +308,7 @@ test("负债周报利率指标进入统一 public.edb 定时同步清单", () =>
       "E1704281", "E1704282", "E1704283", "E1704284",
     ],
   );
-  assert.equal(new Set(ALL_ECONOMIC_INDICATORS.map((indicator) => indicator.code)).size, 54);
+  assert.equal(new Set(ALL_ECONOMIC_INDICATORS.map((indicator) => indicator.code)).size, 60);
 });
 
 test("经济指标 tooltip 只显示发布日期和数值", () => {

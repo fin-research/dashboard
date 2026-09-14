@@ -208,7 +208,7 @@ test("DM 历史资金利率映射为 EDB 指标代码并以北京时间落日", 
     "incremental",
     new Date("2026-08-31T16:00:00.000Z"),
   );
-  assert.equal(result.pageCount, 3);
+  assert.equal(result.pageCount, 6);
   assert.deepEqual(
     result.rows.map((row) => row.code),
     ["E1300003", "E1300004", "E1704420"],
