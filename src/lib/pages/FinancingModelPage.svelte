@@ -79,13 +79,6 @@
           icon: "leverage" as MetricIconName,
         },
         {
-          label: "资金缺口",
-          value: formatSignedNullable(company?.ef_funding_gap, 1),
-          unit: "亿元",
-          tone: "orange",
-          icon: "bank" as MetricIconName,
-        },
-        {
           label: "主体利差",
           value: formatNullable(company?.ef_subject_spread_bp, 2),
           unit: "bp",
@@ -407,13 +400,6 @@
 
   function formatNullable(value: number | null | undefined, digits: number): string {
     return value === null || value === undefined ? "—" : value.toFixed(digits);
-  }
-
-  function formatSignedNullable(
-    value: number | null | undefined,
-    digits: number,
-  ): string {
-    return value === null || value === undefined ? "—" : formatSigned(value, digits);
   }
 
   function formatRatioPercent(value: number | null | undefined): string {
@@ -1215,7 +1201,7 @@
 
   .business-metric-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
   }
 
@@ -1747,7 +1733,7 @@
     }
 
     .business-metric-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .sell-side-grid--3 {

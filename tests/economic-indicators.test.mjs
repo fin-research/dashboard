@@ -270,3 +270,20 @@ test("经济指标数据库、增量 Cron 和本地全量回填受静态契约�
     "economic-indicator-sync-1788278400000",
   );
 });
+
+test('2019 macro releases use verified PBC dates and never observation dates', async () => {
+  const { HISTORICAL_RELEASE_EVIDENCE } = await import('../src/lib/server/economic-release-evidence.ts');
+  const { normalizeChoiceEconomicIndicatorRows } = await import('../src/lib/server/economic-indicator-sync.ts');
+  assert.equal(HISTORICAL_RELEASE_EVIDENCE.length, 24);
+  const raw = HISTORICAL_RELEASE_EVIDENCE.map(row => ({code: row.indicator_code, date: row.observation_date, RESULT: 1, PUBLISHDATE: null}));
+  const normalized = normalizeChoiceEconomicIndicatorRows(raw, '2020-01-16');
+  assert.equal(normalized.length, 24);
+  for (const row of normalized) {
+    const evidence = HISTORICAL_RELEASE_EVIDENCE.find(x => x.indicator_code === row.code && x.observation_date === row.observationDate);
+    assert.equal(row.date, evidence.published_date);
+    assert.ok(row.date > row.observationDate);
+    assert.equal(new URL(evidence.source_url).hostname, 'www.pbc.gov.cn');
+  }
+  assert.equal(normalizeChoiceEconomicIndicatorRows(raw, '2019-02-14').length, 0);
+  assert.equal(normalizeChoiceEconomicIndicatorRows([{code: 'EMM00087086',date:'2018-12-01',RESULT:1}], '2020-01-16').length, 0);
+});

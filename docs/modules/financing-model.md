@@ -47,3 +47,5 @@ Worker 通过同一 `HYPERDRIVE` 访问 `financing_model` schema：
 - 人工结论只增量更新目标 `model_run` 的 `conclusion_*` 与 `conclusion_updated_at`；模型基础结论列保持不变。生成的卖方观点和人工卖方逻辑汇总继续追加保存。
 - 历史择时决策记录按 `run_id` upsert；决策操作必填，结果允许后补，二者均由人工输入，不从模型预测自动生成。
 - 卖方快照只保存结构化观点、检索口径和源文档 key，不保存 AI Search 返回的完整正文。
+
+资金缺口保留在模型输入与结构化快照中供内部判断，但报告指标卡及自动生成业务文字不展示其数值和状态。其来源为资金日报规范化历史，见 [Quant 输入](quant-inputs.md)。

@@ -328,14 +328,6 @@ export function companyBusinessNarrative(
   const liquidityClause = hasReadiness
     ? `流动性整体${readiness}`
     : "流动性状态暂缺";
-  const fundingClause =
-    metrics.ef_funding_gap === null
-      ? "资金缺口信息暂缺"
-      : metrics.ef_funding_gap < -100
-        ? "资金缺口较大"
-        : metrics.ef_funding_gap > 50
-          ? "资金缺口较小"
-          : "资金缺口适中";
   const spreadClause =
     metrics.ef_subject_spread_bp === null
       ? "主体利差信息暂缺"
@@ -357,7 +349,7 @@ export function companyBusinessNarrative(
         : metrics.ef_funding_gap === null && !hasReadiness
           ? "公司融资需求尚待确认，建议补充业务指标后安排发行"
           : "公司融资需求总体适中，建议结合市场窗口择机完成发行";
-  return `${liquidityClause}；${fundingClause}；${spreadClause}；${demandClause}。`;
+  return `${liquidityClause}；${spreadClause}；${demandClause}。`;
 }
 
 export function sellSideSummaryBody(

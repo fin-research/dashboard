@@ -211,12 +211,12 @@ test("融资择时报告契约接受模型、人工结论和卖方观点", () =>
   assert.match(report.sellSide.logicSummary, /长端利率方向/);
 });
 
-test("公司业务指标结论包含三个状态分句和发行节奏建议", () => {
+test("公司业务指标结论隐藏资金缺口并保留发行节奏建议", () => {
   const narrative = companyBusinessNarrative(snapshot().company_metrics);
 
   assert.equal(
     narrative,
-    "流动性整体宽裕；资金缺口较大；主体利差处于相对低位；公司融资需求较为迫切，建议尽快完成发行。",
+    "流动性整体宽裕；主体利差处于相对低位；公司融资需求较为迫切，建议尽快完成发行。",
   );
   assert.doesNotMatch(narrative, /\d/);
 
@@ -224,7 +224,7 @@ test("公司业务指标结论包含三个状态分句和发行节奏建议", ()
     ...snapshot().company_metrics,
     ef_funding_gap: 60,
   });
-  assert.match(unhurried, /资金缺口较小/);
+  assert.doesNotMatch(unhurried, /资金缺口/);
   assert.match(unhurried, /公司融资需求暂不迫切，建议等待成本较优窗口择机完成发行/);
 
   const moderate = companyBusinessNarrative({
@@ -232,7 +232,7 @@ test("公司业务指标结论包含三个状态分句和发行节奏建议", ()
     readiness_label: "适中",
     ef_funding_gap: -50,
   });
-  assert.match(moderate, /资金缺口适中/);
+  assert.doesNotMatch(moderate, /资金缺口/);
   assert.match(moderate, /公司融资需求总体适中，建议结合市场窗口择机完成发行/);
 });
 
@@ -620,7 +620,7 @@ test("融资模型页面按决策三行展示并提供品种推荐和验证指�
   assert.match(page, /label: "NSFR"/);
   assert.match(page, /company\?\.ef_lcr/);
   assert.match(page, /company\?\.ef_nsfr/);
-  assert.match(page, /company\?\.ef_funding_gap/);
+  assert.doesNotMatch(page, /company\?\.ef_funding_gap/);
   assert.match(page, /company\?\.ef_subject_spread_bp/);
   assert.match(page, /class="business-metric-grid"/);
   assert.match(page, /productRecommendation\.recommended_product/);

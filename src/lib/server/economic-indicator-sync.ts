@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { historicalReleaseDate } from "./economic-release-evidence.ts";
 
 import {
   ALL_ECONOMIC_INDICATORS,
@@ -173,7 +174,7 @@ export function normalizeChoiceEconomicIndicatorRows(
       definition.frequency === "日频" || definition.frequency === "不定期"
         ? observationDate
         : null;
-    const date = publishedDate ?? fallbackDate;
+    const date = publishedDate ?? historicalReleaseDate(code, observationDate) ?? fallbackDate;
     if (!date || date > endDate) continue;
     if (row.RESULT === null || row.RESULT === undefined || row.RESULT === '') continue;
     const value = numericField(row, "RESULT");
