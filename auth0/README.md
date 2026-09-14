@@ -49,7 +49,7 @@ Auth0 配置与 Actions 当前由 [Gateway](../../gateway/auth0/README.md) 维�
 ## 配置和发布
 
 1. Auth0 Custom Domain `auth.hasbai.xyz` 使用 Auth0-managed certificate。DNS-only CNAME 为 `hasbai-cd-j8r0mxglxwb2knim.edge.tenants.eu.auth0.com`；保留该记录用于证书续期。
-2. `node --use-env-proxy scripts/publish-auth0-signup.mjs --login-domain=auth.hasbai.xyz` 查看计划，加 `--apply` 发布 Form、资料 Action、绑定，最后发布注册标记 Action。脚本保留其他绑定，拒绝覆盖不认识的草稿。
+2. Dashboard 的 `scripts/publish-auth0-signup.mjs` 已退役；Auth0 signup Form、资料 Action、绑定和 M2M 凭据由 Gateway 维护。请使用 Gateway 的 Auth0 Deploy/Management workflow，本仓库脚本会直接拒绝执行。
 3. Dashboard `AUTH0_LOGIN_DOMAIN` 控制浏览器退出域名，管理服务继续使用 `AUTH0_DOMAIN`。变更后运行 `pnpm worker:typegen`、正式检查和构建，再推送 GitHub 触发自动部署；必要时手动部署 Worker，两种方式均无需再次申请授权。
 4. 提供 `CLOUDFLARE_ACCESS_API_TOKEN` 后运行 `node --use-env-proxy scripts/configure-auth0-login-domain.mjs` 查看 Access OIDC 修改计划，加 `--apply` 切换授权、token、JWKS 地址。复用现有客户端密钥、PKCE、claims、scopes 和回调白名单。
 5. `node --use-env-proxy scripts/verify-auth0-branding.mjs --login-domain=auth.hasbai.xyz` 检查实际登录／注册 HTML 的中文及配色，并回读 Form 字段和 Action 绑定。它不提交登录、注册或发送邮件，也不打印 Cookie／事务 URL；这是 HTTP 和配置检查，不是浏览器视觉验收。
