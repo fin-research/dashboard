@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import ModuleCard from "../../components/ModuleCard.svelte";
-  import { CalendarDays } from '@lucide/svelte';
+  import { Clock } from '@lucide/svelte';
   import { portal } from '../portal';
   import WorkflowCanvas from '../trading-workflow/WorkflowCanvas.svelte';
+  import { workflowGroups } from '../trading-workflow/graph';
   import WorkflowEditor from '../trading-workflow/WorkflowEditor.svelte';
   import { globalMessages } from '../global-messages';
   import { configResponseSchema, configSchema, dayKey, dueReminders, emptyDay, products, nodesSchema,
@@ -41,14 +42,17 @@
     finally { saving = false; }
   }
   function move(id: string, offset: { x: number; y: number }) {
-    if (editing && !saving) { draft = draft.map(node => node.id === id ? { ...node, offset } : node); selectedId = id; }
+    if (editing && !saving) {
+      const ids = new Set(workflowGroups(draft).find(group => group.some(node => node.id === id))?.map(node => node.id));
+      draft = draft.map(node => ids.has(node.id) ? { ...node, offset } : node); selectedId = id;
+    }
   }
   function addNode() {
     const node: WorkflowNode = { id: crypto.randomUUID(), scope: 'shared', parentId: null, kind: 'task', title: '新节点', detail: '', startTime: null, endTime: null };
     draft = [...draft, node]; selectedId = node.id;
   }
-  function setBranch(id: string, value: boolean) {
-    if (editing) preview.branches[id] = value; else branch(id, value);
+  function setBranch(ids: string[], value: boolean) {
+    if (editing) { for (const id of ids) preview.branches[id] = value; } else branch(ids, value);
   }
   function setEnabled(product: Product, value: boolean) {
     if (editing) preview.enabled[product] = value; else enable(product, value);
@@ -61,7 +65,6 @@
   let checking = false;
   let abort: AbortController;
   const clock = $derived(shanghaiClock(now));
-  const dateLabel = $derived(new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(now));
   function prefsKey() { return `eastmoney:trading-workflow:notifications:${encodeURIComponent(actorKey)}`; }
   function storageFailure() {
     localAvailable = false;
@@ -111,8 +114,8 @@
     globalMessages.success('交易流程节点已保存');
     void remind(); return true;
   }
-  function complete(id: string, value: boolean) { void change(state => { state.completed[id] = value; }); }
-  function branch(id: string, value: boolean) { void change(state => { state.branches[id] = value; }).then(remind); }
+  function complete(ids: string[], value: boolean) { void change(state => { for (const id of ids) state.completed[id] = value; }); }
+  function branch(ids: string[], value: boolean) { void change(state => { for (const id of ids) state.branches[id] = value; }).then(remind); }
   function enable(product: Product, value: boolean) { void change(state => { state.enabled[product] = value; }).then(remind); }
   async function toggleNotifications() {
     if (permission === 'unsupported') return;
@@ -179,7 +182,7 @@
 
 <div class="workflow-view">
   <div class="workflow-header" use:portal={'#tr-topbar-actions'}>
-    <time class="workflow-date" datetime={clock.date}><CalendarDays size={18} />{dateLabel}</time>
+    <time class="workflow-clock" datetime={`${clock.date}T${clock.time}+08:00`} aria-label="当前时间"><Clock size={18} aria-hidden="true" />{clock.time}</time>
     {#if canEdit && config}
       <label class="edit-mode"><input type="checkbox" class="toggle toggle-primary" checked={editing} disabled={saving}
         onchange={event => { editing ? cancelEditing() : startEditing(); event.currentTarget.checked = editing; }} />编辑模式</label>
@@ -193,7 +196,7 @@
         onSelect={id => selectedId = id} onMove={move} onComplete={complete} onBranch={setBranch} onEnable={setEnabled} onNote={note} />
       {#if editing && (selectedId || !draft.length)}
         {#key selectedId}<WorkflowEditor bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
-          onClose={() => selectedId = ''} onBranch={setBranch} expanded={!!preview.branches[selectedId]}
+          onClose={() => selectedId = ''} onBranch={(id, value) => setBranch([id], value)} expanded={!!preview.branches[selectedId]}
           onSave={saveDraft} onAdd={addNode} onReset={() => draft = draft.map(({ offset, ...node }) => node)}
           notificationsEnabled={notificationsEnabled} notificationsSupported={permission !== 'unsupported'} onNotifications={toggleNotifications} />{/key}
       {/if}
@@ -204,11 +207,11 @@
 <style>
   .workflow-view { min-width: 0; }
   .workflow-header { display: flex; align-items: center; gap: 28px; }
-  .workflow-date { display: flex; gap: 8px; align-items: center; color: var(--tr-text); font-size: 1rem; white-space: nowrap; }
-  .workflow-date :global(svg) { color: #5b759c; }
+  .workflow-clock { display: flex; gap: 8px; align-items: center; color: var(--tr-text); font-size: 1rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .workflow-clock :global(svg) { color: #5b759c; }
   .edit-mode { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 1rem; white-space: nowrap; }
   .flow-workspace { display: flex; min-width: 0; align-items: flex-start; gap: 16px; }
   .flow-workspace :global(.workflow-diagram) { flex: 1; }
   .flow-workspace.saving { pointer-events: none; }
-  @media (max-width: 720px) { .workflow-header { gap: 12px; } .workflow-date { font-size: .875rem; } }
+  @media (max-width: 720px) { .workflow-header { gap: 12px; } .workflow-clock { font-size: .875rem; } }
 </style>

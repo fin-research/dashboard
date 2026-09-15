@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { workflowGroups } from './graph';
   import { onMount } from 'svelte';
   import { descendants, isInquiry, products, type Scope, type WorkflowNode } from './model';
   let { nodes = $bindable(), selectedId, disabled, onSelect, onClose, onBranch, expanded, onSave, onAdd, onReset, notificationsEnabled, notificationsSupported, onNotifications }: {
@@ -7,6 +8,13 @@
     onClose: () => void; onBranch: (id: string, value: boolean) => void; expanded: boolean;
   } = $props();
   const selected = $derived(nodes.find(node => node.id === selectedId));
+  const group = $derived(workflowGroups(nodes).find(items => items.some(node => node.id === selectedId)) ?? []);
+  const offset = $derived(group[0]?.offset ?? { x: 0, y: 0 });
+  function setOffset(axis: 'x' | 'y', value: number) {
+    const ids = new Set(group.map(node => node.id));
+    const next = { ...offset, [axis]: value };
+    nodes = nodes.map(node => ids.has(node.id) ? { ...node, offset: next } : node);
+  }
   const scopes = [{ id: 'shared', label: '日内协同' }, ...products];
   let panel: HTMLElement;
   onMount(() => panel.querySelector<HTMLInputElement>('input')?.focus());
@@ -27,6 +35,9 @@
   <div class="editor-heading"><h2 id="workflow-editor-title">节点编辑</h2><button class="btn btn-ghost" type="button" aria-label="关闭节点编辑" onclick={onClose}>×</button></div>
   <fieldset disabled={disabled} class="editor-fields">
     {#if selected}
+      <label>编辑节点<select class="select" value={selectedId} onchange={event => onSelect(event.currentTarget.value)}>
+        {#each nodes as node}<option value={node.id}>{scopes.find(scope => scope.id === node.scope)?.label} · {isInquiry(node) ? '群价' : node.title}</option>{/each}
+      </select></label>
       <label>节点名称<input class="input" required maxlength="160" bind:value={selected.title} /></label>
       {#if selected.kind === 'task'}
         <div class="editor-pair">
@@ -54,11 +65,11 @@
           {#each nodes.filter(node => node.scope === selected.scope && node.kind === 'branch' && !descendants(nodes, selected.id).has(node.id)) as parent}<option value={parent.id}>{parent.title}</option>{/each}
         </select></label>
         {#if selected.kind === 'task'}
-          <label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={isInquiry(selected)} onchange={event => { if (selected) selected.inquiry = event.currentTarget.checked; }} />询价文本框</label>
+          <label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={isInquiry(selected)} onchange={event => { if (selected) selected.inquiry = event.currentTarget.checked; }} />群价输入框</label>
         {:else}<label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={expanded} onchange={event => onBranch(selectedId, event.currentTarget.checked)} />展开分支</label>{/if}
         <div class="editor-pair">
-          <label>水平偏移<input class="input" type="number" min="-10000" max="10000" value={selected.offset?.x ?? 0} oninput={event => { if (selected) selected.offset = { x: event.currentTarget.valueAsNumber || 0, y: selected.offset?.y ?? 0 }; }} /></label>
-          <label>垂直偏移<input class="input" type="number" min="-10000" max="10000" value={selected.offset?.y ?? 0} oninput={event => { if (selected) selected.offset = { x: selected.offset?.x ?? 0, y: event.currentTarget.valueAsNumber || 0 }; }} /></label>
+          <label>水平偏移<input class="input" type="number" min="-10000" max="10000" value={offset.x} oninput={event => setOffset('x', event.currentTarget.valueAsNumber || 0)} /></label>
+          <label>垂直偏移<input class="input" type="number" min="-10000" max="10000" value={offset.y} oninput={event => setOffset('y', event.currentTarget.valueAsNumber || 0)} /></label>
         </div>
         <button class="btn btn-ghost" type="button" onclick={onReset}>恢复自动布局</button>
       </div></details>

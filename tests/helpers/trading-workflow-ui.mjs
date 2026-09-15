@@ -9,7 +9,7 @@ Object.defineProperty(window, 'isSecureContext', { value: true, configurable: tr
 let lockTail = Promise.resolve();
 Object.defineProperty(navigator, 'locks', { value: { request(_name, run) { const next = lockTail.then(run); lockTail = next.catch(() => {}); return next; } }, configurable: true });
 const nativeDate = Date;
-const fixed = new nativeDate('2026-09-15T11:00:00+08:00').getTime();
+let fixed = new nativeDate('2026-09-15T11:00:00+08:00').getTime();
 class Clock extends nativeDate { constructor(...args) { super(...(args.length ? args : [fixed])); } static now() { return fixed; } }
 globalThis.Date = Clock;
 const notices = [];
@@ -47,8 +47,17 @@ assert.ok(header.querySelector('.edit-mode'));
 assert.equal(target.querySelector('.flow-toolbar'),null);
 assert.equal(target.querySelector('.svelte-flow__controls'),null);
 assert.equal(target.querySelector('h2'),null);
+assert.equal(target.querySelector('.svelte-flow__attribution'), null);
+assert.match(header.querySelector('time').textContent, /11:00:00/);
+const initialCursor = target.querySelector('.current-time-line').getAttribute('y1');
+fixed += 30 * 60 * 1000; window.dispatchEvent(new window.Event('focus')); await settle();
+assert.match(header.querySelector('time').textContent, /11:30:00/);
+assert.ok(Number(target.querySelector('.current-time-line').getAttribute('y1')) > Number(initialCursor));
+fixed -= 30 * 60 * 1000; window.dispatchEvent(new window.Event('focus')); await settle();
+assert.equal(document.querySelector('.inquiry'), null);
+const originalIcon = document.querySelector('[data-workflow-node="loan-deal"] .node-symbol').innerHTML;
 assert.deepEqual([...target.querySelectorAll('[data-timeline-time]')].map(n=>n.dataset.timelineTime),['08:30','10:00','11:00','16:30']);
-assert.equal(document.querySelector('[data-workflow-product="exchange"]'), null);
+assert.equal(document.querySelector('[data-workflow-product="exchange"] button').getAttribute('aria-expanded'), 'false');
 assert.equal(document.querySelector('[data-workflow-node="reverse-position"]'), null);
 assert.equal(document.querySelector('[data-workflow-node="loan-deal"] input'), null, 'nodes have no checkbox controls');
 const clickNode = async id => { flushSync(() => document.querySelector(`[data-workflow-node="${id}"] .node-surface`).click()); await settle(); };
@@ -59,9 +68,15 @@ await clickNode('reverse-change');
 assert.equal(document.querySelector('[data-workflow-node="reverse-position"]'), null);
 await clickNode('reverse-change');
 assert.equal(document.querySelector('[data-workflow-node="reverse-position"] button').getAttribute('aria-pressed'), 'true');
-await clickNode('loan-deal'); await clickNode('reverse-quote');
-const quoteInput = document.querySelector('[aria-label="逆回购询价内容"]');
+assert.equal(document.querySelector('[data-workflow-node="reverse-change"]').classList.contains('done'), false);
+await clickNode('reverse-transfer'); await clickNode('reverse-ccdc');
+assert.equal(document.querySelector('[data-workflow-node="reverse-change"]').classList.contains('done'), true);
+await clickNode('loan-deal');
+assert.equal(document.querySelector('[data-workflow-node="loan-deal"] .node-symbol').innerHTML, originalIcon);
+await clickNode('reverse-quote');
+const quoteInput = document.querySelector('[aria-label="逆回购群价内容"]');
 flushSync(() => { quoteInput.value = '7天 1.65%，5000万元'; quoteInput.dispatchEvent(new window.Event('input', { bubbles: true })); }); await settle();
+flushSync(() => document.querySelector('[data-workflow-node="reverse-quote"] .inquiry-editor button').click()); await settle();
 const local = JSON.parse(localStorage.getItem(dayKey('test-actor','2026-09-15')));
 assert.equal(local.completed['loan-deal'],true); assert.equal(local.completed['reverse-quote'],true);
 assert.equal(local.notes['reverse-quote'], '7天 1.65%，5000万元');
@@ -104,10 +119,11 @@ assert.equal(header.children.length,0,'header portal is cleaned on route unmount
 localStorage.setItem(dayKey('test-actor','2026-09-15'),JSON.stringify(local));
 const reloaded=mount(View,{target});await settle();
 assert.equal(document.querySelector('[data-workflow-node="loan-deal"] button').getAttribute('aria-pressed'),'true');
-assert.equal(document.querySelector('[aria-label="逆回购询价内容"]').value, '7天 1.65%，5000万元');
+await clickNode('reverse-quote');
+assert.equal(document.querySelector('[aria-label="逆回购群价内容"]').value, '7天 1.65%，5000万元');
 for (const product of ['loan', 'reverse']) { flushSync(()=>document.querySelector(`[data-workflow-product="${product}"] button`).click()); await settle(); }
-assert.equal(document.querySelector('[data-workflow-node="shared-elements"] button').disabled, true);
-assert.equal(document.querySelector('[data-workflow-node="shared-done"] button').disabled, true);
+assert.equal(document.querySelector('[data-workflow-node="shared-elements"] button').disabled, false);
+assert.equal(document.querySelector('[data-workflow-node="shared-done"] button').disabled, false);
 await unmount(reloaded);globalMessages.clear();
 
 // Real route handlers, no authentication bypass or network calls.

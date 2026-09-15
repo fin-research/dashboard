@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { buildGraph, timelineCursor } from '../src/lib/trading-workflow/graph.ts';
+import { buildGraph, timelineCursor, workflowGroups, nodeComplete } from '../src/lib/trading-workflow/graph.ts';
 import { activeTasks, childrenOf, dayKey, descendants, dueReminders, emptyDay, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
 import { readWorkflowConfig, saveWorkflowConfig } from '../src/lib/server/trading-workflow.ts';
 
@@ -133,11 +133,14 @@ test('flow graph folds conditions, centers common steps, joins paths and preserv
   const options = { editing: false, selectedId: '', clockMinutes: 600, activate() {}, toggleProduct() {}, note() {} };
   const folded = buildGraph(defaults, day, options);
   assert.equal(folded.nodes.some(n => n.id === 'reverse-position'), false);
-  assert.equal(folded.nodes.some(n => n.id === 'product-exchange'), false);
+  assert.equal(folded.nodes.find(n => n.id === 'product-exchange').data.expanded, false);
   const at = id => folded.nodes.find(n => n.id === id).position;
-  assert.equal(at('shared-elements').x, (at('product-loan').x + at('product-reverse').x) / 2);
+  assert.equal(at('shared-elements').x, (at('product-loan').x + at('product-exchange').x) / 2);
   assert.equal(at('shared-done').x, at('shared-elements').x);
   assert.ok(at('shared-done').y > at('loan-arrival').y);
+  assert.ok(at('product-loan').y < at('loan-quote').y);
+  assert.equal(at('loan-quote').x, at('product-loan').x);
+  assert.equal(at('reverse-quote').x, at('product-reverse').x);
   assert.ok(at('loan-quote').y < at('shared-elements').y);
   assert.ok(at('reverse-quote').y < at('shared-elements').y);
   assert.ok(at('shared-elements').y < at('loan-send').y);
@@ -159,6 +162,7 @@ test('flow graph folds conditions, centers common steps, joins paths and preserv
   const custom = buildGraph(positioned, day, {...options, editing:true});
   assert.equal(custom.nodes.find(n => n.id === 'loan-send').position.x, custom.bases['loan-send'].x + 85);
   assert.equal(custom.nodes.find(n => n.id === 'loan-send').draggable, true);
+  assert.equal(custom.bases['loan-deal'].y, expanded.bases['loan-deal'].y, 'manual offsets do not shift downstream automatic bases');
   assert.equal(folded.nodes.find(n => n.id === 'loan-send').draggable, false);
   assert.equal(nodesSchema.safeParse(positioned).success, true);
   assert.equal(nodesSchema.safeParse(defaults.map(n => ({...n,offset:{x:Infinity,y:0}}))).success, false);
@@ -174,4 +178,47 @@ test('legacy day records gain empty inquiry notes without losing progress; notes
   assert.equal(readDay(store,key,date).completed['loan-quote'],true);
   assert.equal(readDay(store,key,date).notes['loan-quote'],'7天 1.65%');
   assert.deepEqual(readDay(store,dayKey('notes-user','2026-09-16'),'2026-09-16').notes,{});
+});
+
+
+test('equivalent steps merge, split after edits, preserve IDs and avoid order cycles', () => {
+  const options = { editing: false, selectedId: '', clockMinutes: 600, activate() {}, toggleProduct() {}, note() {} };
+  const day = emptyDay('2026-09-15');
+  const group = workflowGroups(defaults).find(group => group.some(node => node.id === 'loan-hengtai'));
+  assert.deepEqual(group.map(node => node.id), ['loan-hengtai', 'reverse-hengtai', 'exchange-hengtai']);
+  assert.equal(workflowGroups(defaults).find(group => group.some(node => node.id === 'loan-quote')).length, 1);
+  let graph = buildGraph(defaults, day, options);
+  assert.equal(graph.nodes.filter(node => node.data.title === '衡泰补单审批').length, 1);
+  assert.ok(graph.edges.some(edge => edge.source === 'loan-hengtai' && edge.target === 'loan-funds'));
+  assert.ok(graph.edges.some(edge => edge.source === 'loan-hengtai' && edge.target === 'reverse-confirm'));
+  for (const id of group.map(node => node.id)) day.completed[id] = true;
+  for (const product of ['loan', 'reverse', 'exchange']) day.enabled[product] = false;
+  graph = buildGraph(defaults, day, options);
+  assert.equal(graph.nodes.find(node => node.id === 'loan-hengtai').data.done, true);
+  assert.ok(graph.nodes.find(node => node.id === 'shared-elements').data.active);
+  const edited = defaults.map(node => node.id === 'reverse-hengtai' ? { ...node, title: '独立审批' } : node);
+  day.enabled.reverse = true;
+  graph = buildGraph(edited, day, options);
+  assert.ok(graph.nodes.find(node => node.id === 'reverse-hengtai').data.done);
+  assert.equal(workflowGroups(edited).find(group => group[0].id === 'loan-hengtai').length, 2);
+  const task = (id, scope, title) => ({ id, scope, title, detail: '', kind: 'task', parentId: null, startTime: null, endTime: null });
+  const crossed = [task('a1','loan','A'),task('b1','loan','B'),task('b2','reverse','B'),task('a2','reverse','A')];
+  assert.doesNotThrow(() => buildGraph(crossed, emptyDay('2026-09-15'), options));
+  assert.equal(workflowGroups(crossed).length, 3, 'opposite order cannot collapse into a cycle');
+  const modifiedTime = defaults.map(node => node.id === 'reverse-hengtai' ? {...node, startTime: '13:00'} : node);
+  assert.equal(workflowGroups(modifiedTime).find(group => group[0].id === 'reverse-hengtai').length, 1);
+});
+
+test('branch completion requires every descendant, including collapsed nested branches', () => {
+  const day = emptyDay('2026-09-15');
+  const parent = defaults.find(node => node.id === 'reverse-counterparty');
+  assert.equal(nodeComplete(parent, defaults, day), false);
+  day.completed['reverse-check'] = true;
+  assert.equal(nodeComplete(parent, defaults, day), false);
+  day.completed['reverse-approval'] = true;
+  assert.equal(nodeComplete(parent, defaults, day), true);
+  day.branches['reverse-counterparty'] = false;
+  assert.equal(nodeComplete(parent, defaults, day), true);
+  const differentParents = defaults.map(node => node.id === 'reverse-hengtai' ? {...node, parentId:'reverse-counterparty'} : node);
+  assert.equal(workflowGroups(differentParents).find(group => group[0].id === 'reverse-hengtai').length, 1);
 });

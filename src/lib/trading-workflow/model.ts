@@ -85,7 +85,7 @@ export function emptyDay(date: string): WorkflowDay {
   return { date, enabled: { loan: true, reverse: true, exchange: false }, completed: {}, branches: {}, notified: {}, notes: {} };
 }
 export function isActive(node: WorkflowNode, nodes: WorkflowNode[], day: WorkflowDay): boolean {
-  if (node.scope === 'shared' ? !Object.values(day.enabled).some(Boolean) : !day.enabled[node.scope]) return false;
+  if (node.scope !== 'shared' && !day.enabled[node.scope]) return false;
   let parent = node.parentId;
   for (let depth = 0; parent && depth < 5; depth++) {
     if (!day.branches[parent]) return false;
