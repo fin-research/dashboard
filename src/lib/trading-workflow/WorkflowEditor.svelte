@@ -1,111 +1,74 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { childrenOf, descendants, moveNode, nodesSchema, products, type Scope, type WorkflowNode, type WorkflowConfig } from './model';
-  import { globalMessages } from '../global-messages';
-  let { config, onSave, onClose }: { config: WorkflowConfig; onSave: (nodes: WorkflowNode[]) => Promise<boolean>; onClose: () => void } = $props();
-  let draft = $state<WorkflowNode[]>([]);
-  let selectedId = $state('');
-  let saving = $state(false);
-  let validation = $state('');
-  let dialog: HTMLDialogElement;
-  const selected = $derived(draft.find(node => node.id === selectedId));
+  import { descendants, isInquiry, products, type Scope, type WorkflowNode } from './model';
+  let { nodes = $bindable(), selectedId, disabled, onSelect, onClose, onBranch, expanded }: {
+    nodes: WorkflowNode[]; selectedId: string; disabled: boolean; onSelect: (id: string) => void;
+    onClose: () => void; onBranch: (id: string, value: boolean) => void; expanded: boolean;
+  } = $props();
+  const selected = $derived(nodes.find(node => node.id === selectedId));
   const scopes = [{ id: 'shared', label: '日内协同' }, ...products];
-  onMount(() => { draft = structuredClone($state.snapshot(config.nodes)); selectedId = draft[0]?.id ?? ''; dialog.showModal(); });
-  function add(scope: Scope, kind: 'task' | 'branch') {
-    const node: WorkflowNode = { id: crypto.randomUUID(), scope, kind, parentId: null, title: kind === 'task' ? '新节点' : '新分支', detail: '', startTime: null, endTime: null };
-    draft = [...draft, node]; selectedId = node.id;
-  }
+  let panel: HTMLElement;
+  onMount(() => panel.querySelector<HTMLInputElement>('input')?.focus());
   function remove(node: WorkflowNode) {
     if (!window.confirm(`删除“${node.title}”及其子节点？`)) return;
-    const ids = descendants(draft, node.id);
-    draft = draft.filter(item => !ids.has(item.id)); selectedId = draft[0]?.id ?? '';
+    const ids = descendants(nodes, node.id); nodes = nodes.filter(item => !ids.has(item.id)); onClose();
   }
-  async function save() {
-    validation = '';
-    const result = nodesSchema.safeParse(draft);
-    if (!result.success) { validation = result.error.issues[0]?.message ?? '节点配置无效'; return; }
-    saving = true;
-    try { if (await onSave(result.data)) onClose(); }
-    catch { globalMessages.error('配置保存失败，请重试'); }
-    finally { saving = false; }
+  function addChild(node: WorkflowNode) {
+    const child: WorkflowNode = { id: crypto.randomUUID(), scope: node.scope, kind: 'task', parentId: node.kind === 'branch' ? node.id : node.parentId, title: '新节点', detail: '', startTime: null, endTime: null };
+    const index = nodes.findIndex(item => item.id === node.id);
+    nodes = [...nodes.slice(0, index + 1), child, ...nodes.slice(index + 1)];
+    if (node.kind === 'branch') onBranch(node.id, true);
+    onSelect(child.id);
   }
 </script>
 
-{#snippet tree(scope: Scope, parentId: string | null = null)}
-  <ol class="editor-list">
-    {#each childrenOf(draft, scope, parentId) as node, index (node.id)}
-      <li>
-        <div class="editor-row">
-          <button type="button" class="btn btn-ghost node-select" class:chosen={selectedId === node.id} aria-pressed={selectedId === node.id} onclick={() => selectedId = node.id}>{node.kind === 'branch' ? '◇ ' : ''}{node.title}</button>
-          <button type="button" class="btn btn-ghost" aria-label={`上移 ${node.title}`} disabled={saving || index === 0} onclick={() => draft = moveNode(draft, node.id, -1)}>↑</button>
-          <button type="button" class="btn btn-ghost" aria-label={`下移 ${node.title}`} disabled={saving || index === childrenOf(draft, scope, parentId).length - 1} onclick={() => draft = moveNode(draft, node.id, 1)}>↓</button>
+<aside class="workflow-editor" aria-labelledby="workflow-editor-title" bind:this={panel}>
+  <div class="editor-heading"><h2 id="workflow-editor-title">节点编辑</h2><button class="btn btn-ghost" type="button" aria-label="关闭节点编辑" onclick={onClose}>×</button></div>
+  <fieldset disabled={disabled} class="editor-fields">
+    {#if selected}
+      <label>节点名称<input class="input" required maxlength="160" bind:value={selected.title} /></label>
+      <label>业务内容<textarea class="textarea" maxlength="1200" rows="4" bind:value={selected.detail}></textarea></label>
+      <label>所属流程<select class="select" value={selected.scope} onchange={(event) => {
+        if (!selected) return; const scope = event.currentTarget.value as Scope;
+        const ids = descendants(nodes, selected.id); nodes = nodes.map(node => ids.has(node.id) ? { ...node, scope, parentId: node.id === selectedId ? null : node.parentId } : node);
+      }}>{#each scopes as scope}<option value={scope.id}>{scope.label}</option>{/each}</select></label>
+      <label>节点类型<select class="select" value={selected.kind} onchange={event => {
+        if (!selected) return;
+        if (event.currentTarget.value === 'task' && nodes.some(node => node.parentId === selectedId)) return;
+        selected.kind = event.currentTarget.value as 'task' | 'branch';
+        if (selected.kind === 'branch') { selected.startTime = null; selected.endTime = null; }
+      }}><option value="task" disabled={nodes.some(node => node.parentId === selectedId)}>任务</option><option value="branch">条件分支</option></select></label>
+      <label>上级分支<select class="select" bind:value={selected.parentId}>
+        <option value={null}>主流程</option>
+        {#each nodes.filter(node => node.scope === selected.scope && node.kind === 'branch' && !descendants(nodes, selected.id).has(node.id)) as parent}<option value={parent.id}>{parent.title}</option>{/each}
+      </select></label>
+      {#if selected.kind === 'task'}
+        <div class="editor-pair">
+          <label>开始 / 提醒<input class="input" type="time" value={selected.startTime ?? ''} oninput={event => { if (selected) selected.startTime = event.currentTarget.value || null; }} /></label>
+          <label>结束<input class="input" type="time" value={selected.endTime ?? ''} oninput={event => { if (selected) selected.endTime = event.currentTarget.value || null; }} /></label>
         </div>
-        {#if node.kind === 'branch'}{@render tree(scope, node.id)}{/if}
-      </li>
-    {/each}
-  </ol>
-{/snippet}
-
-<dialog bind:this={dialog} class="modal" aria-labelledby="workflow-editor-title" oncancel={(event) => { event.preventDefault(); if (!saving) onClose(); }}>
-  <div class="modal-box workflow-editor">
-    <h2 id="workflow-editor-title">编辑流程节点</h2>
-    <form onsubmit={(event) => { event.preventDefault(); void save(); }}>
-      <fieldset disabled={saving}>
-        <div class="editor-layout">
-          <div class="editor-navigation">
-            {#each scopes as scope}
-              <section aria-label={scope.label}>
-                <h3>{scope.label}</h3>
-                <div class="editor-add"><button class="btn btn-ghost" type="button" onclick={() => add(scope.id as Scope, 'task')}>＋ 节点</button><button class="btn btn-ghost" type="button" onclick={() => add(scope.id as Scope, 'branch')}>＋ 分支</button></div>
-                {@render tree(scope.id as Scope)}
-              </section>
-            {/each}
-          </div>
-          <div class="editor-fields">
-            {#if selected}
-              <label>节点名称<input class="input" required maxlength="160" bind:value={selected.title} /></label>
-              <label>业务内容<textarea class="textarea" maxlength="1200" rows="5" bind:value={selected.detail}></textarea></label>
-              <label>品种<select class="select" value={selected.scope} onchange={(event) => {
-                if (!selected) return; const scope = event.currentTarget.value as Scope;
-                const ids = descendants(draft, selected.id); draft = draft.map(node => ids.has(node.id) ? { ...node, scope, parentId: node.id === selectedId ? null : node.parentId } : node);
-              }}>{#each scopes as scope}<option value={scope.id}>{scope.label}</option>{/each}</select></label>
-              <label>上级分支<select class="select" bind:value={selected.parentId}>
-                <option value={null}>主流程</option>
-                {#each draft.filter(node => node.scope === selected.scope && node.kind === 'branch' && !descendants(draft, selected.id).has(node.id)) as parent}<option value={parent.id}>{parent.title}</option>{/each}
-              </select></label>
-              {#if selected.kind === 'task'}
-                <div class="editor-times">
-                  <label>开始 / 提醒<input class="input" type="time" value={selected.startTime ?? ''} oninput={(event) => { if (selected) selected.startTime = event.currentTarget.value || null; }} /></label>
-                  <label>结束<input class="input" type="time" value={selected.endTime ?? ''} oninput={(event) => { if (selected) selected.endTime = event.currentTarget.value || null; }} /></label>
-                </div>
-              {/if}
-              <button type="button" class="btn btn-outline btn-error" onclick={() => selected && remove(selected)}>删除节点</button>
-            {:else}<p>暂无节点</p>{/if}
-          </div>
-        </div>
-      </fieldset>
-      {#if validation}<p role="alert" class="text-error">{validation}</p>{/if}
-      <div class="modal-action"><button class="btn" type="button" disabled={saving} onclick={onClose}>取消</button><button class="btn btn-primary" disabled={saving}>{saving ? '保存中…' : '保存配置'}</button></div>
-    </form>
-  </div>
-</dialog>
+        <label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={isInquiry(selected)} onchange={event => { if (selected) selected.inquiry = event.currentTarget.checked; }} />询价文本框</label>
+      {:else}
+        <label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={expanded} onchange={event => onBranch(selectedId, event.currentTarget.checked)} />展开分支</label>
+      {/if}
+      <div class="editor-pair">
+        <label>水平偏移<input class="input" type="number" min="-10000" max="10000" value={selected.offset?.x ?? 0} oninput={event => { if (selected) selected.offset = { x: event.currentTarget.valueAsNumber || 0, y: selected.offset?.y ?? 0 }; }} /></label>
+        <label>垂直偏移<input class="input" type="number" min="-10000" max="10000" value={selected.offset?.y ?? 0} oninput={event => { if (selected) selected.offset = { x: selected.offset?.x ?? 0, y: event.currentTarget.valueAsNumber || 0 }; }} /></label>
+      </div>
+      <div class="editor-actions"><button type="button" class="btn" onclick={() => selected && addChild(selected)}>新增下级节点</button><button type="button" class="btn btn-outline btn-error" onclick={() => selected && remove(selected)}>删除节点</button></div>
+    {/if}
+  </fieldset>
+</aside>
 
 <style>
-  .workflow-editor { width: min(1000px, calc(100vw - 32px)); max-width: 1000px; max-height: calc(100dvh - 32px); }
-  h2 { font-size: 1.25rem; font-weight: bold; margin: 0 0 20px; }
-  h3 { font-size: 1rem; font-weight: bold; margin: 0; }
-  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
-  .editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
-  .editor-navigation section { margin-bottom: 20px; }
-  .editor-list { list-style: none; padding: 0; margin: 0; }
-  .editor-list .editor-list { padding-left: 16px; border-left: 1px solid var(--tr-border); }
-  .editor-row { display: flex; gap: 4px; align-items: center; }
-  .node-select { flex: 1; min-width: 0; height: auto; min-height: 44px; text-align: left; justify-content: flex-start; white-space: normal; overflow-wrap: anywhere; }
-  .chosen { color: var(--tr-primary); background: var(--color-base-200); }
-  .editor-add { display: flex; gap: 8px; margin: 6px 0; }
-  .editor-fields { display: grid; gap: 16px; align-content: start; position: sticky; top: 0; align-self: start; }
+  .workflow-editor { width: 340px; max-height: 76dvh; overflow-y: auto; padding: 20px; background: var(--tr-surface); border-left: 1px solid var(--tr-border); flex: none; }
+  .editor-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  h2 { font-size: 1.25rem; font-weight: bold; margin: 0; }
+  .editor-fields { border: 0; margin: 0; padding: 0; display: grid; gap: 16px; min-width: 0; }
   .editor-fields label { display: grid; gap: 6px; font-weight: bold; font-size: .875rem; min-width: 0; }
-  .editor-fields :is(input, select, textarea) { width: 100%; font-weight: normal; }
-  .editor-times { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  @media (max-width: 720px) { .editor-layout { grid-template-columns: minmax(0, 1fr); } .editor-fields { position: static; } .editor-navigation { max-height: 35dvh; overflow-y: auto; } }
+  .editor-fields :is(input:not([type="checkbox"]), select, textarea) { width: 100%; font-weight: normal; }
+  .editor-fields .editor-checkbox { display: flex; align-items: center; gap: 8px; }
+  .editor-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .editor-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  @media (max-width: 1100px) { .workflow-editor { position: fixed; right: 16px; bottom: 16px; z-index: 30; width: min(340px, calc(100vw - 32px)); max-height: calc(100dvh - 130px); border: 1px solid var(--tr-border); border-radius: 10px; box-shadow: 0 8px 32px rgb(23 32 51 / 12%); } }
 </style>

@@ -464,10 +464,12 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
     assert.match(view, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
     assert.match(view, /<ModuleCard/);
   }
-  for (const view of [...views.slice(0, 3), views[4]]) {
+  for (const view of views.slice(0, 3)) {
     assert.match(view, /PanelHeading from "\.\/PanelHeading\.svelte"/);
     assert.match(view, /Badge from "\.\/Badge\.svelte"/);
   }
+  assert.match(views[4], /WorkflowCanvas/);
+  assert.doesNotMatch(views[4], /WorkflowLane|WorkflowTree|flow-lanes/);
   for (const view of views.slice(0, 3)) {
     assert.match(view, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
   }

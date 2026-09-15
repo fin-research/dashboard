@@ -18,6 +18,8 @@ export const nodeSchema = z.object({
   detail: z.string().trim().max(1200),
   startTime: timeSchema.nullable(),
   endTime: timeSchema.nullable(),
+  offset: z.object({ x: z.number().finite().min(-10000).max(10000), y: z.number().finite().min(-10000).max(10000) }).strict().optional(),
+  inquiry: z.boolean().optional(),
 }).strict();
 export type WorkflowNode = z.infer<typeof nodeSchema>;
 export const nodesSchema = z.array(nodeSchema).max(150).superRefine((nodes, ctx) => {
@@ -76,10 +78,11 @@ export const daySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   enabled: z.object({ loan: z.boolean(), reverse: z.boolean(), exchange: z.boolean() }),
   completed: flags, branches: flags, notified: flags,
+  notes: z.record(z.string(), z.string().max(4000)).default({}),
 }).strict();
 export type WorkflowDay = z.infer<typeof daySchema>;
 export function emptyDay(date: string): WorkflowDay {
-  return { date, enabled: { loan: true, reverse: true, exchange: false }, completed: {}, branches: {}, notified: {} };
+  return { date, enabled: { loan: true, reverse: true, exchange: false }, completed: {}, branches: {}, notified: {}, notes: {} };
 }
 export function isActive(node: WorkflowNode, nodes: WorkflowNode[], day: WorkflowDay): boolean {
   if (node.scope === 'shared' ? !Object.values(day.enabled).some(Boolean) : !day.enabled[node.scope]) return false;
@@ -121,4 +124,8 @@ export function updateDay(storage: Pick<Storage, 'getItem' | 'setItem'>, key: st
   change(day);
   storage.setItem(key, JSON.stringify(daySchema.parse(day)));
   return day;
+}
+
+export function isInquiry(node: WorkflowNode) {
+  return node.inquiry ?? ['loan-quote', 'reverse-quote'].includes(node.id);
 }

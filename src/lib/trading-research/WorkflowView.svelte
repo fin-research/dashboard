@@ -1,14 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import ModuleCard from "../../components/ModuleCard.svelte";
-  import PanelHeading from "./PanelHeading.svelte";
   import SectionHeading from "./SectionHeading.svelte";
   import Badge from "./Badge.svelte";
-  import WorkflowLane from '../trading-workflow/WorkflowLane.svelte';
-  import WorkflowTree from '../trading-workflow/WorkflowTree.svelte';
+  import WorkflowCanvas from '../trading-workflow/WorkflowCanvas.svelte';
   import WorkflowEditor from '../trading-workflow/WorkflowEditor.svelte';
   import { globalMessages } from '../global-messages';
-  import { activeTasks, configResponseSchema, configSchema, dayKey, dueReminders, emptyDay, products,
+  import { activeTasks, configResponseSchema, configSchema, dayKey, dueReminders, emptyDay, products, nodesSchema,
     readDay, shanghaiClock, updateDay, type Product, type WorkflowConfig, type WorkflowDay, type WorkflowNode } from '../trading-workflow/model';
 
   let config = $state<WorkflowConfig | null>(null);
@@ -19,6 +17,43 @@
   let loading = $state(true);
   let loadError = $state('');
   let editing = $state(false);
+  let draft = $state<WorkflowNode[]>([]);
+  let selectedId = $state('');
+  let saving = $state(false);
+  let preview = $state<WorkflowDay>(emptyDay(shanghaiClock().date));
+  const displayDay = $derived(editing ? { ...day, enabled: preview.enabled, branches: preview.branches } : day);
+  function startEditing() {
+    if (!config) return;
+    draft = structuredClone($state.snapshot(config.nodes));
+    preview = structuredClone($state.snapshot(day)); selectedId = ''; editing = true;
+  }
+  function cancelEditing() {
+    if (saving) return;
+    if (config && JSON.stringify(draft) !== JSON.stringify(config.nodes) && !window.confirm('放弃未保存的流程修改？')) return;
+    editing = false; selectedId = '';
+  }
+  async function saveDraft() {
+    const result = nodesSchema.safeParse(draft);
+    if (!result.success) { globalMessages.error(result.error.issues[0]?.message ?? '节点配置无效'); return; }
+    saving = true;
+    try { if (await saveConfig(result.data)) { editing = false; selectedId = ''; } }
+    catch { globalMessages.error('配置保存失败，请重试'); }
+    finally { saving = false; }
+  }
+  function move(id: string, offset: { x: number; y: number }) {
+    if (editing && !saving) draft = draft.map(node => node.id === id ? { ...node, offset } : node);
+  }
+  function addNode() {
+    const node: WorkflowNode = { id: crypto.randomUUID(), scope: 'shared', parentId: null, kind: 'task', title: '新节点', detail: '', startTime: null, endTime: null };
+    draft = [...draft, node]; selectedId = node.id;
+  }
+  function setBranch(id: string, value: boolean) {
+    if (editing) preview.branches[id] = value; else branch(id, value);
+  }
+  function setEnabled(product: Product, value: boolean) {
+    if (editing) preview.enabled[product] = value; else enable(product, value);
+  }
+  function note(id: string, value: string) { void change(state => { state.notes[id] = value; }); }
   let permission = $state<NotificationPermission | 'unsupported'>('unsupported');
   let notificationsEnabled = $state(false);
   let mounted = false;
@@ -93,7 +128,7 @@
   }
   function locate() {
     const pending = tasks.find(node => !day.completed[node.id]);
-    if (pending) document.querySelector<HTMLElement>(`[data-workflow-node="${pending.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    if (pending) window.dispatchEvent(new CustomEvent('workflow-locate', { detail: pending.id }));
   }
   async function remind() {
     if (!mounted || !config || checking) return;
@@ -114,7 +149,7 @@
           for (const item of due) {
             const label = products.find(product => product.id === item.node.scope)?.label ?? '日内协同';
             const notification = new Notification(`${item.time} · ${label}`, { body: item.node.title, tag: `${actorKey}:${date}:${item.key}` });
-            notification.onclick = () => { window.focus(); document.querySelector<HTMLElement>(`[data-workflow-node="${item.node.id}"]`)?.scrollIntoView({ block: 'center' }); notification.close(); };
+            notification.onclick = () => { window.focus(); window.dispatchEvent(new CustomEvent('workflow-locate', { detail: item.node.id })); notification.close(); };
             notification.onerror = () => globalMessages.warning('浏览器通知未送达，请查看到点待办', { key: 'workflow-notification-error' });
           }
           sent = true;
@@ -157,24 +192,32 @@
       <Badge tone={completed === tasks.length ? 'success' : 'info'}>已完成 {completed} / {tasks.length}</Badge>
       <button class="btn" onclick={locate}>定位待办</button>
       <button class="btn" disabled={permission === 'unsupported'} onclick={toggleNotifications}>{notificationLabel}</button>
-      <button class="btn" onclick={loadConfig}>刷新配置</button>
-      {#if canEdit}<button class="btn btn-primary" onclick={() => editing = true}>编辑节点</button>{/if}
+      <button class="btn" disabled={editing} onclick={loadConfig}>刷新配置</button>
+      {#if canEdit}
+        <label class="edit-mode"><input type="checkbox" class="toggle toggle-primary" checked={editing} disabled={saving} onchange={event => { editing ? cancelEditing() : startEditing(); event.currentTarget.checked = editing; }} />编辑模式</label>
+      {/if}
+      {#if editing}
+        <button class="btn" disabled={saving} onclick={addNode}>新增节点</button>
+        <button class="btn" disabled={saving} onclick={() => draft = draft.map(({ offset, ...node }) => node)}>自动布局</button>
+        <button class="btn" disabled={saving} onclick={cancelEditing}>取消编辑</button>
+        <button class="btn btn-primary" disabled={saving} onclick={saveDraft}>{saving ? '保存中…' : '保存配置'}</button>
+      {/if}
     </div>
-    <ModuleCard labelledBy="workflow-common-title">
-      <PanelHeading id="workflow-common-title" title="日内协同" />
-      <WorkflowTree nodes={config.nodes} {day} scope="shared" clockMinutes={clock.minutes} onComplete={complete} onBranch={branch} />
-    </ModuleCard>
-    <div class="flow-lanes">
-      {#each products as product}
-        <WorkflowLane product={product.id} label={product.label} nodes={config.nodes} {day} clockMinutes={clock.minutes} clockTime={clock.time} onComplete={complete} onBranch={branch} onEnable={enable} />
-      {/each}
+    <div class="flow-workspace" class:saving>
+      <WorkflowCanvas nodes={editing ? draft : config.nodes} day={displayDay} clockMinutes={clock.minutes} {editing} {selectedId}
+        onSelect={id => selectedId = id} onMove={move} onComplete={complete} onBranch={setBranch} onEnable={setEnabled} onNote={note} />
+      {#if editing && selectedId}
+        {#key selectedId}<WorkflowEditor bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
+          onClose={() => selectedId = ''} onBranch={setBranch} expanded={!!preview.branches[selectedId]} />{/key}
+      {/if}
     </div>
-    {#if editing}<WorkflowEditor {config} onSave={saveConfig} onClose={() => editing = false} />{/if}
   {/if}
 </div>
 
 <style>
   .flow-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-  .flow-lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
-  @media (max-width: 1000px) { .flow-lanes { grid-template-columns: minmax(0, 1fr); } }
+  .edit-mode { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-left: auto; font-size: 1rem; }
+  .flow-workspace { display: flex; min-width: 0; align-items: flex-start; gap: 16px; }
+  .flow-workspace :global(.workflow-diagram) { flex: 1; }
+  .flow-workspace.saving { pointer-events: none; }
 </style>

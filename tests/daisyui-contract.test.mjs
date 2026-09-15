@@ -37,7 +37,7 @@ test('visible native fields share daisyUI primitives and native dialogs separate
         if (type === 'hidden' || attribute(node,'hidden') || classes.some(c => ['sr-only','upload-file-input'].includes(c))) return;
         if (parent?.name === 'label' && value(attribute(parent,'class')).split(/\s+/).includes('input')) return;
         const primitive = node.name !== 'input' ? node.name : ({checkbox:'checkbox',radio:'radio',file:'file-input',range:'range'}[type] ?? 'input');
-        assert.ok(classes.includes(primitive), `${file}:${node.start} is missing ${primitive}`);
+        assert.ok(classes.includes(primitive) || (type === 'checkbox' && classes.includes('toggle')), `${file}:${node.start} is missing ${primitive}`);
         fields++;
       }
       if (node.name === 'dialog') {
@@ -49,7 +49,7 @@ test('visible native fields share daisyUI primitives and native dialogs separate
     });
   }
   assert.ok(fields > 90);
-  assert.equal(dialogs, 11); // Includes root login and trading workflow node editor dialogs.
+  assert.equal(dialogs, 10); // Workflow editing uses an inline side panel.
 });
 
 test('role drafts, failed saves, personal entry and financing multi-select retain their behavior', async () => {

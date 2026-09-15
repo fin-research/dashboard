@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
+import { buildGraph } from '../src/lib/trading-workflow/graph.ts';
 import { activeTasks, childrenOf, dayKey, descendants, dueReminders, emptyDay, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
 import { readWorkflowConfig, saveWorkflowConfig } from '../src/lib/server/trading-workflow.ts';
 
@@ -124,4 +125,44 @@ test('workflow DOM interactions, local-only writes, editor conflicts and authent
   const { promisify } = await import('node:util');
   const { stdout } = await promisify(execFile)(process.execPath, ['--conditions=browser','tests/helpers/trading-workflow-ui.mjs'], { cwd: new URL('../',import.meta.url), timeout:60000 });
   assert.match(stdout, /Trading workflow DOM and API checks passed/);
+});
+
+
+test('flow graph folds conditions, centers common steps, joins paths and preserves custom offsets', () => {
+  const day = emptyDay('2026-09-15');
+  const options = { editing: false, selectedId: '', clockMinutes: 600, activate() {}, toggleProduct() {}, note() {} };
+  const folded = buildGraph(defaults, day, options);
+  assert.equal(folded.nodes.some(n => n.id === 'reverse-position'), false);
+  assert.equal(folded.nodes.some(n => n.id === 'product-exchange'), false);
+  const at = id => folded.nodes.find(n => n.id === id).position;
+  assert.equal(at('shared-elements').x, (at('product-loan').x + at('product-reverse').x) / 2);
+  assert.equal(at('shared-done').x, at('shared-elements').x);
+  assert.ok(at('shared-done').y > at('loan-arrival').y);
+  day.branches['reverse-change'] = true;
+  const expanded = buildGraph(defaults, day, options);
+  assert.ok(expanded.nodes.some(n => n.id === 'reverse-position'));
+  assert.ok(expanded.edges.some(e => e.source === 'reverse-change' && e.target === 'reverse-position'));
+  assert.ok(expanded.edges.some(e => e.source === 'reverse-ccdc' && e.target === 'reverse-counterparty'));
+  assert.ok(expanded.edges.some(e => e.source === 'reverse-change' && e.target === 'reverse-counterparty'));
+  const taller = buildGraph(defaults, day, {...options, heights:{'loan-send':500}});
+  assert.ok(taller.nodes.find(n => n.id === 'loan-deal').position.y >= taller.nodes.find(n => n.id === 'loan-send').position.y + 542);
+  const positioned = defaults.map(n => n.id === 'loan-send' ? {...n, offset:{x:85,y:-20}} : n);
+  const custom = buildGraph(positioned, day, {...options, editing:true});
+  assert.equal(custom.nodes.find(n => n.id === 'loan-send').position.x, custom.bases['loan-send'].x + 85);
+  assert.equal(custom.nodes.find(n => n.id === 'loan-send').draggable, true);
+  assert.equal(folded.nodes.find(n => n.id === 'loan-send').draggable, false);
+  assert.equal(nodesSchema.safeParse(positioned).success, true);
+  assert.equal(nodesSchema.safeParse(defaults.map(n => ({...n,offset:{x:Infinity,y:0}}))).success, false);
+});
+
+test('legacy day records gain empty inquiry notes without losing progress; notes isolate and merge by day', () => {
+  const store=storage(), date='2026-09-15', key=dayKey('notes-user',date);
+  const {notes,...legacy}=emptyDay(date); legacy.completed['loan-quote']=true;
+  store.setItem(key,JSON.stringify(legacy));
+  assert.deepEqual(readDay(store,key,date).notes,{});
+  updateDay(store,key,date,d=>{d.notes['loan-quote']='7天 1.65%';});
+  updateDay(store,key,date,d=>{d.completed['loan-send']=true;});
+  assert.equal(readDay(store,key,date).completed['loan-quote'],true);
+  assert.equal(readDay(store,key,date).notes['loan-quote'],'7天 1.65%');
+  assert.deepEqual(readDay(store,dayKey('notes-user','2026-09-16'),'2026-09-16').notes,{});
 });
