@@ -2,7 +2,7 @@
 
 ## 当前交付边界
 
-交易研究工作台包含八个导航标签页：总览、交易管理、市场热点、政策跟踪、研究辅助、流程中心、二级池周报和融资择时模型。授信工作台独立为首页一级入口，提供授信一览表、授信日历、授信周报、授信助手。授信报表已经接入 Neon `credit` schema：业务人员每周在本地解析 Excel 并按报告日期写入数据库，浏览器通过同源 `/api/credit` 和 Hyperdrive 读取。研究辅助的首次全历史回填由受控本地命令完成；此后 dashboard Worker 每日增量读取 Choice EDB 与 DM 资金利率历史并写入 Neon `public.edb`，浏览器只通过同源 `/api/economic-indicators` 读取；交易和流程中心仍使用仓库内冻结数据；二级池周报与融资择时复用独立路由的生产页面组件和既有数据链路。
+交易研究工作台包含八个导航标签页：总览、交易管理、市场热点、政策跟踪、研究辅助、交易流程、二级池周报和融资择时模型。授信工作台独立为首页一级入口，提供授信一览表、授信日历、授信周报、授信助手。授信报表已经接入 Neon `credit` schema：业务人员每周在本地解析 Excel 并按报告日期写入数据库，浏览器通过同源 `/api/credit` 和 Hyperdrive 读取。研究辅助的首次全历史回填由受控本地命令完成；此后 dashboard Worker 每日增量读取 Choice EDB 与 DM 资金利率历史并写入 Neon `public.edb`，浏览器只通过同源 `/api/economic-indicators` 读取；交易管理仍使用仓库内冻结数据；交易流程节点配置保存在 D1，每日进度仅保存在浏览器本地；二级池周报与融资择时复用独立路由的生产页面组件和既有数据链路。
 
 上述数据边界属于工程实现说明，不在工作台 UI 展示“演示数据”“静态演示”“未来统一由数据库与同源 `/data` API 提供”等提示。业务页面只展示模块、数据基准日和业务状态，避免以实现说明占用研究界面。
 
@@ -11,7 +11,7 @@
 - 交易数据与资金存量：`dashboard/app.js` 中的冻结演示快照，基准时点为 `2026-08-07 15:00`。
 - 授信数据：本地 Excel 的“授信一览表”和“授信周报”Sheet，经 `pnpm credit:import` 按明确的报告日期写入 Neon；源 Excel 不提交到仓库。
 - 研究数据：36 个国内外宏观序列、利率与资金面的 8 个日频序列，以及负债周报使用的 11 个利率序列（其中 1Y 国债与研究序列复用同一代码），合计 54 个唯一指标。数据库保存上游可得全历史，页面读取最近 18 个月 Neon 快照；DR001、DR007、R007 使用 DM 历史接口，其余使用 Choice EDB。
-- 流程中心：沿用原项目的交易流程与授信周报流程结构，当前任务卡仍由演示数据组装，只用于展示状态流转布局。
+- 交易流程：日内三品种待办，节点配置由 Dashboard D1 维护，不创建后端任务、审批或进度记录。
 
 原项目的 `source-data/` Excel、登录、局域网 FastAPI、PostgreSQL、Nginx、账号权限和管理员页面均未迁入。源 Excel 含受控业务数据，不应提交到 dashboard 仓库。
 
@@ -24,7 +24,7 @@
 - `/trading-research/market-hotspots`：市场热点。
 - `/trading-research/policy-tracking`：政策跟踪。
 - `/trading-research/research`：研究辅助。
-- `/trading-research/workflow`：流程中心。
+- `/trading-research/workflow`：交易流程。
 - `/trading-research/secondary-bond-pool`：二级池周报。
 - `/trading-research/bond`：旧二级池报告隐藏深链，不显示在导航。
 - `/trading-research/financing-model`：融资择时模型。
@@ -41,7 +41,7 @@
 | 交易管理 | 当日汇总、品种分布、对手集中度、交易筛选与明细 | 交易录入、聊天解析、凭证生成、押券校验写入 |
 | 授信管理 | 数据库一览表、逐列排序、详情自动保存、授信日历，以及结构化事件、近六个月批复和授信明细周报 | 额度调整审批、系统内投资人自动归集 |
 | 研究辅助 | “利率与资金面”主图、4 张资金利率指标卡、两组利差副图，以及 9 类 × 4 项“宏观指标”走势卡 | 指标自定义 |
-| 流程中心 | 交易与授信周报表单布局、只读任务与节点进度 | 登录身份、创建、提交、退回、复核、归档和导出 |
+| 交易流程 | 三品种纵向流程、条件分支、节点在线增删改排序、浏览器到点提醒 | 后端进度、服务器定时推送、审批执行与聊天发送 |
 | 二级池周报 | 复用 Neon 二级池数据链路，默认展示年初至最近完整周，并按原版报告画布呈现图表、重仓券和跟踪重点 | 原持仓成交分析页只保留隐藏深链 |
 | 融资择时模型 | 复用原模型快照、发行窗口、人工结论和卖方观点 | 无新增平行实现 |
 
@@ -86,12 +86,17 @@
 - 当前研究底稿未覆盖的 SHIBOR 曲线、逐日 OMO、政策原文、国内高频和海外市场数据均应明确返回 `available: false` 与 `reason`，不得用模拟数字进入正式快照。
 - 规则模板输出不等同于大模型输出，也不等同于研究岗已复核结论。
 
-### 流程
+### 交易流程
 
-- 交易流程节点：交易员提交 → 投资经理复核 → 合规复核 → 部门负责人复核 → 交易员归档。
-- 授信周报节点：授信专员提交 → 授信主管复核 → 周报待导出 → 已导出。
-- 每次写操作必须提交 `expectedVersion`，服务端执行乐观锁；流程事件只追加，不覆盖历史审计记录。
-- 任务状态、当前节点、经办人、复核人、意见、时间和版本必须由服务端返回，前端不得自行推断。
+- `/trading-research/workflow` 为交易流程页，沿用工作台导航。拆借、逆回购每日默认启用，交易所逆回购每日默认关闭；日内协同节点共用一份进度，不重复计入三品种。
+- 节点配置包含稳定 ID、品种、上级分支、任务/分支类型、名称、业务内容、开始/结束时间与数组顺序。上级只能为同品种分支，禁止循环且最多四层；删除分支需确认并删除子树。排序针对同级节点，子树随父节点展示。
+- D1 `trading_workflow_config` 只存单份共享配置及版本；migration `1015_trading_workflow_config.sql` 播种用户指定的全部节点。只有配置保存会写数据库，不存每日日期、完成状态、分支选择、提醒记录、用户任务或审批审计。
+- `GET /api/trading-workflow/config` 要求 `research.workspace:read`，返回 `version/nodes/actorKey/canEdit`。`PUT` 要求 `research.workflow:update`、同源及严格 Schema，且只接受 `{expectedVersion,nodes}`。条件 UPDATE 原子增加版本；冲突返回 409，编辑草稿留在弹窗，取消后可刷新配置。
+- 本地 key 按当前账号与上海自然日隔离；新的一天恢复默认品种、空进度和未激活分支。刷新/同账号同浏览器标签页使用 localStorage 恢复，同步 storage 事件；更换浏览器或设备不共享进度。本地存储不可用或损坏时保留当前页内状态并通过全局消息报告，不回传后端。
+- 分支激活后自动展开，关闭后折叠；父分支关闭时后代不计入待办、不触发提醒，但本地勾选保留，重新激活时恢复。业务触发条件由经办人选择，时间流逝不会自动确认成交、审批或完成任务。
+- 明确时点到点提醒；时间区间在开始与结束提醒未完成节点。晚打开页面或休眠恢复后补报当天逾期未办，已过整个区间只报结束时间。完成或停用品种/分支不提醒，去重粒度为账号、日期、节点、提醒时点与渠道；支持 Web Locks 的浏览器串行领取通知，其他浏览器采用 localStorage 与 Notification tag 尽量去重。
+- 提醒权限只在点击按钮时申请；浏览器选择单独保存在本地。支持的桌面浏览器通过 Notification API 弹出通知，不支持/拒绝/发送失败时保留全局消息及待办状态。关闭流程页、浏览器休眠/后台限速或系统禁止通知时无法保证准点送达，不使用服务端推送、邮件或群消息。
+- 时间游标每秒按上海时间更新，在可见的明确时间节点间插值移动（边界 08:00–18:00），不为未定时节点增加期限，也不改变业务进度；非递增时间不作为插值锚点。动画尊重 reduced-motion，定位待办仅由按钮触发。
 
 ## 数据分层
 
@@ -104,7 +109,7 @@
 | 交易 | `trade`, `trade_collateral`, `trade_status_event` | `trade_id`, `version`, `event_id` |
 | 授信 | `credit.institution`, `credit.item` | `report_date`, `institution_name`, `item_type`, `updated_at` |
 | 研究 | `research_snapshot`, `market_observation`, `curve_point`, `source_availability` | `snapshot_id`, `series_code`, `observation_date` |
-| 流程 | `workflow_task`, `workflow_event`, `workflow_assignment` | `task_id`, `event_id`, `version` |
+| 交易流程配置 | `trading_workflow_config` | 单例 `id=1`, `version` |
 
 授信日报按日期保存，同日更正直接事务替换，不另建导入审计记录；其他业务域若需要不可变历史，应在各自契约中独立设计。列表接口必须稳定排序并返回明确报告日期。
 
@@ -148,9 +153,8 @@ pnpm exec wrangler workflows instances restart economic-indicator-sync <instance
 
 - `GET /data/trading-research/overview?as_of=YYYY-MM-DD`
 - `GET /data/trading-research/trades?date=YYYY-MM-DD&query=&product=&status=&cursor=&limit=`
-- `GET /data/trading-research/workflows?scope=mine|pending&cursor=&limit=`
 
-流程写接口在身份、权限和审计方案确认后再开放，建议保持同一 `/data/trading-research/workflows/*` 资源前缀：创建草稿、提交、通过、退回、归档和导出分别使用明确动作端点，并携带 `expectedVersion`。所有写接口必须进行账号鉴权、岗位授权、CSRF/同源校验、输入 Schema 校验和审计落库。
+交易流程配置接口及本地进度边界见上文；不实现原演示方案中的后端审批任务接口。
 
 通用响应规则：
 
@@ -165,6 +169,6 @@ pnpm exec wrangler workflows instances restart economic-indicator-sync <instance
 2. 投资人及业务明细进入数据库后，再设计自动占用归集与未匹配告警；不得把当前 Excel 数字与未来自动归集结果混为同一口径。
 3. 交易接入前确定数据所有权、权限和 `/data/trading-research/*` OpenAPI/Schema；需保留 `GET /data/trading-research/trades?date=YYYY-MM-DD&query=&product=&status=&cursor=&limit=` 契约。
 4. 研究数据首次通过本地全量命令回填，随后由每日增量 Cron 更新；新增或替换指标时先复核名称、ID、单位、频率、区域和展示换算，并同步指标映射测试。任何调试不得用页面挂载或循环请求验证付费 EDB。
-5. 流程中心最后接入身份和写操作，完成角色矩阵、乐观锁、流程审计事件和导出权限测试。
+5. 交易流程验证配置 Schema、版本冲突、本地跨日隔离、分支启停、通知去重及权限边界。
 
 正式验收至少核对：交易汇总与明细求和一致、授信总额勾稽一致、研究曲线日期一致、流程版本冲突可见、所有页面显示明确基准日、移动端仅表格区域横向滚动。

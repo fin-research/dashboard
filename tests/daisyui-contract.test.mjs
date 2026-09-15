@@ -49,7 +49,7 @@ test('visible native fields share daisyUI primitives and native dialogs separate
     });
   }
   assert.ok(fields > 90);
-  assert.equal(dialogs, 10); // Includes the root login dialog.
+  assert.equal(dialogs, 11); // Includes root login and trading workflow node editor dialogs.
 });
 
 test('role drafts, failed saves, personal entry and financing multi-select retain their behavior', async () => {

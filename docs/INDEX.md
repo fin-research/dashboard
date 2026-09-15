@@ -12,7 +12,7 @@
 | `/trading-research/market-hotspots`、旧 `/market-hotspots`、`/api/rag/hotspots` | [市场热点](modules/market-hotspots.md) |
 | `/trading-research/policy-tracking`、旧 `/policy-tracking`、`/api/policies/*` | [政策跟踪](modules/policy-tracking.md) |
 | `/news/[id]`、`/articles/[id]`、`/commentaries/[id]` 及同名 `/api/*` | [资讯、研报与点评详情](modules/research-details.md) |
-| `/trading-research`、`/trading-research/trading`、`/trading-research/workflow`、工作台框架与兼容跳转 | [交易研究工作台](TRADING_RESEARCH_WORKBENCH.md) |
+| `/trading-research`、`/trading-research/trading`、`/trading-research/workflow`、`/api/trading-workflow/config`、工作台框架与兼容跳转 | [交易研究工作台](TRADING_RESEARCH_WORKBENCH.md) |
 | `/trading-research/research`、`/api/economic-indicators`、EDB Cron / 回填 | [研究辅助与 EDB](modules/research-assistance.md) |
 | `/secondary-bond-pool`、`/trading-research/secondary-bond-pool`、隐藏 `/bond` / `/trading-research/bond`、`/api/bond-ledger` / `/bond-ledger` | [二级池](modules/secondary-bond-pool.md) |
 | `/financing-model`、`/trading-research/financing-model`、`/api/financing-model/*` | [融资择时模型](modules/financing-model.md) |

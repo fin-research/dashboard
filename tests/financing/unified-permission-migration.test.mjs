@@ -26,7 +26,10 @@ test('permission migration preserves business references, refuses unmapped ident
   assert.equal((await db.query("SELECT default_owner_role FROM financing.sop_nodes WHERE id='permission-node'")).rows[0].default_owner_role,'rol_Handler');
   for(const table of ['people','role_permissions','audit_logs'])assert.equal((await db.query(`SELECT to_regclass('financing.${table}') AS value`)).rows[0].value,null);
   const codes=(await db.query('SELECT code FROM "authorization".permission ORDER BY sort_order')).rows.map(row=>row.code);
-  assert.deepEqual(codes,PERMISSION_CODES);
+  // The archived SQL predates Auth0-only workflow configuration permission. Do not rewrite historical migrations.
+  assert.equal(codes.length,58);
+  assert.deepEqual(codes,PERMISSION_CODES.filter(code=>code!=='research.workflow:update'));
+  assert.ok(!codes.includes('research.workflow:update'));
   assert.equal((await db.query('SELECT count(*)::int AS count FROM "authorization".role_permission')).rows[0].count,3*codes.length);
   const report=(await db.query("SELECT financing.liability_weekly_report_data('2026-09-01') AS value")).rows[0].value;
   assert.equal(report.report.projects.find(project=>project.id==='permission-project').ownerId,'auth0|person');

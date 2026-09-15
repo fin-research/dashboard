@@ -23,7 +23,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份报告数据生成文字版，并把可识别的文字版手动编辑反向更新到规范报告数据；不得保存完整文字版或建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
-- `/credit-workbench` 的授信报表通过 `/api/credit` 读取 Neon `credit` 日报；交易研究工作台总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；融资工作台的负债周报也只读这张公共表。Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易和流程中心仍读取 `src/lib/trading-research/demo-data.ts`，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
+- `/credit-workbench` 的授信报表通过 `/api/credit` 读取 Neon `credit` 日报；交易研究工作台总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；融资工作台的负债周报也只读这张公共表。Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易管理仍读取 `src/lib/trading-research/demo-data.ts`；交易流程通过 `/api/trading-workflow/config` 读写 D1 节点配置，日内进度与提醒状态仅在浏览器本地维护，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 - `/trading-research/policy-tracking` 只读 ingest Workflow 已聚合的政策、面向境内资金/利率研究的三档重要性与自动研报关系；人工调整关系和手动生成/编辑政策点评通过同源 `/api/policies/*` 写 D1。页面加载和筛选不调用模型。政策资讯、关联研报与点评分别使用 `/news/[id]`、`/articles/[id]`、`/commentaries/[id]` 独立深链；政策资讯详情读取 D1 已归档的 DM 原文与政策原文链接，研报详情通过 Worker 的 `DATA` Service Binding 获取正文，点评详情只读 D1。
 
 - 交易研究工作台与授信工作台使用同一 `src/lib/workbench/WorkbenchShell.svelte`。市场热点和政策跟踪由 `src/lib/pages/` 维护单一业务组件，在工作台内使用嵌入布局；旧独立入口仅做兼容跳转。授信助手以固定根容器包裹聊天和工具栏，只有嵌套工具栏通过 portal 挂载页头，避免切换标签时遗留聊天 DOM。
@@ -47,7 +47,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 
 ## 模块数据流
 
-- 工作台装配与尚未接入生产的交易/流程范围：[交易研究工作台](TRADING_RESEARCH_WORKBENCH.md)。
+- 工作台装配、交易范围与交易流程本地进度边界：[交易研究工作台](TRADING_RESEARCH_WORKBENCH.md)。
 - 授信日报导入、自动保存、事件比较：[授信模块](modules/credit-workbench.md)。
 - 经济数据回填、增量同步、研究与周报共享读取：[研究辅助](modules/research-assistance.md)。
 - 研究资讯、研报和点评详情来源：[详情模块](modules/research-details.md)。

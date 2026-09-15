@@ -72,9 +72,9 @@ export const workbenchRoutes: Array<{
   },
   {
     id: "workflow",
-    label: "流程中心",
-    title: "流程中心",
-    context: "交易流程与授信周报流程",
+    label: "交易流程",
+    title: "交易流程",
+    context: "日内交易流程",
     icon: "workflow",
   },
   {
