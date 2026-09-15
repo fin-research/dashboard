@@ -460,7 +460,7 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
   ]);
 
   for (const view of views) {
-    assert.match(view, /SectionHeading from "\.\/SectionHeading\.svelte"/);
+    if (view !== views[4]) assert.match(view, /SectionHeading from "\.\/SectionHeading\.svelte"/);
     assert.match(view, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
     assert.match(view, /<ModuleCard/);
   }
@@ -469,7 +469,7 @@ test("市场点评、工作台与并入模块复用统一指标卡和结构组�
     assert.match(view, /Badge from "\.\/Badge\.svelte"/);
   }
   assert.match(views[4], /WorkflowCanvas/);
-  assert.doesNotMatch(views[4], /WorkflowLane|WorkflowTree|flow-lanes/);
+  assert.doesNotMatch(views[4], /WorkflowLane|WorkflowTree|flow-lanes|SectionHeading|flow-toolbar/);
   for (const view of views.slice(0, 3)) {
     assert.match(view, /MetricCard from "\.\.\/\.\.\/components\/MetricCard\.svelte"/);
   }

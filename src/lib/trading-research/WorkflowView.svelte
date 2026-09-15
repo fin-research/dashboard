@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import ModuleCard from "../../components/ModuleCard.svelte";
-  import SectionHeading from "./SectionHeading.svelte";
-  import Badge from "./Badge.svelte";
+  import { CalendarDays } from '@lucide/svelte';
+  import { portal } from '../portal';
   import WorkflowCanvas from '../trading-workflow/WorkflowCanvas.svelte';
   import WorkflowEditor from '../trading-workflow/WorkflowEditor.svelte';
   import { globalMessages } from '../global-messages';
-  import { activeTasks, configResponseSchema, configSchema, dayKey, dueReminders, emptyDay, products, nodesSchema,
+  import { configResponseSchema, configSchema, dayKey, dueReminders, emptyDay, products, nodesSchema,
     readDay, shanghaiClock, updateDay, type Product, type WorkflowConfig, type WorkflowDay, type WorkflowNode } from '../trading-workflow/model';
 
   let config = $state<WorkflowConfig | null>(null);
@@ -41,7 +41,7 @@
     finally { saving = false; }
   }
   function move(id: string, offset: { x: number; y: number }) {
-    if (editing && !saving) draft = draft.map(node => node.id === id ? { ...node, offset } : node);
+    if (editing && !saving) { draft = draft.map(node => node.id === id ? { ...node, offset } : node); selectedId = id; }
   }
   function addNode() {
     const node: WorkflowNode = { id: crypto.randomUUID(), scope: 'shared', parentId: null, kind: 'task', title: '新节点', detail: '', startTime: null, endTime: null };
@@ -61,9 +61,7 @@
   let checking = false;
   let abort: AbortController;
   const clock = $derived(shanghaiClock(now));
-  const tasks = $derived(config ? activeTasks(config.nodes, day) : []);
-  const completed = $derived(tasks.filter(node => day.completed[node.id]).length);
-  const notificationLabel = $derived(permission === 'unsupported' ? '浏览器不支持通知' : permission === 'denied' ? '通知已被阻止' : notificationsEnabled ? '关闭浏览器提醒' : '开启浏览器提醒');
+  const dateLabel = $derived(new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(now));
   function prefsKey() { return `eastmoney:trading-workflow:notifications:${encodeURIComponent(actorKey)}`; }
   function storageFailure() {
     localAvailable = false;
@@ -126,10 +124,6 @@
       if (notificationsEnabled) void remind();
     } catch { globalMessages.error('浏览器通知开启失败，请检查网站通知权限'); }
   }
-  function locate() {
-    const pending = tasks.find(node => !day.completed[node.id]);
-    if (pending) window.dispatchEvent(new CustomEvent('workflow-locate', { detail: pending.id }));
-  }
   async function remind() {
     if (!mounted || !config || checking) return;
     checking = true;
@@ -183,41 +177,38 @@
   });
 </script>
 
-<div class="tr-view-stack">
-  <SectionHeading id="workflow-day-title" title="日内交易" meta={`${clock.date} · ${clock.time}`} />
+<div class="workflow-view">
+  <div class="workflow-header" use:portal={'#tr-topbar-actions'}>
+    <time class="workflow-date" datetime={clock.date}><CalendarDays size={18} />{dateLabel}</time>
+    {#if canEdit && config}
+      <label class="edit-mode"><input type="checkbox" class="toggle toggle-primary" checked={editing} disabled={saving}
+        onchange={event => { editing ? cancelEditing() : startEditing(); event.currentTarget.checked = editing; }} />编辑模式</label>
+    {/if}
+  </div>
   {#if loading}<p role="status">正在加载交易流程…</p>
   {:else if loadError}<ModuleCard><p role="alert">{loadError}</p><button class="btn" onclick={loadConfig}>重新加载</button></ModuleCard>
   {:else if config}
-    <div class="flow-toolbar" aria-label="交易流程操作">
-      <Badge tone={completed === tasks.length ? 'success' : 'info'}>已完成 {completed} / {tasks.length}</Badge>
-      <button class="btn" onclick={locate}>定位待办</button>
-      <button class="btn" disabled={permission === 'unsupported'} onclick={toggleNotifications}>{notificationLabel}</button>
-      <button class="btn" disabled={editing} onclick={loadConfig}>刷新配置</button>
-      {#if canEdit}
-        <label class="edit-mode"><input type="checkbox" class="toggle toggle-primary" checked={editing} disabled={saving} onchange={event => { editing ? cancelEditing() : startEditing(); event.currentTarget.checked = editing; }} />编辑模式</label>
-      {/if}
-      {#if editing}
-        <button class="btn" disabled={saving} onclick={addNode}>新增节点</button>
-        <button class="btn" disabled={saving} onclick={() => draft = draft.map(({ offset, ...node }) => node)}>自动布局</button>
-        <button class="btn" disabled={saving} onclick={cancelEditing}>取消编辑</button>
-        <button class="btn btn-primary" disabled={saving} onclick={saveDraft}>{saving ? '保存中…' : '保存配置'}</button>
-      {/if}
-    </div>
     <div class="flow-workspace" class:saving>
       <WorkflowCanvas nodes={editing ? draft : config.nodes} day={displayDay} clockMinutes={clock.minutes} {editing} {selectedId}
         onSelect={id => selectedId = id} onMove={move} onComplete={complete} onBranch={setBranch} onEnable={setEnabled} onNote={note} />
-      {#if editing && selectedId}
+      {#if editing && (selectedId || !draft.length)}
         {#key selectedId}<WorkflowEditor bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
-          onClose={() => selectedId = ''} onBranch={setBranch} expanded={!!preview.branches[selectedId]} />{/key}
+          onClose={() => selectedId = ''} onBranch={setBranch} expanded={!!preview.branches[selectedId]}
+          onSave={saveDraft} onAdd={addNode} onReset={() => draft = draft.map(({ offset, ...node }) => node)}
+          notificationsEnabled={notificationsEnabled} notificationsSupported={permission !== 'unsupported'} onNotifications={toggleNotifications} />{/key}
       {/if}
     </div>
   {/if}
 </div>
 
 <style>
-  .flow-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-  .edit-mode { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-left: auto; font-size: 1rem; }
+  .workflow-view { min-width: 0; }
+  .workflow-header { display: flex; align-items: center; gap: 28px; }
+  .workflow-date { display: flex; gap: 8px; align-items: center; color: var(--tr-text); font-size: 1rem; white-space: nowrap; }
+  .workflow-date :global(svg) { color: #5b759c; }
+  .edit-mode { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 1rem; white-space: nowrap; }
   .flow-workspace { display: flex; min-width: 0; align-items: flex-start; gap: 16px; }
   .flow-workspace :global(.workflow-diagram) { flex: 1; }
   .flow-workspace.saving { pointer-events: none; }
+  @media (max-width: 720px) { .workflow-header { gap: 12px; } .workflow-date { font-size: .875rem; } }
 </style>
