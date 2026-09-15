@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { inquiryRowSchema } from './inquiries.ts';
 
 export const products = [
   { id: 'loan', label: '拆借', enabled: true, tone: 'info' },
   { id: 'reverse', label: '逆回购', enabled: true, tone: 'success' },
-  { id: 'exchange', label: '交易所逆回购', enabled: false, tone: 'warning' },
+  { id: 'exchange', label: '交易所回购', enabled: false, tone: 'warning' },
 ] as const;
 export type Product = typeof products[number]['id'];
 export type Scope = Product | 'shared';
@@ -78,11 +79,12 @@ export const daySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   enabled: z.object({ loan: z.boolean(), reverse: z.boolean(), exchange: z.boolean() }),
   completed: flags, branches: flags, notified: flags,
+  quotes: z.record(z.string(), z.array(inquiryRowSchema).max(500)).default({}),
   notes: z.record(z.string(), z.string().max(4000)).default({}),
 }).strict();
 export type WorkflowDay = z.infer<typeof daySchema>;
 export function emptyDay(date: string): WorkflowDay {
-  return { date, enabled: { loan: true, reverse: true, exchange: false }, completed: {}, branches: {}, notified: {}, notes: {} };
+  return { date, enabled: { loan: true, reverse: true, exchange: false }, completed: {}, branches: {}, notified: {}, notes: {}, quotes: {} };
 }
 export function isActive(node: WorkflowNode, nodes: WorkflowNode[], day: WorkflowDay): boolean {
   if (node.scope !== 'shared' && !day.enabled[node.scope]) return false;
@@ -96,7 +98,7 @@ export function isActive(node: WorkflowNode, nodes: WorkflowNode[], day: Workflo
   return !parent;
 }
 export function activeTasks(nodes: WorkflowNode[], day: WorkflowDay, scope?: Scope) {
-  return nodes.filter(node => node.kind === 'task' && (!scope || node.scope === scope) && isActive(node, nodes, day));
+  return nodes.filter(node => node.kind === 'task' && !isInquiry(node) && (!scope || node.scope === scope) && isActive(node, nodes, day));
 }
 export function dueReminders(nodes: WorkflowNode[], day: WorkflowDay, now: Date, channel: string) {
   const clock = shanghaiClock(now);

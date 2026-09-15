@@ -4,10 +4,19 @@ import { DatabaseSync } from 'node:sqlite';
 import { installDom } from './svelte-dom.mjs';
 import { loadWorkflowView } from './workflow-bundle.mjs';
 const window = installDom();
+// happy-dom rejects animation.finished during cancellation without the browser's
+// handled-promise behavior; observe that promise while retaining real transitions.
+const nativeAnimate = window.HTMLElement.prototype.animate;
+window.HTMLElement.prototype.animate = function (...args) {
+  const animation = nativeAnimate.apply(this, args);
+  animation.finished.catch(() => {});
+  return animation;
+};
 Object.defineProperty(globalThis, 'localStorage', { value: window.localStorage, configurable: true });
 Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
 let lockTail = Promise.resolve();
-Object.defineProperty(navigator, 'locks', { value: { request(_name, run) { const next = lockTail.then(run); lockTail = next.catch(() => {}); return next; } }, configurable: true });
+let lockGate = Promise.resolve();
+Object.defineProperty(navigator, 'locks', { value: { request(_name, run) { const next = lockTail.then(() => lockGate).then(run); lockTail = next.catch(() => {}); return next; } }, configurable: true });
 const nativeDate = Date;
 let fixed = new nativeDate('2026-09-15T11:00:00+08:00').getTime();
 class Clock extends nativeDate { constructor(...args) { super(...(args.length ? args : [fixed])); } static now() { return fixed; } }
@@ -26,6 +35,7 @@ const requests = [];
 let conflict = false;
 globalThis.fetch = async (url, options = {}) => {
   requests.push({ url, ...options });
+  if (url === '/data/chinamoney/shibor') return Response.json([{publishDate:'2026-09-15',publishedAt:'2026-09-15T11:00:00+08:00',tenor:'1W',rate:1.5}]);
   if (options.method === 'PUT') {
     if (conflict) return Response.json({error:'节点配置已被更新，请重新载入后修改'},{status:409});
     const body = JSON.parse(options.body);
@@ -42,7 +52,7 @@ const app = mount(View,{target});
 async function settle() { for(let i=0;i<12;i++){await new Promise(resolve=>setTimeout(resolve,0));flushSync();} }
 await settle();
 const button = text => [...document.querySelectorAll('button')].find(node=>node.textContent.trim() === text);
-assert.ok(document.querySelector('[aria-label="展开交易所逆回购"]'));
+assert.ok(document.querySelector('[aria-label="展开交易所回购"]'));
 assert.ok(header.querySelector('.edit-mode'));
 assert.equal(target.querySelector('.flow-toolbar'),null);
 assert.equal(target.querySelector('.svelte-flow__controls'),null);
@@ -57,7 +67,8 @@ fixed -= 30 * 60 * 1000; window.dispatchEvent(new window.Event('focus')); await 
 assert.equal(document.querySelector('.inquiry'), null);
 const originalIcon = document.querySelector('[data-workflow-node="loan-deal"] .node-symbol').innerHTML;
 assert.deepEqual([...target.querySelectorAll('[data-timeline-time]')].map(n=>n.dataset.timelineTime),['08:30','10:00','11:00','16:30']);
-assert.equal(document.querySelector('[data-workflow-product="exchange"] button').getAttribute('aria-expanded'), 'false');
+assert.equal(document.querySelector('[data-workflow-product="exchange"]'), null);
+assert.equal(document.querySelector('[data-id="product-loan"]'), null);
 assert.equal(document.querySelector('[data-workflow-node="reverse-position"]'), null);
 assert.equal(document.querySelector('[data-workflow-node="loan-deal"] input'), null, 'nodes have no checkbox controls');
 const clickNode = async id => { flushSync(() => document.querySelector(`[data-workflow-node="${id}"] .node-surface`).click()); await settle(); };
@@ -73,18 +84,50 @@ await clickNode('reverse-transfer'); await clickNode('reverse-ccdc');
 assert.equal(document.querySelector('[data-workflow-node="reverse-change"]').classList.contains('done'), true);
 await clickNode('loan-deal');
 assert.equal(document.querySelector('[data-workflow-node="loan-deal"] .node-symbol').innerHTML, originalIcon);
-await clickNode('reverse-quote');
-const quoteInput = document.querySelector('[aria-label="逆回购群价内容"]');
-flushSync(() => { quoteInput.value = '7天 1.65%，5000万元'; quoteInput.dispatchEvent(new window.Event('input', { bubbles: true })); }); await settle();
-flushSync(() => document.querySelector('[data-workflow-node="reverse-quote"] .inquiry-editor button').click()); await settle();
+await clickNode('loan-quote');
+const table = () => document.querySelector('[data-workflow-node="loan-quote"] .inquiry-table');
+assert.equal(table().querySelector('button'),null);
+assert.equal(table().querySelector('th'),null);
+assert.equal(document.querySelector('[data-workflow-node="loan-quote"] .node-surface').hasAttribute('aria-pressed'), false);
+const fill = async (field, value) => {
+  const input = table().querySelector(`.inquiry-row:last-child [data-field="${field}"]`);
+  input.focus(); flushSync(()=>{input.value=value;input.dispatchEvent(new window.Event('input',{bubbles:true}));});
+  assert.equal(document.activeElement.dataset.field, field, 'typing retains focus before async persistence');
+  await settle(); return document.activeElement;
+};
+const tabKey = async () => { const input=document.activeElement; flushSync(()=>input.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}))); await settle(); };
+await fill('counterparty','工商银行'); await tabKey();
+async function typeActive(value) { const input=document.activeElement; flushSync(()=>{input.value=value;input.dispatchEvent(new window.Event('input',{bubbles:true}));});await settle(); }
+await typeActive('张三'); await tabKey(); await typeActive('3'); await tabKey(); await typeActive('1.5'); await tabKey(); await typeActive('10'); await tabKey();
+assert.equal(document.activeElement.dataset.field,'counterparty');
+await typeActive('gsyh'); await tabKey();
+assert.equal(table().querySelectorAll('[data-field="counterparty"]')[1].value,'工商银行');
+await typeActive('zs'); await tabKey(); await tabKey(); await tabKey(); await tabKey();
 const local = JSON.parse(localStorage.getItem(dayKey('test-actor','2026-09-15')));
-assert.equal(local.completed['loan-deal'],true); assert.equal(local.completed['reverse-quote'],true);
-assert.equal(local.notes['reverse-quote'], '7天 1.65%，5000万元');
-flushSync(() => document.querySelector('[aria-label="展开交易所逆回购"]').click()); await settle();
+assert.equal(local.completed['loan-deal'],true); assert.equal(local.completed['loan-quote'],undefined);
+assert.equal(local.quotes['loan-quote'].length,2);
+assert.deepEqual(local.quotes['loan-quote'].map(({id,...row})=>row),Array(2).fill({counterparty:'工商银行',trader:'张三',tenor:'3',amount:'1.5',price:'10'}));
+assert.equal(table().querySelector('[data-field="price"]').value,'1.4000%');
+await clickNode('reverse-quote');
+const reverse = document.querySelector('[data-workflow-node="reverse-quote"] .inquiry-table');
+assert.equal(reverse.querySelector('[data-field="trader"]'),null);
+assert.equal(reverse.querySelectorAll('input').length,4);
+let releaseLock;
+lockGate = new Promise(resolve => releaseLock = resolve);
+const counterparty = reverse.querySelector('[data-field="counterparty"]');
+counterparty.focus();
+flushSync(()=>{counterparty.value='招商银行';counterparty.dispatchEvent(new window.Event('input',{bubbles:true}));});await settle();
+counterparty.blur();
+window.dispatchEvent(new window.StorageEvent('storage',{key:dayKey('test-actor','2026-09-15')}));await settle();
+assert.equal(reverse.querySelector('[data-field="counterparty"]').value,'招商银行','pending optimistic rows survive stale storage refresh after blur');
+releaseLock(); await settle();
+assert.equal(JSON.parse(localStorage.getItem(dayKey('test-actor','2026-09-15'))).quotes['reverse-quote'][0].counterparty,'招商银行');
+
+flushSync(() => document.querySelector('[aria-label="展开交易所回购"]').click()); await settle();
 assert.ok(document.querySelector('[data-workflow-node="exchange-o32"]'));
 flushSync(() => document.querySelector('[data-workflow-product="exchange"] button').click()); await settle();
 assert.equal(document.querySelector('[data-workflow-node="exchange-o32"]'), null);
-assert.equal(requests.length,1,'local interactions must never call backend');
+assert.equal(requests.filter(request => request.options?.method === 'PUT' || request.method === 'PUT').length,0,'local interactions must never write to backend');
 flushSync(()=>document.querySelector('.edit-mode input').click()); await settle();
 assert.equal(document.querySelector('.workflow-editor'), null, 'editing starts on the graph; panel opens on node click');
 await clickNode('shared-elements');
@@ -119,8 +162,8 @@ assert.equal(header.children.length,0,'header portal is cleaned on route unmount
 localStorage.setItem(dayKey('test-actor','2026-09-15'),JSON.stringify(local));
 const reloaded=mount(View,{target});await settle();
 assert.equal(document.querySelector('[data-workflow-node="loan-deal"] button').getAttribute('aria-pressed'),'true');
-await clickNode('reverse-quote');
-assert.equal(document.querySelector('[aria-label="逆回购群价内容"]').value, '7天 1.65%，5000万元');
+await clickNode('loan-quote');
+assert.equal(document.querySelector('[data-workflow-node="loan-quote"] [data-field="counterparty"]').value, '工商银行');
 for (const product of ['loan', 'reverse']) { flushSync(()=>document.querySelector(`[data-workflow-product="${product}"] button`).click()); await settle(); }
 assert.equal(document.querySelector('[data-workflow-node="shared-elements"] button').disabled, false);
 assert.equal(document.querySelector('[data-workflow-node="shared-done"] button').disabled, false);

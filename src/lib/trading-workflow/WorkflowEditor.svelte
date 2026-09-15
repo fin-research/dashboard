@@ -36,7 +36,7 @@
   <fieldset disabled={disabled} class="editor-fields">
     {#if selected}
       <label>编辑节点<select class="select" value={selectedId} onchange={event => onSelect(event.currentTarget.value)}>
-        {#each nodes as node}<option value={node.id}>{scopes.find(scope => scope.id === node.scope)?.label} · {isInquiry(node) ? '群价' : node.title}</option>{/each}
+        {#each nodes as node}<option value={node.id}>{scopes.find(scope => scope.id === node.scope)?.label} · {isInquiry(node) ? '询价' : node.title}</option>{/each}
       </select></label>
       <label>节点名称<input class="input" required maxlength="160" bind:value={selected.title} /></label>
       {#if selected.kind === 'task'}
@@ -65,7 +65,7 @@
           {#each nodes.filter(node => node.scope === selected.scope && node.kind === 'branch' && !descendants(nodes, selected.id).has(node.id)) as parent}<option value={parent.id}>{parent.title}</option>{/each}
         </select></label>
         {#if selected.kind === 'task'}
-          <label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={isInquiry(selected)} onchange={event => { if (selected) selected.inquiry = event.currentTarget.checked; }} />群价输入框</label>
+          <label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={isInquiry(selected)} onchange={event => { if (selected) selected.inquiry = event.currentTarget.checked; }} />询价输入框</label>
         {:else}<label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={expanded} onchange={event => onBranch(selectedId, event.currentTarget.checked)} />展开分支</label>{/if}
         <div class="editor-pair">
           <label>水平偏移<input class="input" type="number" min="-10000" max="10000" value={offset.x} oninput={event => setOffset('x', event.currentTarget.valueAsNumber || 0)} /></label>

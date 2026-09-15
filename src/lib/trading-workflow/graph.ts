@@ -1,9 +1,13 @@
+import type { ShiborRate } from '../../data-contracts.ts';
+import type { InquiryRow, InquiryDirectory } from './inquiries.ts';
 import type { Node, BuiltInEdge } from '@xyflow/svelte';
 import { childrenOf, descendants, isInquiry, minutes, products, type Scope, type Product, type WorkflowNode, type WorkflowDay } from './model.ts';
 
 export const NODE_WIDTH = 300;
 export type FlowData = {
-  title: string; scope: Scope; node?: WorkflowNode; members?: WorkflowNode[]; product?: Product; width: number;
+  title: string; scope: Scope; node?: WorkflowNode; members?: WorkflowNode[]; width: number;
+  rows: InquiryRow[]; directory: InquiryDirectory; rates: ShiborRate[]; date: string; now: Date;
+  writeRows: (rows: InquiryRow[]) => void; remember: (row: InquiryRow) => void;
   done?: boolean; active?: boolean; expanded?: boolean; editing: boolean; selected?: boolean;
   note?: string; measureHeight?: (height: number) => void;
   activate: () => void; writeNote: (value: string) => void; complete?: () => void;
@@ -72,9 +76,10 @@ function workflowPaths(config: WorkflowNode[]): string[][] {
 }
 
 export function nodeComplete(node: WorkflowNode, config: WorkflowNode[], day: WorkflowDay): boolean {
+  if (isInquiry(node)) return false;
   if (node.kind === 'task') return !!day.completed[node.id];
   const ids = descendants(config, node.id);
-  const tasks = config.filter(item => ids.has(item.id) && item.kind === 'task');
+  const tasks = config.filter(item => ids.has(item.id) && item.kind === 'task' && !isInquiry(item));
   return tasks.length > 0 && tasks.every(item => day.completed[item.id]);
 }
 
@@ -82,13 +87,16 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
   editing: boolean; selectedId: string; clockMinutes: number; width?: number; heights?: Record<string, number>;
   inquiries?: Record<string, boolean>; measureHeight?: (id: string, height: number) => void;
   activate: (node: WorkflowNode, members: WorkflowNode[]) => void; toggleProduct: (product: Product) => void;
+  rows?: (id: string, rows: InquiryRow[]) => void; directory?: InquiryDirectory; rates?: ShiborRate[]; now?: Date; remember?: (row: InquiryRow) => void;
   note: (id: string, value: string) => void; complete?: (members: WorkflowNode[]) => void;
 }): FlowGraph {
-  const width = Math.max(1040, options.width ?? 1040);
+  const enabled = products.filter(product => day.enabled[product.id]);
+  const count = Math.max(1, enabled.length);
+  const width = Math.max(170 + count * 440, options.width ?? 1040);
   const graph: FlowGraph = { nodes: [], edges: [], bases: {}, timeline: [], height: 0, width };
-  const areaLeft = 134, areaRight = width - 36, column = (areaRight - areaLeft) / products.length;
-  const nodeWidth = Math.min(NODE_WIDTH, column - 36), center = (areaLeft + areaRight - nodeWidth) / 2;
-  const laneX = (scope: Scope) => areaLeft + products.findIndex(product => product.id === scope) * column + (column - nodeWidth) / 2;
+  const areaLeft = 134, areaRight = width - 24, column = (areaRight - areaLeft) / count;
+  const nodeWidth = column - 36, center = (areaLeft + areaRight - nodeWidth) / 2;
+  const laneX = (scope: Scope) => areaLeft + Math.max(0, enabled.findIndex(product => product.id === scope)) * column + 18;
   const allGroups = workflowGroups(config);
   const byId = new Map(allGroups.flatMap(group => group.map(node => [node.id, group] as const)));
   const expanded = (group: WorkflowNode[]) => group.some(node => day.branches[node.id]);
@@ -103,11 +111,7 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
   const incoming = new Map<string, Set<string>>(groups.map(group => [group[0]!.id, new Set()]));
   const paths = workflowPaths(config);
   products.forEach((product, index) => {
-    const id = `product-${product.id}`, x = laneX(product.id), enabled = day.enabled[product.id];
-    graph.nodes.push({ id, type: 'workflow', position: { x, y: 24 }, width: nodeWidth, measured: { width: nodeWidth, height: 54 }, draggable: false, focusable: false, connectable: false,
-      data: { product: product.id, title: product.label, width: nodeWidth, scope: product.id, expanded: enabled, editing: options.editing,
-        activate: () => options.toggleProduct(product.id), writeNote: () => {} } });
-    let previous = enabled ? id : '';
+    let previous = '';
     for (const sourceId of paths[index]!) {
       const target = visible.get(sourceId);
       if (!target) continue;
@@ -130,16 +134,17 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
     const id = members[0]!.id, scope = members.length > 1 ? 'shared' : node.scope;
     const x = scope === 'shared' ? center : laneX(scope);
     const predecessors = [...incoming.get(id)!].map(id => graph.nodes.find(node => node.id === id)!);
-    const y = Math.max(106, ...predecessors.map(node => (graph.bases[node.id]?.y ?? node.position.y) + node.measured!.height! + 28));
+    const y = Math.max(80, ...predecessors.map(node => (graph.bases[node.id]?.y ?? node.position.y) + node.measured!.height! + 28));
     graph.bases[id] = { x, y };
     const offset = members[0]!.offset;
     const position = { x: x + (offset?.x ?? 0), y: y + (offset?.y ?? 0) };
     const open = isInquiry(node) ? !!options.inquiries?.[id] : expanded(members);
-    const estimate = 52 + (node.detail ? Math.ceil(node.detail.length / Math.max(12, (nodeWidth - 65) / 15)) * 23 : 0) + (isInquiry(node) && open ? 142 : 0);
+    const estimate = 52 + (node.detail ? Math.ceil(node.detail.length / Math.max(12, (nodeWidth - 65) / 15)) * 23 : 0) + (isInquiry(node) && open ? 56 + (day.quotes[node.id]?.length ?? 0) * 39 : 0);
     const height = options.heights?.[id] ?? estimate;
     const done = members.every(item => nodeComplete(item, config, day));
     graph.nodes.push({ id, type: 'workflow', position, width: nodeWidth, measured: { width: nodeWidth, height }, focusable: false, draggable: options.editing, connectable: false,
-      data: { node, members, title: isInquiry(node) ? '群价' : node.title, width: nodeWidth, scope, active: true, done, expanded: open,
+      data: { node, members, rows: day.quotes[node.id] ?? [], directory: options.directory ?? { counterparties: [], traders: [] }, rates: options.rates ?? [], date: day.date, now: options.now ?? new Date(),
+        writeRows: rows => options.rows?.(node.id, rows), remember: row => options.remember?.(row), title: isInquiry(node) ? '询价' : node.title, width: nodeWidth, scope, active: true, done, expanded: open,
         editing: options.editing, selected: members.some(item => item.id === options.selectedId),
         measureHeight: height => options.measureHeight?.(id, height), note: day.notes[node.id] ?? '',
         activate: () => options.activate(node, members), complete: () => options.complete?.(members), writeNote: value => options.note(node.id, value) } });

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { shiborRatesSchema, type ShiborRate } from '../../data-contracts';
+  import { blankDirectory, directoryKey, directorySchema, remember, type InquiryDirectory, type InquiryRow } from '../trading-workflow/inquiries';
   import { onMount } from 'svelte';
   import ModuleCard from "../../components/ModuleCard.svelte";
   import { Clock } from '@lucide/svelte';
@@ -12,6 +14,10 @@
 
   let config = $state<WorkflowConfig | null>(null);
   let actorKey = '';
+  let directory = $state<InquiryDirectory>(blankDirectory());
+  let rates = $state<ShiborRate[]>([]);
+  let fetchingRates = false;
+  let nextRateCheck = 0;
   let canEdit = $state(false);
   let now = $state(new Date());
   let day = $state<WorkflowDay>(emptyDay(shanghaiClock().date));
@@ -58,6 +64,37 @@
     if (editing) preview.enabled[product] = value; else enable(product, value);
   }
   function note(id: string, value: string) { void change(state => { state.notes[id] = value; }); }
+  function quoteRows(id: string, rows: InquiryRow[]) { void change(state => { state.quotes[id] = rows; }); }
+  function restoreDirectory() {
+    try { const raw = localStorage.getItem(directoryKey(actorKey)); directory = raw ? directorySchema.parse(JSON.parse(raw)) : blankDirectory(); }
+    catch { globalMessages.warning('询价名单读取失败，当前名单仅在本页保留', { key: 'inquiry-directory' }); }
+  }
+  function rememberRow(row: InquiryRow) {
+    const write = () => {
+      try {
+        const raw = localStorage.getItem(directoryKey(actorKey));
+        directory = remember(raw ? directorySchema.parse(JSON.parse(raw)) : directory, row);
+        localStorage.setItem(directoryKey(actorKey), JSON.stringify(directory));
+      } catch { directory = remember(directory, row); globalMessages.warning('询价名单保存失败', { key: 'inquiry-directory' }); }
+    };
+    directory = remember(directory, row);
+    if (navigator.locks) void navigator.locks.request(directoryKey(actorKey), write); else write();
+  }
+  async function refreshRates() {
+    const current = shanghaiClock();
+    if (!mounted || fetchingRates || document.visibilityState === 'hidden' || current.minutes < 660 || Date.now() < nextRateCheck) return;
+    fetchingRates = true;
+    nextRateCheck = Date.now() + 15_000;
+    try {
+      const response = await fetch('/data/chinamoney/shibor', { cache: 'no-store', signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) });
+      if (!response.ok) throw new Error('SHIBOR 读取失败');
+      const loaded = shiborRatesSchema.parse(await response.json());
+      if (!mounted || shanghaiClock().date !== current.date) return;
+      rates = loaded;
+      if (loaded.length === 8 && loaded.every(rate => rate.publishDate === current.date)) nextRateCheck = Date.now() + 300_000;
+    } catch { if (mounted) globalMessages.warning('SHIBOR 暂不可用，保留 BP 报价', { key: 'inquiry-shibor' }); }
+    finally { fetchingRates = false; }
+  }
   let permission = $state<NotificationPermission | 'unsupported'>('unsupported');
   let notificationsEnabled = $state(false);
   let mounted = false;
@@ -95,7 +132,7 @@
       const data = configResponseSchema.parse(await response.json());
       if (!mounted) return;
       config = { version: data.version, nodes: data.nodes }; actorKey = data.actorKey; canEdit = data.canEdit;
-      restore(shanghaiClock().date);
+      restore(shanghaiClock().date); restoreDirectory(); void refreshRates();
       try { notificationsEnabled = localStorage.getItem(prefsKey()) === 'true'; } catch { storageFailure(); }
       void remind();
     } catch (error) { if (mounted) loadError = error instanceof Error ? error.message : '交易流程加载失败'; }
@@ -168,13 +205,14 @@
     const timer = setInterval(() => {
       now = new Date();
       if (config && day.date !== clock.date) restore(clock.date);
-      void remind();
+      void remind(); void refreshRates();
     }, 1000);
     function sync(event: StorageEvent) {
+      if (event.key === directoryKey(actorKey) || event.key === null) restoreDirectory();
       if (event.key === dayKey(actorKey, shanghaiClock().date) || event.key === null) restore(shanghaiClock().date);
       if (event.key === prefsKey() || event.key === null) { try { notificationsEnabled = localStorage.getItem(prefsKey()) === 'true'; } catch { storageFailure(); } }
     }
-    function wake() { now = new Date(); void remind(); }
+    function wake() { now = new Date(); void remind(); void refreshRates(); }
     window.addEventListener('storage', sync); window.addEventListener('focus', wake); document.addEventListener('visibilitychange', wake);
     return () => { mounted = false; abort.abort(); clearInterval(timer); window.removeEventListener('storage', sync); window.removeEventListener('focus', wake); document.removeEventListener('visibilitychange', wake); };
   });
@@ -193,7 +231,7 @@
   {:else if config}
     <div class="flow-workspace" class:saving>
       <WorkflowCanvas nodes={editing ? draft : config.nodes} day={displayDay} clockMinutes={clock.minutes} {editing} {selectedId}
-        onSelect={id => selectedId = id} onMove={move} onComplete={complete} onBranch={setBranch} onEnable={setEnabled} onNote={note} />
+        onSelect={id => selectedId = id} onMove={move} onComplete={complete} onBranch={setBranch} onEnable={setEnabled} onNote={note} onRows={quoteRows} onRemember={rememberRow} {directory} {rates} {now} />
       {#if editing && (selectedId || !draft.length)}
         {#key selectedId}<WorkflowEditor bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
           onClose={() => selectedId = ''} onBranch={(id, value) => setBranch([id], value)} expanded={!!preview.branches[selectedId]}

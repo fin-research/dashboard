@@ -240,3 +240,9 @@ export type FavoriteQuote = z.infer<typeof favoriteQuoteSchema>;
 export type BondInfo = z.infer<typeof bondInfoSchema>;
 export type IndustrySnapshot = z.infer<typeof industrySnapshotSchema>;
 export type StockSummary = z.infer<typeof stockSummarySchema>;
+
+export const shiborRatesSchema = z.array(z.object({
+  publishDate: z.string().date(), publishedAt: z.string().datetime({ offset: true }),
+  tenor: z.enum(['O/N', '1W', '2W', '1M', '3M', '6M', '9M', '1Y']), rate: z.number().finite(),
+})).max(8);
+export type ShiborRate = z.infer<typeof shiborRatesSchema>[number];
