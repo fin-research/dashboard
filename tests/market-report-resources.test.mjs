@@ -203,3 +203,37 @@ test("东财债券零 Bid/Ofr 归一为空但债券仍保留", () => {
   assert.equal(report.inventory_bonds[0].bid_yield, null);
   assert.equal(report.inventory_bonds[0].ofr_yield, null);
 });
+
+test("东财存量债剔除净价误填的成交收益率及利差，并仅回退有效成交", () => {
+  const makeReport = (tradeEntryPrice, tradeYield = null) => buildReportData({
+    reportDate: "2026-09-15", generatedAt: "2026-09-15T15:00:00+08:00",
+    previousPrimaryDate: "2026-09-14",
+    omo: [], dr: [], dibo: [], governmentBonds: [], futures: [],
+    stock: { title: "收评", time: null, paragraphs: [] }, margin: [],
+    industry: { dataDate: "2026-09-15", equities: [], industries: [],
+      turnoverYi: null, turnoverChangeYi: null, tradingDates: [] },
+    primary: [],
+    todayTrades: [{ bondUniCode: "1000974894", remainingTenor: "3Y", tradeYield, cbYte: 1.7124 }],
+    favoriteQuotes: [{ bondUniCode: "1000974894", remainingTenor: "3Y",
+      remainingTenorDay: 1095, cbYield: 1.7124, tradeEntryPrice,
+      tradeYieldSubCb: -1.43, bidYield: 1.72, ofrYield: 1.7 }],
+    bondInfos: [{ bondUniCode: "1000974894", bondShortName: "26东财01",
+      comShortName: "东方财富证券", bondType: 37, bondOfferingType: 1,
+      sciTechInnoBondStatus: 0 }],
+  }).inventory_bonds[0];
+
+  for (const invalid of [100, 99.8, 101, 0, -1]) {
+    const bond = makeReport(invalid, invalid);
+    assert.equal(bond.trade_yield, null);
+    assert.equal(bond.trade_spread_bp, null);
+    assert.equal(bond.valuation, 1.7124);
+    assert.equal(bond.bid_yield, 1.72);
+    assert.equal(bond.ofr_yield, 1.7);
+  }
+  const fallback = makeReport(100, 1.7);
+  assert.equal(fallback.trade_yield, 1.7);
+  assert.equal(fallback.trade_spread_bp, -1.24);
+  const normal = makeReport(1.6981, 100);
+  assert.equal(normal.trade_yield, 1.6981);
+  assert.equal(normal.trade_spread_bp, -1.43);
+});

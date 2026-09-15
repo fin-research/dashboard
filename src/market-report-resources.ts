@@ -371,16 +371,27 @@ function normalizeInventory(
     const valuation = toFloat(row.cbYield);
     if (tenorYears === null || valuation === null) continue;
     const [bidYield, ofrYield] = quoteYields(row);
+    // Entry prices can contain a net price (e.g. 100) instead of a yield.
+    // Reject nonpositive values and deviations over 500 bp for inventory bonds.
+    const validTradeYield = (value: unknown): number | null => {
+      const parsed = positiveYield(value);
+      return parsed !== null && Math.abs(parsed - valuation) <= 5 ? parsed : null;
+    };
+    const quoteTradeYield = validTradeYield(row.tradeEntryPrice);
+    const tradeYield = quoteTradeYield ?? validTradeYield(
+      tradeYieldByCode.get(String(row.bondUniCode)),
+    );
     result.push({
       bond_name: String(row.bondShortName ?? "--").trim(),
       tenor_label: String(row.remainingTenor ?? ""),
       tenor_years: tenorYears,
       valuation,
-      trade_yield:
-        toFloat(row.tradeEntryPrice) ??
-        tradeYieldByCode.get(String(row.bondUniCode)) ??
-        null,
-      trade_spread_bp: toFloat(row.tradeYieldSubCb),
+      trade_yield: tradeYield,
+      trade_spread_bp: tradeYield === null
+        ? null
+        : quoteTradeYield !== null
+          ? toFloat(row.tradeYieldSubCb)
+          : Math.round((tradeYield - valuation) * 100 * 1e6) / 1e6,
       bid_yield: bidYield,
       ofr_yield: ofrYield,
     });
