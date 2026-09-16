@@ -14,18 +14,21 @@ pnpm dev
 - `pnpm dev` 仍使用本地 D1，不自动同步远端 D1 数据。
 - 只有明确需要热点证据时运行 `pnpm db:sync:remote`。本地模型请求仍会产生外部调用。
 
-## 默认验证
+## 默认验证与合并
 
-```bash
-pnpm typecheck
-pnpm test
-pnpm build
-git diff --check
-```
+单元测试、浏览器组件集成测试和构建验收统一交给 GitHub Actions，本地不再运行 `pnpm test*`、Playwright、类型检查或重复构建验收；用户明确要求本地排障时例外。本地完成修改、审阅差异和 `git diff --check` 后进入交付流程。
 
-`pnpm build` 同时执行 Svelte 类型检查、Worker 类型检查和生产构建。UI、全局样式、共享组件和图表变更默认加跑 `pnpm test:visual`；截图基线、覆盖范围与更新规则见 [TESTING](TESTING.md)。只有实际运行后才声明视觉验收。
+1. 主代理修改代码并划定本任务文件，每次派一个新的子代理负责提交、推送任务分支和创建/更新 PR；禁止直接推送 `main`。
+2. 每次分支 push 和 PR 更新触发 `.github/workflows/tests.yml` 的 `Dashboard CI`，依次执行 Python 测试、Node 单元/契约测试与覆盖率、`pnpm build`（含 Svelte/Worker 类型检查）、Playwright 截图比较与浏览器交互、`git diff --check`。所有改动均运行完整检查，不按路径跳过。
+3. 子代理等待当前提交的 push/PR 运行结束，核对 PR 最新 head SHA、check 名称、结论与运行链接。失败、取消、跳过或尚未完成均不能作为通过；返回失败日志，由主代理修复并重新委派推送和核验。
+4. `main` ruleset 要求 PR 和 GitHub Actions 来源的 `Dashboard CI`，分支必须基于最新 `main` 通过检查；不要求额外人工批准，不设置管理员或应用 bypass，禁止删除/强推。配置源为 `.github/main-ruleset.json`；修改此文件不会自动修改 GitHub 规则，须使用仓库 rulesets API 应用并读回核验。
+5. CI 通过且交付范围允许合并时，子代理通过普通 PR 合并（禁止 `--admin`），核对合并提交、`main` CI 和 Cloudflare 构建状态。报告记录 SHA 与实际运行结果；CI 成功不代表生产鉴权或全部路由 E2E 已验收。
+
+截图基线、覆盖范围与候选生成规则见 [TESTING](TESTING.md)。`Visual baseline candidates` 只生成待审候选，不能替代 `Dashboard CI`。
 
 ## 专项验证
+
+下列测试也以 CI 为执行环境；涉及真实数据、权限或线上服务的专项验证按任务单独安排，不因常规 CI 通过而省略或声称通过。
 
 - 报告口径：运行 `report-view`、`text-report`、`primary-issues` 相关测试，并核对视觉/文字共用字段。
 - 热点：运行热点、快照、AI Gateway 测试；必要时在本地 D1 请求 GET/POST。
@@ -46,7 +49,7 @@ git diff --check
 ## 发布
 
 - `pnpm worker:dev` 用于构建后本地 Worker 检查。
-- 默认将验证通过的变更推送 GitHub `main`，由 Cloudflare Git 自动构建部署 `eastmoney-dashboard`；核对对应提交的构建状态和线上受影响路由。
+- 默认将通过必需 CI 的 PR 合并到 GitHub `main`，由 Cloudflare Git 自动构建部署 `eastmoney-dashboard`；核对对应提交的构建状态和线上受影响路由。
 - 自动部署不可用、失败或有其他必要时，可执行 `pnpm worker:deploy` 手动部署同一份已验证代码。自动构建与手动部署全程无需再次向用户申请授权；不得覆盖其他任务尚未集成的改动。
 - JWT、Auth0、会话、角色配置及其 Secret 由 Gateway 维护；Dashboard 只需要 `IDENTITY` Service Binding。新建或变更绑定须先部署提供对应 entrypoint 的 Gateway。
 - Gateway 变更的发布顺序见 [Gateway DEVELOPMENT](../../gateway/docs/DEVELOPMENT.md)。不能恢复本 Worker 的公网 route、workers.dev、preview 或旧 Access 开关。

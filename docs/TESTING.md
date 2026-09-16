@@ -1,13 +1,15 @@
 # Dashboard 测试与视觉回归
 
-测试取舍遵循[项目组测试规范](../../eastmoney/docs/TESTING.md)。以下为 2026-09-16 本地离线审计；覆盖率只代表注明的执行范围。
+测试取舍遵循[项目组测试规范](../../eastmoney/docs/TESTING.md)。自 2026-09-16 起，日常单元、浏览器测试和构建验收只在 GitHub CI 执行；本地不重复运行，用户明确要求本地排障时例外。下方审计记录保留历史执行环境，覆盖率只代表注明的执行范围。
 
-## 命令
+## CI 命令
+
+每次分支推送和 PR 更新运行 `Dashboard CI`，包括以下测试与生产构建（含类型检查）。`test:coverage` 已运行完整 Node 测试集，不再重复调用 `test`。本地可下载 CI 证据并使用报告查看命令；推送、CI 等待与核验由子代理负责，详见 [DEVELOPMENT](DEVELOPMENT.md#默认验证与合并)。
 
 ```bash
-pnpm test
 pnpm test:coverage
 pnpm test:python
+pnpm build
 pnpm exec playwright install chromium
 pnpm test:visual
 pnpm test:visual:report
@@ -21,13 +23,13 @@ pnpm test:visual:report
 
 当前场景：门户、交易总览与管理、交易流程及展开/编辑态、授信总览/日历/周报/失败态、研究辅助、二级池非空与空态、市场点评、融资时点/时段控件及重置，融资择时非空报告，以及 Maia 多选、弹窗、日历筛选与热点键盘交互。桌面 1440×900、手机 390×844 都运行。固定夹具覆盖实际图表与表格，不访问真实业务网络；未注册请求与浏览器异常会失败。
 
-默认命令只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。新增或有意改变页面时运行：
+默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。新增或有意改变页面时，推送任务分支后手动触发独立候选 workflow：
 
 ```bash
-pnpm test:visual:update
+gh workflow run visual-baselines.yml --ref <task-branch>
 ```
 
-基线首次生成或有意改变设计时核对预期后提交；日常改代码直接运行 `test:visual`，不需要每次人工或 AI 看图。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。基线按平台和视口分目录；macOS 本机与 CI 使用 macOS 26/ARM64 与同一锁定浏览器，仍因系统字体版本不同分为 `darwin` 与 `macos-ci` 两套基线。CI 基线仅通过手动 workflow_dispatch 的 `update_visual_baselines` 生成候选并下载核对后提交；普通 push/PR 永不更新。系统字体/渲染版本变化可能需要在目标环境重新确认基线，不把跨平台差异当作业务回归。CI 运行覆盖率、构建及视觉测试并保存失败证据，首次远端执行结果必须单独确认。
+下载 `visual-baseline-candidates` artifact，核对预期后只提交有意变化的截图，再推送并等待普通 `Dashboard CI` 比较通过；候选任务成功不构成验收。日常比较由每次 push/PR 自动完成，不需要每次人工或 AI 看图。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。保留历史 `darwin` 基线；日常只维护 macOS 26/ARM64、锁定 Chromium 的 `macos-ci` 基线，不要求本地生成。普通 push/PR 和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。系统字体/渲染版本变化须在 CI 重新确认基线。CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
 
 ## 审计与替换
 
