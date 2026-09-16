@@ -135,24 +135,9 @@
 - Choice 原始“核心 CPI（上年同月=100）”在前端减 100 展示同比；10Y-2Y 原始百分点在前端乘 100 展示 bp。其他指标不做口径换算。
 - Choice EDB 按指标代码计次，不按批量 HTTP 请求计次；页面挂载、刷新和重试均只读 Neon，消耗 0 次 Choice EDB 额度。
 
-首次建表及以后人工更新：
 
-```bash
-pnpm edb:db:migrate
-pnpm edb:update -- --apply --full
-```
+经济指标的采集目录、回填命令、每日 Cron 和 Workflow 重试由 [Data 经济指标同步](../../data/docs/modules/economic-indicator-sync.md) 维护。Dashboard 只读同一张 `public.edb`。
 
-`edb:update` 默认使用生产 Data API，可通过 `DATA_API_BASE_URL` 或 `DATA_PROXY_TARGET` 覆盖；命令不自动重试，缺少 `--apply` 会在网络和数据库操作前退出。`--full` 从 1899-01-01 查询 Choice，并完整分页 DM 历史，在单事务内只替换本次 54 项唯一指标；数据库以指标与观测期作为记录主键，同时保存真实发布日期供页面展示。负债周报只读同一张 `public.edb`，不再在生成周报时单独调用 Choice EDB。
-
-线上 Cron 使用 `0 16 * * *`（Cloudflare Cron 为 UTC，即北京时间每日 00:00）。Cron 只幂等创建 `economic-indicator-sync` Workflow 实例，实例 ID 为 `economic-indicator-sync-<scheduledTime>`；Cron 投递和 Workflow 步骤均不自动重试，Choice EDB、DM 三个资金利率和 Neon 写入任一步失败都会记录实例 ID、步骤和错误并立即结束，需人工从 Workflow 控制台或 Wrangler 重启。成功实例保留 30 天，失败实例保留 90 天，可查看步骤、错误和重启位置。它只做增量 upsert：Choice 普通日频/不定期回看 14 天，负债周报日频和月频回看 400 天，季频回看 800 天；DM 三个资金利率各取最新一页。负债周报序列因此可由首次增量运行补齐年度区间；全历史下载和分页绝不放入 Worker 定时任务。
-
-运维排查与人工重跑：
-
-```bash
-pnpm exec wrangler workflows instances list economic-indicator-sync
-pnpm exec wrangler workflows instances describe economic-indicator-sync <instance-id>
-pnpm exec wrangler workflows instances restart economic-indicator-sync <instance-id>
-```
 
 尚未接入模块的首期接口建议：
 
