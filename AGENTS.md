@@ -44,7 +44,8 @@
 - 不手动编辑生成文件 `worker-configuration.d.ts`；绑定变化使用 `pnpm worker:typegen`。
 - `pnpm dev` 不自动同步远程 D1。只有任务明确需要本地证据时才运行 `pnpm db:sync:remote`。
 - 保留用户已有改动，不做无关重构，不通过删除测试或关闭检查掩盖错误。
-- 默认验收为 `pnpm typecheck`、`pnpm test`、`pnpm build`、`git diff --check`；UI/样式/组件/图表变更加跑 `pnpm test:visual`。测试规范化任务同时运行 `pnpm test:coverage`。未实际执行浏览器或截图检查时，不得声明视觉验收通过。
+- 默认验收统一在 GitHub Actions 执行：每次分支推送和 PR 更新必须通过 `Dashboard CI`（Python、Node 单元/覆盖率、类型检查、构建、Playwright 浏览器组件集成测试及截图比较）。本地不运行这些测试或重复构建验收，只做改动审阅与 `git diff --check`；用户明确要求本地排障时例外。未实际通过的 CI 不得声明验收通过。
+- 每次改完代码后派一个新的子代理负责提交/推送任务分支、创建或更新 PR、等待并核对当前提交的 CI；推送与 CI 核验属于子代理执行职责。子代理不修改业务代码，失败时返回运行链接和日志，由主代理修复后重新委派。禁止直接推送 `main` 或绕过必需检查；完整流程见 [DEVELOPMENT](docs/DEVELOPMENT.md)。
 
 ## Commands
 
@@ -61,7 +62,7 @@
 - Neon migration：`pnpm bond:db:migrate`
 - 融资择时 Neon migration：`pnpm financing-model:db:migrate`
 - 台账回填盘点：`pnpm bond:db:backfill`；只有显式增加 `--apply` 才写入
-- 部署：验证通过后推送 GitHub `main`，由 Cloudflare Git 自动构建部署；必要时可执行 `pnpm worker:deploy` 手动部署。两种方式均无需再次向用户申请授权；部署后核对线上版本和受影响路由。
+- 部署：PR 通过 GitHub 必需检查后合并到 `main`，由 Cloudflare Git 自动构建部署；必要时可执行 `pnpm worker:deploy` 手动部署同一已验证提交。两种方式均无需再次向用户申请授权；部署后核对线上版本和受影响路由。
 
 ## Context Routing
 

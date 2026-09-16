@@ -1,15 +1,11 @@
-name: Tests and visual regression
+name: Generate candidate visual baselines
 on:
-  pull_request:
-  push:
-    branches: ['**']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  test:
-    name: Dashboard CI
-    # Match the committed native macOS baselines. No containers or login secrets.
+  visual-baseline-candidates:
+    name: Visual baseline candidates
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -19,20 +15,13 @@ jobs:
           node-version: '24'
       - run: npm install --global pnpm@10.33.2
       - run: pnpm install --frozen-lockfile
-      - uses: astral-sh/setup-uv@v6
-      - run: pnpm test:python
-      - run: pnpm test:coverage
-      - run: pnpm build
       - run: pnpm exec playwright install chromium
-      - name: Compare visual baselines
-        run: pnpm test:visual
-      - run: git diff --check
+      - run: pnpm test:visual:update
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-evidence
+          name: visual-baseline-candidates
           path: |
-            coverage/
             playwright-report/
             test-results/
             tests/visual/__screenshots__/macos-ci/
