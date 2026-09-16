@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockResources } from './fixtures.mjs';
+import { VERTICAL_GAP } from '../../src/lib/trading-workflow/graph.ts';
 
 let errors, requests;
 test.beforeEach(async ({ page }) => {
@@ -59,6 +60,14 @@ test('workflow expands a branch and opens the real editor', async ({ page }) => 
   await expect(page.getByRole('complementary', { name: '流程展开与折叠' }).getByRole('button')).toHaveCount(3);
   await page.getByRole('button', { name: '展开交易所回购', exact: true }).click();
   await expect(page.locator('[data-workflow-node="exchange-o32"]')).toBeVisible();
+  // The transfer title wraps after the lane opens. Wait for ResizeObserver's
+  // measured height to reach the graph before capturing downstream nodes.
+  await page.evaluate(() => document.fonts.ready);
+  await expect.poll(() => page.evaluate(() => {
+    const transfer = document.querySelector('[data-workflow-node="exchange-transfer"]').getBoundingClientRect();
+    const sign = document.querySelector('[data-workflow-node="exchange-sign"]').getBoundingClientRect();
+    return Math.round(sign.top - transfer.top) - Math.round(transfer.height);
+  })).toBe(VERTICAL_GAP);
   await screenshot(page, 'workflow-expanded');
   await page.getByRole('checkbox', { name: '编辑模式' }).check();
   await page.locator('[data-workflow-node="shared-elements"] .node-surface').click();
