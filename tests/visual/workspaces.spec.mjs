@@ -85,12 +85,11 @@ test('workflow branches expand to the right without displacing the main path', a
   await trigger.locator('.node-surface').click();
   const child = page.locator('[data-workflow-node="reverse-position"]');
   await expect(child).toBeVisible();
-  const positions = await page.evaluate(() => {
+  await expect.poll(() => page.evaluate(() => {
     const rect = id => document.querySelector(`[data-workflow-node="${id}"]`).getBoundingClientRect();
     const a = rect('reverse-change'), b = rect('reverse-position');
-    return { right: a.right, childLeft: b.left };
-  });
-  expect(positions.childLeft).toBeGreaterThan(positions.right);
+    return b.left - a.right;
+  })).toBeGreaterThan(0);
   const after = await next.evaluate(element => element.closest('.svelte-flow__node').style.transform);
   expect(after.split(',')[1]).toBe(before.split(',')[1]);
   await screenshot(page, 'workflow-branch');
