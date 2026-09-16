@@ -21,6 +21,7 @@ export const nodeSchema = z.object({
   endTime: timeSchema.nullable(),
   offset: z.object({ x: z.number().finite().min(-10000).max(10000), y: z.number().finite().min(-10000).max(10000) }).strict().optional(),
   inquiry: z.boolean().optional(),
+  icon: z.enum(['file-text', 'message-square', 'git-branch', 'landmark', 'clock', 'send', 'clipboard-check', 'shield-check', 'banknote', 'wallet', 'building-2', 'calendar-clock', 'list-checks', 'check-check']).optional(),
 }).strict();
 export type WorkflowNode = z.infer<typeof nodeSchema>;
 export const nodesSchema = z.array(nodeSchema).max(150).superRefine((nodes, ctx) => {
@@ -61,6 +62,14 @@ export function descendants(nodes: WorkflowNode[], id: string): Set<string> {
   const result = new Set([id]);
   for (let depth = 0; depth < 5; depth++) for (const node of nodes) if (node.parentId && result.has(node.parentId)) result.add(node.id);
   return result;
+}
+/** Promote direct children at the removed node's position, retaining descendants. */
+export function removeNode(nodes: WorkflowNode[], id: string): WorkflowNode[] {
+  const removed = nodes.find(node => node.id === id);
+  if (!removed) return nodes;
+  const children = childrenOf(nodes, removed.scope, id);
+  return nodes.filter(node => node.parentId !== id).flatMap(node => node.id === id
+    ? children.map(child => ({ ...child, parentId: removed.parentId })) : [node]);
 }
 export function moveNode(nodes: WorkflowNode[], id: string, direction: -1 | 1): WorkflowNode[] {
   const current = nodes.find(node => node.id === id);

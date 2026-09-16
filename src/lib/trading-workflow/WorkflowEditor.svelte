@@ -5,11 +5,12 @@
   import { Input } from "$lib/components/ui/input/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { workflowGroups } from './graph';
+  import { nodeIcon, workflowIcons } from './icons';
   import { onMount } from 'svelte';
   import { descendants, isInquiry, products, type Scope, type WorkflowNode } from './model';
-  let { nodes = $bindable(), selectedId, disabled, onSelect, onClose, onBranch, expanded, onSave, onAdd, onReset, notificationsEnabled, notificationsSupported, onNotifications }: {
+  let { nodes = $bindable(), selectedId, disabled, onSelect, onClose, onBranch, expanded, onSave, onDelete, onAdd, onReset, notificationsEnabled, notificationsSupported, onNotifications }: {
     nodes: WorkflowNode[]; selectedId: string; disabled: boolean; onSelect: (id: string) => void;
-    onSave: () => void; onAdd: () => void; onReset: () => void; notificationsEnabled: boolean; notificationsSupported: boolean; onNotifications: () => void;
+    onDelete: (id: string) => void; onSave: () => void; onAdd: () => void; onReset: () => void; notificationsEnabled: boolean; notificationsSupported: boolean; onNotifications: () => void;
     onClose: () => void; onBranch: (id: string, value: boolean) => void; expanded: boolean;
   } = $props();
   const selected = $derived(nodes.find(node => node.id === selectedId));
@@ -20,12 +21,12 @@
     const next = { ...offset, [axis]: value };
     nodes = nodes.map(node => ids.has(node.id) ? { ...node, offset: next } : node);
   }
-  const scopes = [{ id: 'shared', label: '日内协同' }, ...products];
+  const scopes = [{ id: 'shared', label: '共通节点' }, ...products];
   let panel: HTMLElement;
   onMount(() => panel.querySelector<HTMLInputElement>('input')?.focus());
   function remove(node: WorkflowNode) {
-    if (!window.confirm(`删除“${node.title}”及其子节点？`)) return;
-    const ids = descendants(nodes, node.id); nodes = nodes.filter(item => !ids.has(item.id)); onClose();
+    if (!window.confirm(`删除“${node.title}”？子节点将自动接上。`)) return;
+    onDelete(node.id);
   }
   function addChild(node: WorkflowNode) {
     const child: WorkflowNode = { id: crypto.randomUUID(), scope: node.scope, kind: 'task', parentId: node.kind === 'branch' ? node.id : node.parentId, title: '新节点', detail: '', startTime: null, endTime: null };
@@ -44,13 +45,18 @@
         {#each nodes as node}<option value={node.id}>{scopes.find(scope => scope.id === node.scope)?.label} · {isInquiry(node) ? '询价' : node.title}</option>{/each}
       </NativeSelect></label>
       <label>节点名称<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} required maxlength={160} bind:value={selected.title} /></label>
+      <fieldset class="icon-options"><legend>节点图标</legend>
+        {#each Object.entries(workflowIcons) as [value, item]}
+          <button type="button" aria-label={item.label} aria-pressed={nodeIcon(selected) === value} onclick={() => { if (selected) selected.icon = value as NonNullable<WorkflowNode['icon']>; }}><item.component size={20} aria-hidden="true" /></button>
+        {/each}
+      </fieldset>
       {#if selected.kind === 'task'}
         <div class="editor-pair">
           <label>开始 / 提醒<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} type="time" value={selected.startTime ?? ''} oninput={event => { if (selected) selected.startTime = event.currentTarget.value || null; }} /></label>
           <label>结束<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} type="time" value={selected.endTime ?? ''} oninput={event => { if (selected) selected.endTime = event.currentTarget.value || null; }} /></label>
         </div>
       {/if}
-      <label>所属流程<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} value={selected.scope} onchange={(event) => {
+      <label>节点归属<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} value={selected.scope} onchange={(event) => {
         if (!selected) return; const scope = event.currentTarget.value as Scope;
         const ids = descendants(nodes, selected.id); nodes = nodes.map(node => ids.has(node.id) ? { ...node, scope, parentId: node.id === selectedId ? null : node.parentId } : node);
       }}>{#each scopes as scope}<option value={scope.id}>{scope.label}</option>{/each}</NativeSelect></label>
@@ -78,7 +84,7 @@
         </div>
         <Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="ghost" class={"ui-button "} type="button" onclick={onReset}>恢复自动布局</Button>
       </div></details>
-    {:else}<Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="default" class={"ui-button "} type="button" onclick={onAdd}>新增节点</Button>{/if}
+    {:else}<Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" type="button" onclick={onSave}>保存</Button><Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="default" class={"ui-button "} type="button" onclick={onAdd}>新增节点</Button>{/if}
   </fieldset>
 </aside>
 
@@ -94,6 +100,11 @@
   :global(.editor-save[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"]) { width: 100%; }
   .editor-advanced { border: 1px solid var(--tr-border); border-radius: 8px; }
   .editor-settings { display: grid; gap: 16px; }
+  .icon-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; border: 0; padding: 0; margin: 0; }
+  .icon-options legend { font-weight: bold; margin-bottom: 8px; }
+  .icon-options button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--tr-border); border-radius: 8px; background: var(--background); color: var(--tr-muted); cursor: pointer; }
+  .icon-options button[aria-pressed="true"] { color: var(--brand); border-color: var(--brand); background: var(--accent); }
+  .icon-options button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 1200px) { .workflow-editor { position: fixed; right: 16px; bottom: 16px; z-index: 30; width: min(340px, calc(100vw - 32px)); max-height: calc(100dvh - 130px); border: 1px solid var(--tr-border); box-shadow: 0 8px 32px rgb(23 32 51 / 12%); } }
 </style>

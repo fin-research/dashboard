@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import { Archive, ArchiveRestore } from '@lucide/svelte';
-  import { crossfade } from 'svelte/transition';
+  import { ChevronLeft, ChevronRight } from '@lucide/svelte';
   import type { InquiryRow, InquiryDirectory } from './inquiries';
   import type { ShiborRate } from '../../data-contracts';
   import { SvelteFlow } from '@xyflow/svelte';
@@ -19,7 +18,6 @@
   } = $props();
   const nodeTypes = { workflow: WorkflowNodeView };
   const edgeTypes = { workflow: WorkflowEdgeView };
-  const [send, receive] = crossfade({ duration: 240 });
   let reducedMotion = $state(false);
   const enabledProducts = $derived(products.filter(product => day.enabled[product.id]));
   let lastEnabled = '';
@@ -30,7 +28,7 @@
   let inquiries = $state<Record<string, boolean>>({});
   let flowNodes = $state.raw<FlowNode[]>([]);
   let heights = $state<Record<string, number>>({});
-  let graph = $state.raw<FlowGraph>({ nodes: [], edges: [], bases: {}, timeline: [], height: 680, width: 1040 });
+  let graph = $state.raw<FlowGraph>({ nodes: [], edges: [], bases: {}, timeline: [], height: 680, width: 1040, lanes: {} });
   const cursor = $derived(timelineCursor(graph.timeline, clockMinutes));
   function measureHeight(id: string, height: number) { if (!animating && height > 0 && heights[id] !== height) heights = { ...heights, [id]: height }; }
   function complete(members: WorkflowNode[]) {
@@ -84,10 +82,10 @@
 <div class="workflow-diagram" class:editing aria-label="交易流程图">
   <div class="flow-scroll" bind:clientWidth={viewportWidth}>
     <div class="flow-canvas" style:width={`${graph.width}px`} style:height={`${graph.height}px`}>
-      <div class="product-categories" style:grid-template-columns={`repeat(${Math.max(1, enabledProducts.length)}, minmax(0, 1fr))`}>
+      <div class="product-categories">
         {#each enabledProducts as product (product.id)}
-          <div class="product-category" data-workflow-product={product.id} in:receive={{ key: product.id, duration: reducedMotion ? 0 : 240 }} out:send={{ key: product.id, duration: reducedMotion ? 0 : 240 }}>
-            <span>{product.label}</span><button type="button" class="category-collapse" aria-label={`折叠${product.label}`} aria-expanded="true" onclick={() => onEnable(product.id, false)}><Archive size={18} /></button>
+          <div class="product-category" data-workflow-product={product.id} style:left={`${graph.lanes[product.id]?.x ?? 0}px`} style:width={`${graph.lanes[product.id]?.width ?? 0}px`}>
+            <span>{product.label}</span>
           </div>
         {/each}
       </div>
@@ -119,11 +117,10 @@
         }} />
     </div>
   </div>
-  <aside class="archived-products" aria-label="已折叠品种">
-    {#each products.filter(product => !day.enabled[product.id]) as product (product.id)}
-      <button type="button" class="archived-product" aria-label={`展开${product.label}`} aria-expanded="false" onclick={() => onEnable(product.id, true)}
-        in:receive={{ key: product.id, duration: reducedMotion ? 0 : 240 }} out:send={{ key: product.id, duration: reducedMotion ? 0 : 240 }}>
-        <ArchiveRestore size={16} /><span>{product.label}</span>
+  <aside class="product-toggles" aria-label="流程展开与折叠">
+    {#each products as product (product.id)}
+      <button type="button" class="product-toggle" aria-label={`${day.enabled[product.id] ? '折叠' : '展开'}${product.label}`} aria-expanded={day.enabled[product.id]} onclick={() => onEnable(product.id, !day.enabled[product.id])}>
+        {#if day.enabled[product.id]}<ChevronRight size={16} />{:else}<ChevronLeft size={16} />{/if}<span>{product.label}</span>
       </button>
     {/each}
   </aside>
@@ -131,20 +128,17 @@
 
 <style>
   .workflow-diagram { display: flex; min-width: 0; gap: 8px; position: relative; background: #fff; border-radius: 8px; }
-  .product-categories { position: absolute; z-index: 5; top: 12px; left: 134px; right: 24px; display: grid; gap: 0; }
-  .product-category { margin-inline: auto; width: calc(100% - 36px); max-width: 460px; min-height: 52px; border: 1px solid color-mix(in srgb, var(--category-tone) 25%, white); border-radius: 8px; --category-tone: #087cff; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 1rem; font-weight: bold; color: var(--category-tone); background: color-mix(in srgb, var(--category-tone) 9%, white); }
+  .product-categories { position: absolute; z-index: 5; top: 12px; left: 0; right: 0; }
+  .product-category { position: absolute; max-width: 460px; min-height: 52px; border: 1px solid color-mix(in srgb, var(--category-tone) 25%, white); border-radius: 8px; --category-tone: #087cff; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 1rem; font-weight: bold; color: var(--category-tone); background: color-mix(in srgb, var(--category-tone) 9%, white); }
   .product-category[data-workflow-product="reverse"] { --category-tone: #00a773; }
   .product-category[data-workflow-product="exchange"] { --category-tone: #8090aa; }
-  .category-collapse { display: inline-grid; place-items: center; flex: none; color: inherit; height: 44px; width: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; cursor: pointer; border-radius: 6px; transition: opacity 150ms; }
-  .category-collapse:hover { opacity: .7; }
-  .category-collapse:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
-  @media (prefers-reduced-motion: reduce) { .category-collapse { transition: none; } }
-  .archived-products { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 12px; align-self: flex-start; padding-block: 12px; width: 32px; flex: none; }
-  .archived-products:empty { display: none; }
-  .archived-product { display: flex; align-items: center; flex-direction: column; gap: 8px; width: 30px; padding: 10px 4px; background: white; border: 1px solid var(--tr-border, #dbe7f7); border-radius: 6px; color: var(--tr-muted, #667085); cursor: pointer; }
-  .archived-product span { writing-mode: vertical-rl; text-orientation: upright; font-size: .875rem; }
-  .archived-product:hover { color: var(--brand, #2f6fd6); border-color: currentColor; }
-  .archived-product:focus-visible { outline: 2px solid var(--brand, #2f6fd6); outline-offset: 2px; }
+  .product-toggles { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 12px; align-self: flex-start; padding-block: 12px; width: 44px; flex: none; }
+  .product-toggle { display: flex; align-items: center; flex-direction: column; gap: 8px; width: 44px; min-height: 44px; padding: 12px 8px; background: white; border: 1px solid var(--tr-border); border-radius: 8px; color: var(--tr-muted); cursor: pointer; transition: color 150ms, background 150ms; }
+  .product-toggle span { writing-mode: vertical-rl; text-orientation: upright; font-size: .875rem; }
+  .product-toggle[aria-expanded="true"] { color: var(--brand); background: var(--accent); border-color: var(--brand); }
+  .product-toggle:hover { border-color: currentColor; }
+  .product-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .product-toggle { transition: none; } }
   .flow-scroll { flex: 1; min-width: 0; overflow-x: auto; }
   .flow-canvas { position: relative; }
   .workflow-timeline { position: absolute; inset: 0; pointer-events: none; overflow: visible; }

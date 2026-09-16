@@ -2,11 +2,13 @@
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount } from 'svelte';
   import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-  import { ChevronDown, ChevronRight, GitBranch, MessageSquare, FileText, Clock, Landmark, Send } from '@lucide/svelte';
+  import { ChevronDown, ChevronRight } from '@lucide/svelte';
   import InquiryTable from './InquiryTable.svelte';
   import { isInquiry } from './model';
+  import { nodeIcon, workflowIcons } from './icons';
   import type { FlowNode } from './graph';
   let { data }: NodeProps<FlowNode> = $props();
+  const Icon = $derived(workflowIcons[nodeIcon(data.node)].component);
   let body: HTMLDivElement;
   onMount(() => {
     const measure = () => data.measureHeight?.(body.offsetHeight);
@@ -16,6 +18,8 @@
 </script>
 
 <Handle type="target" position={Position.Top} isConnectable={false} aria-hidden="true" tabindex={-1} />
+<Handle id="side" type="target" position={Position.Left} isConnectable={false} aria-hidden="true" tabindex={-1} />
+<Handle id="side" type="source" position={Position.Right} isConnectable={false} aria-hidden="true" tabindex={-1} />
 <div bind:this={body} class="workflow-node" class:decision={data.node?.kind === 'branch'}
   class:done={data.done} class:chosen={data.selected} class:editing={data.editing}
   data-workflow-node={data.node?.id} data-scope={data.scope} style:width={`${data.width}px`}>
@@ -25,12 +29,7 @@
     aria-describedby={data.node && !isInquiry(data.node) ? `workflow-state-${data.node.id}` : undefined}
     onkeydown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); data.activate(); } }}>
     <span class="node-symbol" aria-hidden="true">
-      {#if data.node && isInquiry(data.node)}<MessageSquare size={21} />
-      {:else if data.node?.kind === 'branch'}<GitBranch size={20} />
-      {:else if /银行|银企|划拨|调拨|中债/.test(data.title)}<Landmark size={21} />
-      {:else if /等待/.test(data.title)}<Clock size={21} />
-      {:else if /群|导出/.test(data.title)}<Send size={21} />
-      {:else}<FileText size={21} />{/if}
+      <Icon size={21} />
     </span>
     <span class="node-copy"><span class="node-title">{data.title}</span>{#if data.node?.detail}<span class="node-detail">{data.node.detail}</span>{/if}</span>
     {#if data.node?.kind === 'branch' || (data.node && isInquiry(data.node))}<span class="node-chevron" aria-hidden="true">{#if data.expanded}<ChevronDown size={17} />{:else}<ChevronRight size={17} />{/if}</span>{/if}
@@ -57,11 +56,11 @@
   .editing .node-surface:active { cursor: grabbing; }
   .node-symbol { color: var(--node-tone); flex: none; display: flex; align-items: center; justify-content: center; }
   .node-copy { display: grid; gap: 2px; flex: 1; min-width: 0; }
-  .node-title, .node-detail { font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
-  .node-detail { white-space: pre-line; }
+  .node-title, .node-detail { line-height: 1.4; overflow-wrap: anywhere; }
+  .node-title { font-size: 1.125rem; font-weight: bold; }
+  .node-detail { font-size: .875rem; font-weight: normal; color: var(--tr-muted); white-space: pre-line; }
   .node-chevron { color: var(--node-tone); display: flex; }
   .done .node-surface { background: color-mix(in srgb, var(--node-tone) 20%, white); border-color: color-mix(in srgb, var(--node-tone) 60%, white); }
-  .decision .node-title { font-weight: bold; }
   .workflow-node:has(:global(.inquiry-table)) .node-surface { border-radius: 8px 8px 0 0; }
   :global(.legacy-note[data-ui-owner="lib-trading-workflow-WorkflowNode-svelte"]) { width: 100%; font-size: .875rem; }
   :global(.svelte-flow__handle) { opacity: 0; pointer-events: none; }

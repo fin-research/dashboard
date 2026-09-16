@@ -55,8 +55,8 @@ test('portal exposes real destinations', async ({ page }) => {
 test('workflow expands a branch and opens the real editor', async ({ page }) => {
   await page.goto('/trading-research/workflow');
   const collapse = page.getByRole('button', { name: '折叠拆借', exact: true });
-  await expect(collapse).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(collapse).toHaveCSS('box-shadow', 'none');
+  await expect(collapse).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('complementary', { name: '流程展开与折叠' }).getByRole('button')).toHaveCount(3);
   await page.getByRole('button', { name: '展开交易所回购', exact: true }).click();
   await expect(page.locator('[data-workflow-node="exchange-o32"]')).toBeVisible();
   await screenshot(page, 'workflow-expanded');
@@ -64,6 +64,26 @@ test('workflow expands a branch and opens the real editor', async ({ page }) => 
   await page.locator('[data-workflow-node="shared-elements"] .node-surface').click();
   await expect(page.locator('.workflow-editor')).toBeVisible();
   await screenshot(page, 'workflow-editor');
+});
+
+test('workflow branches expand to the right without displacing the main path', async ({ page }) => {
+  await page.goto('/trading-research/workflow');
+  const trigger = page.locator('[data-workflow-node="reverse-change"]');
+  const next = page.locator('[data-workflow-node="reverse-counterparty"]');
+  await expect(trigger).toBeVisible();
+  const before = await next.evaluate(element => element.closest('.svelte-flow__node').style.transform);
+  await trigger.locator('.node-surface').click();
+  const child = page.locator('[data-workflow-node="reverse-position"]');
+  await expect(child).toBeVisible();
+  const positions = await page.evaluate(() => {
+    const rect = id => document.querySelector(`[data-workflow-node="${id}"]`).getBoundingClientRect();
+    const a = rect('reverse-change'), b = rect('reverse-position');
+    return { right: a.right, childLeft: b.left };
+  });
+  expect(positions.childLeft).toBeGreaterThan(positions.right);
+  const after = await next.evaluate(element => element.closest('.svelte-flow__node').style.transform);
+  expect(after.split(',')[1]).toBe(before.split(',')[1]);
+  await screenshot(page, 'workflow-branch');
 });
 
 test('credit failure is visible instead of an empty success', async ({ page }) => {

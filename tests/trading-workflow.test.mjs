@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { buildGraph, timelineCursor, workflowGroups, nodeComplete } from '../src/lib/trading-workflow/graph.ts';
-import { activeTasks, childrenOf, dayKey, descendants, dueReminders, emptyDay, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
+import { activeTasks, childrenOf, dayKey, descendants, dueReminders, emptyDay, removeNode, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
 import { readWorkflowConfig, saveWorkflowConfig } from '../src/lib/server/trading-workflow.ts';
 
 function database() {
@@ -75,7 +75,7 @@ test('daily products and nested conditions determine active tasks without losing
   assert.equal(activeTasks(defaults, day, 'exchange').length, 4);
 });
 
-test('move keeps branch descendants and reorders only siblings; deletion collects entire subtree', () => {
+test('move keeps branch descendants and reorders only siblings; descendant lookup retains the entire subtree', () => {
   const moved = moveNode(defaults, 'reverse-counterparty', -1);
   assert.deepEqual(childrenOf(moved, 'reverse').map(n => n.id), ['reverse-quote', 'reverse-counterparty', 'reverse-change', 'reverse-hengtai', 'reverse-confirm']);
   assert.deepEqual([...descendants(moved, 'reverse-counterparty')].sort(), ['reverse-approval', 'reverse-check', 'reverse-counterparty', 'reverse-missing'].sort());
@@ -166,8 +166,10 @@ test('flow graph folds conditions, centers common steps, joins paths and preserv
   const expanded = buildGraph(defaults, day, options);
   assert.ok(expanded.nodes.some(n => n.id === 'reverse-position'));
   assert.ok(expanded.edges.some(e => e.source === 'reverse-change' && e.target === 'reverse-position'));
-  assert.ok(expanded.edges.some(e => e.source === 'reverse-ccdc' && e.target === 'reverse-counterparty'));
-  assert.equal(expanded.edges.some(e => e.source === 'reverse-change' && e.target === 'reverse-counterparty'), false);
+  assert.ok(expanded.edges.some(e => e.source === 'reverse-change' && e.target === 'reverse-counterparty'));
+  assert.equal(expanded.edges.some(e => e.source === 'reverse-ccdc' && e.target === 'reverse-counterparty'), false);
+  assert.ok(expanded.bases['reverse-position'].x > expanded.bases['reverse-change'].x);
+  assert.equal(expanded.bases['reverse-counterparty'].y, folded.bases['reverse-counterparty'].y, 'expanded branches do not push the main path down');
   const taller = buildGraph(defaults, day, {...options, heights:{'loan-send':500}});
   assert.ok(taller.nodes.find(n => n.id === 'loan-deal').position.y >= taller.nodes.find(n => n.id === 'loan-send').position.y + 528);
   const positioned = defaults.map(n => n.id === 'loan-send' ? {...n, offset:{x:85,y:-20}} : n);
@@ -193,32 +195,59 @@ test('legacy day records gain empty inquiry notes without losing progress; notes
 });
 
 
-test('equivalent steps merge, split after edits, preserve IDs and avoid order cycles', () => {
+test('product-owned approvals stay separate, fold with their own flow, and never bridge shared nodes', () => {
   const options = { editing: false, selectedId: '', clockMinutes: 600, activate() {}, toggleProduct() {}, note() {} };
   const day = emptyDay('2026-09-15');
-  const group = workflowGroups(defaults).find(group => group.some(node => node.id === 'loan-hengtai'));
-  assert.deepEqual(group.map(node => node.id), ['loan-hengtai', 'reverse-hengtai', 'exchange-hengtai']);
-  assert.equal(workflowGroups(defaults).find(group => group.some(node => node.id === 'loan-quote')).length, 1);
+  assert.ok(workflowGroups(defaults).every(group => group.length === 1));
   let graph = buildGraph(defaults, day, options);
-  assert.equal(graph.nodes.filter(node => node.data.title === '衡泰补单审批').length, 1);
-  assert.ok(graph.edges.some(edge => edge.source === 'loan-hengtai' && edge.target === 'loan-funds'));
-  assert.ok(graph.edges.some(edge => edge.source === 'loan-hengtai' && edge.target === 'reverse-confirm'));
-  for (const id of group.map(node => node.id)) day.completed[id] = true;
+  assert.deepEqual(graph.nodes.filter(node => node.data.title === '衡泰补单审批').map(node => node.id), ['loan-hengtai', 'reverse-hengtai']);
+  assert.ok(graph.edges.some(edge => edge.source === 'reverse-hengtai' && edge.target === 'reverse-confirm'));
+  assert.equal(graph.edges.some(edge => edge.source === 'shared-elements' && edge.target === 'shared-done'), false);
+  day.enabled.exchange = true;
+  graph = buildGraph(defaults, day, options);
+  assert.equal(graph.nodes.filter(node => node.data.title === '衡泰补单审批').length, 3);
+  day.completed['loan-hengtai'] = true;
+  graph = buildGraph(defaults, day, options);
+  assert.equal(graph.nodes.find(node => node.id === 'reverse-hengtai').data.done, false);
   for (const product of ['loan', 'reverse', 'exchange']) day.enabled[product] = false;
   graph = buildGraph(defaults, day, options);
-  assert.equal(graph.nodes.find(node => node.id === 'loan-hengtai').data.done, true);
-  assert.ok(graph.nodes.find(node => node.id === 'shared-elements').data.active);
-  const edited = defaults.map(node => node.id === 'reverse-hengtai' ? { ...node, title: '独立审批' } : node);
-  day.enabled.reverse = true;
-  graph = buildGraph(edited, day, options);
-  assert.ok(graph.nodes.find(node => node.id === 'reverse-hengtai').data.done);
-  assert.equal(workflowGroups(edited).find(group => group[0].id === 'loan-hengtai').length, 2);
-  const task = (id, scope, title) => ({ id, scope, title, detail: '', kind: 'task', parentId: null, startTime: null, endTime: null });
-  const crossed = [task('a1','loan','A'),task('b1','loan','B'),task('b2','reverse','B'),task('a2','reverse','A')];
-  assert.doesNotThrow(() => buildGraph(crossed, emptyDay('2026-09-15'), options));
-  assert.equal(workflowGroups(crossed).length, 3, 'opposite order cannot collapse into a cycle');
-  const modifiedTime = defaults.map(node => node.id === 'reverse-hengtai' ? {...node, startTime: '13:00'} : node);
-  assert.equal(workflowGroups(modifiedTime).find(group => group[0].id === 'reverse-hengtai').length, 1);
+  assert.deepEqual(graph.nodes.map(node => node.id), ['shared-elements', 'shared-done']);
+  day.enabled.loan = true; day.enabled.exchange = true;
+  const emptyExchange = defaults.filter(node => node.scope !== 'exchange');
+  graph = buildGraph(emptyExchange, day, options);
+  assert.equal(graph.edges.some(edge => edge.source === 'shared-elements' && edge.target === 'shared-done'), false, 'empty flow adds no shared shortcut');
+});
+
+test('shared branches have a separate right rail even with all products folded', () => {
+  const branch = { id: 'common-branch', scope: 'shared', parentId: null, kind: 'branch', title: '共通条件', detail: '', startTime: null, endTime: null };
+  const child = { ...branch, id: 'common-child', parentId: branch.id, kind: 'task' };
+  const day = emptyDay('2026-09-15');
+  day.enabled = { loan: false, reverse: false, exchange: false };
+  day.branches[branch.id] = true;
+  const graph = buildGraph([branch, child], day, { editing: false, selectedId: '', clockMinutes: 0, activate() {}, toggleProduct() {}, note() {} });
+  const root = graph.nodes.find(node => node.id === branch.id), side = graph.nodes.find(node => node.id === child.id);
+  assert.ok(side.position.x > root.position.x + root.width);
+  assert.ok(side.position.x + side.width <= graph.width);
+});
+
+test('deleting one branch promotes its children in order and persists both deletion and icons', async () => {
+  const { sqlite, adapter } = database();
+  try {
+    let nodes = removeNode(defaults, 'reverse-counterparty');
+    assert.equal(nodes.some(node => node.id === 'reverse-counterparty'), false);
+    assert.equal(nodes.find(node => node.id === 'reverse-missing').parentId, null);
+    assert.equal(nodes.find(node => node.id === 'reverse-check').parentId, null);
+    assert.equal(nodes.find(node => node.id === 'reverse-approval').parentId, 'reverse-missing');
+    assert.deepEqual(childrenOf(nodes, 'reverse').map(node => node.id), ['reverse-quote', 'reverse-change', 'reverse-check', 'reverse-missing', 'reverse-hengtai', 'reverse-confirm']);
+    nodes = removeNode(nodes, 'reverse-missing');
+    nodes = nodes.map(node => node.id === 'reverse-approval' ? { ...node, icon: 'clipboard-check' } : node);
+    const saved = await saveWorkflowConfig(adapter, saveSchema.parse({ expectedVersion: 1, nodes }));
+    assert.deepEqual(await readWorkflowConfig(adapter), saved);
+    assert.equal(saved.nodes.find(node => node.id === 'reverse-approval').parentId, null);
+    assert.equal(saved.nodes.find(node => node.id === 'reverse-approval').icon, 'clipboard-check');
+    assert.equal(nodesSchema.safeParse([{ ...defaults[0], icon: 'unregistered' }]).success, false);
+    assert.deepEqual(removeNode([{ ...defaults[0], parentId: null }], defaults[0].id), []);
+  } finally { sqlite.close(); }
 });
 
 test('branch completion requires every descendant, including collapsed nested branches', () => {

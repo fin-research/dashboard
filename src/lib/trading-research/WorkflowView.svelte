@@ -12,7 +12,7 @@
   import WorkflowEditor from '../trading-workflow/WorkflowEditor.svelte';
   import { globalMessages } from '../global-messages';
   import { configResponseSchema, configSchema, dayKey, dueReminders, emptyDay, products, nodesSchema,
-    readDay, shanghaiClock, updateDay, type Product, type WorkflowConfig, type WorkflowDay, type WorkflowNode } from '../trading-workflow/model';
+    removeNode, readDay, shanghaiClock, updateDay, type Product, type WorkflowConfig, type WorkflowDay, type WorkflowNode } from '../trading-workflow/model';
 
   let config = $state<WorkflowConfig | null>(null);
   let actorKey = '';
@@ -42,12 +42,20 @@
     editing = false; selectedId = '';
   }
   async function saveDraft() {
+    if (saving) return;
     const result = nodesSchema.safeParse(draft);
     if (!result.success) { globalMessages.error(result.error.issues[0]?.message ?? '节点配置无效'); return; }
     saving = true;
     try { if (await saveConfig(result.data)) { editing = false; selectedId = ''; } }
     catch { globalMessages.error('配置保存失败，请重试'); }
     finally { saving = false; }
+  }
+  async function deleteNode(id: string) {
+    if (saving) return;
+    const index = draft.findIndex(node => node.id === id);
+    draft = removeNode(draft, id);
+    selectedId = draft[Math.min(index, draft.length - 1)]?.id ?? '';
+    await saveDraft();
   }
   function move(id: string, offset: { x: number; y: number }) {
     if (editing && !saving) {
@@ -183,7 +191,7 @@
       if (browser) {
         try {
           for (const item of due) {
-            const label = products.find(product => product.id === item.node.scope)?.label ?? '日内协同';
+            const label = products.find(product => product.id === item.node.scope)?.label ?? '共通节点';
             const notification = new Notification(`${item.time} · ${label}`, { body: item.node.title, tag: `${actorKey}:${date}:${item.key}` });
             notification.onclick = () => { window.focus(); window.dispatchEvent(new CustomEvent('workflow-locate', { detail: item.node.id })); notification.close(); };
             notification.onerror = () => globalMessages.warning('浏览器通知未送达，请查看到点待办', { key: 'workflow-notification-error' });
@@ -236,7 +244,7 @@
       {#if editing && (selectedId || !draft.length)}
         {#key selectedId}<WorkflowEditor bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
           onClose={() => selectedId = ''} onBranch={(id, value) => setBranch([id], value)} expanded={!!preview.branches[selectedId]}
-          onSave={saveDraft} onAdd={addNode} onReset={() => draft = draft.map(({ offset, ...node }) => node)}
+          onSave={saveDraft} onDelete={deleteNode} onAdd={addNode} onReset={() => draft = draft.map(({ offset, ...node }) => node)}
           notificationsEnabled={notificationsEnabled} notificationsSupported={permission !== 'unsupported'} onNotifications={toggleNotifications} />{/key}
       {/if}
     </div>

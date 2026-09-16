@@ -5,7 +5,7 @@ import { childrenOf, descendants, isInquiry, minutes, products, type Scope, type
 
 export const NODE_WIDTH = 460;
 export const VERTICAL_GAP = 76;
-export type FlowEdge = Edge<{ joinY: number }, 'workflow'>;
+export type FlowEdge = Edge<{ joinY: number; side?: boolean }, 'workflow'>;
 export type FlowData = {
   title: string; scope: Scope; node?: WorkflowNode; members?: WorkflowNode[]; width: number;
   rows: InquiryRow[]; directory: InquiryDirectory; rates: ShiborRate[]; date: string; now: Date;
@@ -16,54 +16,15 @@ export type FlowData = {
 };
 export type FlowNode = Node<FlowData, 'workflow'>;
 export type TimelineMark = { time: string; minute: number; y: number; endX: number };
-export type FlowGraph = { nodes: FlowNode[]; edges: FlowEdge[]; bases: Record<string, { x: number; y: number }>; timeline: TimelineMark[]; height: number; width: number };
+export type FlowGraph = { nodes: FlowNode[]; edges: FlowEdge[]; bases: Record<string, { x: number; y: number }>; timeline: TimelineMark[]; height: number; width: number; lanes: Partial<Record<Product, { x: number; width: number }>> };
 
-/** Visual groups retain every source ID, so edits and daily records remain reversible. */
+/** Product ownership is explicit; identical labels never merge distinct nodes. */
 export function workflowGroups(config: WorkflowNode[]): WorkflowNode[][] {
-  const groups = config.map(node => [node]);
-  const signature = (node: WorkflowNode): string => JSON.stringify([
-    node.kind, node.title.trim(), node.detail.trim(), node.startTime, node.endTime,
-    isInquiry(node) ? node.id : null,
-    childrenOf(config, node.scope, node.id).map(signature),
-  ]);
-  // Match occurrences within equivalent conditional contexts, never just a task label.
-  const keys = new Map<string, string>();
-  function visit(scope: Scope, parent: string | null, context: string) {
-    const occurrences = new Map<string, number>();
-    for (const node of childrenOf(config, scope, parent)) {
-      const sig = signature(node), occurrence = occurrences.get(sig) ?? 0;
-      occurrences.set(sig, occurrence + 1);
-      const key = JSON.stringify([context, sig, occurrence]); keys.set(node.id, key);
-      visit(scope, node.id, key);
-    }
-  }
-  for (const scope of ['shared', ...products.map(product => product.id)] as Scope[]) visit(scope, null, 'root');
-  const paths = workflowPaths(config);
-  function acyclic(candidate: WorkflowNode[][]) {
-    const ids = new Map(candidate.flatMap((group, index) => group.map(node => [node.id, index] as const)));
-    const edges = candidate.map(() => new Set<number>()), indegree = candidate.map(() => 0);
-    for (const path of paths) for (let i = 1; i < path.length; i++) {
-      const a = ids.get(path[i - 1]!)!, b = ids.get(path[i]!)!;
-      if (a === b) return false;
-      if (!edges[a]!.has(b)) { edges[a]!.add(b); indegree[b]!++; }
-    }
-    const ready = indegree.flatMap((degree, index) => degree === 0 ? [index] : []);
-    let visited = 0;
-    while (ready.length) { const id = ready.shift()!; visited++; for (const next of edges[id]!) if (--indegree[next]! === 0) ready.push(next); }
-    return visited === candidate.length;
-  }
-  for (let i = 0; i < groups.length; i++) for (let j = i + 1; j < groups.length; j++) {
-    const a = groups[i]!, b = groups[j]!;
-    if (a.some(node => node.scope === 'shared') || b.some(node => node.scope === 'shared') ||
-      a.some(node => b.some(other => other.scope === node.scope)) || keys.get(a[0]!.id) !== keys.get(b[0]!.id)) continue;
-    const candidate = groups.map((group, index) => index === i ? [...a, ...b] : group).filter((_, index) => index !== j);
-    if (acyclic(candidate)) { groups[i] = [...a, ...b]; groups.splice(j--, 1); }
-  }
-  return groups;
+  return config.map(node => [node]);
 }
 
 function workflowPaths(config: WorkflowNode[]): string[][] {
-  const flatten = (items: WorkflowNode[]): string[] => items.flatMap(node => [node.id, ...flatten(childrenOf(config, node.scope, node.id))]);
+  const flatten = (items: WorkflowNode[]): string[] => items.map(node => node.id);
   const shared = childrenOf(config, 'shared');
   const closingIndex = shared.findIndex(node => node.id === 'shared-done');
   const opening = closingIndex < 0 ? shared : shared.slice(0, closingIndex);
@@ -93,12 +54,27 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
   note: (id: string, value: string) => void; complete?: (members: WorkflowNode[]) => void;
 }): FlowGraph {
   const enabled = products.filter(product => day.enabled[product.id]);
-  const count = Math.max(1, enabled.length);
-  const width = Math.max(170 + count * 440, options.width ?? 1040);
-  const graph: FlowGraph = { nodes: [], edges: [], bases: {}, timeline: [], height: 0, width };
-  const areaLeft = 134, areaRight = width - 24, column = (areaRight - areaLeft) / count;
-  const nodeWidth = Math.min(NODE_WIDTH, column - 36), center = (areaLeft + areaRight - nodeWidth) / 2;
-  const laneX = (scope: Scope) => areaLeft + Math.max(0, enabled.findIndex(product => product.id === scope)) * column + (column - nodeWidth) / 2;
+  const depth = (node: WorkflowNode): number => node.parentId ? 1 + depth(config.find(item => item.id === node.parentId)!) : 0;
+  const parentsActive = (node: WorkflowNode): boolean => !node.parentId || (!!day.branches[node.parentId] && parentsActive(config.find(item => item.id === node.parentId)!));
+  const visibleConfig = config.filter(node => parentsActive(node) && (node.scope === 'shared' || day.enabled[node.scope]));
+  const columns = new Map<Scope, number>([...enabled.map(product => [product.id, 1 + Math.max(0, ...visibleConfig.filter(node => node.scope === product.id).map(depth))] as [Scope, number]),
+    ['shared', Math.max(0, ...visibleConfig.filter(node => node.scope === 'shared').map(depth))]]);
+  const slots = Math.max(1, [...columns.values()].reduce((sum, value) => sum + value, enabled.length ? 0 : 1));
+  const width = Math.max(170 + slots * 360, options.width ?? 1040);
+  const graph: FlowGraph = { nodes: [], edges: [], bases: {}, timeline: [], height: 0, width, lanes: {} };
+  const areaLeft = 134, column = (width - areaLeft - 24) / slots;
+  const nodeWidth = Math.min(NODE_WIDTH, column - 36);
+  let slot = enabled.length ? 0 : 1;
+  for (const product of enabled) {
+    graph.lanes[product.id] = { x: areaLeft + slot * column + (column - nodeWidth) / 2, width: nodeWidth };
+    slot += columns.get(product.id)!;
+  }
+  const laneX = (scope: Scope) => scope === 'shared' ? center : graph.lanes[scope]?.x ?? areaLeft;
+  const centers = enabled.map(product => graph.lanes[product.id]!.x);
+  const center = centers.length ? (centers[0]! + centers.at(-1)!) / 2 : areaLeft + (column - nodeWidth) / 2;
+  const sideX = (node: WorkflowNode) => node.scope === 'shared' && node.parentId
+    ? areaLeft + (slot + depth(node) - 1) * column + (column - nodeWidth) / 2
+    : laneX(node.scope) + depth(node) * column;
   const allGroups = workflowGroups(config);
   const byId = new Map(allGroups.flatMap(group => group.map(node => [node.id, group] as const)));
   const expanded = (group: WorkflowNode[]) => group.some(node => day.branches[node.id]);
@@ -113,6 +89,7 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
   const incoming = new Map<string, Set<string>>(groups.map(group => [group[0]!.id, new Set()]));
   const paths = workflowPaths(config);
   products.forEach((product, index) => {
+    if (!day.enabled[product.id]) return;
     let previous = '';
     for (const sourceId of paths[index]!) {
       const target = visible.get(sourceId);
@@ -121,11 +98,39 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
       previous = target;
     }
   });
+  if (!enabled.length) {
+    const shared = childrenOf(config, 'shared');
+    for (let i = 1; i < shared.length; i++) incoming.get(shared[i]!.id)?.add(shared[i - 1]!.id);
+  }
+  // Conditional children run on their own right-hand rail. The next root step
+  // follows the branch trigger, never the expanded child chain.
+  const sideEdges = new Set<string>();
+  for (const node of visibleConfig.filter(node => node.kind === 'branch')) {
+    let previous = node.id;
+    for (const child of childrenOf(config, node.scope, node.id).filter(child => visible.has(child.id))) {
+      incoming.get(child.id)!.add(previous);
+      if (previous === node.id) sideEdges.add(`${previous}:${child.id}`);
+      previous = child.id;
+    }
+  }
+  // An empty lane must not add a shortcut across populated product paths.
+  function reaches(from: string, target: string, seen = new Set<string>()): boolean {
+    if (from === target) return true;
+    if (seen.has(from)) return false;
+    seen.add(from);
+    return [...incoming.get(from) ?? []].some(id => reaches(id, target, seen));
+  }
+  for (const [target, sources] of incoming) {
+    if (config.find(node => node.id === target)?.scope !== 'shared') continue;
+    for (const source of [...sources]) if (config.find(node => node.id === source)?.scope === 'shared' &&
+      [...sources].some(other => other !== source && reaches(other, source))) sources.delete(source);
+  }
+  const railBottom = new Map<number, number>();
   function connect(source: string, target: string, joinY: number) {
     const from = graph.nodes.find(node => node.id === source)!, to = graph.nodes.find(node => node.id === target)!;
     const scope = to.data.scope === 'shared' ? from.data.scope : to.data.scope;
     const color = scope === 'reverse' ? '#00a773' : scope === 'exchange' ? '#8090aa' : '#087cff';
-    graph.edges.push({ id: `${source}:${target}`, source, target, type: 'workflow', data: { joinY },
+    graph.edges.push({ id: `${source}:${target}`, source, target, type: 'workflow', sourceHandle: sideEdges.has(`${source}:${target}`) ? 'side' : undefined, targetHandle: sideEdges.has(`${source}:${target}`) ? 'side' : undefined, data: { joinY, side: sideEdges.has(`${source}:${target}`) },
       markerEnd: { type: 'arrowclosed' as import('@xyflow/svelte').MarkerType, width: 16, height: 16, color }, style: `stroke: ${color}; stroke-width: 1.8;` });
   }
   const pending = [...groups];
@@ -134,15 +139,16 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
     if (index < 0) throw new Error('交易流程存在循环连线');
     const members = pending.splice(index, 1)[0]!, node = members.find(item => item.id === options.selectedId) ?? members[0]!;
     const id = members[0]!.id, scope = members.length > 1 ? 'shared' : node.scope;
-    const x = scope === 'shared' ? center : laneX(scope);
+    const x = sideX(node);
     const predecessors = [...incoming.get(id)!].map(id => graph.nodes.find(node => node.id === id)!);
-    const y = Math.max(104, ...predecessors.map(node => (graph.bases[node.id]?.y ?? node.position.y) + node.measured!.height! + VERTICAL_GAP));
+    const y = Math.max(104, node.parentId ? railBottom.get(x) ?? 0 : 0, ...predecessors.map(previous => (graph.bases[previous.id]?.y ?? previous.position.y) + (sideEdges.has(`${previous.id}:${id}`) ? 0 : previous.measured!.height! + VERTICAL_GAP)));
     graph.bases[id] = { x, y };
     const offset = members[0]!.offset;
     const position = { x: x + (offset?.x ?? 0), y: y + (offset?.y ?? 0) };
     const open = isInquiry(node) ? !!options.inquiries?.[id] : expanded(members);
     const estimate = 52 + (node.detail ? Math.ceil(node.detail.length / Math.max(12, (nodeWidth - 65) / 15)) * 23 : 0) + (isInquiry(node) && open ? 56 + (day.quotes[node.id]?.length ?? 0) * 39 : 0);
     const height = options.heights?.[id] ?? estimate;
+    if (node.parentId) railBottom.set(x, y + height + VERTICAL_GAP);
     const done = members.every(item => nodeComplete(item, config, day));
     graph.nodes.push({ id, type: 'workflow', position, width: nodeWidth, measured: { width: nodeWidth, height }, focusable: false, draggable: options.editing, connectable: false,
       data: { node, members, rows: day.quotes[node.id] ?? [], directory: options.directory ?? { counterparties: [], traders: [] }, rates: options.rates ?? [], date: day.date, now: options.now ?? new Date(),

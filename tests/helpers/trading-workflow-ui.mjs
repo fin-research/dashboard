@@ -65,6 +65,7 @@ assert.match(header.querySelector('time').textContent, /11:30:00/);
 assert.ok(Number(target.querySelector('.current-time-line').getAttribute('y1')) > Number(initialCursor));
 fixed -= 30 * 60 * 1000; window.dispatchEvent(new window.Event('focus')); await settle();
 assert.equal(document.querySelector('.inquiry'), null);
+assert.equal(document.querySelectorAll('.product-toggle').length, 3);
 const originalIcon = document.querySelector('[data-workflow-node="loan-deal"] .node-symbol').innerHTML;
 assert.deepEqual([...target.querySelectorAll('[data-timeline-time]')].map(n=>n.dataset.timelineTime),['08:30','10:00','11:00','16:30']);
 assert.equal(document.querySelector('[data-workflow-product="exchange"]'), null);
@@ -128,7 +129,7 @@ assert.equal(JSON.parse(localStorage.getItem(dayKey('test-actor','2026-09-15')))
 
 flushSync(() => document.querySelector('[aria-label="展开交易所回购"]').click()); await settle();
 assert.ok(document.querySelector('[data-workflow-node="exchange-o32"]'));
-flushSync(() => document.querySelector('[data-workflow-product="exchange"] button').click()); await settle();
+flushSync(() => document.querySelector('[aria-label="折叠交易所回购"]').click()); await settle();
 assert.equal(document.querySelector('[data-workflow-node="exchange-o32"]'), null);
 assert.equal(requests.filter(request => request.options?.method === 'PUT' || request.method === 'PUT').length,0,'local interactions must never write to backend');
 flushSync(()=>document.querySelector('.edit-mode [role=checkbox]').click()); await settle();
@@ -156,6 +157,30 @@ conflict=false;
 flushSync(()=>button('保存').click()); await settle();
 assert.equal(document.querySelector('.workflow-editor'),null); assert.equal(config.nodes[0].title,'修改后的协同节点');
 assert.deepEqual(config.nodes[0].offset, {x:120,y:0});
+// Deletion saves immediately, retains children, and failed writes remain retryable.
+window.confirm = () => true;
+flushSync(()=>document.querySelector('.edit-mode [role=checkbox]').click()); await settle();
+await clickNode('reverse-counterparty');
+conflict = true;
+flushSync(()=>button('删除节点').click()); await settle();
+assert.ok(document.querySelector('.workflow-editor'));
+assert.ok(config.nodes.some(node => node.id === 'reverse-counterparty'), 'conflict does not mutate saved config');
+conflict = false;
+flushSync(()=>button('保存').click()); await settle();
+assert.equal(config.nodes.some(node => node.id === 'reverse-counterparty'), false);
+assert.equal(config.nodes.find(node => node.id === 'reverse-check').parentId, null);
+flushSync(()=>document.querySelector('.edit-mode [role=checkbox]').click()); await settle();
+await clickNode('loan-send');
+flushSync(()=>document.querySelector('.icon-options [aria-label="审批"]').click()); await settle();
+flushSync(()=>button('保存').click()); await settle();
+assert.equal(config.nodes.find(node => node.id === 'loan-send').icon, 'clipboard-check');
+flushSync(()=>document.querySelector('.edit-mode [role=checkbox]').click()); await settle();
+await clickNode('reverse-missing');
+const writesBeforeDelete = requests.filter(request => request.method === 'PUT').length;
+flushSync(()=>button('删除节点').click()); await settle();
+assert.equal(requests.filter(request => request.method === 'PUT').length, writesBeforeDelete + 1);
+assert.equal(config.nodes.find(node => node.id === 'reverse-approval').parentId, null);
+assert.equal(document.querySelector('.workflow-editor'), null);
 // A corrupted record in another tab must not erase this tab's existing completed work.
 localStorage.setItem(dayKey('test-actor','2026-09-15'),'{broken');
 window.dispatchEvent(new window.StorageEvent('storage',{key:dayKey('test-actor','2026-09-15')}));await settle();
@@ -164,10 +189,14 @@ await unmount(app);globalMessages.clear();
 assert.equal(header.children.length,0,'header portal is cleaned on route unmount');
 localStorage.setItem(dayKey('test-actor','2026-09-15'),JSON.stringify(local));
 const reloaded=mount(View,{target});await settle();
+assert.equal(document.querySelector('[data-workflow-node="reverse-counterparty"]'), null);
+assert.equal(document.querySelector('[data-workflow-node="reverse-missing"]'), null);
+assert.ok(document.querySelector('[data-workflow-node="reverse-approval"]'));
+assert.ok(document.querySelector('[data-workflow-node="loan-send"] .lucide-clipboard-check'));
 assert.equal(document.querySelector('[data-workflow-node="loan-deal"] button').getAttribute('aria-pressed'),'true');
 await clickNode('loan-quote');
 assert.equal(document.querySelector('[data-workflow-node="loan-quote"] [data-field="counterparty"]').value, '工商银行');
-for (const product of ['loan', 'reverse']) { flushSync(()=>document.querySelector(`[data-workflow-product="${product}"] button`).click()); await settle(); }
+for (const product of ['loan', 'reverse']) { flushSync(()=>document.querySelector(`[aria-label="折叠${product === 'loan' ? '拆借' : '逆回购'}"]`).click()); await settle(); }
 assert.equal(document.querySelector('[data-workflow-node="shared-elements"] button').disabled, false);
 assert.equal(document.querySelector('[data-workflow-node="shared-done"] button').disabled, false);
 await unmount(reloaded);globalMessages.clear();
