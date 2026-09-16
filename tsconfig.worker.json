@@ -26,6 +26,7 @@
     "worker-configuration.d.ts",
     "worker/credit-agent.ts",
     "worker/credit-assistant-http.ts",
-    "worker/financing-debt-import.ts"
+    "worker/financing-debt-import.ts",
+    "worker/market-briefing-workflow.ts"
   ]
 }

@@ -255,7 +255,7 @@ async function fetchBriefingNews(
   };
 }
 
-async function fetchDataJson<T>(
+export async function fetchDataJson<T>(
   env: Env,
   url: string,
   schema: z.ZodType<T>,

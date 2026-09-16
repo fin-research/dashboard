@@ -1,3 +1,4 @@
+import { buildReportData } from "../../src/market-report-resources.ts";
 import { financingModel } from './report-fixtures.mjs';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -43,6 +44,23 @@ const ledger = toBondLedgerReport(buildBondLedgerAnalytics(
   performance.map(row => ({ date: row.date, performance: performance.filter(p => p.date <= row.date),
     positions: [{ ...position, reportDate: row.date, marketValue: row.marketValue, dailyProfit: row.dailyRevenue }] })), '2026-09-10', today));
 
+export const marketSnapshot = {
+  ...buildReportData({
+    reportDate: today, generatedAt: `${today}T17:00:00+08:00`, previousPrimaryDate:'2026-09-14',
+    industry: { dataDate: today, equities: [{ name:'上证指数',close:3610.2,change_pct:0.4 }], industries:[{name:'银行',change_pct:1.2,market_cap_yuan:9.8e12},{name:'电子',change_pct:-0.6,market_cap_yuan:8e12}],turnoverYi:15000,turnoverChangeYi:200,tradingDates:['2026-09-14',today] },
+    stock:{title:'A股收评',time:`${today}T15:00:00+08:00`,paragraphs:['市场交投平稳，资金面保持均衡。','后续关注政策落地与资金价格变化。']},
+    omo:[{operationDate:today,operationName:'逆回购',duration:'7D',interestRate:1.4,operationAmount:1000}],
+    dr:[{bondCode:'DR007',weightedYield:1.5,weightedYieldUpDownValueBp:-2}],
+    dibo:[{bondCode:'R007',weightedYield:1.5,weightedYieldUpDownValueBp:-2}],
+    governmentBonds:[{bondCode:'260010.IB',ordinateName:'国债',abscissaName:'10Y',tradeNum:12,yield:1.8,yieldSubYtdCloseBp:-1}],
+    futures:[{contractCode:'T9999',lastPrice:106.5,upDownValuePct:0.15}],
+    margin:[{DIM_DATE:today,TOTAL_RZRQYE:2e12,TOTAL_RZYE:1.99e12,TOTAL_RQYE:1e10},{DIM_DATE:'2026-09-14',TOTAL_RZRQYE:1.999e12,TOTAL_RZYE:1.9891e12,TOTAL_RQYE:9.9e9}],
+    primary:[],todayTrades:[],favoriteQuotes:[],bondInfos:[],
+  }),
+  focus_text:'1、市场交投平稳，资金面保持均衡。\n2、后续关注政策落地与资金价格变化。',
+  cached_at:`${today}T17:00:00+08:00`,finalized_at:`${today}T17:00:00+08:00`,
+};
+
 export async function mockResources(page, { creditError = false, ledgerEmpty = false } = {}) {
   const unexpected = [];
   await page.route('**/*', async route => {
@@ -57,7 +75,8 @@ export async function mockResources(page, { creditError = false, ledgerEmpty = f
     if (url.pathname === '/api/credit') {
       if (creditError) return route.fulfill({ status: 503, json: { error: '授信报表暂不可用' } });
       body = credit;
-    } else if (url.pathname === '/api/financing-model') body = financingModel;
+    } else if (url.pathname === '/api/market-report') body = marketSnapshot;
+    else if (url.pathname === '/api/financing-model') body = financingModel;
     else if (url.pathname === '/api/financing-model/decisions') body = [];
     else if (url.pathname === '/api/trading-workflow/config') body = workflow;
     else if (url.pathname === '/data/chinamoney/shibor') body = [{ publishDate: today, publishedAt: `${today}T11:00:00+08:00`, tenor: '1W', rate: 1.5 }];

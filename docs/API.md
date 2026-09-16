@@ -4,7 +4,7 @@
 
 ## 外部数据服务 `/data/*`
 
-市场点评及其定稿 GET/HEAD 公开只读；浏览器直接请求独立 Data Worker 的公开 `/data/*` 行情资源，服务端通过私有 DATA binding 读取。DM、东方财富网和固定行业快照读取不查询身份服务；Choice 通用查询和 CAMEL 仍要求登录。旧 `/api/market-resources/*` 保留为公开的限定兼容通道。
+市场点评及其定稿 GET/HEAD 公开只读；市场点评 Workflow 通过私有 DATA binding 读取原始行情，浏览器只读取 R2 定稿。DM、东方财富网和固定行业快照读取不查询身份服务；Choice 通用查询和 CAMEL 仍要求登录。旧 `/api/market-resources/*` 保留为公开的限定兼容通道。
 
 除基础配置和 Choice 外，所有 REST 资源都支持 `fields=a,b` 顶层字段投影；未知字段为
 422。列表资源直接返回 JSON array，不再读取 `data`、`list` 等上游 envelope。响应必须
@@ -22,22 +22,17 @@
 - `GET /data/news?date=YYYY-MM-DD&important=true&pageSize=40` 与 `GET /data/news/{id}`：今日聚焦的 DM 新闻列表和正文。
 - `POST /data/graphql`：以 nullable 顶层字段薄映射全部公共数据资源，参数、`fields` 投影
   和 DTO 与对应 REST 相同；不包含市场点评筛选、合并或口径换算。市场点评继续使用分段
-  REST，避免多字段 CPU 累计并保证单资源失败只影响对应模块。
+  REST，避免多字段 CPU 累计并让每个数据步骤独立重试。
 
 本地 Vite 完整保留 `/data` 前缀并代理到 `DATA_PROXY_TARGET`。线上由独立数据服务处理，Dashboard Worker 不注册这些路由。
 
-原始资源字段变化必须与 `src/api.ts` 请求编排、`src/market-report-resources.ts` 加工、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/market-report/*` 或 GraphQL 市场报告聚合，也不要为视觉版或文字版增加单独的数据源。
+原始资源字段变化必须与 `worker/market-report-collector.ts` 请求编排、`src/market-report-resources.ts` 加工、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/market-report/*` 或 GraphQL 市场报告聚合，也不要为视觉版或文字版增加单独的数据源。
 
-Data 错误响应保留安全诊断字段，前端错误消息展示接口路径、HTTP 状态、错误码、数据源、
-处理阶段及限长后的 Schema issue。市场点评的原始资源请求相互隔离：单个请求失败只记录
-该资源 issue，并在依赖它的模块显示“数据缺失”，其他模块及文字版继续生成；只有报告
-定稿本身损坏或最终共享 Schema 无法成立才进入整页错误。`stock-summary` 当日尚未发布时
-返回 404，页面以空股市段落继续加载其他模块；稀疏 OMO/CFETS/期货数值和今日成交收益率
-以 `null` 表示，不转换为 0。
+Data 错误保留安全诊断字段；市场点评 Workflow 对失败资源独立重试，耗尽后明确失败且不归档残缺报告。稀疏 OMO/CFETS/期货数值和今日成交收益率以 `null` 表示，不转换为 0。空列表是否有业务意义仍由原 DTO 与共享派生层解释。
 
 研究辅助浏览器只调用 Dashboard `GET /api/economic-indicators` 读取 Neon。Choice `GET /data/choice/edb` 与 DM `GET /data/cfets-histories` 只供首次本地全历史回填和每日定时增量任务使用，页面加载不消耗上游查询额度。
 
-浏览器在当天直接读取 Data REST 市场数据；历史日期先通过 Dashboard REST 读取完整人工定稿，无定稿时再按所选日期读取可回溯的 Data REST 市场数据并在页面 warning；不支持日期参数的期货最新、今日成交和收藏报价不会进入历史重生成结果。今日聚焦、研究辅助、热点快照、融资择时模型、二级池台账和资金日报仍各自属于一个明确业务资源，不在薄 GraphQL 中增加业务聚合。
+市场点评所有日期只通过 `GET /api/market-report` 读取定稿。缺省日期按上海 17:00 选择 T-1 或当日；缺失明确返回错误，不回退到 Data。生成、重试、归档与邮件由 `market-briefing` Workflow 承担；旧写接口兼容不代表新版前端生成入口。具体规则见[市场点评](modules/market-briefing.md)。
 
 ## Dashboard Worker `/api/*`
 

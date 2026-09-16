@@ -20,3 +20,15 @@ export function shouldWarnUnfinalizedReport(
 ): boolean {
   return !finalizedAt && reportDate < currentDate;
 }
+
+export function isBeforeReportCutoff(now = new Date()): boolean {
+  return Number(new Intl.DateTimeFormat("en-US", {
+    timeZone: SHANGHAI_TIME_ZONE, hour: "2-digit", hourCycle: "h23",
+  }).format(now)) < 17;
+}
+
+export function previousReportTradingDate(tradingDates: string[], today: string): string {
+  const date = tradingDates.filter(date => date < today).sort().at(-1);
+  if (!date) throw new Error("无法确定上一交易日，请稍后重试");
+  return date;
+}

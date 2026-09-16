@@ -13,6 +13,7 @@
   import type { MarketReportResource, ReportData } from "../types";
 
   interface Props {
+    readonly?: boolean;
     data: ReportData;
     focusText?: string;
     missingResources?: MarketReportResource[];
@@ -30,6 +31,7 @@
   }
 
   let {
+    readonly = false,
     data,
     focusText = "",
     missingResources = [],
@@ -170,6 +172,7 @@
         <path d="M13.5 6.5v-2A1.5 1.5 0 0 0 12 3H4.5A1.5 1.5 0 0 0 3 4.5V12a1.5 1.5 0 0 0 1.5 1.5h2" />
       </svg>
     </Button>
+    {#if !readonly}
     <Button data-ui-owner="components-TextReport-svelte" variant="outline"
 
       class={["ui-button text-report__action", saving && "text-report__saving"]}
@@ -183,7 +186,11 @@
         <path d="M7 3.5v4h6v-4M7 16.5v-5h6v5" />
       </svg>
     </Button>
+    {/if}
   </div>
+  {#if readonly}
+    <div bind:this={editor} class="text-report__editor" contenteditable="false" role="textbox" aria-label="文字版境内市场点评" aria-readonly="true" aria-multiline="true" tabindex="0">{@html html}</div>
+  {:else}
   <div
     bind:this={editor}
     bind:innerHTML={html}
@@ -199,4 +206,5 @@
     onpaste={pastePlainText}
     onblur={applyDraft}
   ></div>
+  {/if}
 </article>

@@ -55,87 +55,17 @@ function memoryBucket() {
   };
 }
 
-function directDataResponse(target) {
-  const url = new URL(target, "https://example.test");
-  if (url.pathname === "/data/industry") {
-    return Response.json({
-      dataDate: "2026-08-25",
-      industries: [],
-      equities: [],
-      turnoverYi: null,
-      turnoverChangeYi: null,
-      tradingDates: ["2026-08-22", "2026-08-25"],
-    });
-  }
-  if (url.pathname === "/data/stock-summary") {
-    return Response.json({
-      title: "A股收评",
-      time: "2026-08-25T15:00:00+08:00",
-      paragraphs: ["第一段", "第二段"],
-    });
-  }
-  if (url.pathname === "/data/omo") return Response.json([]);
-  if (url.pathname === "/data/cfets") {
-    return Response.json([]);
-  }
-  if (url.pathname === "/data/bond-top-case") {
-    return Response.json([]);
-  }
-  if (url.pathname === "/data/futures-latest") {
-    return Response.json([]);
-  }
-  if (url.pathname === "/data/margin") {
-    return Response.json([
-        {
-          DIM_DATE: "2026-08-22",
-          TOTAL_RZRQYE: 2e12,
-          TOTAL_RZYE: 1.99e12,
-          TOTAL_RQYE: 1e10,
-        },
-        {
-          DIM_DATE: "2026-08-21",
-          TOTAL_RZRQYE: 1.999e12,
-          TOTAL_RZYE: 1.9891e12,
-          TOTAL_RQYE: 9.9e9,
-        },
-    ]);
-  }
-  if (url.pathname === "/data/primary-issues") {
-    assert.equal(url.searchParams.get("startDate"), "2026-08-22");
-    return Response.json([]);
-  }
-  if (url.pathname === "/data/today-trades") return Response.json([]);
-  if (url.pathname === "/data/favorite-quotes") return Response.json([]);
-  throw new Error(`unexpected request: ${target}`);
-}
-
-test("浏览器经 Access 保护的 Data REST 直接读取并加工，不走聚合或 GraphQL", async (context) => {
-  const originalFetch = globalThis.fetch;
-  context.after(() => { globalThis.fetch = originalFetch; });
-  const calls = [];
-  globalThis.fetch = async (target) => {
-    calls.push(String(target));
-    return directDataResponse(String(target));
-  };
-
-  const { report: result } = await fetchReport(
-    "2026-08-25",
-    false,
-    undefined,
-    "2026-08-25",
-  );
-  assert.equal(result.report_date, "2026-08-25");
-  assert.equal(result.margin.total, 20000);
-  assert.deepEqual(result.stock_paragraphs, ["第一段", "第二段"]);
-  assert.equal(result.focus_text, "");
-  assert.equal(calls.filter((target) => target.includes("/data/market-report/")).length, 0);
-  assert.equal(calls.filter((target) => target.includes("/api/market-report")).length, 0);
-  assert.ok(calls.some((target) => target.includes("/data/industry?")));
-  assert.ok(calls.some((target) => target.includes("/data/primary-issues?")));
-  assert.ok(calls.every((target) => !target.includes("/data/graphql")));
+test("浏览器从归档读取完整报告且不请求原始行情", async (context) => {
+  context.mock.method(globalThis, "fetch", async () => Response.json({
+    ...reportData(), focus_text: "归档聚焦", cached_at: "2026-08-25T09:00:00Z", finalized_at: "2026-08-25T09:00:00Z",
+  }));
+  const { report } = await fetchReport("2026-08-25", false);
+  assert.equal(report.focus_text, "归档聚焦");
+  assert.equal(globalThis.fetch.mock.calls.length, 1);
+  assert.equal(globalThis.fetch.mock.calls[0].arguments[0], "/api/market-report?date=2026-08-25");
 });
 
-test("人工定稿才写入裁剪后的 R2 快照", async () => {
+test("定稿写入裁剪后的 R2 快照", async () => {
   const bucket = memoryBucket();
   const saved = await saveMarketReport(
     bucket,
@@ -198,4 +128,10 @@ test("合并导出保存仍只上传原 JSON 定稿数据与今日聚焦", async
   };
   try { await saveFromBrowser(report, '股债正文'); }
   finally { globalThis.fetch = original; }
+});
+
+test('R2未定稿对象返回404而非成功快照',async()=>{
+  const bucket=memoryBucket();
+  bucket.objects.set('market-briefing/2026-08-25.json',JSON.stringify({...reportData(),focus_text:'',cached_at:'2026-08-25T09:00:00Z',finalized_at:null}));
+  await assert.rejects(readMarketReport(bucket,'2026-08-25'),error=>error.status===404&&error.code==='REPORT_NOT_FINALIZED');
 });

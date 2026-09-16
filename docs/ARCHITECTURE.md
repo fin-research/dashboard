@@ -2,7 +2,7 @@
 
 ## 运行单元
 
-项目由 SvelteKit 应用和自定义 Cloudflare Worker 入口组成。`worker/entry.ts` 承载构建后的 SvelteKit Worker，并注册 `BondLedgerImportWorkflow`。静态资源由 Worker Assets 提供。
+项目由 SvelteKit 应用和自定义 Cloudflare Worker 入口组成。`worker/entry.ts` 承载构建后的 SvelteKit Worker，并注册台账导入与 `MarketBriefingWorkflow`。静态资源由 Worker Assets 提供。
 
 Worker Assets 只承载随应用版本一起构建、发布的前端资源。资金日报是每日独立上传且需要运行时立即生效的业务文件，因此存入 R2，不写入构建目录，也不触发 Worker 重新发布。
 
@@ -18,10 +18,10 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 
 - `src/routes/` 负责页面装配、路由参数和 HTTP 边界，不承载复杂业务计算。
 - `src/App.svelte` 保留市场点评的整体报告装配。
-- `src/api.ts` 按上海日期分流：当天对同源 `/data/*` 原始资源做一次请求编排，用 `fields` 请求最小 DTO 并经 Zod 校验；每个资源独立捕获错误并以显式空结构继续构建报告，同时返回 resource issue 供依赖模块显示“数据缺失”。历史日期优先 GET 完整 R2 定稿，收到 `REPORT_NOT_FINALIZED` 时按所选日期重新请求原始资源；只有手动保存定稿才 PUT `/api/market-report`。
-- `src/market-report-resources.ts` 在浏览器内完成市场点评的筛选、合并与口径换算，产出的唯一 `ReportData` 同时供视觉版和文字版使用。
+- `src/api.ts` 只 GET 完整 R2 市场点评定稿；无定稿明确失败，不触发原始资源或 AI。默认报告日由服务端按上海 17:00 截止时点及交易日证据选择。
+- `src/market-report-resources.ts` 维护市场点评筛选、合并和换算，供后台 Workflow 汇总唯一 `ReportData`，视觉与文字版只做展示派生。
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
-- `src/text-report.ts` 从同一份报告数据生成文字版，并把可识别的文字版手动编辑反向更新到规范报告数据；不得保存完整文字版或建立第二套数据源。
+- `src/text-report.ts` 从同一份归档报告数据派生只读文字版；不得保存完整文字版或建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
 - `/credit-workbench` 的授信报表通过 `/api/credit` 读取 Neon `credit` 日报；交易研究工作台总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；融资工作台的负债周报也只读这张公共表。Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易管理仍读取 `src/lib/trading-research/demo-data.ts`；交易流程通过 `/api/trading-workflow/config` 读写 D1 节点配置，日内进度与提醒状态仅在浏览器本地维护，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 - `/trading-research/policy-tracking` 只读 ingest Workflow 已聚合的政策、面向境内资金/利率研究的三档重要性与自动研报关系；人工调整关系和手动生成/编辑政策点评通过同源 `/api/policies/*` 写 D1。页面加载和筛选不调用模型。政策资讯、关联研报与点评分别使用 `/news/[id]`、`/articles/[id]`、`/commentaries/[id]` 独立深链；政策资讯详情读取 D1 已归档的 DM 原文与政策原文链接，研报详情通过 Worker 的 `DATA` Service Binding 获取正文，点评详情只读 D1。
@@ -35,7 +35,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。
 - `src/lib/server/market-briefing.ts` 通过 `DATA` Service Binding 分别从 `/data/stock-summary`、`/data/news` 和新闻详情取材；新闻详情保持最多 5 个并发，在 Dashboard Worker 组装提示词并生成今日聚焦。
-- `src/lib/server/market-report.ts` 负责完整定稿的按日 R2 读取与手动覆盖，读取和写入都经同一快照 Schema 校验，不查询 Data API。
+- `src/lib/server/market-report.ts` 负责完整定稿的按日 R2 读取、Workflow 写入与旧接口兼容覆盖，读取和写入都经同一快照 Schema 校验，不查询 Data API。
 - `src/lib/server/data-news.ts` 通过 `DATA` Service Binding 有界读取并校验单篇研报正文，供研报详情和政策点评生成复用。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器；传输契约见 [共享 AI](../../eastmoney/docs/AI.md)，业务 Prompt 和 Schema 留在调用模块。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
@@ -69,7 +69,7 @@ Dashboard 是唯一 UI/API Worker。融资领域位于 `src/lib/financing/`（�
 
 融资人员授权查询、提醒查询、报表生成和数据库连接均不能放进全站根 layout。仅融资业务导航执行融资授权与集合查询；重型导入解析器留在浏览器 Web Worker，报表动作客户端按路由加载。Finance 的 CSS 限定 `.financing-scope`，其颜色与表面映射 Dashboard 令牌，不能在导航后污染门户和报告。
 
-自定义 Worker 同时导出 DebtImportWorkflow，继续使用既有 Workflow 名称和台账原子导入。Dashboard 仅保留每小时融资提醒 Cron；经济指标午夜 Cron 与 Workflow 由 Data 持有。从旧 Worker 切换时停止旧 cron，防止重复扫描。迁移不会改变 Quant、Data、Ingest 或其他上游接口。
+自定义 Worker 同时导出 DebtImportWorkflow，继续使用既有 Workflow 名称和台账原子导入。Dashboard 包含每小时融资提醒与北京时间交易日 17:00 市场点评两项 Cron；经济指标午夜 Cron 与 Workflow 由 Data 持有。从旧 Worker 切换时停止旧 cron，防止重复扫描。迁移不会改变 Quant、Data、Ingest 或其他上游接口。
 
 Gateway 在私有 `GatewayDashboard` 中传入唯一身份；hooks 设置 `locals.user` 及 `user.authorization`；融资领域只使用该统一身份与权限。`src/lib/identity.ts` 定义身份及客户端 DTO，基础 subject、邮箱和认证有效期不被业务缓存替换。
 

@@ -6,7 +6,7 @@ import { AuthTestError, SITE_ORIGIN, createHttpSession, loginTestAccount, readAu
 export const ACCESS_PROBES = [
   ['public', '/market-briefing', [200]],
   ['public', '/market-briefing/text', [200]],
-  ['public', '/api/market-report', [400]],
+  ['public', '/api/market-report?date=invalid', [400]],
   ['public', '/api/market-resources/unknown', [400]],
   ['public', '/data/omo', [422]],
   ['public', '/data/news?pageSize=invalid', [422]],

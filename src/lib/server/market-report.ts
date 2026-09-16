@@ -56,8 +56,12 @@ export async function readMarketReport(
     );
   }
   try {
-    return marketReportSnapshotSchema.parse(await object.json());
-  } catch {
+    const snapshot = marketReportSnapshotSchema.parse(await object.json());
+    if (snapshot.report_date !== reportDate) throw new Error("报告日期不匹配");
+    if (!snapshot.finalized_at) throw new MarketReportStoreError(404, `${reportDate} 尚无市场点评定稿`, "REPORT_NOT_FINALIZED", "snapshot_read");
+    return snapshot;
+  } catch (error) {
+    if (error instanceof MarketReportStoreError) throw error;
     console.error(JSON.stringify({
       event: "market_report_snapshot_invalid",
       reportDate,

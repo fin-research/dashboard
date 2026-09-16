@@ -10,11 +10,14 @@
     "CLOUDFLARE_ACCOUNT_ID": "5cecc63c78acf8f5473f8745f4244448",
     "AI_GATEWAY_ID": "default",
     "DATA_API_BASE_URL": "https://eastmoney.hasbai.xyz/data",
-    "CHOICE_DATA_API_URL": "https://eastmoney.hasbai.xyz/data"
+    "CHOICE_DATA_API_URL": "https://eastmoney.hasbai.xyz/data",
+    "FROM_EMAIL": "no-reply@hasbai.xyz",
+    "MARKET_BRIEFING_RECIPIENTS": "shiyue@18.cn"
   },
   "secrets": {
     "required": [
-      "CF_AIG_TOKEN"
+      "CF_AIG_TOKEN",
+      "MARKET_BRIEFING_RESEND_API_KEY"
     ]
   },
   "assets": {
@@ -27,7 +30,8 @@
   },
   "triggers": {
     "crons": [
-      "0 * * * *"
+      "0 * * * *",
+      "0 9 * * MON-FRI"
     ]
   },
   "routes": [],
@@ -86,6 +90,11 @@
       "binding": "DEBT_IMPORT_WORKFLOW",
       "name": "financing-debt-import",
       "class_name": "DebtImportWorkflow"
+    },
+    {
+      "binding": "MARKET_BRIEFING",
+      "name": "market-briefing",
+      "class_name": "MarketBriefingWorkflow"
     }
   ],
   "observability": {

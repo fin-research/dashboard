@@ -1,3 +1,4 @@
+import { MARKET_BRIEFING_CRON, startMarketBriefing } from "./market-briefing-runner.ts";
 import svelteKitWorker from "../.svelte-kit/cloudflare/_worker.js";
 import { creditAssistantHttp } from "./credit-assistant-http.ts";
 import { dashboardAccessFailure } from '../src/lib/server/dashboard-access.ts';
@@ -19,6 +20,7 @@ export class GatewayDashboard extends WorkerEntrypoint<Cloudflare.Env> {
   }
 }
 
+export { MarketBriefingWorkflow } from "./market-briefing-workflow.ts";
 export { BondLedgerImportWorkflow } from "./bond-ledger-workflow.ts";
 export { CreditAgent } from "./credit-agent.ts";
 export { DebtImportWorkflow } from './financing-debt-import.ts';
@@ -26,6 +28,10 @@ export { DebtImportWorkflow } from './financing-debt-import.ts';
 const worker: ExportedHandler<Cloudflare.Env> = {
   fetch() { return new Response('Not Found', { status: 404 }); },
   scheduled(controller, env, context) {
+    if (controller.cron === MARKET_BRIEFING_CRON) {
+      context.waitUntil(startMarketBriefing(env, controller.scheduledTime));
+      return;
+    }
     if (controller.cron === '0 * * * *') {
       context.waitUntil(import('../src/lib/server/financing/reminder-scheduler.js')
         .then(({ runScheduledReminderCheck }) => runScheduledReminderCheck({ scheduledTime: controller.scheduledTime, env }))
