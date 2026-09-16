@@ -75,7 +75,8 @@ test('workflow expands a branch and opens the real editor', async ({ page }) => 
   await screenshot(page, 'workflow-editor');
 });
 
-test('workflow branches expand to the right without displacing the main path', async ({ page }) => {
+test('workflow branches expand to the right without displacing the main path', async ({ page }, testInfo) => {
+  if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/trading-research/workflow');
   const trigger = page.locator('[data-workflow-node="reverse-change"]');
   const next = page.locator('[data-workflow-node="reverse-counterparty"]');

@@ -21,14 +21,15 @@
   let reducedMotion = $state(false);
   const enabledProducts = $derived(products.filter(product => day.enabled[product.id]));
   let lastStructure = '';
-  const branchFrames = $derived(workflowBranchFrames(flowNodes));
   let animation = 0;
   let animating = false;
+  let pendingGraph: FlowGraph | undefined;
   let pendingHeights: Record<string, number> = {};
   let viewportWidth = $state(1040);
   let dragging = $state(false);
   let inquiries = $state<Record<string, boolean>>({});
   let flowNodes = $state.raw<FlowNode[]>([]);
+  const branchFrames = $derived(workflowBranchFrames(flowNodes));
   let heights = $state<Record<string, number>>({});
   let graph = $state.raw<FlowGraph>({ nodes: [], edges: [], bases: {}, timeline: [], height: 680, width: 1040, lanes: {} });
   const cursor = $derived(timelineCursor(graph.timeline, clockMinutes));
@@ -59,6 +60,9 @@
     else complete(members);
   }
   function displayGraph(next: FlowGraph, structure: string) {
+    // Mount/clock/size updates must not turn a running reveal into an instant swap.
+    if (animating && lastStructure === structure && !reducedMotion) { pendingGraph = next; return; }
+    pendingGraph = undefined;
     cancelAnimationFrame(animation);
     const animate = lastStructure !== '' && lastStructure !== structure && !reducedMotion;
     lastStructure = structure;
@@ -95,7 +99,11 @@
             data: { ...edge.data!, joinY: from + (edge.data!.joinY - from) * eased } };
         }) };
       if (progress < 1) animation = requestAnimationFrame(frame);
-      else { graph = next; flowNodes = next.nodes; finishAnimation(); }
+      else {
+        const finalGraph = pendingGraph ?? next;
+        pendingGraph = undefined;
+        graph = finalGraph; flowNodes = finalGraph.nodes; finishAnimation();
+      }
     }
     frame(start);
   }
@@ -185,6 +193,13 @@
   .branch-frame[data-scope="exchange"] { --frame-tone: #8090aa; }
   .product-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) { .product-toggle { transition: none; } }
+  @media (max-width: 700px) {
+    .workflow-diagram { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .product-toggles { grid-row: 1; flex-direction: row; width: 100%; padding: 8px; gap: 6px; background: white; z-index: 10; top: 0; }
+    .product-toggle { flex: 1; min-width: 0; padding: 8px 6px; gap: 4px; }
+    .product-dot { display: none; }
+    .flow-scroll { grid-row: 2; }
+  }
   .flow-scroll { flex: 1; min-width: 0; overflow-x: auto; }
   .flow-canvas { position: relative; }
   .workflow-timeline { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
