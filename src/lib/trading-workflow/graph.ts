@@ -1,9 +1,11 @@
 import type { ShiborRate } from '../../data-contracts.ts';
 import type { InquiryRow, InquiryDirectory } from './inquiries.ts';
-import type { Node, BuiltInEdge } from '@xyflow/svelte';
+import type { Node, Edge } from '@xyflow/svelte';
 import { childrenOf, descendants, isInquiry, minutes, products, type Scope, type Product, type WorkflowNode, type WorkflowDay } from './model.ts';
 
-export const NODE_WIDTH = 300;
+export const NODE_WIDTH = 460;
+export const VERTICAL_GAP = 76;
+export type FlowEdge = Edge<{ joinY: number }, 'workflow'>;
 export type FlowData = {
   title: string; scope: Scope; node?: WorkflowNode; members?: WorkflowNode[]; width: number;
   rows: InquiryRow[]; directory: InquiryDirectory; rates: ShiborRate[]; date: string; now: Date;
@@ -14,7 +16,7 @@ export type FlowData = {
 };
 export type FlowNode = Node<FlowData, 'workflow'>;
 export type TimelineMark = { time: string; minute: number; y: number; endX: number };
-export type FlowGraph = { nodes: FlowNode[]; edges: BuiltInEdge[]; bases: Record<string, { x: number; y: number }>; timeline: TimelineMark[]; height: number; width: number };
+export type FlowGraph = { nodes: FlowNode[]; edges: FlowEdge[]; bases: Record<string, { x: number; y: number }>; timeline: TimelineMark[]; height: number; width: number };
 
 /** Visual groups retain every source ID, so edits and daily records remain reversible. */
 export function workflowGroups(config: WorkflowNode[]): WorkflowNode[][] {
@@ -95,8 +97,8 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
   const width = Math.max(170 + count * 440, options.width ?? 1040);
   const graph: FlowGraph = { nodes: [], edges: [], bases: {}, timeline: [], height: 0, width };
   const areaLeft = 134, areaRight = width - 24, column = (areaRight - areaLeft) / count;
-  const nodeWidth = column - 36, center = (areaLeft + areaRight - nodeWidth) / 2;
-  const laneX = (scope: Scope) => areaLeft + Math.max(0, enabled.findIndex(product => product.id === scope)) * column + 18;
+  const nodeWidth = Math.min(NODE_WIDTH, column - 36), center = (areaLeft + areaRight - nodeWidth) / 2;
+  const laneX = (scope: Scope) => areaLeft + Math.max(0, enabled.findIndex(product => product.id === scope)) * column + (column - nodeWidth) / 2;
   const allGroups = workflowGroups(config);
   const byId = new Map(allGroups.flatMap(group => group.map(node => [node.id, group] as const)));
   const expanded = (group: WorkflowNode[]) => group.some(node => day.branches[node.id]);
@@ -119,11 +121,11 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
       previous = target;
     }
   });
-  function connect(source: string, target: string) {
+  function connect(source: string, target: string, joinY: number) {
     const from = graph.nodes.find(node => node.id === source)!, to = graph.nodes.find(node => node.id === target)!;
     const scope = to.data.scope === 'shared' ? from.data.scope : to.data.scope;
     const color = scope === 'reverse' ? '#00a773' : scope === 'exchange' ? '#8090aa' : '#087cff';
-    graph.edges.push({ id: `${source}:${target}`, source, target, type: 'smoothstep', pathOptions: { borderRadius: 10, offset: 24 },
+    graph.edges.push({ id: `${source}:${target}`, source, target, type: 'workflow', data: { joinY },
       markerEnd: { type: 'arrowclosed' as import('@xyflow/svelte').MarkerType, width: 16, height: 16, color }, style: `stroke: ${color}; stroke-width: 1.8;` });
   }
   const pending = [...groups];
@@ -134,7 +136,7 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
     const id = members[0]!.id, scope = members.length > 1 ? 'shared' : node.scope;
     const x = scope === 'shared' ? center : laneX(scope);
     const predecessors = [...incoming.get(id)!].map(id => graph.nodes.find(node => node.id === id)!);
-    const y = Math.max(80, ...predecessors.map(node => (graph.bases[node.id]?.y ?? node.position.y) + node.measured!.height! + 28));
+    const y = Math.max(104, ...predecessors.map(node => (graph.bases[node.id]?.y ?? node.position.y) + node.measured!.height! + VERTICAL_GAP));
     graph.bases[id] = { x, y };
     const offset = members[0]!.offset;
     const position = { x: x + (offset?.x ?? 0), y: y + (offset?.y ?? 0) };
@@ -148,7 +150,8 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
         editing: options.editing, selected: members.some(item => item.id === options.selectedId),
         measureHeight: height => options.measureHeight?.(id, height), note: day.notes[node.id] ?? '',
         activate: () => options.activate(node, members), complete: () => options.complete?.(members), writeNote: value => options.note(node.id, value) } });
-    for (const predecessor of predecessors) connect(predecessor.id, id);
+    const joinY = position.y - VERTICAL_GAP / 2;
+    for (const predecessor of predecessors) connect(predecessor.id, id, joinY);
   }
   const candidates = graph.nodes.filter(node => node.data.node?.startTime).map(node => ({
     time: node.data.node!.startTime!, minute: minutes(node.data.node!.startTime!), y: node.position.y + node.measured!.height! / 2, endX: node.position.x - 8,

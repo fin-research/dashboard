@@ -7,6 +7,7 @@
   import { SvelteFlow } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import WorkflowNodeView from './WorkflowNode.svelte';
+  import WorkflowEdgeView from './WorkflowEdge.svelte';
   import { buildGraph, timelineCursor, type FlowGraph, type FlowNode } from './graph';
   import { isInquiry, products, type WorkflowNode, type WorkflowDay, type Product } from './model';
   let { nodes, day, clockMinutes, editing = false, selectedId = '', onSelect, onMove, onComplete, onBranch, onEnable, onNote, onRows, onRemember, directory, rates, now }: {
@@ -17,6 +18,7 @@
     onEnable: (product: Product, value: boolean) => void; onNote: (id: string, value: string) => void;
   } = $props();
   const nodeTypes = { workflow: WorkflowNodeView };
+  const edgeTypes = { workflow: WorkflowEdgeView };
   const [send, receive] = crossfade({ duration: 240 });
   let reducedMotion = $state(false);
   const enabledProducts = $derived(products.filter(product => day.enabled[product.id]));
@@ -102,7 +104,7 @@
         {/each}
         {#if cursor !== null}<circle class="clock-cursor" cx="88" cy={cursor} r="4" fill="#087cff" />{/if}
       </svg>
-      <SvelteFlow bind:nodes={flowNodes} edges={graph.edges} {nodeTypes} viewport={{ x: 0, y: 0, zoom: 1 }}
+      <SvelteFlow bind:nodes={flowNodes} edges={graph.edges} {nodeTypes} {edgeTypes} viewport={{ x: 0, y: 0, zoom: 1 }}
         proOptions={{ hideAttribution: true }} minZoom={1} maxZoom={1} nodesDraggable={editing} nodesConnectable={false} elementsSelectable={false}
         panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}
         deleteKey={null} nodeDragThreshold={6} preventScrolling={false} nodeExtent={[[114, 0], [graph.width - 24, 10000]]}
@@ -130,7 +132,9 @@
 <style>
   .workflow-diagram { display: flex; min-width: 0; gap: 8px; position: relative; background: #fff; border-radius: 8px; }
   .product-categories { position: absolute; z-index: 5; top: 12px; left: 134px; right: 24px; display: grid; gap: 0; }
-  .product-category { margin-inline: 18px; min-height: 44px; display: flex; align-items: center; justify-content: space-between; font-size: 1rem; font-weight: bold; background: white; }
+  .product-category { margin-inline: auto; width: calc(100% - 36px); max-width: 460px; min-height: 52px; border: 1px solid color-mix(in srgb, var(--category-tone) 25%, white); border-radius: 8px; --category-tone: #087cff; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 1rem; font-weight: bold; color: var(--category-tone); background: color-mix(in srgb, var(--category-tone) 9%, white); }
+  .product-category[data-workflow-product="reverse"] { --category-tone: #00a773; }
+  .product-category[data-workflow-product="exchange"] { --category-tone: #8090aa; }
   .product-category .btn { color: var(--tr-muted, #667085); min-height: 44px; width: 44px; padding: 0; }
   .archived-products { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 12px; align-self: flex-start; padding-block: 12px; width: 32px; flex: none; }
   .archived-products:empty { display: none; }

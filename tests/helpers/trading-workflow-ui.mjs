@@ -86,7 +86,7 @@ await clickNode('loan-deal');
 assert.equal(document.querySelector('[data-workflow-node="loan-deal"] .node-symbol').innerHTML, originalIcon);
 await clickNode('loan-quote');
 const table = () => document.querySelector('[data-workflow-node="loan-quote"] .inquiry-table');
-assert.equal(table().querySelector('button'),null);
+assert.ok(table().querySelector('[aria-label="在此行下方插入询价"]'));
 assert.equal(table().querySelector('th'),null);
 assert.equal(document.querySelector('[data-workflow-node="loan-quote"] .node-surface').hasAttribute('aria-pressed'), false);
 const fill = async (field, value) => {
@@ -96,13 +96,16 @@ const fill = async (field, value) => {
   await settle(); return document.activeElement;
 };
 const tabKey = async () => { const input=document.activeElement; flushSync(()=>input.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}))); await settle(); };
-await fill('counterparty','工商银行'); await tabKey();
+await fill('counterparty','工商银行'); assert.equal(table().querySelectorAll('.inquiry-row').length,1,'first value does not append a row'); await tabKey();
 async function typeActive(value) { const input=document.activeElement; flushSync(()=>{input.value=value;input.dispatchEvent(new window.Event('input',{bubbles:true}));});await settle(); }
 await typeActive('张三'); await tabKey(); await typeActive('3'); await tabKey(); await typeActive('1.5'); await tabKey(); await typeActive('10'); await tabKey();
 assert.equal(document.activeElement.dataset.field,'counterparty');
 await typeActive('gsyh'); await tabKey();
 assert.equal(table().querySelectorAll('[data-field="counterparty"]')[1].value,'工商银行');
-await typeActive('zs'); await tabKey(); await tabKey(); await tabKey(); await tabKey();
+await typeActive('zs'); await tabKey();
+assert.equal(document.activeElement.value,'','numeric suggestion is not a value');
+assert.equal(table().querySelector(`[id="choices-${document.activeElement.dataset.row}-${document.activeElement.dataset.field}"] [role=option]`).textContent,'3');
+await tabKey(); await tabKey(); await tabKey();
 const local = JSON.parse(localStorage.getItem(dayKey('test-actor','2026-09-15')));
 assert.equal(local.completed['loan-deal'],true); assert.equal(local.completed['loan-quote'],undefined);
 assert.equal(local.quotes['loan-quote'].length,2);

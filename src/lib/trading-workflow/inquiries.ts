@@ -30,8 +30,10 @@ export function suggestions(values: string[], query: string): string[] {
     return { value, score, index };
   }).filter(item => item.score >= 0).sort((a, b) => a.score - b.score || a.index - b.index).slice(0, 7).map(item => item.value);
 }
-export function inheritRow(row: InquiryRow, previous?: InquiryRow): InquiryRow {
-  return { ...row, tenor: row.tenor.trim() || previous?.tenor || '', amount: row.amount.trim() || previous?.amount || '', price: row.price.trim() || previous?.price || '' };
+export const hasInquiryValue = (row: InquiryRow) => [row.counterparty, row.trader, row.tenor, row.amount, row.price].some(value => value.trim());
+export function previousValues(rows: InquiryRow[], id: string, field: InquiryField): string[] {
+  const index = rows.findIndex(row => row.id === id);
+  return [...new Set(rows.slice(0, index).reverse().map(row => row[field]).filter(value => value.trim() && !fieldError(field, value)))].slice(0, 7);
 }
 export function tenorDays(value: string): number | null {
   const input = value.trim().toUpperCase();
@@ -39,16 +41,19 @@ export function tenorDays(value: string): number | null {
   const match = /^(\d+(?:\.\d+)?)(D|天|W|周|M|月|Y|年)?$/.exec(input);
   if (!match) return null;
   const days = Number(match[1]) * (({ W: 7, 周: 7, M: 30, 月: 30, Y: 365, 年: 365 } as Record<string, number>)[match[2] ?? 'D'] ?? 1);
-  return days > 0 && Number.isInteger(days) ? days : null;
+  return days > 0 && Number.isSafeInteger(days) ? days : null;
 }
 const numeric = /^-?\d+(?:\.\d+)?$/;
-export function invalidField(row: InquiryRow, loan: boolean): InquiryField | null {
-  if (!row.counterparty.trim()) return 'counterparty';
-  if (loan && !row.trader.trim()) return 'trader';
-  if (!tenorDays(row.tenor)) return 'tenor';
-  if (!numeric.test(row.amount) || Number(row.amount) <= 0) return 'amount';
-  if (!numeric.test(row.price)) return 'price';
+export function fieldError(field: InquiryField, value: string): string | null {
+  if (!value.trim()) return null;
+  if (field === 'tenor' && !tenorDays(value)) return '期限须为正整数天数';
+  if (field === 'amount' && (!numeric.test(value) || !Number.isFinite(Number(value)) || Number(value) <= 0)) return '金额须为大于零的数值';
+  if (field === 'price' && (!numeric.test(value) || !Number.isFinite(Number(value)))) return '价格须为有效数值';
   return null;
+}
+export function invalidField(row: InquiryRow, loan: boolean): InquiryField | null {
+  const fields: InquiryField[] = loan ? ['counterparty', 'trader', 'tenor', 'amount', 'price'] : ['counterparty', 'tenor', 'amount', 'price'];
+  return fields.find(field => !row[field].trim() || fieldError(field, row[field])) ?? null;
 }
 export function shiborTenor(value: string): ShiborRate['tenor'] | null {
   const days = tenorDays(value);

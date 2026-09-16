@@ -139,7 +139,19 @@ test('flow graph folds conditions, centers common steps, joins paths and preserv
   assert.equal(at('shared-done').x, at('shared-elements').x);
   assert.ok(at('shared-done').y > at('loan-arrival').y);
   const foldedLoan = buildGraph(defaults, {...day,enabled:{loan:true,reverse:false,exchange:false}}, options);
-  assert.ok(foldedLoan.nodes.find(n => n.id === 'loan-quote').data.width > folded.nodes.find(n => n.id === 'loan-quote').data.width);
+  assert.ok(foldedLoan.nodes.every(n => n.data.width <= 460));
+  const wide = buildGraph(defaults,day,{...options,width:2400});
+  assert.ok(wide.nodes.every(n => n.data.width <= 460));
+  for (const target of wide.nodes) {
+    const incoming = wide.edges.filter(edge => edge.target === target.id);
+    assert.equal(new Set(incoming.map(edge => edge.data.joinY)).size, incoming.length ? 1 : 0);
+    for (const edge of incoming) {
+      const source = wide.nodes.find(node => node.id === edge.source);
+      assert.ok(target.position.y - source.position.y - source.measured.height >= 76);
+      assert.ok(edge.data.joinY > source.position.y + source.measured.height);
+      assert.ok(edge.data.joinY < target.position.y);
+    }
+  }
   assert.equal(foldedLoan.nodes.find(n => n.id === 'loan-quote').position.x, foldedLoan.nodes.find(n => n.id === 'shared-elements').position.x);
   assert.ok(at('loan-quote').y < at('shared-elements').y);
   assert.ok(at('reverse-quote').y < at('shared-elements').y);
