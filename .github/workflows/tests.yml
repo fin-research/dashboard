@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      update_visual_baselines:
+        description: Generate candidate CI baselines for review
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -23,7 +28,12 @@ jobs:
       - run: pnpm test:coverage
       - run: pnpm build
       - run: pnpm exec playwright install chromium
-      - run: pnpm test:visual
+      - name: Compare visual baselines
+        if: ${{ !inputs.update_visual_baselines }}
+        run: pnpm test:visual
+      - name: Generate candidate visual baselines
+        if: ${{ inputs.update_visual_baselines }}
+        run: pnpm test:visual:update
       - run: git diff --check
       - uses: actions/upload-artifact@v4
         if: always()
@@ -33,4 +43,5 @@ jobs:
             coverage/
             playwright-report/
             test-results/
+            tests/visual/__screenshots__/macos-ci/
           retention-days: 14
