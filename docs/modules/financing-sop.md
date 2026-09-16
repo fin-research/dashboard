@@ -34,4 +34,4 @@
 
 ## 每小时调度与交付边界
 
-`worker/entry.ts` 按 cron 表达式分流：`0 * * * *` 仅运行融资提醒，`0 16 * * *` 仅触发经济观测同步。每日任务不得随小时提醒扩大频率。提醒沿用原查询、周期、去重键和状态含义；无 Resend 配置时仍为 pending。真实发送测试需明确收件人与发件人，Provider accepted 不等于 delivered。
+`worker/entry.ts` 的 `0 * * * *` 仅运行融资提醒。经济观测同步的午夜 Cron 已迁至 Data。提醒沿用原查询、周期、去重键和状态含义；无 Resend 配置时仍为 pending。真实发送测试需明确收件人与发件人，Provider accepted 不等于 delivered。

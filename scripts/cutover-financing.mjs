@@ -46,7 +46,7 @@ if (mode === 'switch-route') {
     if (!settings.bindings.some(binding => binding.name === name)) throw new Error(`Dashboard binding ${name} missing`);
   }
   const schedules = await api(`accounts/${account}/workers/scripts/eastmoney-dashboard/schedules`);
-  if (!['0 * * * *', '0 16 * * *'].every(cron => schedules.schedules.some(item => item.cron === cron))) throw new Error('Dashboard schedules incomplete');
+  if (!['0 * * * *'].every(cron => schedules.schedules.some(item => item.cron === cron))) throw new Error('Dashboard schedules incomplete');
   if (oldRoute) await api(`zones/${zone}/workers/routes/${oldRoute.id}`, 'DELETE');
   const confirmed = await api(`zones/${zone}/workers/routes`);
   if (confirmed.some(route => route.pattern === 'eastmoney.hasbai.xyz/financing/*')) throw new Error('Legacy route still exists');

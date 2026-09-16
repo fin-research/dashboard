@@ -19,3 +19,9 @@ dist/
 .auth0-deploy/
 
 node_modules
+
+# Local test evidence
+/coverage/
+/playwright-report/
+/test-results/
+/visual-dist/

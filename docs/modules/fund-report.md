@@ -14,3 +14,5 @@
 ## 数据流
 
 历史资金日报页的上传模态框上传完整 HTML → Worker 校验文件名日期、大小、编码和 HTML 文档头 → R2 `fund-reports/YYYY-MM-DD.html`。`/fund-report` 枚举固定前缀并按日期倒序展示历史列表；日期页只解析确定性的对象 key，不接受任意 R2 路径。
+
+Data 的每日同步只读取本次上海日期对应的一份资金日报，不存在就跳过。历史补录和更正使用 Data 的显式[资金日报回填](../../../data/docs/modules/quant-inputs.md#一次性回填)。

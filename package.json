@@ -19,8 +19,6 @@
     "financing-model:db:migrate": "node scripts/apply-financing-model-migrations.mjs",
     "credit:db:migrate": "node scripts/apply-credit-migrations.mjs",
     "credit:import": "node --experimental-strip-types scripts/import-credit-workbook.ts",
-    "edb:db:migrate": "node --env-file-if-exists=.env.local scripts/apply-edb-migrations.mjs",
-    "edb:update": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/update-economic-indicators.ts",
     "db:sync:remote": "node scripts/sync-remote-d1.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
@@ -37,7 +35,12 @@
     "auth:verify": "node --use-env-proxy scripts/verify-auth-access.mjs",
     "auth0:export": "node --use-env-proxy scripts/auth0-deploy.mjs export",
     "auth0:plan": "node --use-env-proxy scripts/auth0-deploy.mjs plan",
-    "auth0:apply": "node --use-env-proxy scripts/auth0-deploy.mjs apply"
+    "auth0:apply": "node --use-env-proxy scripts/auth0-deploy.mjs apply",
+    "test:coverage": "mkdir -p coverage && node --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-include='src/**/*.js' --test-coverage-exclude='src/**/generated/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.mjs tests/financing/*.test.mjs",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:report": "playwright show-report",
+    "test:python": "uv run tests/test_credit_materials.py"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.1",
@@ -65,6 +68,7 @@
     "@bufbuild/protoc-gen-es": "^2.14.1",
     "@cloudflare/workers-types": "5.20260823.1",
     "@electric-sql/pglite": "^0.3.12",
+    "@playwright/test": "1.62.0",
     "@sveltejs/vite-plugin-svelte": "6.2.4",
     "@tailwindcss/vite": "4.3.3",
     "@types/better-sqlite3": "^7.6.13",

@@ -44,7 +44,7 @@
 - 不手动编辑生成文件 `worker-configuration.d.ts`；绑定变化使用 `pnpm worker:typegen`。
 - `pnpm dev` 不自动同步远程 D1。只有任务明确需要本地证据时才运行 `pnpm db:sync:remote`。
 - 保留用户已有改动，不做无关重构，不通过删除测试或关闭检查掩盖错误。
-- 默认验收为 `pnpm typecheck`、`pnpm test`、`pnpm build`、`git diff --check`。未实际执行浏览器或截图检查时，不得声明视觉验收通过。
+- 默认验收为 `pnpm typecheck`、`pnpm test`、`pnpm build`、`git diff --check`；UI/样式/组件/图表变更加跑 `pnpm test:visual`。测试规范化任务同时运行 `pnpm test:coverage`。未实际执行浏览器或截图检查时，不得声明视觉验收通过。
 
 ## Commands
 
@@ -82,3 +82,7 @@
 共享认证架构、各权限范围及测试账号配置见 [项目组 AUTH](../eastmoney/docs/AUTH.md)。权限登录与验收只使用程序化 HTTP、单元测试与 CLI，禁止 browser、Chrome、Playwright 和浏览器 MCP。新增测试仅使用匿名和 `test@18.cn` 两种身份；真实密码只读根目录 `.env`，不进入测试夹具或日志。
 
 Auth0 租户配置与用户资料服务由 Gateway 维护。Dashboard 只经 `IDENTITY: IdentityService` 调用，不新增 Auth0 凭据或权限数据库 binding。历史维护脚本不构成运行时身份服务。
+
+## 测试规范
+
+测试新增、合并、覆盖率与视觉回归按 [TESTING](docs/TESTING.md) 执行；不要通过源码样式或控件数量锁定代替行为验证。

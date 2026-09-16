@@ -35,9 +35,15 @@
 
 	function resetWithForm(element: HTMLElement) {
 		const form = element.closest('form');
-		const reset = () => queueMicrotask(resetValues);
+		// Svelte resets bound controls from defaultValue after the native reset.
+		// Restore our dynamic fields after that batch, including newly mounted inputs.
+		let timer: ReturnType<typeof setTimeout>;
+		const reset = () => {
+			clearTimeout(timer);
+			timer = setTimeout(resetValues, 0);
+		};
 		form?.addEventListener('reset', reset);
-		return { destroy: () => form?.removeEventListener('reset', reset) };
+		return { destroy: () => { clearTimeout(timer); form?.removeEventListener('reset', reset); } };
 	}
 
 	function offsetLabel(value: number | undefined) {

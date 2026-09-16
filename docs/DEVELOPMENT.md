@@ -23,7 +23,7 @@ pnpm build
 git diff --check
 ```
 
-`pnpm build` 同时执行 Svelte 类型检查、Worker 类型检查和生产构建。默认验收不包含浏览器、截图或命名视口检查；只有实际运行后才声明视觉验收。
+`pnpm build` 同时执行 Svelte 类型检查、Worker 类型检查和生产构建。UI、全局样式、共享组件和图表变更默认加跑 `pnpm test:visual`；截图基线、覆盖范围与更新规则见 [TESTING](TESTING.md)。只有实际运行后才声明视觉验收。
 
 ## 专项验证
 
@@ -85,3 +85,7 @@ Gateway 切换验证后，删除 Dashboard 不再使用的 Auth0 管理 Secret�
 按 [共享 AUTH](../../eastmoney/docs/AUTH.md#程序化权限测试) 执行本仓库匿名/测试账号覆盖。权限验收禁止 browser；真实登录统一使用 Dashboard 的 `pnpm auth:verify`，凭据只从项目组根 `.env` 读取，不复制登录实现或密码到各仓库。
 
 Auth0 配置维护在 Gateway 使用 `pnpm auth0:export` / `pnpm auth0:plan` / `pnpm auth0:apply`，必须指定 `--include`。详细参数、机器凭据、套餐限制与测试账号准备见 [共享 AUTH](../../eastmoney/docs/AUTH.md#auth0-配置管理deploy-cli)。
+
+## 测试分层与覆盖率
+
+测试规范、覆盖率口径、当前审计及专项入口见 [TESTING](TESTING.md)。

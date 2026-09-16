@@ -1,0 +1,36 @@
+name: Tests and visual regression
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    # Match the committed native macOS baselines. No containers or login secrets.
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@10.33.2
+      - run: pnpm install --frozen-lockfile
+      - uses: astral-sh/setup-uv@v6
+      - run: pnpm test:python
+      - run: pnpm test:coverage
+      - run: pnpm build
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test:visual
+      - run: git diff --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-evidence
+          path: |
+            coverage/
+            playwright-report/
+            test-results/
+          retention-days: 14

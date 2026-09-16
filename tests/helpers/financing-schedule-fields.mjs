@@ -38,6 +38,8 @@ async function exercise(props, startName, endName, start, end) {
 	change('scheduleType', 'period', 'change');
 	assert.equal(form.querySelector(`[name="${startName}"]`).value, start);
 	form.reset();
+	// Let the native/Svelte reset batch finish before the component restores its props.
+	await new Promise(resolve => setTimeout(resolve, 0));
 	await tick();
 	await Promise.resolve();
 	flushSync();
