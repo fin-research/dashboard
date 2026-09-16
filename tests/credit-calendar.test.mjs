@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import {execFile} from 'node:child_process';
-import {promisify} from 'node:util';
 import test from 'node:test';
 import {creditLimitFilterLabels,matchesCreditCalendarEvent} from '../src/lib/credit/calendar.ts';
 import {creditItemTypes} from '../src/lib/credit/types.ts';
@@ -22,7 +20,4 @@ test('额度和已用默认均为全部，两组独立多选且额度续作扩�
   assert.equal(matchesCreditCalendarEvent(usage(undefined),[],['other']),false);
 });
 
-test('真实授信日历组件支持两组多选、恢复全部和切月保持筛选',async()=>{
-  const {stdout}=await promisify(execFile)(process.execPath,['--conditions=browser','tests/helpers/credit-calendar-ui.mjs'],{cwd:new URL('../',import.meta.url),timeout:60_000});
-  assert.match(stdout,/Credit calendar multi-select checks passed/);
-});
+// Mounted multi-select and month navigation live in visual/ui-contracts.spec.mjs.

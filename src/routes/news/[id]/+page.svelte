@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
   import { onMount } from "svelte";
 
   import ModuleCard from "../../../components/ModuleCard.svelte";
@@ -61,7 +62,7 @@
   {#if loading}
     <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取新闻资讯</strong></section>
   {:else if errorMessage}
-    <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><button class="btn" type="button" onclick={loadNews}>重新读取</button></section>
+    <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><Button data-ui-owner="routes-news--id---page-svelte" variant="outline" class={"ui-button"} type="button" onclick={loadNews}>重新读取</Button></section>
   {:else if detail}
     <div class="news-layout">
       <div class="news-column">
@@ -98,9 +99,9 @@
 <style>
   .page-state { display: flex; min-height: 260px; align-items: center; justify-content: center; gap: 14px; border: 1px solid #d8e2f0; border-radius: 10px; background: #fff; }
   .page-state--error { flex-wrap: wrap; color: #b42318; }
-  .page-state button, .source-link, aside a { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 16px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; font: inherit; font-weight: bold; background: #fff; cursor: pointer; text-decoration: none; transition: border-color 180ms ease, background 180ms ease; }
-  .page-state button:hover, .source-link:hover, aside a:hover { border-color: #2f6fd6; background: #f5f9ff; }
-  .page-state button:focus-visible, .source-link:focus-visible, aside a:focus-visible { outline: 3px solid rgba(47, 111, 214, .28); outline-offset: 2px; }
+  :global(.page-state button[data-ui-owner="routes-news--id---page-svelte"]), .source-link, aside a { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 0 16px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; font: inherit; font-weight: bold; background: #fff; cursor: pointer; text-decoration: none; transition: border-color 180ms ease, background 180ms ease; }
+  :global(.page-state button[data-ui-owner="routes-news--id---page-svelte"]:hover), .source-link:hover, aside a:hover { border-color: #2f6fd6; background: #f5f9ff; }
+  :global(.page-state button[data-ui-owner="routes-news--id---page-svelte"]:focus-visible), .source-link:focus-visible, aside a:focus-visible { outline: 3px solid rgba(47, 111, 214, .28); outline-offset: 2px; }
   .spinner { width: 22px; height: 22px; border: 3px solid #d8e2f0; border-top-color: #2f6fd6; border-radius: 50%; animation: spin .8s linear infinite; }
   .news-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
   .news-column { display: grid; gap: 20px; min-width: 0; }
@@ -119,5 +120,5 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (max-width: 900px) { .news-layout { grid-template-columns: 1fr; } aside { order: -1; } }
   @media (max-width: 620px) { :global(.news-hero), :global(.news-content) { padding: 16px; } #news-title { font-size: 1.25rem; } }
-  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } .page-state button, .source-link, aside a { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } :global(.page-state button[data-ui-owner="routes-news--id---page-svelte"]), .source-link, aside a { transition: none; } }
 </style>

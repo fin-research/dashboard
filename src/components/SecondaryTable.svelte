@@ -1,15 +1,19 @@
 <script lang="ts">
   import type { TableRowView } from "../view-model";
 
-  export let headers: string[];
-  export let rows: TableRowView[];
-  export let emptyText: string;
+  interface Props {
+    headers: string[];
+    rows: TableRowView[];
+    emptyText: string;
+  }
+
+  let { headers, rows, emptyText }: Props = $props();
 </script>
 
 {#if !rows.length}
   <div class="secondary-table__empty">{emptyText}</div>
 {:else}
-  <table class="table secondary-table">
+  <table class="ui-table secondary-table">
     <thead>
       <tr>
         {#each headers as label}
@@ -24,7 +28,7 @@
             <td>
               {#if columnIndex === 0 && row.tagIndex}
                 <span
-                  class={`badge primary-badge tenor-badge primary-badge--${row.tagIndex}`}
+                  class={`ui-badge primary-badge tenor-badge primary-badge--${row.tagIndex}`}
                   >{value}</span
                 >
               {:else}

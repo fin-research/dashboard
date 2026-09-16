@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
   import { shiborRatesSchema, type ShiborRate } from '../../data-contracts';
   import { blankDirectory, directoryKey, directorySchema, remember, type InquiryDirectory, type InquiryRow } from '../trading-workflow/inquiries';
   import { onMount } from 'svelte';
@@ -222,12 +224,11 @@
   <div class="workflow-header" use:portal={'#tr-topbar-actions'}>
     <time class="workflow-clock" datetime={`${clock.date}T${clock.time}+08:00`} aria-label="当前时间"><Clock size={18} aria-hidden="true" />{clock.time}</time>
     {#if canEdit && config}
-      <label class="edit-mode"><input type="checkbox" class="toggle toggle-primary" checked={editing} disabled={saving}
-        onchange={event => { editing ? cancelEditing() : startEditing(); event.currentTarget.checked = editing; }} />编辑模式</label>
+      <label class="edit-mode"><Checkbox  bind:checked={() => editing, (value) => { value ? startEditing() : cancelEditing(); }} disabled={saving} />编辑模式</label>
     {/if}
   </div>
   {#if loading}<p role="status">正在加载交易流程…</p>
-  {:else if loadError}<ModuleCard><p role="alert">{loadError}</p><button class="btn" onclick={loadConfig}>重新加载</button></ModuleCard>
+  {:else if loadError}<ModuleCard><p role="alert">{loadError}</p><Button data-ui-owner="lib-trading-research-WorkflowView-svelte" variant="outline" class={"ui-button"} onclick={loadConfig}>重新加载</Button></ModuleCard>
   {:else if config}
     <div class="flow-workspace" class:saving>
       <WorkflowCanvas nodes={editing ? draft : config.nodes} day={displayDay} clockMinutes={clock.minutes} {editing} {selectedId}

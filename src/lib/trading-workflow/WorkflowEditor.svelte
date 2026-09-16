@@ -1,4 +1,9 @@
 <script lang="ts">
+  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { workflowGroups } from './graph';
   import { onMount } from 'svelte';
   import { descendants, isInquiry, products, type Scope, type WorkflowNode } from './model';
@@ -32,48 +37,48 @@
 </script>
 
 <aside class="workflow-editor" aria-labelledby="workflow-editor-title" bind:this={panel}>
-  <div class="editor-heading"><h2 id="workflow-editor-title">节点编辑</h2><button class="btn btn-ghost" type="button" aria-label="关闭节点编辑" onclick={onClose}>×</button></div>
+  <div class="editor-heading"><h2 id="workflow-editor-title">节点编辑</h2><Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="ghost" class={"ui-button "} type="button" aria-label="关闭节点编辑" onclick={onClose}>×</Button></div>
   <fieldset disabled={disabled} class="editor-fields">
     {#if selected}
-      <label>编辑节点<select class="select" value={selectedId} onchange={event => onSelect(event.currentTarget.value)}>
+      <label>编辑节点<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} value={selectedId} onchange={event => onSelect(event.currentTarget.value)}>
         {#each nodes as node}<option value={node.id}>{scopes.find(scope => scope.id === node.scope)?.label} · {isInquiry(node) ? '询价' : node.title}</option>{/each}
-      </select></label>
-      <label>节点名称<input class="input" required maxlength="160" bind:value={selected.title} /></label>
+      </NativeSelect></label>
+      <label>节点名称<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} required maxlength={160} bind:value={selected.title} /></label>
       {#if selected.kind === 'task'}
         <div class="editor-pair">
-          <label>开始 / 提醒<input class="input" type="time" value={selected.startTime ?? ''} oninput={event => { if (selected) selected.startTime = event.currentTarget.value || null; }} /></label>
-          <label>结束<input class="input" type="time" value={selected.endTime ?? ''} oninput={event => { if (selected) selected.endTime = event.currentTarget.value || null; }} /></label>
+          <label>开始 / 提醒<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} type="time" value={selected.startTime ?? ''} oninput={event => { if (selected) selected.startTime = event.currentTarget.value || null; }} /></label>
+          <label>结束<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} type="time" value={selected.endTime ?? ''} oninput={event => { if (selected) selected.endTime = event.currentTarget.value || null; }} /></label>
         </div>
       {/if}
-      <label>所属流程<select class="select" value={selected.scope} onchange={(event) => {
+      <label>所属流程<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} value={selected.scope} onchange={(event) => {
         if (!selected) return; const scope = event.currentTarget.value as Scope;
         const ids = descendants(nodes, selected.id); nodes = nodes.map(node => ids.has(node.id) ? { ...node, scope, parentId: node.id === selectedId ? null : node.parentId } : node);
-      }}>{#each scopes as scope}<option value={scope.id}>{scope.label}</option>{/each}</select></label>
-      <label class="editor-checkbox"><input class="checkbox checkbox-primary" type="checkbox" checked={notificationsEnabled} disabled={!notificationsSupported} onchange={onNotifications} />浏览器提醒</label>
-      <label>备注<textarea class="textarea" maxlength="1200" rows="4" bind:value={selected.detail}></textarea></label>
-      <button class="btn btn-primary editor-save" type="button" onclick={onSave}>{disabled ? '保存中…' : '保存'}</button>
-      <div class="editor-actions"><button type="button" class="btn btn-outline btn-error" style="--btn-color: var(--color-error-content)" onclick={() => selected && remove(selected)}>删除节点</button><button type="button" class="btn btn-outline btn-primary" onclick={() => selected && addChild(selected)}>新增下级节点</button></div>
+      }}>{#each scopes as scope}<option value={scope.id}>{scope.label}</option>{/each}</NativeSelect></label>
+      <label class="editor-checkbox"><Checkbox data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"  bind:checked={() => notificationsEnabled, () => onNotifications()} disabled={!notificationsSupported} />浏览器提醒</label>
+      <label>备注<Textarea data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-textarea"} maxlength={1200} rows={4} bind:value={selected.detail}></Textarea></label>
+      <Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="default" class={"ui-button  editor-save"} type="button" onclick={onSave}>{disabled ? '保存中…' : '保存'}</Button>
+      <div class="editor-actions"><Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="destructive" type="button" class={"ui-button  "} onclick={() => selected && remove(selected)}>删除节点</Button><Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="outline" type="button" class={"ui-button  "} onclick={() => selected && addChild(selected)}>新增下级节点</Button></div>
       <details class="collapse editor-advanced"><summary class="collapse-title">节点设置</summary><div class="collapse-content editor-settings">
-        <label>节点类型<select class="select" value={selected.kind} onchange={event => {
+        <label>节点类型<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} value={selected.kind} onchange={event => {
           if (!selected) return;
           if (event.currentTarget.value === 'task' && nodes.some(node => node.parentId === selectedId)) return;
           selected.kind = event.currentTarget.value as 'task' | 'branch';
           if (selected.kind === 'branch') { selected.startTime = null; selected.endTime = null; }
-        }}><option value="task" disabled={nodes.some(node => node.parentId === selectedId)}>任务</option><option value="branch">条件分支</option></select></label>
-        <label>上级分支<select class="select" bind:value={selected.parentId}>
+        }}><option value="task" disabled={nodes.some(node => node.parentId === selectedId)}>任务</option><option value="branch">条件分支</option></NativeSelect></label>
+        <label>上级分支<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} bind:value={selected.parentId}>
           <option value={null}>主流程</option>
           {#each nodes.filter(node => node.scope === selected.scope && node.kind === 'branch' && !descendants(nodes, selected.id).has(node.id)) as parent}<option value={parent.id}>{parent.title}</option>{/each}
-        </select></label>
+        </NativeSelect></label>
         {#if selected.kind === 'task'}
-          <label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={isInquiry(selected)} onchange={event => { if (selected) selected.inquiry = event.currentTarget.checked; }} />询价输入框</label>
-        {:else}<label class="editor-checkbox"><input type="checkbox" class="checkbox" checked={expanded} onchange={event => onBranch(selectedId, event.currentTarget.checked)} />展开分支</label>{/if}
+          <label class="editor-checkbox"><Checkbox data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"  checked={isInquiry(selected)} onCheckedChange={checked => { if (selected) selected.inquiry = checked; }} />询价输入框</label>
+        {:else}<label class="editor-checkbox"><Checkbox data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"  checked={expanded} onCheckedChange={checked => onBranch(selectedId, checked)} />展开分支</label>{/if}
         <div class="editor-pair">
-          <label>水平偏移<input class="input" type="number" min="-10000" max="10000" value={offset.x} oninput={event => setOffset('x', event.currentTarget.valueAsNumber || 0)} /></label>
-          <label>垂直偏移<input class="input" type="number" min="-10000" max="10000" value={offset.y} oninput={event => setOffset('y', event.currentTarget.valueAsNumber || 0)} /></label>
+          <label>水平偏移<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} type="number" min="-10000" max="10000" value={offset.x} oninput={event => setOffset('x', event.currentTarget.valueAsNumber || 0)} /></label>
+          <label>垂直偏移<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} type="number" min="-10000" max="10000" value={offset.y} oninput={event => setOffset('y', event.currentTarget.valueAsNumber || 0)} /></label>
         </div>
-        <button class="btn btn-ghost" type="button" onclick={onReset}>恢复自动布局</button>
+        <Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="ghost" class={"ui-button "} type="button" onclick={onReset}>恢复自动布局</Button>
       </div></details>
-    {:else}<button class="btn btn-primary" type="button" onclick={onAdd}>新增节点</button>{/if}
+    {:else}<Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="default" class={"ui-button "} type="button" onclick={onAdd}>新增节点</Button>{/if}
   </fieldset>
 </aside>
 
@@ -83,10 +88,10 @@
   h2 { font-size: 1.25rem; font-weight: bold; margin: 0; }
   .editor-fields { border: 0; margin: 0; padding: 0; display: grid; gap: 22px; min-width: 0; }
   .editor-fields label { display: grid; gap: 8px; font-weight: bold; font-size: 1rem; min-width: 0; }
-  .editor-fields :is(input:not([type="checkbox"]), select, textarea) { width: 100%; font-weight: normal; }
+  :global(.editor-fields :is(input[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"]:not([type="checkbox"]), select[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"], textarea[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"])) { width: 100%; font-weight: normal; }
   .editor-fields .editor-checkbox { display: flex; align-items: center; gap: 10px; }
   .editor-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .editor-save { width: 100%; }
+  :global(.editor-save[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"]) { width: 100%; }
   .editor-advanced { border: 1px solid var(--tr-border); border-radius: 8px; }
   .editor-settings { display: grid; gap: 16px; }
   .editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

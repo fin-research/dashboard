@@ -8,7 +8,7 @@
 .profile-avatar { display: grid; flex-shrink: 0; place-items: center; width: 56px; height: 56px; border-radius: var(--radius-card); color: var(--brand-deep); background: var(--brand-soft); }
 .profile-summary > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
 .profile-summary strong { font-size: 1.25rem; }
-.profile-summary > div > span { color: var(--muted); font-size: .875rem; line-height: 1.6; }
+.profile-summary > div > span { color: var(--text-muted); font-size: .875rem; line-height: 1.6; }
 .profile-tag { margin-left: auto; padding: 6px 10px; flex-shrink: 0; color: var(--brand-deep); background: var(--brand-soft); border-radius: var(--radius-tag); font-size: .875rem; }
 .profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .profile-form { display: grid; gap: 12px; }
@@ -17,7 +17,7 @@
 .profile-form fieldset { display: block; border: 0; padding: 0; margin: 0; min-width: 0; font-size: 1rem; }
 .profile-form legend { margin-bottom: 4px; padding: 0; font-size: .875rem; font-weight: bold; }
 .profile-form fieldset .profile-choice { display: inline-flex; margin-right: 20px; font-size: 1rem; font-weight: normal; }
-.field-status { margin-left: 8px; font-size: .875rem; color: var(--muted); }
+.field-status { margin-left: 8px; font-size: .875rem; color: var(--text-muted); }
 .profile-choice { display: flex; align-items: center; min-height: 44px; gap: 10px; cursor: pointer; }
 .profile-choice input { width: 20px; flex-shrink: 0; accent-color: var(--brand); }
 .profile-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
@@ -26,7 +26,7 @@
 @media (max-width: 720px) { .profile-page { padding-inline: 12px; } .profile-grid { grid-template-columns: 1fr; } .profile-summary { gap: 12px; } .profile-header h1 { font-size: 1.25rem; } .profile-tag { display: none; } }
 
 .permission-roles { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0 0 1.25rem; padding: 0; list-style: none; }
-.permission-roles li { display: inline-flex; align-items: center; gap: .5rem; min-height: 36px; padding: .375rem .75rem; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--color-base-200); font-size: 1rem; color: var(--text-1); }
+.permission-roles li { display: inline-flex; align-items: center; gap: .5rem; min-height: 36px; padding: .375rem .75rem; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); font-size: 1rem; color: var(--text-1); }
 .permission-roles svg { color: var(--brand); flex-shrink: 0; }
 .permission-status { display: grid; place-items: center; min-height: 80px; }
 

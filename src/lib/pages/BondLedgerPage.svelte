@@ -1,7 +1,8 @@
 <script lang="ts">
+  import Modal from "$lib/components/Modal.svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
   import { onMount } from "svelte";
 
-  export let embedded = false;
   import "../../bond-ledger.css";
 
   import {
@@ -52,6 +53,11 @@
   import { portal } from "$lib/portal";
   import type { MetricIconName } from "../../view-model";
   import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
+  interface Props {
+    embedded?: boolean;
+  }
+
+  let { embedded = false }: Props = $props();
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
   const INITIAL_REPORT_DATE = currentReportDate();
@@ -73,160 +79,30 @@
     { value: "available", label: "可供户" },
   ];
 
-  let analytics: BondLedgerReport = emptyBondLedgerReport();
-  let remoteFiles: RemoteBondLedgerFile[] = [];
-  let databaseLedgerDates: string[] = [];
-  let startDate = INITIAL_WEEK_RANGE.startDate;
-  let endDate = INITIAL_WEEK_RANGE.endDate;
-  let loadingRecords = true;
-  let uploading = false;
-  let deleting = false;
-  let rangeOpen = false;
-  let rangePhase: "start" | "end" = "start";
-  let rangeMonthLeft = monthStart(startDate);
-  let managementMonth = monthStart(INITIAL_REPORT_DATE);
-  let selectedManagedDate = "";
+  let analytics: BondLedgerReport = $state(emptyBondLedgerReport());
+  let remoteFiles = $state<RemoteBondLedgerFile[]>([]);
+  let databaseLedgerDates = $state<string[]>([]);
+  let startDate = $state(INITIAL_WEEK_RANGE.startDate);
+  let endDate = $state(INITIAL_WEEK_RANGE.endDate);
+  let loadingRecords = $state(true);
+  let uploading = $state(false);
+  let deleting = $state(false);
+  let rangeOpen = $state(false);
+  let rangePhase: "start" | "end" = $state("start");
+  let rangeMonthLeft = $state(monthStart(INITIAL_WEEK_RANGE.startDate));
+  let managementMonth = $state(monthStart(INITIAL_REPORT_DATE));
+  let selectedManagedDate = $state("");
   let reuploadTarget = "";
-  let exporting = false;
-  let exportLabel = "导出图片";
+  let exporting = $state(false);
+  let exportLabel = $state("导出图片");
   let exportTimer: number | null = null;
   let syncGeneration = 0;
-  let trendAccount: LedgerTrendAccount = "all";
-  let batchInput: HTMLInputElement;
-  let reuploadInput: HTMLInputElement;
-  let managementDialog: HTMLDialogElement;
-  let reportSurface: HTMLElement;
+  let trendAccount: LedgerTrendAccount = $state("all");
+  let batchInput = $state<HTMLInputElement>(null!);
+  let reuploadInput = $state<HTMLInputElement>(null!);
+  let managementDialog = $state<Modal>(null!);
+  let reportSurface = $state<HTMLElement>(null!);
 
-  $: current = analytics.currentPerformance;
-  $: rangeMonths = [rangeMonthLeft, shiftMonth(rangeMonthLeft, 1)];
-  $: managedFile =
-    remoteFiles.find((file) => file.date === selectedManagedDate) ?? null;
-  $: managementCalendarDays = calendarDaysWithLedgerStatus(
-    managementMonth,
-    databaseLedgerDates,
-  );
-  $: selectedManagedDateHasLedger = databaseLedgerDates.includes(
-    selectedManagedDate,
-  );
-  $: trendPoints =
-    trendAccount === "all"
-      ? analytics.performanceTrend
-      : analytics.accountPerformanceTrends[trendAccount];
-  $: trendReturnLabel =
-    trendAccount === "all" ? "年化收益率" : "年化收益贡献";
-  $: metricCards = [
-    {
-      label: "当前规模",
-      value: formatYi(current?.marketValue ?? null),
-      detail: signedMetric(
-        analytics.metricDeltas.marketValue,
-        100_000_000,
-        2,
-        "亿元",
-      ),
-      delta: analytics.metricDeltas.marketValue,
-      icon: "bank" as MetricIconName,
-    },
-    {
-      label: "杠杆率",
-      value: formatMultiple(current?.leverage ?? null),
-      detail: signedMetric(analytics.metricDeltas.leverage, 1, 2, "倍"),
-      delta: analytics.metricDeltas.leverage,
-      icon: "leverage" as MetricIconName,
-    },
-    {
-      label: "修正久期",
-      value: formatYears(current?.modifiedDuration ?? null),
-      detail: signedMetric(
-        analytics.metricDeltas.modifiedDuration,
-        1,
-        2,
-        "年",
-      ),
-      delta: analytics.metricDeltas.modifiedDuration,
-      icon: "bond" as MetricIconName,
-    },
-    {
-      label: "年化收益率",
-      value: formatDecimalPercent(analytics.ytdAnnualizedReturn),
-      detail: signedMetric(
-        analytics.metricDeltas.ytdAnnualizedReturn,
-        0.01,
-        2,
-        "pct",
-      ),
-      delta: analytics.metricDeltas.ytdAnnualizedReturn,
-      icon: "equity" as MetricIconName,
-    },
-    {
-      label: "本周营收",
-      value: formatSignedWan(analytics.rangeProfit),
-      detail: signedMetric(
-        analytics.metricDeltas.rangeProfit,
-        10_000,
-        1,
-        "万元",
-      ),
-      delta: analytics.metricDeltas.rangeProfit,
-      icon: "profit" as MetricIconName,
-    },
-    {
-      label: "本周交易",
-      value: `${analytics.transactionCount} 只`,
-      detail: signedMetric(
-        analytics.metricDeltas.transactionCount,
-        1,
-        0,
-        "只",
-      ),
-      delta: analytics.metricDeltas.transactionCount,
-      icon: "trade" as MetricIconName,
-    },
-  ];
-  $: returnRiskCards = [
-    {
-      label: "收益率（含免税）",
-      value: formatDecimalPercent(current?.ytdAnnualizedReturn ?? null),
-      ...weeklyPercentageDelta(
-        analytics.metricDeltas.reportedYtdAnnualizedReturn,
-      ),
-      tone: "teal" as const,
-      icon: "profit" as MetricIconName,
-    },
-    {
-      label: "收益率（不含免税）",
-      value: formatDecimalPercent(current?.ytdExTaxAnnualizedReturn ?? null),
-      ...weeklyPercentageDelta(
-        analytics.metricDeltas.reportedYtdExTaxAnnualizedReturn,
-      ),
-      tone: "blue" as const,
-      icon: "equity" as MetricIconName,
-    },
-    {
-      label: "波动率",
-      value: formatDecimalPercent(
-        analytics.returnRiskMetrics.annualizedVolatility,
-      ),
-      ...weeklyPercentageDelta(
-        analytics.metricDeltas.annualizedVolatility,
-      ),
-      tone: "purple" as const,
-      icon: "equity" as MetricIconName,
-    },
-    {
-      label: "最大回撤",
-      value: formatDrawdown(analytics.returnRiskMetrics.maxDrawdown),
-      detail: drawdownPeriod(
-        analytics.returnRiskMetrics.maxDrawdownPeakDate,
-        analytics.returnRiskMetrics.maxDrawdownTroughDate,
-      ),
-      detailPrefix: "",
-      detailSuffix: "",
-      detailTone: "",
-      tone: "red" as const,
-      icon: "bond" as MetricIconName,
-    },
-  ];
 
   onMount(() => {
     void refreshReport(true);
@@ -580,6 +456,136 @@
   function shortDate(value: string): string {
     return value.slice(5).replace("-", "/");
   }
+  let current = $derived(analytics.currentPerformance);
+  let rangeMonths = $derived([rangeMonthLeft, shiftMonth(rangeMonthLeft, 1)]);
+  let managedFile =
+    $derived(remoteFiles.find((file) => file.date === selectedManagedDate) ?? null);
+  let managementCalendarDays = $derived(calendarDaysWithLedgerStatus(
+    managementMonth,
+    databaseLedgerDates,
+  ));
+  let selectedManagedDateHasLedger = $derived(databaseLedgerDates.includes(
+    selectedManagedDate,
+  ));
+  let trendPoints =
+    $derived(trendAccount === "all"
+      ? analytics.performanceTrend
+      : analytics.accountPerformanceTrends[trendAccount]);
+  let trendReturnLabel =
+    $derived(trendAccount === "all" ? "年化收益率" : "年化收益贡献");
+  let metricCards = $derived([
+    {
+      label: "当前规模",
+      value: formatYi(current?.marketValue ?? null),
+      detail: signedMetric(
+        analytics.metricDeltas.marketValue,
+        100_000_000,
+        2,
+        "亿元",
+      ),
+      delta: analytics.metricDeltas.marketValue,
+      icon: "bank" as MetricIconName,
+    },
+    {
+      label: "杠杆率",
+      value: formatMultiple(current?.leverage ?? null),
+      detail: signedMetric(analytics.metricDeltas.leverage, 1, 2, "倍"),
+      delta: analytics.metricDeltas.leverage,
+      icon: "leverage" as MetricIconName,
+    },
+    {
+      label: "修正久期",
+      value: formatYears(current?.modifiedDuration ?? null),
+      detail: signedMetric(
+        analytics.metricDeltas.modifiedDuration,
+        1,
+        2,
+        "年",
+      ),
+      delta: analytics.metricDeltas.modifiedDuration,
+      icon: "bond" as MetricIconName,
+    },
+    {
+      label: "年化收益率",
+      value: formatDecimalPercent(analytics.ytdAnnualizedReturn),
+      detail: signedMetric(
+        analytics.metricDeltas.ytdAnnualizedReturn,
+        0.01,
+        2,
+        "pct",
+      ),
+      delta: analytics.metricDeltas.ytdAnnualizedReturn,
+      icon: "equity" as MetricIconName,
+    },
+    {
+      label: "本周营收",
+      value: formatSignedWan(analytics.rangeProfit),
+      detail: signedMetric(
+        analytics.metricDeltas.rangeProfit,
+        10_000,
+        1,
+        "万元",
+      ),
+      delta: analytics.metricDeltas.rangeProfit,
+      icon: "profit" as MetricIconName,
+    },
+    {
+      label: "本周交易",
+      value: `${analytics.transactionCount} 只`,
+      detail: signedMetric(
+        analytics.metricDeltas.transactionCount,
+        1,
+        0,
+        "只",
+      ),
+      delta: analytics.metricDeltas.transactionCount,
+      icon: "trade" as MetricIconName,
+    },
+  ]);
+  let returnRiskCards = $derived([
+    {
+      label: "收益率（含免税）",
+      value: formatDecimalPercent(current?.ytdAnnualizedReturn ?? null),
+      ...weeklyPercentageDelta(
+        analytics.metricDeltas.reportedYtdAnnualizedReturn,
+      ),
+      tone: "teal" as const,
+      icon: "profit" as MetricIconName,
+    },
+    {
+      label: "收益率（不含免税）",
+      value: formatDecimalPercent(current?.ytdExTaxAnnualizedReturn ?? null),
+      ...weeklyPercentageDelta(
+        analytics.metricDeltas.reportedYtdExTaxAnnualizedReturn,
+      ),
+      tone: "blue" as const,
+      icon: "equity" as MetricIconName,
+    },
+    {
+      label: "波动率",
+      value: formatDecimalPercent(
+        analytics.returnRiskMetrics.annualizedVolatility,
+      ),
+      ...weeklyPercentageDelta(
+        analytics.metricDeltas.annualizedVolatility,
+      ),
+      tone: "purple" as const,
+      icon: "equity" as MetricIconName,
+    },
+    {
+      label: "最大回撤",
+      value: formatDrawdown(analytics.returnRiskMetrics.maxDrawdown),
+      detail: drawdownPeriod(
+        analytics.returnRiskMetrics.maxDrawdownPeakDate,
+        analytics.returnRiskMetrics.maxDrawdownTroughDate,
+      ),
+      detailPrefix: "",
+      detailSuffix: "",
+      detailTone: "",
+      tone: "red" as const,
+      icon: "bond" as MetricIconName,
+    },
+  ]);
 </script>
 
 <svelte:window onclick={closeRangeFromWindow} />
@@ -612,8 +618,8 @@
         use:portal={embedded ? "#tr-topbar-actions" : null}
       >
         <div class="ledger-range-picker">
-          <button
-            class="btn ledger-range-trigger"
+          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline"
+            class={"ui-button ledger-range-trigger"}
             type="button"
             aria-label="选择统计日期范围"
             aria-expanded={rangeOpen}
@@ -625,13 +631,13 @@
             <time datetime={startDate}>{startDate}</time>
             <span aria-hidden="true">—</span>
             <time datetime={endDate}>{endDate}</time>
-          </button>
+          </Button>
           {#if rangeOpen}
             <div class="ledger-range-popover" role="dialog" aria-label="选择统计日期范围" tabindex="-1">
               <div class="range-calendar-nav">
-                <button class="btn" type="button" aria-label="向前一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, -1))}>‹</button>
+                <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="向前一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, -1))}>‹</Button>
                 <strong>{rangePhase === "start" ? "选择起始日期" : "选择结束日期"}</strong>
-                <button class="btn" type="button" aria-label="向后一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, 1))}>›</button>
+                <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="向后一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, 1))}>›</Button>
               </div>
               <div class="range-calendar-pair">
                 {#each rangeMonths as month (month)}
@@ -642,15 +648,15 @@
                     </div>
                     <div class="calendar-grid">
                       {#each calendarDays(month) as day (day.date)}
-                        <button class="btn"
+                        <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={["ui-button", !day.inMonth && "outside", isSelectedDate(day.date) && "in-range", day.date === startDate || day.date === endDate && "endpoint"]}
                           type="button"
-                          class:outside={!day.inMonth}
-                          class:in-range={isSelectedDate(day.date)}
-                          class:endpoint={day.date === startDate || day.date === endDate}
+
+
+
                           disabled={!day.inMonth}
                           aria-label={day.date}
                           onclick={() => selectRangeDate(day.date)}
-                        >{day.day}</button>
+                        >{day.day}</Button>
                       {/each}
                     </div>
                   </section>
@@ -660,15 +666,15 @@
           {/if}
         </div>
 
-        <button class="btn ledger-management-button" type="button" onclick={openManagement}>
+        <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button ledger-management-button"} type="button" onclick={openManagement}>
           <svg viewBox="0 0 20 20" aria-hidden="true">
             <path d="M3.5 5.5h13v11h-13zM6 3.5h8v2M6.5 9h7M6.5 12.5h7" />
           </svg>
           <span>台账管理</span>
-        </button>
-        <button
-          class:is-exporting={exporting}
-          class="btn btn-primary export-button"
+        </Button>
+        <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="default"
+
+          class={["ui-button  export-button", exporting && "is-exporting"]}
           type="button"
           disabled={!analytics.hasData || loadingRecords || exporting}
           onclick={exportImage}
@@ -679,7 +685,7 @@
             <path d="M4 14.5v2h12v-2" />
           </svg>
           <span>{exportLabel}</span>
-        </button>
+        </Button>
       </div>
     </header>
 
@@ -697,7 +703,7 @@
           </svg>
         </div>
         <h2>数据库暂无二级池数据</h2>
-        <button class="btn" type="button" onclick={openManagement}>打开台账管理</button>
+        <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={openManagement}>打开台账管理</Button>
       </section>
     {:else}
       <section class="ledger-main">
@@ -724,7 +730,7 @@
                 <div class="ledger-account-filter" role="radiogroup" aria-label="账户范围">
                   {#each TREND_ACCOUNT_OPTIONS as option (option.value)}
                     <label class:active={trendAccount === option.value}>
-                      <input class="radio radio-primary"
+                      <input class="ui-radio "
                         type="radio"
                         name="ledger-trend-account"
                         value={option.value}
@@ -857,26 +863,26 @@
   onchange={handleFiles}
 />
 
-<dialog bind:this={managementDialog} class="modal" aria-labelledby="ledger-management-title">
-<div class="modal-box ledger-management-dialog">
+<Modal bind:this={managementDialog}  aria-labelledby="ledger-management-title">
+<div class="dialog-body ledger-management-dialog">
   <div class="ledger-management-content">
     <header>
       <h2 id="ledger-management-title">台账管理</h2>
-      <button class="btn" type="button" aria-label="关闭台账管理" onclick={() => managementDialog.close()}>
+      <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭台账管理" onclick={() => managementDialog.close()}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
-      </button>
+      </Button>
     </header>
     <div class="ledger-management-toolbar">
-      <button class="btn btn-primary ledger-upload-primary" type="button" disabled={uploading} onclick={openBatchUpload}>
+      <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="default" class={"ui-button  ledger-upload-primary"} type="button" disabled={uploading} onclick={openBatchUpload}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5M4 12.5V17h12v-4.5" /></svg>
         <span>{uploading ? "正在上传" : "批量上传 Excel"}</span>
-      </button>
+      </Button>
       <span>数据库共 {databaseLedgerDates.length} 个报表日</span>
     </div>
     <div class="management-calendar-nav">
-      <button class="btn" type="button" aria-label="上一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, -1))}>‹</button>
+      <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="上一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, -1))}>‹</Button>
       <strong>{monthLabel(managementMonth)}</strong>
-      <button class="btn" type="button" aria-label="下一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, 1))}>›</button>
+      <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="下一个月" onclick={() => (managementMonth = shiftMonth(managementMonth, 1))}>›</Button>
     </div>
     <section class="management-calendar" aria-label={monthLabel(managementMonth)}>
       <div class="calendar-weekdays" aria-hidden="true">
@@ -884,18 +890,18 @@
       </div>
       <div class="calendar-grid">
         {#each managementCalendarDays as day (day.date)}
-          <button class="btn"
+          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={["ui-button", !day.inMonth && "outside", day.hasLedger && "available", day.date === selectedManagedDate && "selected"]}
             type="button"
-            class:outside={!day.inMonth}
-            class:available={day.hasLedger}
-            class:selected={day.date === selectedManagedDate}
+
+
+
             disabled={!day.inMonth || !day.hasLedger}
             aria-label={day.hasLedger ? `${day.date} 数据库有台账，查看管理操作` : `${day.date} 数据库无台账`}
             onclick={() => (selectedManagedDate = day.date)}
           >
             <span>{day.day}</span>
             <span class="sr-only">{day.hasLedger ? "有台账" : "无台账"}</span>
-          </button>
+          </Button>
         {/each}
       </div>
     </section>
@@ -906,9 +912,9 @@
           <span>{managedFile.fileName} · {(managedFile.size / 1024).toFixed(0)} KB</span>
         </div>
         <div class="ledger-management-actions">
-          <button class="btn" type="button" onclick={() => downloadManagedFile(managedFile)}>下载</button>
-          <button class="btn" type="button" disabled={uploading} onclick={() => openReupload(managedFile.date)}>重新上传</button>
-          <button class="btn btn-error danger" type="button" disabled={deleting} onclick={() => removeRemoteLedger(managedFile)}>删除</button>
+          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => downloadManagedFile(managedFile)}>下载</Button>
+          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" disabled={uploading} onclick={() => openReupload(managedFile.date)}>重新上传</Button>
+          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="destructive" class={"ui-button  danger"} type="button" disabled={deleting} onclick={() => removeRemoteLedger(managedFile)}>删除</Button>
         </div>
       {:else if selectedManagedDate && selectedManagedDateHasLedger}
         <div>
@@ -921,4 +927,4 @@
     </section>
   </div>
 </div>
-</dialog>
+</Modal>

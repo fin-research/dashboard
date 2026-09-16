@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
 import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	import { enhance } from '$app/forms';
@@ -228,7 +232,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						use:enhance={enhanceForm(`task-${task.id}`, { autoSave: true })}
 						class="task-item"
 					>
-						<input type="hidden" name="taskId" value={task.id} />
+						<input data-ui-owner="routes-financing-projects--id---page-svelte" type="hidden" name="taskId" value={task.id} />
 						<span class={`task-index ${task.status}`}>{index + 1}</span>
 						<div class="task-copy">
 							<strong>{task.name}</strong>
@@ -237,20 +241,20 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						</div>
 						<label>
 							<span>状态</span>
-							<select class="select" name="status" value={task.status} aria-label={`${task.name}状态`} disabled={!canUpdateTaskStatus(task)}>
+							<NativeSelect data-ui-owner="routes-financing-projects--id---page-svelte" class={"ui-select"} name="status" value={task.status} aria-label={`${task.name}状态`} disabled={!canUpdateTaskStatus(task)}>
 								{#each Object.entries(taskStatusLabels) as [value, label]}
 									<option {value}>{label}</option>
 								{/each}
-							</select>
+							</NativeSelect>
 						</label>
 						<label>
 							<span>负责人</span>
-							<select class="select" name="assigneeId" value={task.assigneeId ?? ''} aria-label={`${task.name}负责人`} disabled={!canManage}>
+							<NativeSelect data-ui-owner="routes-financing-projects--id---page-svelte" class={"ui-select"} name="assigneeId" value={task.assigneeId ?? ''} aria-label={`${task.name}负责人`} disabled={!canManage}>
 								<option value="">待分配</option>
 								{#each data.people as person}
 									<option value={person.id}>{person.name}</option>
 								{/each}
-							</select>
+							</NativeSelect>
 						</label>
 						<div class="task-schedule">
 							<ScheduleFields scheduleType={task.scheduleType ?? 'point'} startValue={task.plannedStartDate} endValue={task.dueDate} label={task.name} disabled={!canManage} />
@@ -264,22 +268,22 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<form method="post" action="?/addTask" use:enhance={enhanceForm('add-task', { resetOnSuccess: true })} class="add-task">
 				<label>
 					<span>任务名称</span>
-					<input class="input" name="name" maxlength="120" required />
+					<Input data-ui-owner="routes-financing-projects--id---page-svelte" class={"ui-input"} name="name" maxlength={120} required />
 				</label>
 				<label>
 					<span>负责人</span>
-					<select class="select" name="assigneeId">
+					<NativeSelect data-ui-owner="routes-financing-projects--id---page-svelte" class={"ui-select"} name="assigneeId">
 						<option value="">待分配</option>
 						{#each data.people as person}
 							<option value={person.id}>{person.name}</option>
 						{/each}
-					</select>
+					</NativeSelect>
 				</label>
 				<div class="task-schedule"><ScheduleFields /></div>
-				<button class="btn" type="submit" disabled={pendingAction !== ''}>
+				<Button data-ui-owner="routes-financing-projects--id---page-svelte" variant="outline" class={"ui-button"} type="submit" disabled={pendingAction !== ''}>
 					<Plus size={16} />
 					{pendingAction === 'add-task' ? '添加中…' : '添加节点'}
-				</button>
+				</Button>
 			</form>
 			{/if}
 		</section>
@@ -302,24 +306,24 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			>
 				<label>
 					<span>项目状态</span>
-					<select class="select" name="status" value={data.project.status} disabled={!canManageProject}>
+					<NativeSelect data-ui-owner="routes-financing-projects--id---page-svelte" class={"ui-select"} name="status" value={data.project.status} disabled={!canManageProject}>
 						{#each Object.entries(statusLabels) as [value, label]}
 							<option {value}>{label}</option>
 						{/each}
-					</select>
+					</NativeSelect>
 				</label>
 				<label>
 					<span>负责人</span>
-					<select class="select" name="ownerId" value={data.project.ownerId ?? ''} disabled={!canManageProject}>
+					<NativeSelect data-ui-owner="routes-financing-projects--id---page-svelte" class={"ui-select"} name="ownerId" value={data.project.ownerId ?? ''} disabled={!canManageProject}>
 						<option value="">待分配</option>
 						{#each data.people as person}
 							<option value={person.id}>{person.name} · {person.roles?.map((role: { name: string }) => role.name).join('、') || '未分配角色'}</option>
 						{/each}
-					</select>
+					</NativeSelect>
 				</label>
 				<label>
 					<span>项目说明</span>
-					<textarea class="textarea" name="notes" rows="5" disabled={!canManageProject}>{data.project.notes ?? ''}</textarea>
+					<Textarea data-ui-owner="routes-financing-projects--id---page-svelte" value={data.project.notes ?? ''} class={"ui-textarea"} name="notes" rows={5} disabled={!canManageProject}></Textarea>
 				</label>
 			</form>
 			<dl class="metadata">
@@ -420,7 +424,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		align-items: center;
 		gap: 0.5rem;
 		font-size: 0.75rem;
-		color: var(--muted);
+		color: var(--text-muted);
 	}
 	.summary-grid strong {
 		font-size: 1.125rem;
@@ -522,7 +526,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		color: var(--subtle);
 	}
 	.task-copy .task-note {
-		color: var(--muted);
+		color: var(--text-muted);
 		line-height: 1.5;
 	}
 	label {
@@ -532,18 +536,18 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	label span {
 		font-size: 0.75rem;
 		font-weight: bold;
-		color: var(--muted);
+		color: var(--text-muted);
 	}
-	select,
-	input,
-	textarea {
+	:global(select[data-ui-owner="routes-financing-projects--id---page-svelte"]),
+	:global(input[data-ui-owner="routes-financing-projects--id---page-svelte"]),
+	:global(textarea[data-ui-owner="routes-financing-projects--id---page-svelte"]) {
 		width: 100%;
 		padding: 0.55rem 0.7rem;
 	}
-	textarea {
+	:global(textarea[data-ui-owner="routes-financing-projects--id---page-svelte"]) {
 		resize: vertical;
 	}
-	button {
+	:global(button[data-ui-owner="routes-financing-projects--id---page-svelte"]) {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -562,7 +566,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		margin: 0;
 		padding: 1.25rem;
 		font-size: 1rem;
-		color: var(--muted);
+		color: var(--text-muted);
 		text-align: center;
 	}
 	.project-form {
@@ -587,7 +591,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		font-size: 0.75rem;
 	}
 	.metadata dt {
-		color: var(--muted);
+		color: var(--text-muted);
 	}
 	.metadata dd {
 		font-weight: bold;
@@ -625,7 +629,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		display: block;
 		margin: 0.15rem 0 0;
 		font-size: 0.75rem;
-		color: var(--muted);
+		color: var(--text-muted);
 		overflow-wrap: anywhere;
 	}
 	@media (max-width: 75rem) {

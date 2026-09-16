@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-债券市场研究全栈应用，提供市场点评、市场热点、二级池周报及融资业务管理。技术栈为 SvelteKit、Svelte 5、TypeScript、Tailwind CSS 4、daisyUI、ECharts、Cloudflare Workers/D1/R2/Workflows/Hyperdrive、Neon PostgreSQL 与 AI Gateway。
+债券市场研究全栈应用，提供市场点评、市场热点、二级池周报及融资业务管理。技术栈为 SvelteKit、Svelte 5、TypeScript、Tailwind CSS 4、shadcn-svelte Maia、Bits UI、svelte-sonner、TanStack Table v9、ECharts、Cloudflare Workers/D1/R2/Workflows/Hyperdrive、Neon PostgreSQL 与 AI Gateway。
 
 融资入口 `/financing`（仪表盘、负债周报、项目、SOP、台账）；管理中心 `/management`（角色权限配置）与全站个人信息 `/profile`。
 

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
 import { enhance } from '$app/forms';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
@@ -144,7 +146,7 @@ let { permissions }: { permissions: string[] } = $props();
 					<div class="report-header-actions" aria-label="负债周报操作">
 						<form class="report-history-picker" method="GET" action={withBase('/liability-report')}>
 							<label for="report-history-date">报告日</label>
-							<input class="input"
+							<Input data-ui-owner="lib-financing-LiabilityReportActions-svelte" class={"ui-input"}
 								type="date"
 								id="report-history-date"
 								name="date"
@@ -153,17 +155,17 @@ let { permissions }: { permissions: string[] } = $props();
 								onchange={submitReportHistorySelection}
 							/>
 						</form>
-						<button class="btn header-action" type="button" disabled={!Boolean((page.data as any)?.hasSnapshot)} onclick={() => window.print()} aria-label="导出 PDF">
+						<Button data-ui-owner="lib-financing-LiabilityReportActions-svelte" variant="outline" class={"ui-button header-action"} type="button" disabled={!Boolean((page.data as any)?.hasSnapshot)} onclick={() => window.print()} aria-label="导出 PDF">
 							<Printer size={17} /><span class="header-action-label">导出 PDF</span>
-						</button>
+						</Button>
 						{#if hasPermission(permissions, 'financing.report:generate')}
 							<form bind:this={reportSnapshotForm} method="POST" action={withBase('/liability-report?/saveSnapshot')} use:enhance={enhanceReportSnapshotSaving}>
-								<input type="hidden" name="asOfDate" value={selectedLiabilityReportDate()} />
-								<input type="hidden" name="payload" value={reportSourcesPayload} />
-								<button class="btn btn-primary header-action header-primary-action" type="button" disabled={reportGenerating} onclick={prepareReportSnapshot} aria-label={reportGenerating ? '正在生成本期周报' : '生成本期周报'}>
+								<input data-ui-owner="lib-financing-LiabilityReportActions-svelte" type="hidden" name="asOfDate" value={selectedLiabilityReportDate()} />
+								<input data-ui-owner="lib-financing-LiabilityReportActions-svelte" type="hidden" name="payload" value={reportSourcesPayload} />
+								<Button data-ui-owner="lib-financing-LiabilityReportActions-svelte" variant="default" class={"ui-button  header-action header-primary-action"} type="button" disabled={reportGenerating} onclick={prepareReportSnapshot} aria-label={reportGenerating ? '正在生成本期周报' : '生成本期周报'}>
 									<LoaderCircle class={reportGenerating ? 'spinning' : ''} size={17} />
 									<span>{reportGenerating ? '生成中…' : '生成本期周报'}</span>
-								</button>
+								</Button>
 							</form>
 						{/if}
 					</div>

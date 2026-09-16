@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { StatIconName } from "../view-model";
 
-  export let icon: StatIconName;
+  interface Props {
+    icon: StatIconName;
+  }
+
+  let { icon }: Props = $props();
 </script>
 
 <svg

@@ -1,4 +1,6 @@
 <script lang="ts">
+
+  import { Button } from "$lib/components/ui/button/index.js";
   import { globalMessages } from "$lib/global-messages";
 
   import {
@@ -10,35 +12,50 @@
   import { applyTextReportEdits } from "../text-report-editor";
   import type { MarketReportResource, ReportData } from "../types";
 
-  export let data: ReportData;
-  export let focusText = "";
-  export let missingResources: MarketReportResource[] = [];
-  export let dirty = false;
-  export let saving = false;
-  export let disabled = false;
-  export let onDataChange: (
+  interface Props {
+    data: ReportData;
+    focusText?: string;
+    missingResources?: MarketReportResource[];
+    dirty?: boolean;
+    saving?: boolean;
+    disabled?: boolean;
+    onDataChange?: (
     data: ReportData,
     focusText: string,
-  ) => void = () => {};
-  export let onSave: (
+  ) => void;
+    onSave?: (
     data: ReportData,
     focusText: string,
-  ) => void | Promise<void> = () => {};
-
-  let editor: HTMLDivElement;
-  let html = "";
-  let currentValue = "";
-  let draftDirty = false;
-
-  $: generatedValue = normalizeTextReport(
-    buildTextReport(data, focusText, missingResources),
-  );
-  $: if (!draftDirty && generatedValue !== currentValue) {
-    currentValue = generatedValue;
-    html = buildTextReportHtml(
-      buildTextReportLinesFromText(data, currentValue),
-    );
+  ) => void | Promise<void>;
   }
+
+  let {
+    data,
+    focusText = "",
+    missingResources = [],
+    dirty = false,
+    saving = false,
+    disabled = false,
+    onDataChange = () => {},
+    onSave = () => {}
+  }: Props = $props();
+
+  let editor = $state<HTMLDivElement>(null!);
+  let html = $state("");
+  let currentValue = $state("");
+  let draftDirty = $state(false);
+
+  let generatedValue = $derived(normalizeTextReport(
+    buildTextReport(data, focusText, missingResources),
+  ));
+  $effect(() => {
+    if (!draftDirty && generatedValue !== currentValue) {
+      currentValue = generatedValue;
+      html = buildTextReportHtml(
+        buildTextReportLinesFromText(data, currentValue),
+      );
+    }
+  });
 
   function saveDraft(): void {
     currentValue = normalizeTextReport(editor.innerText);
@@ -142,8 +159,8 @@
     {#if dirty || draftDirty}
       <span class="text-report__dirty" role="status">已修改，待保存</span>
     {/if}
-    <button
-      class="btn text-report__action"
+    <Button data-ui-owner="components-TextReport-svelte" variant="outline"
+      class={"ui-button text-report__action"}
       type="button"
       aria-label="复制文字版报告"
       onclick={copyReport}
@@ -152,10 +169,10 @@
         <rect x="6.5" y="6.5" width="10" height="10" rx="1.5" />
         <path d="M13.5 6.5v-2A1.5 1.5 0 0 0 12 3H4.5A1.5 1.5 0 0 0 3 4.5V12a1.5 1.5 0 0 0 1.5 1.5h2" />
       </svg>
-    </button>
-    <button
-      class:text-report__saving={saving}
-      class="btn text-report__action"
+    </Button>
+    <Button data-ui-owner="components-TextReport-svelte" variant="outline"
+
+      class={["ui-button text-report__action", saving && "text-report__saving"]}
       type="button"
       disabled={saving}
       aria-label="保存市场点评定稿"
@@ -165,7 +182,7 @@
         <path d="M4 3.5h10.5L17 6v10.5H4z" />
         <path d="M7 3.5v4h6v-4M7 16.5v-5h6v5" />
       </svg>
-    </button>
+    </Button>
   </div>
   <div
     bind:this={editor}

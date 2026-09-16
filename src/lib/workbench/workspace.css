@@ -1,6 +1,9 @@
 /* Business workspaces share these refinements. Report canvases retain their
    established shell, typography and controls by omitting tr-shell--workspace. */
 .tr-shell--workspace {
+  --radius-card: 16px;
+  --radius-control: 24px;
+  --radius-tag: 12px;
   --workspace-accent: var(--tr-primary-deep);
   --workspace-soft: var(--tr-primary-soft);
 }
@@ -77,9 +80,9 @@
 .tr-shell--workspace.tr-shell--collapsed .tr-drawer__nav a { padding-inline: 0; }
 
 /* Labels remain emphasized; entered values use normal body weight. */
-.tr-shell--workspace :is(.input, .select, .textarea) { font-weight: normal; }
-.tr-shell--workspace .btn-success {
-  --btn-fg: color-mix(in srgb, var(--color-success-content) 80%, var(--text-1));
+.tr-shell--workspace :is(.ui-input, .ui-select, .ui-textarea) { font-weight: normal; }
+.tr-shell--workspace .ui-tone-success {
+  color: color-mix(in srgb, var(--color-success-content) 80%, var(--text-1));
 }
 .tr-shell--workspace :is(a, button, input, select, textarea, summary, main, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-deep);

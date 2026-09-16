@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
@@ -251,47 +255,47 @@
         <label class="tr-search-control">
           <span class="sr-only">搜索交易</span>
           <WorkbenchIcon name="search" />
-          <input class="input" bind:value={query} type="search" />
+          <Input data-ui-owner="lib-trading-research-TradingView-svelte" class={"ui-input"} bind:value={query} type="search" />
         </label>
         <label>
           <span class="sr-only">业务品种</span>
-          <select class="select" bind:value={product}>
+          <NativeSelect data-ui-owner="lib-trading-research-TradingView-svelte" class={"ui-select"} bind:value={product}>
             <option value="all">全部业务</option>
             <option value="同业拆借">同业拆借</option>
             <option value="质押式回购">质押式回购</option>
-          </select>
+          </NativeSelect>
         </label>
         <label>
           <span class="sr-only">交易方向</span>
-          <select class="select" bind:value={direction}>
+          <NativeSelect data-ui-owner="lib-trading-research-TradingView-svelte" class={"ui-select"} bind:value={direction}>
             <option value="all">全部方向</option>
             <option value="融入">融入</option>
             <option value="融出">融出</option>
-          </select>
+          </NativeSelect>
         </label>
         <label>
           <span class="sr-only">交易状态</span>
-          <select class="select" bind:value={status}>
+          <NativeSelect data-ui-owner="lib-trading-research-TradingView-svelte" class={"ui-select"} bind:value={status}>
             <option value="all">全部状态</option>
             <option value="已成交">已成交</option>
             <option value="待确认">待确认</option>
-          </select>
+          </NativeSelect>
         </label>
         <label>
           <span class="sr-only">交易排序</span>
-          <select class="select" bind:value={sort}>
+          <NativeSelect data-ui-owner="lib-trading-research-TradingView-svelte" class={"ui-select"} bind:value={sort}>
             <option value="time-asc">时间正序</option>
             <option value="time-desc">时间倒序</option>
             <option value="amount-desc">金额从高到低</option>
             <option value="rate-asc">利率从低到高</option>
-          </select>
+          </NativeSelect>
         </label>
-        <button class="btn tr-table-action" type="button" onclick={exportTrades}>导出当前结果</button>
+        <Button data-ui-owner="lib-trading-research-TradingView-svelte" variant="outline" class={"ui-button tr-table-action"} type="button" onclick={exportTrades}>导出当前结果</Button>
         <span class="tr-result-count">共 {filteredTrades.length} 笔</span>
       </div>
     </PanelHeading>
     <div class="tr-table-scroll">
-      <table class="table tr-data-table tr-trade-table">
+      <table class="ui-table tr-data-table tr-trade-table">
         <caption class="sr-only">交易研究工作台交易记录</caption>
         <thead>
           <tr><th>交易编号</th><th>时间</th><th>方向</th><th>业务类型</th><th>交易对手</th><th class="is-numeric">金额（亿元）</th><th>期限</th><th class="is-numeric">利率</th><th>质押券</th><th>押券风控</th><th>状态</th></tr>
@@ -357,12 +361,12 @@
     <div class="tr-parser-grid">
       <div class="tr-parser-input">
         <label for="trade-parser-input">交易聊天记录</label>
-        <textarea class="textarea"
+        <Textarea data-ui-owner="lib-trading-research-TradingView-svelte" class={"ui-textarea"}
           id="trade-parser-input"
           bind:value={tradeText}
-          rows="8"
-        ></textarea>
-        <button class="btn btn-primary tr-primary-action" type="button" onclick={parseTradeText}>规则解析</button>
+          rows={8}
+        ></Textarea>
+        <Button data-ui-owner="lib-trading-research-TradingView-svelte" variant="default" class={"ui-button  tr-primary-action"} type="button" onclick={parseTradeText}>规则解析</Button>
         <aside class="tr-collateral-checklist" aria-label="押券检查项">
           <strong>押券检查项</strong>
           <span>券种准入、评级与期限、折算率、估值覆盖、发行人集中度</span>
@@ -388,11 +392,11 @@
             <strong>交易凭证草稿</strong>
             <p>{parsedTicket.direction} · {parsedTicket.product} · {parsedTicket.amount} · {parsedTicket.term} · {parsedTicket.rate} · {parsedTicket.counterparty}</p>
           </div>
-          <button
-            class="btn tr-secondary-action"
+          <Button data-ui-owner="lib-trading-research-TradingView-svelte" variant="outline"
+            class={"ui-button tr-secondary-action"}
             type="button"
             onclick={() => (ticketConfirmed = true)}
-          >{ticketConfirmed ? "已确认解析结果" : "确认解析结果"}</button>
+          >{ticketConfirmed ? "已确认解析结果" : "确认解析结果"}</Button>
         {:else}
           <div class="tr-parser-empty">解析后将在此展示交易要素与凭证草稿</div>
         {/if}

@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { SummaryItemView } from "../view-model";
 
-  export let items: SummaryItemView[];
+  interface Props {
+    items: SummaryItemView[];
+  }
+
+  let { items }: Props = $props();
 </script>
 
 {#each items as item (item.label)}

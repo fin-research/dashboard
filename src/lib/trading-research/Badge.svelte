@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Badge as PrimitiveBadge } from "$lib/components/ui/badge/index.js";
   import type { Snippet } from "svelte";
 
   let {
@@ -10,4 +11,4 @@
   } = $props();
 </script>
 
-<span class={`badge badge-${tone === "neutral" ? "ghost" : tone} tr-badge tr-badge--${tone}`}>{@render children()}</span>
+<PrimitiveBadge variant="secondary" class={`tr-badge tr-badge--${tone}`}>{@render children()}</PrimitiveBadge>

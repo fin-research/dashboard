@@ -10,7 +10,7 @@
   touch-action: manipulation;
 }
 
-:where(.financing-scope) a:not(.btn) {
+:where(.financing-scope) a:not(.ui-button) {
   color: inherit;
   text-decoration: none;
 }
@@ -198,7 +198,7 @@
 }
 
 .financing-scope {
-  --ink: var(--text-1); --muted: var(--text-3); --subtle: var(--text-3);
+  --ink: var(--text-1); --text-muted: var(--text-3); --subtle: var(--text-3);
   --line: var(--border-color); --surface: var(--bg-card); --canvas: var(--bg-page);
   --blue: var(--color-primary); --blue-soft: var(--color-primary-soft);
   --teal: #12805c; --orange: #b54708; --red: #b42318; --violet: #6941c6;
@@ -219,8 +219,7 @@
 
 .financing-content.liability-report-content { max-width: 1080px; margin-inline: auto; }
 
-.financing-scope .modal-box { max-width: min(64rem, 100%); }
-.financing-scope .modal { max-height: none; padding: 1.5rem; grid-template-columns: minmax(0, 1fr); }
+.financing-scope .dialog-body { max-width: min(64rem, 100%); }
 
 /* Financing owns business layout; card and control surfaces stay shared. */
 .financing-scope .financing-content { container-type: inline-size; }
@@ -230,15 +229,15 @@
 .financing-scope .financing-reminders { position: relative; flex: 0 0 auto; }
 .financing-scope .reminder-trigger { display: flex; gap: .5rem; list-style: none; }
 .financing-scope .reminder-trigger::-webkit-details-marker { display: none; }
-.financing-scope .reminder-popover { z-index: 50; width: min(25rem, calc(100vw - 2rem)); max-height: min(32rem, 70dvh); overflow-y: auto; margin-top: .75rem; padding: .5rem; box-shadow: var(--shadow-card); }
-.financing-scope .reminder-popover-heading { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem; border-bottom: 1px solid var(--line); }
-.financing-scope .reminder-popover-heading span, .financing-scope .reminder-popover small { color: var(--muted); font-size: .875rem; }
-.financing-scope .reminder-popover a { display: grid; gap: .375rem; padding: .75rem; border-radius: var(--radius-control); overflow-wrap: anywhere; }
-.financing-scope .reminder-popover a:hover { background: var(--brand-soft); }
-.financing-scope .reminder-popover p { margin: 0; padding: 1.5rem .75rem; color: var(--muted); }
+.reminder-popover { z-index: 50; width: min(25rem, calc(100vw - 2rem)); max-height: min(32rem, 70dvh); overflow-y: auto; margin-top: .75rem; padding: .5rem; box-shadow: var(--shadow-card); }
+.reminder-popover-heading { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem; border-bottom: 1px solid var(--line); }
+.reminder-popover-heading span, .reminder-popover small { color: var(--text-muted); font-size: .875rem; }
+.reminder-popover a { display: grid; gap: .375rem; padding: .75rem; border-radius: var(--radius-control); overflow-wrap: anywhere; }
+.reminder-popover a:hover { background: var(--brand-soft); }
+.reminder-popover p { margin: 0; padding: 1.5rem .75rem; color: var(--text-muted); }
 @media (max-width: 720px) {
   .financing-scope .reminder-trigger-label { display: none; }
-  .financing-scope .reminder-popover { position: fixed; top: calc(var(--tr-topbar-height, 72px) + .5rem); left: 1rem; right: 1rem; width: auto; }
+  .reminder-popover { position: fixed; top: calc(var(--tr-topbar-height, 72px) + .5rem); left: 1rem; right: 1rem; width: auto; }
 }
 
 @media (max-width: 900px) {

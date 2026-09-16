@@ -1,4 +1,7 @@
 <script lang="ts">
+
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
   import AuthMenu from '$lib/AuthMenu.svelte';
   import { onDestroy, onMount, tick } from "svelte";
 
@@ -63,41 +66,43 @@
     comparable: [],
     inventory: [],
   };
-  let reportSurface: HTMLElement;
-  let textReport: TextReport | undefined;
-  let dateInput: HTMLInputElement;
-  let selectedDate = "";
-  let data: ReportData | null = null;
-  let charts: ChartRenderers | null = null;
-  let loading = true;
-  let errorMessage = "";
-  let exporting = false;
-  let exportLabel = "导出&保存";
+  let reportSurface = $state<HTMLElement>(null!);
+  let textReport: TextReport | undefined = $state();
+  let dateInput = $state<HTMLInputElement>(null!);
+  let selectedDate = $state("");
+  let data = $state<ReportData | null>(null);
+  let charts = $state<ChartRenderers | null>(null);
+  let loading = $state(true);
+  let errorMessage = $state("");
+  let exporting = $state(false);
+  let exportLabel = $state("导出&保存");
   let activeRequest: AbortController | null = null;
   let briefingRequest: AbortController | null = null;
-  let generatedBriefing: MarketBriefing | null = null;
-  let briefingLoading = false;
-  let briefingProgress = "";
-  let briefingSummaries: Array<{ id: string; text: string }> = [];
-  let activeView: ReportView = "visual";
-  let focusText = "";
-  let savedFocusText = "";
-  let focusFinalizedAt: string | null = null;
-  let savingFocus = false;
-  let savedDataJson = "";
-  let resourceIssues: MarketReportResourceIssue[] = [];
+  let generatedBriefing = $state<MarketBriefing | null>(null);
+  let briefingLoading = $state(false);
+  let briefingProgress = $state("");
+  let briefingSummaries: Array<{ id: string; text: string }> = $state([]);
+  let activeView: ReportView = $state("visual");
+  let focusText = $state("");
+  let savedFocusText = $state("");
+  let focusFinalizedAt = $state<string | null>(null);
+  let savingFocus = $state(false);
+  let savedDataJson = $state("");
+  let resourceIssues = $state<MarketReportResourceIssue[]>([]);
 
-  $: derived = data ? deriveReport(data) : EMPTY_DERIVED;
-  $: missingResources = resourceIssues.map((issue) => issue.resource);
-  $: reportDirty = Boolean(data) && (
+  let reportDerived = $derived(data ? deriveReport(data) : EMPTY_DERIVED);
+  let missingResources = $derived(resourceIssues.map((issue) => issue.resource));
+  let reportDirty = $derived(Boolean(data) && (
     JSON.stringify(data) !== savedDataJson || focusText !== savedFocusText
-  );
-  $: dateParts = data
+  ));
+  let dateParts = $derived(data
     ? chineseDateParts(data.report_date)
-    : { date: "—", weekday: "—" };
-  $: if (data) {
-    document.title = `${data.report_date} · 资金管理部 • 市场点评`;
-  }
+    : { date: "—", weekday: "—" });
+  $effect(() => {
+    if (data) {
+      document.title = `${data.report_date} · 资金管理部 • 市场点评`;
+    }
+  });
 
   onMount(async () => {
     activeView = reportViewFromPathname(window.location.pathname);
@@ -336,31 +341,31 @@
       </div>
       <div class="masthead-controls" aria-label="报告控制">
         <div class="titlebar-actions">
-          <div class="join view-toggle" role="group" aria-label="报告展示方式">
-            <button class="btn join-item"
+          <div class="report-view-switch view-toggle" role="group" aria-label="报告展示方式">
+            <Button data-ui-owner="App-svelte" variant={activeView === "visual" ? 'default' : 'outline'} class={"ui-button report-view-switch-item"}
               id="visual-report-tab"
-              class:btn-primary={activeView === "visual"}
+
               type="button"
               aria-pressed={activeView === "visual"}
               disabled={exporting || savingFocus || briefingLoading}
               onclick={() => selectView("visual")}
             >
               可视化
-            </button>
-            <button class="btn join-item"
+            </Button>
+            <Button data-ui-owner="App-svelte" variant={activeView === "text" ? 'default' : 'outline'} class={"ui-button report-view-switch-item"}
               id="text-report-tab"
-              class:btn-primary={activeView === "text"}
+
               type="button"
               aria-pressed={activeView === "text"}
               disabled={exporting || savingFocus || briefingLoading}
               onclick={() => selectView("text")}
             >
               文字版
-            </button>
+            </Button>
           </div>
-          <button
-            class:is-loading={loading}
-            class="btn refresh-button"
+          <Button data-ui-owner="App-svelte" variant="outline"
+
+            class={["ui-button refresh-button", loading && "is-loading"]}
             type="button"
             disabled={loading || exporting || savingFocus}
             onclick={() => loadReport(true)}
@@ -370,10 +375,10 @@
               <path d="M16.5 2.7v4h-4" />
             </svg>
             <span>刷新</span>
-          </button>
-          <button
-            class:is-exporting={exporting}
-            class="btn btn-primary export-button"
+          </Button>
+          <Button data-ui-owner="App-svelte" variant="default"
+
+            class={["ui-button  export-button", exporting && "is-exporting"]}
             type="button"
             disabled={!data || loading || exporting || briefingLoading || savingFocus}
             onclick={exportImage}
@@ -384,13 +389,13 @@
               <path d="M4 14.5v2h12v-2" />
             </svg>
             <span>{exportLabel}</span>
-          </button>
+          </Button>
         </div>
         <label class="hero-date">
           <span class="sr-only">选择报告日期</span>
-          <input
-            bind:this={dateInput}
-            class="input hero-date__input"
+          <Input data-ui-owner="App-svelte"
+            bind:ref={dateInput}
+            class={"ui-input hero-date__input"}
             type="date"
             aria-label="选择报告日期"
             disabled={exporting || savingFocus}
@@ -412,23 +417,23 @@
     </header>
 
     {#if loading}
-      <div class="alert loading-state" role="status" aria-live="polite">
+      <div class="loading-state" role="status" aria-live="polite">
         <span class="loading-orbit" aria-hidden="true"></span>
         <div>
           <strong>正在汇集市场数据</strong>
         </div>
       </div>
     {:else if errorMessage}
-      <div class="alert error-state" role="alert">
+      <div class="error-state" role="alert">
         <span class="error-index">!</span>
         <div>
           <strong>报告暂时无法加载</strong>
           <p>{errorMessage}</p>
         </div>
-        <button
-          class="btn btn-sm"
+        <Button data-ui-owner="App-svelte" variant="outline" size="sm"
+          class={"ui-button "}
           type="button"
-          onclick={() => loadReport(true)}>重新尝试</button
+          onclick={() => loadReport(true)}>重新尝试</Button
         >
       </div>
     {:else if data && charts}
@@ -440,16 +445,16 @@
           aria-labelledby="visual-report-tab"
         >
           <div class="core-metrics" aria-label="核心市场指标">
-            <CoreMetrics {data} {derived} {missingResources} />
+            <CoreMetrics {data} {reportDerived} {missingResources} />
           </div>
           <div class="report-content">
         <section class="dashboard-panel panel--focus" aria-labelledby="focus-title">
           <header class="panel-heading">
             <span class="panel-index">01</span>
             <h2 id="focus-title">今日聚焦</h2>
-            <button
-              class:is-loading={briefingLoading}
-              class="btn btn-primary focus-generate-button"
+            <Button data-ui-owner="App-svelte" variant="default"
+
+              class={["ui-button  focus-generate-button", briefingLoading && "is-loading"]}
               type="button"
               disabled={exporting || savingFocus}
               aria-label={briefingLoading ? "取消生成今日聚焦" : "根据当天新闻生成今日聚焦"}
@@ -460,7 +465,7 @@
                 <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
               </svg>
               <span>{briefingLoading ? "取消生成" : "生成聚焦"}</span>
-            </button>
+            </Button>
           </header>
           <FocusEditor
             generating={briefingLoading}
@@ -487,12 +492,12 @@
             <ChartHost
               id="omo-chart"
               renderer={charts.renderOmo}
-              args={[derived.omoHistory]}
+              args={[reportDerived.omoHistory]}
               ariaLabel="近十个操作日公开市场操作柱状图"
             />
             <div class="summary-strip" aria-label="公开市场操作汇总">
               <SummaryStrip
-                items={omoSummaryItems(derived.omoHistory, data.report_date)}
+                items={omoSummaryItems(reportDerived.omoHistory, data.report_date)}
               />
             </div>
           {/if}
@@ -517,13 +522,13 @@
             </div>
           {/if}
           <div class="indicator-grid">
-            <FundMetrics metrics={derived.funds} />
+            <FundMetrics metrics={reportDerived.funds} />
           </div>
           {#if !hasResourceIssue("governmentBonds")}
             <ChartHost
               id="government-chart"
               renderer={charts.renderGovernmentCurve}
-              args={[derived.governmentBonds]}
+              args={[reportDerived.governmentBonds]}
               ariaLabel="关键期限国债收益率曲线"
             />
           {/if}
@@ -566,7 +571,7 @@
               </div>
             </div>
             <div class="stat-grid">
-              <EquityStats {data} margin={derived.margin} />
+              <EquityStats {data} margin={reportDerived.margin} />
             </div>
             <div class="equity-heatmap-stage">
               <span class="equity-heatmap-label">申万一级行业</span>
@@ -590,7 +595,7 @@
             <div class="module-data-missing" role="status">一级发行数据缺失</div>
           {:else}
             <div class="data-list" aria-label="一级发行列表">
-              <PrimaryTable points={derived.primary} />
+              <PrimaryTable points={reportDerived.primary} />
             </div>
             <div class="summary-strip" aria-label="一级发行汇总">
               <SummaryStrip items={primarySummaryItems(data.primary_summary)} />
@@ -615,12 +620,12 @@
             >
               <SecondaryTable
                 headers={["期限", "债券", "发行人", "成交"]}
-                rows={comparableTenorRows(derived.comparable)}
+                rows={comparableTenorRows(reportDerived.comparable)}
                 emptyText="今日暂无公募债成交"
               />
             </div>
             <div class="summary-strip" aria-label="二级行情汇总">
-              <SummaryStrip items={comparableSummaryItems(derived.comparable)} />
+              <SummaryStrip items={comparableSummaryItems(reportDerived.comparable)} />
             </div>
           {/if}
         </section>
@@ -639,11 +644,11 @@
             <ChartHost
               id="inventory-chart"
               renderer={charts.renderInventory}
-              args={[derived.inventory]}
+              args={[reportDerived.inventory]}
               ariaLabel="东财存量债估值期限结构"
             />
             <div class="summary-strip" aria-label="东财债券汇总">
-              <SummaryStrip items={inventorySummaryItems(derived.inventory)} />
+              <SummaryStrip items={inventorySummaryItems(reportDerived.inventory)} />
             </div>
           {/if}
         </section>

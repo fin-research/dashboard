@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount, tick } from "svelte";
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
   import { portal } from "../portal";
@@ -25,10 +28,10 @@
   let searchError = $state("");
   let showCustomers = $state(false);
   let activeCustomer = $state(-1);
-  let customerInput: HTMLInputElement;
+  let customerInput = $state<HTMLInputElement>(null!);
   let restoreController: AbortController | undefined;
   let chat: HTMLDivElement;
-  let textarea: HTMLTextAreaElement;
+  let textarea = $state<HTMLTextAreaElement>(null!);
   let form: HTMLFormElement;
   let stream: EventSource | undefined;
   let streamFailures = 0;
@@ -279,19 +282,19 @@
 <div class="credit-chat" bind:this={chat}>
   <!-- Keep the component's root in place; only move its nested toolbar. -->
   <div class="chat-toolbar" use:portal={"#tr-topbar-actions"}>
-    <button class="btn chat-button chat-button--new" type="button" disabled={busy || !selectedCustomer} onclick={() => void newSession()}>
+    <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button chat-button--new"} type="button" disabled={busy || !selectedCustomer} onclick={() => void newSession()}>
       <WorkbenchIcon name="plus" /><span>{creating ? "正在新建…" : "新对话"}</span>
-    </button>
+    </Button>
   </div>
   <p class="sr-only" role="status">{!session.running && !sending && !loading && !session.error && session.turns.length ? "授信答复已完成，可阅读正文与资料来源。" : ""}</p>
   <div class="chat-messages" role="log" aria-label="对话记录" aria-live="off">
     {#if loading && !session.turns.length}
-      <div class="chat-empty" role="status"><span class="loading loading-spinner loading-sm" aria-hidden="true"></span><p>正在恢复历史对话，可继续输入…</p></div>
+      <div class="chat-empty" role="status"><span class="ui-spinner  " aria-hidden="true"></span><p>正在恢复历史对话，可继续输入…</p></div>
     {:else if !session.turns.length && !pendingQuestion && !session.running && !session.error && !loadError}
       <div class="chat-empty"><span class="chat-welcome-icon"><WorkbenchIcon name="chat" /></span><h2>有什么需要核实？</h2></div>
     {/if}
     {#if loadError}
-      <div class="chat-load-error" role="alert"><p>{loadError}</p><button class="btn chat-button" type="button" onclick={() => void refresh()}>重新连接</button></div>
+      <div class="chat-load-error" role="alert"><p>{loadError}</p><Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button"} type="button" onclick={() => void refresh()}>重新连接</Button></div>
     {/if}
     {#each session.turns as turn (turn.id)}
       <article class="chat-turn" aria-label="一轮对话">
@@ -335,7 +338,7 @@
                 {/each}
               </details>
             {/if}
-            <button class="btn chat-button chat-button--copy" type="button" onclick={() => void copy(turn.id)} aria-label="复制答复和资料来源"><WorkbenchIcon name="copy" /><span>复制答复</span></button>
+            <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button chat-button--copy"} type="button" onclick={() => void copy(turn.id)} aria-label="复制答复和资料来源"><WorkbenchIcon name="copy" /><span>复制答复</span></Button>
           </div>
         </div>
       </article>
@@ -349,7 +352,7 @@
             <CreditActivityView {session} {sending} notice={streamNotice} />
             {#if draftText}<div class="streaming-answer" aria-label="正在生成的答复" aria-live="off"><span class="draft-label">答复草稿 · 正在核对</span><p class="answer-paragraph">{draftText}</p></div>{/if}
           {:else if session.error}
-            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<button class="btn chat-button" type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</button>{/if}</div>
+            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button"} type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</Button>{/if}</div>
           {/if}
         </div>
       </article>
@@ -359,24 +362,24 @@
     <div class="customer-picker">
       <label for="credit-customer">客户名称</label>
       <div class="customer-search">
-        <input class="input" id="credit-customer" bind:this={customerInput} bind:value={customerName} oninput={searchCustomers} onkeydown={customerKeydown}
+        <Input data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" class={"ui-input"} id="credit-customer" bind:ref={customerInput} bind:value={customerName} oninput={searchCustomers} onkeydown={customerKeydown}
           onfocus={() => { showCustomers = true; }} onblur={() => { showCustomers = false; }}
           type="text" role="combobox" aria-autocomplete="list" aria-expanded={showCustomers} aria-controls="credit-customers"
           aria-activedescendant={showCustomers && activeCustomer >= 0 && customers[activeCustomer] ? `credit-customer-${activeCustomer}` : undefined}
-          autocomplete="off" maxlength="200" disabled={busy} />
+          autocomplete="off" maxlength={200} disabled={busy} />
         {#if showCustomers}
           <div class="customer-options">
             <ul id="credit-customers" role="listbox" aria-label="匹配机构">
               {#each customers as customer, index (customer.name)}
                 <li role="option" aria-selected={index === activeCustomer} id={`credit-customer-${index}`}>
-                  <button class="btn btn-ghost" type="button" tabindex="-1" onpointerdown={event => event.preventDefault()} onclick={() => selectCustomer(customer)}>
+                  <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="ghost" class={"ui-button "} type="button" tabindex={-1} onpointerdown={event => event.preventDefault()} onclick={() => selectCustomer(customer)}>
                     <span>{customer.name}</span><span>{confidentialityLabel(customer.confidentialityStatus)}</span>
-                  </button>
+                  </Button>
                 </li>
               {/each}
             </ul>
             {#if searching}<p role="status">正在加载机构列表…</p>
-            {:else if searchError}<p role="alert">{searchError}<button class="btn btn-ghost" type="button" onpointerdown={event => event.preventDefault()} onclick={() => void loadCustomers()}>重新加载</button></p>
+            {:else if searchError}<p role="alert">{searchError}<Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="ghost" class={"ui-button "} type="button" onpointerdown={event => event.preventDefault()} onclick={() => void loadCustomers()}>重新加载</Button></p>
             {:else if !customers.length}<p role="status">未找到机构</p>{/if}
           </div>
         {/if}
@@ -385,9 +388,9 @@
     </div>
     <form class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
-      <textarea class="textarea textarea-ghost" id="credit-question" bind:this={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows="2" disabled={creating}></textarea>
+      <Textarea data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" class={"ui-textarea textarea-ghost"} id="credit-question" bind:ref={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows={2} disabled={creating}></Textarea>
       <div class="composer-actions">
-        <button class="btn btn-primary chat-button chat-button--send" type="submit" disabled={!selectedCustomer || !question.trim() || busy} aria-label={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></button>
+        <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="default" class={"ui-button  chat-button chat-button--send"} type="submit" disabled={!selectedCustomer || !question.trim() || busy} aria-label={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></Button>
       </div>
     </form>
   </div>
@@ -442,25 +445,25 @@
   .customer-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; max-width: 832px; margin: 0 auto 12px; font-size: .875rem; }
   .customer-picker label { font-weight: bold; color: var(--text-1); }
   .customer-search { position: relative; flex: 1; min-width: min(100%, 220px); }
-  .customer-search input { width: 100%; padding: 10px 12px; }
+  :global(.customer-search input[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { width: 100%; padding: 10px 12px; }
   .customer-options { position: absolute; bottom: calc(100% + 8px); width: 100%; max-height: min(320px, 40dvh); overflow-y: auto; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); box-shadow: var(--shadow-card); }
   .customer-options ul { margin: 0; padding: 4px; list-style: none; }
-  .customer-options button { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; width: 100%; padding: 10px; text-align: left; }
-  .customer-options button span:last-child, .customer-status { color: var(--text-3); }
+  :global(.customer-options button[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; width: 100%; padding: 10px; text-align: left; }
+  :global(.customer-options button[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"] span:last-child), .customer-status { color: var(--text-3); }
   .customer-options li[aria-selected="true"] { background: var(--brand-soft); border-radius: var(--radius-control); }
   .customer-options p { margin: 0; padding: 12px; color: var(--text-2); }
   .chat-composer { max-width: 832px; margin-inline: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 160ms ease; }
   .chat-composer:focus-within { border-color: var(--brand); outline: 2px solid var(--brand); outline-offset: 2px; }
-  textarea { display: block; width: 100%; max-height: 180px; padding: 0; border: 0; box-shadow: none; resize: none; min-height: 56px; }
-  .chat-composer textarea:focus-visible { outline: none; }
-  textarea::placeholder { color: var(--text-3); }
+  :global(textarea[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { display: block; width: 100%; max-height: 180px; padding: 0; border: 0; box-shadow: none; resize: none; min-height: 56px; }
+  :global(.chat-composer textarea[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]:focus-visible) { outline: none; }
+  :global(textarea[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]::placeholder) { color: var(--text-3); }
   .composer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-top: 8px; }
-  .chat-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; padding: 8px 14px; }
-  .chat-button :global(svg) { width: 18px; height: 18px; }
-  .chat-button--copy { padding-inline: 10px; margin-left: -10px; }
-  .chat-button--send { flex-shrink: 0; width: 44px; padding: 0; }
-  .chat-button--send :global(svg) { width: 22px; height: 22px; }
-  .chat-button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  :global(.chat-button[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; padding: 8px 14px; }
+  :global(.chat-button[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"] svg) { width: 18px; height: 18px; }
+  :global(.chat-button--copy[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { padding-inline: 10px; margin-left: -10px; }
+  :global(.chat-button--send[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { flex-shrink: 0; width: 44px; padding: 0; }
+  :global(.chat-button--send[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"] svg) { width: 22px; height: 22px; }
+  :global(.chat-button[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]:focus-visible), a:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
   @media (max-width: 600px) {
     .chat-messages { padding: 24px 16px 12px; }
     .composer-dock { padding: 12px 16px max(16px, env(safe-area-inset-bottom)); }
@@ -468,5 +471,5 @@
     .message--user { max-width: 92%; }
     .chat-turn { gap: 22px; }
   }
-  @media (prefers-reduced-motion: reduce) { .chat-button, .file-attachment, .chat-composer { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { :global(.chat-button[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]), .file-attachment, .chat-composer { transition: none; } }
 </style>

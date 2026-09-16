@@ -1,4 +1,11 @@
 <script lang="ts">
+  import { Badge as UiBadge } from "$lib/components/ui/badge/index.js";
+  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+  import Modal from "$lib/components/Modal.svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
 import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
 import ModuleCard from '../../../components/ModuleCard.svelte';
@@ -25,8 +32,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	let { data } = $props();
 	const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
 	const permissions = $derived($session?.permissions ?? data.permissions);
-	let reminderDialog = $state<HTMLDialogElement>();
-	let sopDialog = $state<HTMLDialogElement>();
+	let reminderDialog = $state<Modal>();
+	let sopDialog = $state<Modal>();
 	let reminderRecipientMode = $state('assignee');
 	let reminderPeriodSequence = 1;
 	let reminderPeriods = $state([{ key: 'period-1', days: 3, hours: 0 }]);
@@ -130,14 +137,14 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 			<PanelHeading id="sop-heading-0" title="负债品种 SOP" controlsInline />
 			<div class="sop-list">
 				{#each settings.sopTemplates as sop}
-					<a class="sop-item" href={withBase(`/sop/${sop.id}`)}>
+					<a data-ui-owner="routes-financing-sop--page-svelte" class="sop-item" href={withBase(`/sop/${sop.id}`)}>
 						<span class="sop-type">{sop.debtType.slice(0, 2)}</span>
 						<div class="sop-copy">
 							<div>
 								<strong>{sop.name}</strong>
-								<span class:inactive={!sop.isActive} class="badge badge-success status-badge">
+								<UiBadge variant="secondary"  class={["ui-tone-success status-badge",!sop.isActive && "inactive"]}>
 									{sop.isActive ? '启用' : '停用'}
-								</span>
+								</UiBadge>
 							</div>
 							{#if sop.description}<p>{sop.description}</p>{/if}
 							<div class="sop-meta">
@@ -154,11 +161,11 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 		<ModuleCard class="section-card">
 			<PanelHeading id="sop-heading-1" title="提醒规则" accent="var(--orange)" controlsInline><div class="header-actions">
-					<a class="btn btn-ghost link-button" href={withBase('/sop/reminders')}>发送历史</a>
+					<Button data-ui-owner="routes-financing-sop--page-svelte" variant="ghost" class={"ui-button  link-button"} href={withBase('/sop/reminders')}>发送历史</Button>
 					{#if canCreateReminder}
-						<button class="btn link-button" type="button" onclick={() => reminderDialog?.showModal()}>
+						<Button data-ui-owner="routes-financing-sop--page-svelte" variant="outline" class={"ui-button link-button"} type="button" onclick={() => reminderDialog?.showModal()}>
 							<Plus size={14} /> 新增提醒
-						</button>
+						</Button>
 					{/if}
 				</div></PanelHeading>
 			<div class="reminder-list">
@@ -168,9 +175,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 						<div>
 							<div class="rule-title">
 								<strong>{rule.name}</strong>
-								<span class:inactive={!rule.isActive} class="badge badge-success status-badge">
+								<UiBadge variant="secondary"  class={["ui-tone-success status-badge",!rule.isActive && "inactive"]}>
 									{rule.isActive ? '启用' : '停用'}
-								</span>
+								</UiBadge>
 							</div>
 							<p>
 								<GitBranch size={13} />
@@ -196,31 +203,31 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	</section>
 
 	{#if canCreateSop}
-	<button
-		class="btn btn-primary floating-create-button"
+	<Button data-ui-owner="routes-financing-sop--page-svelte" variant="default"
+		class={"ui-button  floating-create-button"}
 		type="button"
 		onclick={() => sopDialog?.showModal()}
 		aria-label="新建 SOP"
 	>
 		<Plus size={23} />
-	</button>
+	</Button>
 	{/if}
 
 	{#if canCreateReminder}
-	<dialog class="modal" bind:this={reminderDialog}>
-<div class="modal-box config-modal">
+	<Modal  bind:this={reminderDialog}>
+<div class="dialog-body config-modal">
 		<form method="post" action="?/createReminder" use:enhance={enhanceAction('reminder', '提醒规则已保存')}>
 			<div class="modal-header">
 				<div>
 					<p class="eyebrow">REMINDER RULE</p>
 					<h2>配置邮件提醒</h2>
 				</div>
-				<button class="btn" type="button" aria-label="关闭" onclick={() => reminderDialog?.close()}>×</button>
+				<Button data-ui-owner="routes-financing-sop--page-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => reminderDialog?.close()}>×</Button>
 			</div>
 			<div class="form-grid">
 				<label class="wide">
 					<span>规则名称</span>
-					<input class="input" name="name" required value="任务到期提醒" />
+					<Input data-ui-owner="routes-financing-sop--page-svelte" class={"ui-input"} name="name" required value="任务到期提醒" />
 				</label>
 				<fieldset class="wide rule-fieldset node-selector">
 					<legend>关联 SOP 节点</legend>
@@ -231,7 +238,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 								<div>
 									{#each sop.nodes as node}
 										<label>
-											<input class="checkbox checkbox-primary" type="checkbox" name="nodeIds" value={node.id} />
+											<Checkbox data-ui-owner="routes-financing-sop--page-svelte"  name="nodeIds" value={node.id} />
 											<span>{node.name}</span>
 										</label>
 									{:else}
@@ -247,7 +254,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				<fieldset class="wide rule-fieldset period-editor">
 					<legend>提醒周期</legend>
 					<div class="fieldset-heading">
-						<button type="button" class="btn add-period" onclick={addReminderPeriod} disabled={reminderPeriods.length >= MAX_REMINDER_PERIODS}><Plus size={14} /> 添加周期</button>
+						<Button data-ui-owner="routes-financing-sop--page-svelte" variant="outline" type="button" class={"ui-button add-period"} onclick={addReminderPeriod} disabled={reminderPeriods.length >= MAX_REMINDER_PERIODS}><Plus size={14} /> 添加周期</Button>
 					</div>
 					<div class="period-list">
 						{#each reminderPeriods as period, index (period.key)}
@@ -255,68 +262,68 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 								<span>第 {index + 1} 次</span>
 								<label>
 									<span>天</span>
-									<input class="input" name="periodDays" type="number" min="0" max="3650" step="1" required bind:value={period.days} />
+									<Input data-ui-owner="routes-financing-sop--page-svelte" class={"ui-input"} name="periodDays" type="number" min="0" max="3650" step="1" required bind:value={period.days} />
 								</label>
 								<label>
 									<span>小时</span>
-									<input class="input" name="periodHours" type="number" min="0" max="23" step="1" required bind:value={period.hours} />
+									<Input data-ui-owner="routes-financing-sop--page-svelte" class={"ui-input"} name="periodHours" type="number" min="0" max="23" step="1" required bind:value={period.hours} />
 								</label>
-								<button
+								<Button data-ui-owner="routes-financing-sop--page-svelte" variant="destructive"
 									type="button"
-									class="btn btn-error remove-period"
+									class={"ui-button  remove-period"}
 									onclick={() => removeReminderPeriod(period.key)}
 									disabled={reminderPeriods.length === 1}
 									aria-label={`删除第 ${index + 1} 个提醒周期`}
-								><Trash2 size={15} /></button>
+								><Trash2 size={15} /></Button>
 							</div>
 						{/each}
 					</div>
 				</fieldset>
 				<label class="wide">
 					<span>收件人</span>
-					<select class="select" name="recipientMode" bind:value={reminderRecipientMode}>
+					<NativeSelect data-ui-owner="routes-financing-sop--page-svelte" class={"ui-select"} name="recipientMode" bind:value={reminderRecipientMode}>
 						<option value="assignee">任务负责人</option>
 						<option value="owner">项目负责人</option>
 						<option value="custom">指定邮箱</option>
-					</select>
+					</NativeSelect>
 				</label>
 				{#if reminderRecipientMode === 'custom'}
 					<label class="wide">
 						<span>指定邮箱</span>
-						<input class="input" name="recipients" type="email" multiple required />
+						<Input data-ui-owner="routes-financing-sop--page-svelte" class={"ui-input"} name="recipients" type="email" multiple required />
 					</label>
 				{/if}
 			</div>
 			<div class="modal-actions">
-				<button class="btn" type="button" onclick={() => reminderDialog?.close()}>取消</button>
-				<button class="btn btn-primary primary-action" type="submit" disabled={actionState.status === 'pending'}>
+				<Button data-ui-owner="routes-financing-sop--page-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => reminderDialog?.close()}>取消</Button>
+				<Button data-ui-owner="routes-financing-sop--page-svelte" variant="default" class={"ui-button  primary-action"} type="submit" disabled={actionState.status === 'pending'}>
 					{actionState.status === 'pending' && actionState.key === 'reminder' ? '保存中…' : '保存规则'}
-				</button>
+				</Button>
 			</div>
 		</form>
 	</div>
-</dialog>
+</Modal>
 	{/if}
 
 	{#if canCreateSop}
-	<dialog class="modal" bind:this={sopDialog}>
-<div class="modal-box config-modal">
+	<Modal  bind:this={sopDialog}>
+<div class="dialog-body config-modal">
 		<form method="post" action="?/createSop" use:enhance={enhanceAction('sop', 'SOP 模板已创建')}>
 			<div class="modal-header">
 				<div>
 					<p class="eyebrow">SOP TEMPLATE</p>
 					<h2>新建负债品种 SOP</h2>
 				</div>
-				<button class="btn" type="button" aria-label="关闭" onclick={() => sopDialog?.close()}>×</button>
+				<Button data-ui-owner="routes-financing-sop--page-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => sopDialog?.close()}>×</Button>
 			</div>
 			<div class="form-grid">
 				<label class="wide">
 					<span>SOP 名称</span>
-					<input class="input" name="name" required />
+					<Input data-ui-owner="routes-financing-sop--page-svelte" class={"ui-input"} name="name" required />
 				</label>
 				<label class="wide">
 					<span>负债品种</span>
-					<select class="select" name="debtType" required>
+					<NativeSelect data-ui-owner="routes-financing-sop--page-svelte" class={"ui-select"} name="debtType" required>
 						<option value="">请选择</option>
 						<option>收益凭证</option>
 						<option>公司债</option>
@@ -324,22 +331,22 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 						<option>转融资</option>
 						<option>同业拆借</option>
 						<option>集团借款</option>
-					</select>
+					</NativeSelect>
 				</label>
 				<label class="wide">
 					<span>说明</span>
-					<textarea class="textarea" name="description" rows="3"></textarea>
+					<Textarea data-ui-owner="routes-financing-sop--page-svelte" class={"ui-textarea"} name="description" rows={3}></Textarea>
 				</label>
 			</div>
 			<div class="modal-actions">
-				<button class="btn" type="button" onclick={() => sopDialog?.close()}>取消</button>
-				<button class="btn btn-primary primary-action" type="submit" disabled={actionState.status === 'pending'}>
+				<Button data-ui-owner="routes-financing-sop--page-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => sopDialog?.close()}>取消</Button>
+				<Button data-ui-owner="routes-financing-sop--page-svelte" variant="default" class={"ui-button  primary-action"} type="submit" disabled={actionState.status === 'pending'}>
 					{actionState.status === 'pending' && actionState.key === 'sop' ? '创建中…' : canManage ? '创建并配置节点' : '创建 SOP'}
-				</button>
+				</Button>
 			</div>
 		</form>
 	</div>
-</dialog>
+</Modal>
 	{/if}
 </div>
 
@@ -502,7 +509,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		cursor: pointer;
 	}
 
-	.node-group input {
+	:global(.node-group input[data-ui-owner="routes-financing-sop--page-svelte"]) {
 		width: 1.125rem;
 		padding: 0;
 	}
@@ -514,7 +521,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		gap: 0.75rem;
 	}
 
-	.add-period {
+	:global(.add-period[data-ui-owner="routes-financing-sop--page-svelte"]) {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.375rem;
@@ -545,12 +552,12 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		color: #667085;
 	}
 
-	.period-row input {
+	:global(.period-row input[data-ui-owner="routes-financing-sop--page-svelte"]) {
 		width: 100%;
 		padding-inline: 0.75rem;
 	}
 
-	.remove-period {
+	:global(.remove-period[data-ui-owner="routes-financing-sop--page-svelte"]) {
 		display: grid;
 		width: 2.75rem;
 		place-items: center;

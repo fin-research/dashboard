@@ -5,11 +5,15 @@
   import MetricCard from "./MetricCard.svelte";
   import MetricIcon from "./MetricIcon.svelte";
 
-  export let data: ReportData;
-  export let derived: ReportDerived;
-  export let missingResources: MarketReportResource[] = [];
+  interface Props {
+    data: ReportData;
+    reportDerived: ReportDerived;
+    missingResources?: MarketReportResource[];
+  }
 
-  $: cards = coreMetricCards(data, derived, missingResources);
+  let { data, reportDerived, missingResources = [] }: Props = $props();
+
+  let cards = $derived(coreMetricCards(data, reportDerived, missingResources));
 
   const metricToneByIcon = {
     bank: "green",

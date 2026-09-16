@@ -1,5 +1,8 @@
 <script lang="ts">
 import { getContext } from 'svelte';
+import * as Popover from '$lib/components/ui/popover/index.js';
+import { Button } from '$lib/components/ui/button/index.js';
+import { Badge } from '$lib/components/ui/badge/index.js';
 import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import './layout.css';
 import { Bell } from '@lucide/svelte';
@@ -12,8 +15,8 @@ let { data, children } = $props();
 const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
 const permissions = $derived($session?.permissions ?? data.permissions);
 let navigationSlow = $state(false);
-let remindersMenu = $state<HTMLDetailsElement>();
-$effect(() => { page.url.pathname; if (remindersMenu) remindersMenu.open = false; });
+let remindersOpen = $state(false);
+$effect(() => { page.url.pathname; remindersOpen = false; });
 $effect(() => {
   navigationSlow = false;
   if (!navigating.to) return;
@@ -34,24 +37,25 @@ const isLiabilityReport = $derived(path === '/liability-report');
 const activeLabel = $derived(path.startsWith('/projects/') ? '项目详情' : path.startsWith('/debts/') ? '负债详情' : path === '/sop/reminders' ? '提醒发送历史' : path.startsWith('/sop/') ? 'SOP 配置' : '');
 </script>
 
-<svelte:window onkeydown={(event) => { if (event.key === 'Escape' && remindersMenu?.open) { remindersMenu.open = false; remindersMenu.querySelector('summary')?.focus(); } }} onpointerdown={(event) => { if (remindersMenu?.open && event.target instanceof Node && !remindersMenu.contains(event.target)) remindersMenu.open = false; }} />
+
 
 {#if data.user}
 <WorkbenchShell title="融资工作台" homeHref="/financing/" {views} {activeViewId} {activeLabel}
   class="financing-scope" tone="orange" layoutReport={isLiabilityReport} reportKind={isLiabilityReport ? 'liability' : null}>
   {#snippet actions()}
-    <details class="dropdown dropdown-end financing-reminders" bind:this={remindersMenu}>
-      <summary class="btn btn-ghost reminder-trigger" aria-label={`查看提醒，${data.reminders.total} 条待办`}>
+    <Popover.Root bind:open={remindersOpen}>
+      <Popover.Trigger>{#snippet child({ props })}
+      <Button {...props} variant="ghost" class="reminder-trigger" aria-label={`查看提醒，${data.reminders.total} 条待办`}>
         <Bell size={19} aria-hidden="true" /><span class="reminder-trigger-label">查看提醒</span>
-        {#if data.reminders.total > 0}<span class="badge badge-info">{data.reminders.total}</span>{/if}
-      </summary>
-      <div class="dropdown-content card card-border bg-base-100 reminder-popover">
+        {#if data.reminders.total > 0}<Badge variant="secondary">{data.reminders.total}</Badge>{/if}
+      </Button>{/snippet}</Popover.Trigger>
+      <Popover.Content align="end" class="reminder-popover w-96 max-h-[60dvh] overflow-y-auto">
         <div class="reminder-popover-heading"><strong>待办与提醒</strong><span>{data.reminders.total} 条</span></div>
         {#each data.reminders.items as reminder}
           <a href={withBase(reminder.href)}><strong>{reminder.projectName}</strong><span>{reminder.taskName}</span><small>{reminder.dueLabel}</small></a>
         {:else}<p>当前没有需要处理的项目节点</p>{/each}
-      </div>
-    </details>
+      </Popover.Content>
+    </Popover.Root>
     {#if isLiabilityReport}
       {#await import('$lib/financing/LiabilityReportActions.svelte') then module}
         <module.default permissions={permissions} />

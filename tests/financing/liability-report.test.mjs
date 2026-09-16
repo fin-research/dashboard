@@ -292,7 +292,7 @@ test('weekly report actions and report-date calendar stay in the application hea
 	assert.doesNotMatch(layout, /liability-report#history|历史快照/);
 	assert.match(layout, /class="report-history-picker"/);
 	assert.match(layout, /<label for="report-history-date">报告日<\/label>/);
-	assert.match(layout, /<input[\s\S]*type="date"[\s\S]*name="date"[\s\S]*value=\{selectedLiabilityReportDate\(\)\}/);
+	assert.match(layout, /<Input[\s\S]*type="date"[\s\S]*name="date"[\s\S]*value=\{selectedLiabilityReportDate\(\)\}/);
 	assert.doesNotMatch(layout, /<select[\s\S]*liabilityReportHistory/);
 	assert.doesNotMatch(page, /history-picker|report-history-date/);
 });

@@ -1,3 +1,4 @@
+import { financingModel } from './report-fixtures.mjs';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { buildBondLedgerAnalytics, toBondLedgerReport, emptyBondLedgerReport } from '../../src/lib/bond-ledger/analytics.ts';
@@ -56,7 +57,9 @@ export async function mockResources(page, { creditError = false, ledgerEmpty = f
     if (url.pathname === '/api/credit') {
       if (creditError) return route.fulfill({ status: 503, json: { error: '授信报表暂不可用' } });
       body = credit;
-    } else if (url.pathname === '/api/trading-workflow/config') body = workflow;
+    } else if (url.pathname === '/api/financing-model') body = financingModel;
+    else if (url.pathname === '/api/financing-model/decisions') body = [];
+    else if (url.pathname === '/api/trading-workflow/config') body = workflow;
     else if (url.pathname === '/data/chinamoney/shibor') body = [{ publishDate: today, publishedAt: `${today}T11:00:00+08:00`, tenor: '1W', rate: 1.5 }];
     else if (url.pathname === '/api/economic-indicators') body = { asOf: today, syncedAt: `${today}T08:00:00+08:00`, rows: [
       { code: 'E1300004', date: '2026-09-14', value: 1.4 }, { code: 'E1300004', date: today, value: 1.45 },

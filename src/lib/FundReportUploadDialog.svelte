@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Modal from "$lib/components/Modal.svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
   import { isLoginRedirecting } from "$lib/auth-client";
 
   import {
@@ -15,12 +18,16 @@
     replaced: boolean;
   }
 
-  let fileInput: HTMLInputElement;
-  let selectedFile: File | null = null;
-  let selectedDate = "";
-  let uploading = false;
-  export let onuploaded: (result: UploadResult) => void = () => {};
-  let dialog: HTMLDialogElement;
+  let fileInput = $state<HTMLInputElement>(null!);
+  let selectedFile = $state<File | null>(null);
+  let selectedDate = $state("");
+  let uploading = $state(false);
+  interface Props {
+    onuploaded?: (result: UploadResult) => void;
+  }
+
+  let { onuploaded = () => {} }: Props = $props();
+  let dialog = $state<Modal>(null!);
   export function open(): void { dialog.showModal(); }
 
   function chooseFile(): void {
@@ -113,11 +120,11 @@
   }
 </script>
 
-<dialog class="modal" bind:this={dialog} aria-labelledby="fund-report-upload-title" oncancel={(event) => { if (uploading) event.preventDefault(); }}>
-<div class="modal-box upload-modal-box">
+<Modal  bind:this={dialog} aria-labelledby="fund-report-upload-title" oncancel={(event) => { if (uploading) event.preventDefault(); }}>
+<div class="dialog-body upload-dialog-body">
   <header class="dialog-heading">
     <h2 id="fund-report-upload-title">上传资金日报</h2>
-    <button class="btn btn-ghost close-button" type="button" aria-label="关闭上传窗口" disabled={uploading} onclick={() => dialog.close()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+    <Button data-ui-owner="lib-FundReportUploadDialog-svelte" variant="ghost" class={"ui-button  close-button"} type="button" aria-label="关闭上传窗口" disabled={uploading} onclick={() => dialog.close()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></Button>
   </header>
       <form
         class="upload-form"
@@ -127,9 +134,9 @@
           uploadFundReport();
         }}
       >
-        <input
-          bind:this={fileInput}
-          class="upload-file-input"
+        <Input data-ui-owner="lib-FundReportUploadDialog-svelte"
+          bind:ref={fileInput}
+          class={"upload-file-input"}
           type="file"
           accept=".html,text/html"
           aria-label="选择资金日报 HTML 文件"
@@ -137,9 +144,9 @@
           onchange={handleFileSelection}
         />
 
-        <button
-          class:selected={selectedFile !== null}
-          class="btn file-picker"
+        <Button data-ui-owner="lib-FundReportUploadDialog-svelte" variant="outline"
+
+          class={["ui-button file-picker", selectedFile !== null && "selected"]}
           type="button"
           disabled={uploading}
           onclick={chooseFile}
@@ -155,7 +162,7 @@
             <strong>{selectedFile ? selectedFile.name : "选择资金日报 HTML"}</strong>
           </span>
           <span class="file-picker-action">{selectedFile ? "重新选择" : "选择文件"}</span>
-        </button>
+        </Button>
 
         {#if selectedFile}
           <section class="selected-file" aria-label="待上传文件" aria-live="polite">
@@ -178,25 +185,25 @@
 
         <footer class="upload-actions">
           {#if selectedFile}<span>即将发布 {fundReportFileName(selectedDate)}</span>{/if}
-          <button class="btn btn-ghost cancel-button" type="button" disabled={uploading} onclick={() => dialog.close()}>取消</button>
-          <button class="btn btn-primary upload-button" type="submit" disabled={!selectedFile || uploading}>
+          <Button data-ui-owner="lib-FundReportUploadDialog-svelte" variant="ghost" class={"ui-button  cancel-button"} type="button" disabled={uploading} onclick={() => dialog.close()}>取消</Button>
+          <Button data-ui-owner="lib-FundReportUploadDialog-svelte" variant="default" class={"ui-button  upload-button"} type="submit" disabled={!selectedFile || uploading}>
             {#if uploading}<span class="button-spinner" aria-hidden="true"></span>{/if}
             <span>{uploading ? "正在上传" : "上传并发布"}</span>
-          </button>
+          </Button>
         </footer>
 
 
       </form>
 </div>
-</dialog>
+</Modal>
 
 <style>
-  .upload-modal-box { width: min(720px, 100%); max-width: 720px; padding: 0; }
+  .upload-dialog-body { width: min(720px, 100%); max-width: 720px; padding: 0; }
   .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
   .dialog-heading h2 { margin: 0; font-size: 1.25rem; }
-  .close-button { width: 44px; height: 44px; display: grid; place-items: center; }
-  .close-button svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
-  .cancel-button { padding: 10px 16px; }
+  :global(.close-button[data-ui-owner="lib-FundReportUploadDialog-svelte"]) { width: 44px; height: 44px; display: grid; place-items: center; }
+  :global(.close-button[data-ui-owner="lib-FundReportUploadDialog-svelte"] svg) { width: 20px; fill: none; stroke: currentColor; stroke-width: 2; }
+  :global(.cancel-button[data-ui-owner="lib-FundReportUploadDialog-svelte"]) { padding: 10px 16px; }
   .file-picker-icon svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .upload-form {
     display: grid;
@@ -204,7 +211,7 @@
     padding: 24px;
   }
 
-  .upload-file-input {
+  :global(.upload-file-input[data-ui-owner="lib-FundReportUploadDialog-svelte"]) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -214,7 +221,7 @@
     white-space: nowrap;
   }
 
-  .file-picker {
+  :global(.file-picker[data-ui-owner="lib-FundReportUploadDialog-svelte"]) {
     display: grid;
     min-height: 124px;
     grid-template-columns: 56px minmax(0, 1fr) auto;
@@ -233,13 +240,13 @@
       box-shadow 160ms ease;
   }
 
-  .file-picker:hover:not(:disabled) {
+  :global(.file-picker[data-ui-owner="lib-FundReportUploadDialog-svelte"]:hover:not(:disabled)) {
     border-color: var(--brand);
     background: var(--brand-soft);
     box-shadow: 0 8px 24px rgb(47 111 214 / 9%);
   }
 
-  .file-picker.selected {
+  :global(.file-picker[data-ui-owner="lib-FundReportUploadDialog-svelte"].selected) {
     border-style: solid;
     border-color: color-mix(in srgb, var(--green) 46%, var(--line));
     background: color-mix(in srgb, var(--green) 7%, var(--surface));
@@ -256,7 +263,7 @@
     box-shadow: var(--shadow-card);
   }
 
-  .selected .file-picker-icon {
+  :global(.selected[data-ui-owner="lib-FundReportUploadDialog-svelte"]) .file-picker-icon {
     color: color-mix(in srgb, var(--green) 82%, #173b31);
   }
 
@@ -310,7 +317,7 @@
   }
 
   .selected-file dt {
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 0.875rem;
   }
 
@@ -332,11 +339,11 @@
   }
 
   .upload-actions > span {
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 0.875rem;
   }
 
-  .upload-button {
+  :global(.upload-button[data-ui-owner="lib-FundReportUploadDialog-svelte"]) {
     display: inline-flex;
     min-width: 168px;
     align-items: center;
@@ -346,8 +353,8 @@
     min-height: 46px;
   }
 
-  .upload-button:disabled,
-  .file-picker:disabled {
+  :global(.upload-button[data-ui-owner="lib-FundReportUploadDialog-svelte"]:disabled),
+  :global(.file-picker[data-ui-owner="lib-FundReportUploadDialog-svelte"]:disabled) {
     cursor: not-allowed;
     opacity: 0.48;
   }
@@ -368,7 +375,7 @@
   }
 
   @media (max-width: 720px) {
-    .file-picker { grid-template-columns: 48px minmax(0, 1fr); padding: 16px;
+    :global(.file-picker[data-ui-owner="lib-FundReportUploadDialog-svelte"]) { grid-template-columns: 48px minmax(0, 1fr); padding: 16px;
     min-height: 124px; }
     .file-picker-action { display: none; }
     .selected-file dl { grid-template-columns: 1fr; }

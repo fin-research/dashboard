@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Input } from "$lib/components/ui/input/index.js";
   import { onMount, tick, untrack } from 'svelte';
   import { fly } from 'svelte/transition';
   import { flip } from 'svelte/animate';
@@ -160,7 +161,7 @@
       {#each fields as field}
         {@const message = error(row, field)}
         <div class="inquiry-cell" class:cell-selected={inSelection(row.id, field)} role="cell">
-          <input class="input" type="text" inputmode={field === 'amount' || field === 'price' ? 'decimal' : 'text'}
+          <Input data-ui-owner="lib-trading-workflow-InquiryTable-svelte" class={"ui-input"} type="text" inputmode={field === 'amount' || field === 'price' ? 'decimal' : 'text'}
             data-row={row.id} data-field={field} aria-label={placeholders[field]} placeholder={placeholders[field]}
             maxlength={field === 'counterparty' ? 160 : field === 'trader' ? 80 : 24}
             role="combobox" aria-autocomplete="list" aria-expanded={active?.id === row.id && active.field === field && options.length > 0}
@@ -196,9 +197,9 @@
   .inquiry-cell { position: relative; min-width: 0; transition: background-color 120ms; }
   .cell-selected { background: #dceaff; box-shadow: inset 0 0 0 1px #91b9ef; }
   .selecting { user-select: none; }
-  .inquiry-cell .input { width: 100%; min-width: 0; height: 38px; padding-inline: 5px; font-size: .875rem; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-weight: normal; }
-  .inquiry-cell .input:focus { outline: 2px solid var(--brand, #2f6fd6); outline-offset: -2px; }
-  .inquiry-cell .input[aria-invalid="true"] { outline: 2px solid var(--color-error, #d92d20); outline-offset: -2px; }
+  :global(.inquiry-cell .ui-input[data-ui-owner="lib-trading-workflow-InquiryTable-svelte"]) { width: 100%; min-width: 0; height: 38px; padding-inline: 5px; font-size: .875rem; border: 0; border-radius: 0; background: transparent; box-shadow: none; font-weight: normal; }
+  :global(.inquiry-cell .ui-input[data-ui-owner="lib-trading-workflow-InquiryTable-svelte"]:focus) { outline: 2px solid var(--brand, #2f6fd6); outline-offset: -2px; }
+  :global(.inquiry-cell .ui-input[data-ui-owner="lib-trading-workflow-InquiryTable-svelte"][aria-invalid="true"]) { outline: 2px solid var(--color-error, #d92d20); outline-offset: -2px; }
   .cell-error { display: block; padding: 4px; color: var(--color-error, #d92d20); font-size: .75rem; }
   .inquiry-options { position: absolute; top: 100%; left: 0; z-index: 20; min-width: 120px; max-height: 240px; overflow: auto; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--tr-border, #dbe7f7); border-radius: 6px; background: white; box-shadow: 0 4px 12px #17203318; }
   .inquiry-options li { padding: 8px; cursor: pointer; font-size: .875rem; }

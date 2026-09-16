@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
   import { onMount } from "svelte";
 
   import { portal } from "../portal";
@@ -70,7 +71,7 @@
         <strong>经济指标暂时无法加载</strong>
         <span>{error}</span>
       </div>
-      <button class="btn" type="button" onclick={loadIndicators}>重新加载</button>
+      <Button data-ui-owner="lib-trading-research-ResearchView-svelte" variant="outline" class={"ui-button"} type="button" onclick={loadIndicators}>重新加载</Button>
     </div>
   {/if}
 

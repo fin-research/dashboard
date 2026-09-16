@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount } from 'svelte';
   import { Handle, Position, type NodeProps } from '@xyflow/svelte';
   import { ChevronDown, ChevronRight, GitBranch, MessageSquare, FileText, Clock, Landmark, Send } from '@lucide/svelte';
@@ -38,7 +39,7 @@
   {#if data.node && isInquiry(data.node) && data.expanded && !data.editing}
     {#key data.date}<InquiryTable rows={data.rows} loan={data.node.scope === 'loan'} directory={data.directory} rates={data.rates}
       date={data.date} now={data.now} onRows={data.writeRows} onRemember={data.remember} />{/key}
-    {#if data.note}<textarea class="textarea legacy-note nodrag nopan nowheel" aria-label="原询价记录" value={data.note} oninput={event => data.writeNote(event.currentTarget.value)}></textarea>{/if}
+    {#if data.note}<Textarea data-ui-owner="lib-trading-workflow-WorkflowNode-svelte" class={"ui-textarea legacy-note nodrag nopan nowheel"} aria-label="原询价记录" value={data.note} oninput={event => data.writeNote(event.currentTarget.value)}></Textarea>{/if}
   {/if}
 </div>
 <Handle type="source" position={Position.Bottom} isConnectable={false} aria-hidden="true" tabindex={-1} />
@@ -62,7 +63,7 @@
   .done .node-surface { background: color-mix(in srgb, var(--node-tone) 20%, white); border-color: color-mix(in srgb, var(--node-tone) 60%, white); }
   .decision .node-title { font-weight: bold; }
   .workflow-node:has(:global(.inquiry-table)) .node-surface { border-radius: 8px 8px 0 0; }
-  .legacy-note { width: 100%; font-size: .875rem; }
+  :global(.legacy-note[data-ui-owner="lib-trading-workflow-WorkflowNode-svelte"]) { width: 100%; font-size: .875rem; }
   :global(.svelte-flow__handle) { opacity: 0; pointer-events: none; }
   @media (prefers-reduced-motion: reduce) { .node-surface { transition: none; } }
 </style>

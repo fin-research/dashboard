@@ -2,14 +2,18 @@
   import { number, signed, tone } from "../formatters";
   import type { EquityPoint } from "../types";
 
-  export let points: EquityPoint[];
+  interface Props {
+    points: EquityPoint[];
+  }
 
-  $: valid = points
+  let { points }: Props = $props();
+
+  let valid = $derived(points
     .filter(
       (point) =>
         Number.isFinite(point.close) && Number.isFinite(point.change_pct),
     )
-    .slice(0, 4);
+    .slice(0, 4));
 </script>
 
 {#each valid as point (point.name)}

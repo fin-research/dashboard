@@ -1,3 +1,6 @@
+import { superValidate } from 'sveltekit-superforms';
+import { zod4 } from 'sveltekit-superforms/adapters';
+import { projectCreateSchema } from '$lib/financing/project-form';
 import { activePerson, getDirectory } from '$lib/server/directory';
 import { randomUUID } from 'node:crypto';
 import { fail } from '@sveltejs/kit';
@@ -46,19 +49,10 @@ export const actions: Actions = {
 			return fail(403, { message: '当前角色无权新增项目' });
 		}
 		const data = await event.request.formData();
-		const name = String(data.get('name') ?? '').trim();
-		const sopTemplateId = String(data.get('sopTemplateId') ?? '').trim();
-		const amountYi = String(data.get('amountYi') ?? '').trim();
-		const ownerId = String(data.get('ownerId') ?? '').trim();
-		const notes = String(data.get('notes') ?? '').trim();
+		const form = await superValidate(data, zod4(projectCreateSchema));
+		if (!form.valid) return fail(400, { form, message: Object.values(form.errors).flat().filter(Boolean).join('；') });
+		const { name, sopTemplateId, amountYi, ownerId, notes } = form.data;
 		const plannedBookbuildingDate = projectBookbuildingDate(data);
-		if (!name || name.length > 160) return fail(400, { message: '项目名称须为 1–160 个字符' });
-		if (!sopTemplateId) return fail(400, { message: '请选择融资品种和对应 SOP' });
-		if (notes.length > 4000) return fail(400, { message: '项目说明不能超过 4,000 个字符' });
-		if (amountYi && (!/^\d+(?:\.\d{1,8})?$/.test(amountYi) || Number(amountYi) < 0)) {
-			return fail(400, { message: '项目规模须为有效的非负亿元数值' });
-		}
-		if (!isScheduleDate(plannedBookbuildingDate)) return fail(400, { message: '请填写有效的计划簿记日期' });
 
 		const db = getDatabase();
 		if (ownerId && !await activePerson(ownerId)) {

@@ -14,10 +14,10 @@ function cssColor(name: string, fallback: string): string {
 
 export const colors = {
   ink: cssColor("--text-1", cssColor("--ink", "#202622")),
-  muted: cssColor("--text-3", cssColor("--muted", "#667069")),
+  muted: cssColor("--text-3", cssColor("--text-muted", "#667069")),
   quiet: cssColor("--quiet", "#8d9690"),
-  line: cssColor("--border", cssColor("--line", "#d5dad4")),
-  grid: cssColor("--border", "#e0e4df"),
+  line: cssColor("--chart-line-color", "#ffffff"),
+  grid: cssColor("--chart-grid-color", "#ffffff"),
   zero: cssColor("--border-strong", "#9da59f"),
   paper: cssColor("--bg-card", cssColor("--surface", "#ffffff")),
   brand: cssColor("--color-primary", cssColor("--brand", "#f47a20")),
@@ -30,7 +30,7 @@ export const colors = {
   get down() {
     return cssColor("--color-down", "#12a873");
   },
-  gold: cssColor("--color-accent", cssColor("--gold", "#f47a20")),
+  gold: cssColor("--business-accent", cssColor("--gold", "#f47a20")),
   blue: cssColor("--color-primary", cssColor("--blue", "#3f708c")),
 } as const;
 

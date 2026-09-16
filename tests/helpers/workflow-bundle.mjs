@@ -9,6 +9,7 @@ export async function loadWorkflowView() {
   const outDir = new URL('.svelte-kit/workflow-dom/', root);
   await build({
     configFile: false, logLevel: 'silent', plugins: [svelte()],
+    resolve: { alias: { '$lib': fileURLToPath(new URL('src/lib/', root)) } },
     build: {
       outDir: fileURLToPath(outDir), emptyOutDir: true, minify: false,
       lib: { entry: fileURLToPath(new URL('src/lib/trading-research/WorkflowView.svelte', root)), formats: ['es'], fileName: () => 'workflow.mjs' },

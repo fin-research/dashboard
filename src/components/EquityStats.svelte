@@ -4,9 +4,13 @@
   import { equityStatCards } from "../view-model";
   import StatIcon from "./StatIcon.svelte";
 
-  export let data: ReportData;
-  export let margin: MarginSnapshot;
-  $: items = equityStatCards(data, margin);
+  interface Props {
+    data: ReportData;
+    margin: MarginSnapshot;
+  }
+
+  let { data, margin }: Props = $props();
+  let items = $derived(equityStatCards(data, margin));
 </script>
 
 {#each items as item (item.label)}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
 	import { ArrowLeft } from '@lucide/svelte';
 	import ModuleCard from '../../../../components/ModuleCard.svelte';
 	import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
@@ -11,7 +12,7 @@
 
 <svelte:head><title>{debt.name} · 负债详情</title></svelte:head>
 
-<a class="btn btn-ghost back-link" href={withBase('/')}><ArrowLeft size={16} />返回仪表盘</a>
+<Button data-ui-owner="routes-financing-debts--id---page-svelte" variant="ghost" class={"ui-button  back-link"} href={withBase('/')}><ArrowLeft size={16} />返回仪表盘</Button>
 <section class="debt-heading financing-detail-heading">
 	<h2>{debt.name}</h2>
 	<span>{debt.debtType}{debt.subtype ? ` / ${debt.subtype}` : ''}</span>
@@ -20,7 +21,7 @@
 <section class="detail-grid">
 	<ModuleCard padding="none" labelledBy="debt-core-title"><div class="detail-card-heading"><PanelHeading id="debt-core-title" title="核心信息" /></div><dl>
 		<div><dt>负债大类</dt><dd>{debt.debtType}</dd></div><div><dt>负债小类</dt><dd>{debt.subtype ?? '无'}</dd></div>
-		<div><dt>交易对手</dt><dd>{debt.counterparty ?? '未登记'}</dd></div><div><dt>状态</dt><dd><span class={`badge ${debt.status === 'active' ? 'badge-success' : debt.status === 'planned' ? 'badge-info' : 'badge-ghost'}`}>{statusLabels.get(debt.status) ?? debt.status}</span></dd></div>
+		<div><dt>交易对手</dt><dd>{debt.counterparty ?? '未登记'}</dd></div><div><dt>状态</dt><dd><span class={`ui-badge ${debt.status === 'active' ? 'ui-tone-success' : debt.status === 'planned' ? 'ui-tone-info' : 'ui-tone-neutral'}`}>{statusLabels.get(debt.status) ?? debt.status}</span></dd></div>
 		<div><dt>本金</dt><dd>{amountYi(debt.amount)}</dd></div><div><dt>应付利息</dt><dd>{amountYi(debt.interestPayable)}</dd></div>
 		<div><dt>本息总计</dt><dd>{amountYi(debt.totalAmount)}</dd></div><div><dt>年化利率</dt><dd>{debt.annualRate == null ? '未登记' : `${(debt.annualRate * 100).toFixed(4)}%`}</dd></div>
 		<div><dt>起息日</dt><dd>{debt.issueDate ?? '未登记'}</dd></div><div><dt>到期日</dt><dd>{debt.maturityDate ?? '未登记'}</dd></div>
@@ -37,9 +38,9 @@
 
 <style>
 	.detail-grid > :global(.module-card), :global(.debt-source-card) { overflow: hidden; }
-	.back-link{display:inline-flex;min-height:2.75rem;align-items:center;gap:.5rem;color:var(--color-primary)}.debt-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin:.5rem 0 1rem}.debt-heading h2{margin:0}.debt-heading>span{padding:.375rem .625rem;border-radius:var(--radius-tag);font-size:.875rem;color:var(--color-primary);background:var(--brand-soft)}
+	:global(.back-link[data-ui-owner="routes-financing-debts--id---page-svelte"]){display:inline-flex;min-height:2.75rem;align-items:center;gap:.5rem;color:var(--color-primary)}.debt-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin:.5rem 0 1rem}.debt-heading h2{margin:0}.debt-heading>span{padding:.375rem .625rem;border-radius:var(--radius-tag);font-size:.875rem;color:var(--color-primary);background:var(--brand-soft)}
 	.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.detail-card-heading{padding:1rem 1rem 0;border-bottom:1px solid var(--line)}
-	dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0}dl>div{min-width:0;padding:.75rem 1rem;border-bottom:1px solid var(--line)}dt{font-size:.875rem;color:var(--muted)}dd{margin:.25rem 0 0;font-weight: bold;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.cashflows{display:grid}.cashflows>div{display:grid;grid-template-columns:6.5rem 4rem minmax(0,1fr);gap:.75rem;padding:.75rem 1rem;border-bottom:1px solid var(--line)}.cashflows span{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.cashflows p{padding:1rem;color:var(--muted)}
-	:global(.debt-source-card){margin-top:1rem}.source-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;overflow:hidden;background:var(--surface)}.source-grid>div{display:grid;gap:.25rem;padding:.75rem;background:var(--surface);outline:1px solid var(--line)}.source-grid span,.source-grid small{font-size:.875rem;color:var(--muted)}.source-grid strong{overflow-wrap:anywhere}
+	dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0}dl>div{min-width:0;padding:.75rem 1rem;border-bottom:1px solid var(--line)}dt{font-size:.875rem;color:var(--text-muted)}dd{margin:.25rem 0 0;font-weight: bold;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.cashflows{display:grid}.cashflows>div{display:grid;grid-template-columns:6.5rem 4rem minmax(0,1fr);gap:.75rem;padding:.75rem 1rem;border-bottom:1px solid var(--line)}.cashflows span{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.cashflows p{padding:1rem;color:var(--text-muted)}
+	:global(.debt-source-card){margin-top:1rem}.source-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;overflow:hidden;background:var(--surface)}.source-grid>div{display:grid;gap:.25rem;padding:.75rem;background:var(--surface);outline:1px solid var(--line)}.source-grid span,.source-grid small{font-size:.875rem;color:var(--text-muted)}.source-grid strong{overflow-wrap:anywhere}
 	@media(max-width:64rem){.detail-grid{grid-template-columns:1fr}.source-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:35rem){.debt-heading{align-items:flex-start;flex-direction:column}dl,.source-grid{grid-template-columns:1fr}.cashflows>div{grid-template-columns:1fr 1fr}}
 </style>

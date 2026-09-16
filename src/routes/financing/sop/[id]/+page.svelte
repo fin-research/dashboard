@@ -1,4 +1,9 @@
 <script lang="ts">
+  import Modal from "$lib/components/Modal.svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
 import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 	import '../../management.css';
 	import { enhance } from '$app/forms';
@@ -44,7 +49,7 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 	const pendingAction = $derived(pendingActions.at(-1) ?? '');
 	let handledForm = $state<unknown>(null);
 	let suppressFormFeedback = $state(false);
-	let addNodeDialog = $state<HTMLDialogElement>();
+	let addNodeDialog = $state<Modal>();
 	let addNodeNameInput = $state<HTMLInputElement>();
 	let reorderForm: HTMLFormElement;
 	let draggedNodeId = $state<string | null>(null);
@@ -281,12 +286,12 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 		<a href={withBase('/sop')}><ArrowLeft size={18} /> 返回 SOP 管理</a>
 		{#if canManage}
 			<form method="post" action="?/toggleTemplate" use:enhance={enhanceForm('toggle')}>
-				<button class:active={template.isActive} class="btn btn-ghost toggle-button" type="submit" disabled={pendingAction !== ''} aria-pressed={template.isActive} aria-label={template.isActive ? '停用 SOP' : '启用 SOP'}>
+				<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="ghost"  class={["ui-button  toggle-button", template.isActive && "active"]} type="submit" disabled={pendingAction !== ''} aria-pressed={template.isActive} aria-label={template.isActive ? '停用 SOP' : '启用 SOP'}>
 					{pendingAction === 'toggle' ? '更新中…' : template.isActive ? '停用' : '启用'}
-				</button>
+				</Button>
 			</form>
 		{:else}
-			<span class:active={template.isActive} class="toggle-button read-only-status">{template.isActive ? '已启用' : '已停用'}</span>
+			<span data-ui-owner="routes-financing-sop--id---page-svelte" class:active={template.isActive} class="toggle-button read-only-status">{template.isActive ? '已启用' : '已停用'}</span>
 		{/if}
 	</div>
 
@@ -294,7 +299,7 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 
 	<p class="sr-only" aria-live="assertive">{reorderAnnouncement}</p>
 	<form method="post" action="?/reorderNodes" use:enhance={enhanceForm('reorder', { rollbackOrderOnFailure: true })} bind:this={reorderForm} class="reorder-form">
-		<input type="hidden" name="orderedNodeIds" value={currentOrder().join(',')} />
+		<input data-ui-owner="routes-financing-sop--id---page-svelte" type="hidden" name="orderedNodeIds" value={currentOrder().join(',')} />
 	</form>
 
 	<div class="editor-grid">
@@ -311,9 +316,9 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 						<article class:dragging={draggedNodeId === node.id} class:read-only={!canManage} class="node-card" data-node-id={node.id}>
 							<div class="node-order">
 								<strong>{index + 1}</strong>
-								<button
-									class:grabbed={keyboardGrabbedId === node.id}
-									class="btn drag-handle"
+								<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="outline"
+
+									class={["ui-button drag-handle", keyboardGrabbedId === node.id && "grabbed"]}
 									type="button"
 									aria-label={`拖拽排序 ${node.name}，当前第 ${index + 1} 项`}
 									aria-pressed={keyboardGrabbedId === node.id}
@@ -325,7 +330,7 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 									onkeydown={(event) => handleReorderKey(event, node.id)}
 								>
 									<GripVertical size={18} />
-								</button>
+								</Button>
 							</div>
 							<form
 								method="post"
@@ -334,24 +339,24 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 								use:enhance={enhanceForm(`node-${node.id}`, { autoSave: true })}
 								class="node-form"
 							>
-								<input type="hidden" name="nodeId" value={node.id} />
+								<input data-ui-owner="routes-financing-sop--id---page-svelte" type="hidden" name="nodeId" value={node.id} />
 								<label class="node-name">
 									<span>节点名称</span>
-									<input class="input" name="name" maxlength="120" required bind:value={node.name} disabled={!canManage} />
+									<Input data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-input"} name="name" maxlength={120} required bind:value={node.name} disabled={!canManage} />
 								</label>
 								<label>
 									<span>默认角色</span>
-									<select class="select" name="ownerRole" bind:value={node.ownerRole} disabled={!canManage}>
+									<NativeSelect data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-select"} name="ownerRole" bind:value={node.ownerRole} disabled={!canManage}>
 										<option value="">不指定</option>
 										{#each data.roles as role}<option value={role.code}>{role.label}</option>{/each}
-									</select>
+									</NativeSelect>
 								</label>
 								<div class="node-schedule">
 									<ScheduleFields relative scheduleType={node.startOffsetDays == null ? 'point' : 'period'} startValue={node.startOffsetDays} endValue={node.offsetDays} label={node.name} disabled={!canManage} />
 								</div>
 								<label class="node-description">
 									<span>节点说明</span>
-									<input class="input" name="description" bind:value={node.description} disabled={!canManage} />
+									<Input data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-input"} name="description" bind:value={node.description} disabled={!canManage} />
 								</label>
 							</form>
 							{#if canDelete}
@@ -364,10 +369,10 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 									if (!confirm(`确定删除节点 ${node.name} 吗？`)) event.preventDefault();
 								}}
 							>
-								<input type="hidden" name="nodeId" value={node.id} />
-								<button class="btn" type="submit" aria-label={`删除 ${node.name}`} disabled={pendingAction !== ''}>
+								<input data-ui-owner="routes-financing-sop--id---page-svelte" type="hidden" name="nodeId" value={node.id} />
+								<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="outline" class={"ui-button"} type="submit" aria-label={`删除 ${node.name}`} disabled={pendingAction !== ''}>
 									<Trash2 size={16} />
-								</button>
+								</Button>
 							</form>
 							{/if}
 						</article>
@@ -388,15 +393,15 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 				<form method="post" action="?/updateTemplate" use:autoSave use:enhance={enhanceForm('template', { autoSave: true })} class="template-form">
 					<label>
 						<span>SOP 名称</span>
-						<input class="input" name="name" maxlength="120" required bind:value={template.name} disabled={!canManage} />
+						<Input data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-input"} name="name" maxlength={120} required bind:value={template.name} disabled={!canManage} />
 					</label>
 					<label>
 						<span>负债品种</span>
-						<input class="input" name="debtType" maxlength="80" required bind:value={template.debtType} disabled={!canManage} />
+						<Input data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-input"} name="debtType" maxlength={80} required bind:value={template.debtType} disabled={!canManage} />
 					</label>
 					<label>
 						<span>模板说明</span>
-					<textarea class="textarea" name="description" rows="6" bind:value={template.description} disabled={!canManage}></textarea>
+					<Textarea data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-textarea"} name="description" rows={6} bind:value={template.description} disabled={!canManage}></Textarea>
 					</label>
 				</form>
 			</section>
@@ -405,47 +410,47 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 	</div>
 
 	{#if canManage}
-		<button class="btn btn-primary floating-create-button" type="button" onclick={openAddNode} aria-label="添加流程节点">
+		<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="default" class={"ui-button  floating-create-button"} type="button" onclick={openAddNode} aria-label="添加流程节点">
 			<Plus size={23} />
-		</button>
+		</Button>
 
-		<dialog class="modal" bind:this={addNodeDialog}>
-<div class="modal-box config-modal">
+		<Modal  bind:this={addNodeDialog}>
+<div class="dialog-body config-modal">
 		<form method="post" action="?/addNode" use:enhance={enhanceForm('add-node', { resetOnSuccess: true, closeOnSuccess: true })}>
 			<div class="modal-header">
 				<div>
 					<p class="eyebrow">SOP NODE</p>
 					<h2>添加流程节点</h2>
 				</div>
-				<button class="btn" type="button" aria-label="关闭" onclick={() => addNodeDialog?.close()}><X size={18} /></button>
+				<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => addNodeDialog?.close()}><X size={18} /></Button>
 			</div>
 			<div class="form-grid">
 				<label class="wide">
 					<span>节点名称</span>
-					<input class="input" bind:this={addNodeNameInput} name="name" maxlength="120" required />
+					<Input data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-input"} bind:ref={addNodeNameInput} name="name" maxlength={120} required />
 				</label>
 				<label>
 					<span>默认角色</span>
-					<select class="select" name="ownerRole">
+					<NativeSelect data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-select"} name="ownerRole">
 						<option value="">不指定</option>
 						{#each data.roles as role}<option value={role.code}>{role.label}</option>{/each}
-					</select>
+					</NativeSelect>
 				</label>
 				<div class="wide"><ScheduleFields relative endValue={0} /></div>
 				<label class="wide">
 					<span>节点说明</span>
-					<input class="input" name="description" />
+					<Input data-ui-owner="routes-financing-sop--id---page-svelte" class={"ui-input"} name="description" />
 				</label>
 			</div>
 			<div class="modal-actions">
-				<button class="btn" type="button" onclick={() => addNodeDialog?.close()}>取消</button>
-				<button class="btn btn-primary primary-action" type="submit" disabled={pendingAction !== ''}>
+				<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => addNodeDialog?.close()}>取消</Button>
+				<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="default" class={"ui-button  primary-action"} type="submit" disabled={pendingAction !== ''}>
 					{pendingAction === 'add-node' ? '添加中…' : '添加节点'}
-				</button>
+				</Button>
 			</div>
 		</form>
 		</div>
-</dialog>
+</Modal>
 	{/if}
 </div>
 
@@ -454,8 +459,8 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 	.back-nav { margin-bottom: 1rem; }
 	.detail-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 	.back-nav a { display: inline-flex; min-height: 2.75rem; align-items: center; gap: 0.5rem; font-size: 1rem; font-weight: bold; color: var(--blue); }
-	.toggle-button { min-height: 2.75rem; padding: 0 1rem; border: 1px solid #d0d5dd; border-radius: 0.5rem; font-size: 1rem; font-weight: bold; color: #475467; background: #fff; }
-	.toggle-button.active { border-color: #a6f4c5; color: #067647; background: #ecfdf3; }
+	:global(.toggle-button[data-ui-owner="routes-financing-sop--id---page-svelte"]) { min-height: 2.75rem; padding: 0 1rem; border: 1px solid #d0d5dd; border-radius: 0.5rem; font-size: 1rem; font-weight: bold; color: #475467; background: #fff; }
+	:global(.toggle-button[data-ui-owner="routes-financing-sop--id---page-svelte"].active) { border-color: #a6f4c5; color: #067647; background: #ecfdf3; }
 	.read-only-status { display: inline-flex; align-items: center; }
 	.editor-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(18rem, 0.65fr); gap: 1rem; align-items: start; }
 	main, aside { display: grid; min-width: 0; gap: 1rem; }
@@ -468,17 +473,17 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 	.node-card.dragging { border-color: #84adff; background: #eff4ff; opacity: 0.75; }
 	.node-order { display: grid; align-content: start; justify-items: center; gap: 0.5rem; }
 	.node-order > strong { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border-radius: 999rem; font-size: 1rem; color: var(--color-primary); background: #edf4ff; }
-	.drag-handle { display: grid; width: 2.75rem; place-items: center; touch-action: none; }
+	:global(.drag-handle[data-ui-owner="routes-financing-sop--id---page-svelte"]) { display: grid; width: 2.75rem; place-items: center; touch-action: none; }
 	.node-form { display: grid; grid-template-columns: minmax(12rem, 1.3fr) minmax(10rem, 0.75fr); gap: 0.75rem; align-items: end; }
 	.node-description, .node-schedule { grid-column: 1 / -1; }
 	label { display: grid; gap: 0.3rem; }
-	label span { font-size: 0.75rem; font-weight: bold; color: var(--muted); }
-	input, select, textarea { width: 100%; padding: 0.55rem 0.7rem; }
-	textarea { resize: vertical; }
+	label span { font-size: 0.75rem; font-weight: bold; color: var(--text-muted); }
+	:global(input[data-ui-owner="routes-financing-sop--id---page-svelte"]), :global(select[data-ui-owner="routes-financing-sop--id---page-svelte"]), :global(textarea[data-ui-owner="routes-financing-sop--id---page-svelte"]) { width: 100%; padding: 0.55rem 0.7rem; }
+	:global(textarea[data-ui-owner="routes-financing-sop--id---page-svelte"]) { resize: vertical; }
 	.delete-form { align-self: end; margin-bottom: 0.1rem; }
-	.delete-form button { display: grid; width: 2.75rem; place-items: center; }
+	:global(.delete-form button[data-ui-owner="routes-financing-sop--id---page-svelte"]) { display: grid; width: 2.75rem; place-items: center; }
 	.template-form { display: grid; gap: 0.875rem; padding: 1rem; }
-	.empty-state { margin: 0; padding: 1.25rem; font-size: 1rem; color: var(--muted); text-align: center; }
+	.empty-state { margin: 0; padding: 1.25rem; font-size: 1rem; color: var(--text-muted); text-align: center; }
 	.sop-detail-page .config-modal { max-height: min(90dvh, 42rem); overflow: auto; }
 	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 	@media (max-width: 75rem) { .editor-grid { grid-template-columns: 1fr; } }

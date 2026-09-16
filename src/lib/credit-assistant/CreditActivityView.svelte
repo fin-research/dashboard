@@ -20,7 +20,7 @@
   <details class="activity-details">
     <summary>
       <span class="activity-summary" role="status" aria-atomic="true">
-        <span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+        <span class="ui-spinner  " aria-hidden="true"></span>
         <span>{notice || label}</span>
       </span>
       {#if !sending && elapsed > 0}<span class="activity-duration" aria-label={`已用时 ${duration}`}>{duration}</span>{/if}
@@ -45,7 +45,7 @@
   summary::-webkit-details-marker { display: none; }
   summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: var(--radius-control); }
   .activity-summary { display: inline-flex; align-items: center; gap: 10px; color: var(--text-1); }
-  .loading { color: var(--brand); flex-shrink: 0; }
+  .ui-spinner { color: var(--brand); flex-shrink: 0; }
   .activity-duration { color: var(--text-3); font-variant-numeric: tabular-nums; }
   .activity-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--text-3); margin-left: auto; }
   .activity-toggle::after { content: ""; width: 6px; height: 6px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); }
@@ -61,5 +61,5 @@
   .current .activity-label { color: var(--brand); font-weight: bold; }
   p { margin: 2px 0 0; color: var(--text-3); overflow-wrap: anywhere; }
   .activity-wait { padding: 4px 0 12px; }
-  @media (prefers-reduced-motion: reduce) { .loading { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .ui-spinner { animation: none; } }
 </style>

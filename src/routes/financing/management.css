@@ -124,16 +124,16 @@
 	color: #667085;
 }
 
-:where(.financing-scope) .management-page .config-modal {
+:where(.financing-scope) .config-modal {
 	width: min(100%, 36rem);
 	padding: 0;
 }
 
-:where(.financing-scope) .management-page .config-modal form {
+:where(.financing-scope) .config-modal form {
 	padding: 1.25rem;
 }
 
-:where(.financing-scope) .management-page .modal-header {
+:where(.financing-scope) .config-modal .modal-header {
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
@@ -142,18 +142,18 @@
 	border-bottom: 1px solid #eaecf0;
 }
 
-:where(.financing-scope) .management-page .modal-header h2 {
+:where(.financing-scope) .config-modal .modal-header h2 {
 	margin: 0;
 	font-size: 1.125rem;
 }
 
-:where(.financing-scope) .management-page .modal-header p:not(.eyebrow) {
+:where(.financing-scope) .config-modal .modal-header p:not(.eyebrow) {
 	margin: 0.3125rem 0 0;
 	font-size: 0.875rem;
 	color: #667085;
 }
 
-:where(.financing-scope) .management-page .modal-header > button {
+:where(.financing-scope) .config-modal .modal-header > button {
 	display: grid;
 	width: 2.75rem;
 	flex: 0 0 auto;
@@ -194,14 +194,14 @@
 	resize: vertical;
 }
 
-:where(.financing-scope) .management-page .modal-actions {
+:where(.financing-scope) .config-modal .modal-actions {
 	display: flex;
 	justify-content: flex-end;
 	gap: 0.5rem;
 	padding-top: 1rem;
 }
 
-:where(.financing-scope) .management-page .modal-actions > button:first-child {
+:where(.financing-scope) .config-modal .modal-actions > button:first-child {
 	padding: 0 0.8125rem;
 }
 

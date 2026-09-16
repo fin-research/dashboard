@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
 import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	import {
 		ArrowLeft,
@@ -71,7 +74,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 </svelte:head>
 
 <nav class="back-nav" aria-label="返回 SOP 管理">
-	<a class="btn btn-ghost back-link" href={withBase('/sop')}><ArrowLeft size={16} /> 返回 SOP 管理</a>
+	<Button data-ui-owner="routes-financing-sop-reminders--page-svelte" variant="ghost" class={"ui-button  back-link"} href={withBase('/sop')}><ArrowLeft size={16} /> 返回 SOP 管理</Button>
 </nav>
 
 <section class="summary-grid" aria-label="提醒发送汇总">
@@ -96,25 +99,25 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 <form class="filter-bar" method="get" aria-label="提醒历史筛选">
 	<label>
 		<span>状态</span>
-		<select class="select" name="status" value={data.filters.status}>
+		<NativeSelect data-ui-owner="routes-financing-sop-reminders--page-svelte" class={"ui-select"} name="status" value={data.filters.status}>
 			<option value="">全部状态</option>
 			<option value="sent">已发送</option>
 			<option value="pending">待发送</option>
 			<option value="failed">失败</option>
-		</select>
+		</NativeSelect>
 	</label>
 	<div class="query-field">
 		<span>关键词</span>
-		<label class="input query-input">
+		<label class="query-input">
 			<Search size={16} />
-			<input aria-label="提醒关键词"
+			<Input class="pl-10" aria-label="提醒关键词"
 				name="query"
 				value={data.filters.query}
 			/>
 		</label>
 	</div>
-	<button class="btn btn-primary" type="submit">查询</button>
-	<a class="btn btn-ghost" href={withBase('/sop/reminders')}>清除</a>
+	<Button data-ui-owner="routes-financing-sop-reminders--page-svelte" variant="default" class={"ui-button "} type="submit">查询</Button>
+	<Button data-ui-owner="routes-financing-sop-reminders--page-svelte" variant="ghost" class={"ui-button "} href={withBase('/sop/reminders')}>清除</Button>
 </form>
 
 <section class="history-panel">
@@ -129,7 +132,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			{#each historyRows as row (row.id)}
 				<article class="history-row">
 					<div>
-						<span class={`badge status-pill ${row.status}`}>{statusLabel[row.status] ?? row.status}</span>
+						<span class={`ui-badge status-pill ${row.status}`}>{statusLabel[row.status] ?? row.status}</span>
 						<strong>{row.deliveryDate}</strong>
 						<small>{row.periodLabel} · 计划 {scheduledTimeLabel(row.scheduledFor)}</small>
 						<small>记录 {row.sentAt ?? row.createdAt}</small>
@@ -158,10 +161,10 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		</div>
 		{#if hasMore}
 			<div class="load-more-row">
-				<button class="btn" type="button" onclick={loadMore} disabled={loadingMore}>
+				<Button data-ui-owner="routes-financing-sop-reminders--page-svelte" variant="outline" class={"ui-button"} type="button" onclick={loadMore} disabled={loadingMore}>
 					{#if loadingMore}<LoaderCircle class="spin" size={16} />{/if}
 					{loadingMore ? '加载中…' : '加载更多'}
-				</button>
+				</Button>
 			</div>
 		{/if}
 	{:else}
@@ -177,7 +180,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		margin-bottom: 1.25rem;
 	}
 
-	.back-link {
+	:global(.back-link[data-ui-owner="routes-financing-sop-reminders--page-svelte"]) {
 		display: inline-flex;
 		min-height: 2.75rem;
 		align-items: center;
@@ -268,15 +271,15 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		color: #475467;
 	}
 
-	.filter-bar select,
+	:global(.filter-bar select[data-ui-owner="routes-financing-sop-reminders--page-svelte"]),
 	.query-input,
-	.filter-bar button,
-	.filter-bar > a {
+	:global(.filter-bar button[data-ui-owner="routes-financing-sop-reminders--page-svelte"]),
+	:global(.filter-bar > a[data-ui-owner="routes-financing-sop-reminders--page-svelte"]) {
 		min-height: 2.75rem;
 		font-size: 1rem;
 	}
 
-	.filter-bar select {
+	:global(.filter-bar select[data-ui-owner="routes-financing-sop-reminders--page-svelte"]) {
 		min-width: 9rem;
 		padding-inline: 0.75rem;
 	}
@@ -289,16 +292,16 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		padding-inline: 0.75rem;
+		position: relative;
 	}
-	.query-input :global(svg) { color: var(--muted); }
+	.query-input :global(svg) { position: absolute; left: 14px; color: var(--text-muted); pointer-events: none; }
 
-	.query-field input {
+	.query-field :global(input) {
 		width: 100%;
 	}
 
-	.filter-bar button,
-	.filter-bar > a {
+	:global(.filter-bar button[data-ui-owner="routes-financing-sop-reminders--page-svelte"]),
+	:global(.filter-bar > a[data-ui-owner="routes-financing-sop-reminders--page-svelte"]) {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -346,7 +349,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		border-top: 1px solid #eaecf0;
 	}
 
-	.load-more-row button {
+	:global(.load-more-row button[data-ui-owner="routes-financing-sop-reminders--page-svelte"]) {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -440,7 +443,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			flex-direction: column;
 		}
 
-		.filter-bar select {
+		:global(.filter-bar select[data-ui-owner="routes-financing-sop-reminders--page-svelte"]) {
 			width: 100%;
 		}
 	}

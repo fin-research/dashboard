@@ -2,7 +2,11 @@
   import { number, signed, tone } from "../formatters";
   import type { MarketMetric } from "../types";
 
-  export let metrics: MarketMetric[];
+  interface Props {
+    metrics: MarketMetric[];
+  }
+
+  let { metrics }: Props = $props();
 </script>
 
 {#each metrics as item (item.label)}

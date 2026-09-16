@@ -1,9 +1,13 @@
 <script lang="ts">
   import { resolveInstitutionLogo } from "$lib/sell-side-institutions";
 
-  export let institution: string;
+  interface Props {
+    institution: string;
+  }
 
-  $: logo = resolveInstitutionLogo(institution);
+  let { institution }: Props = $props();
+
+  let logo = $derived(resolveInstitutionLogo(institution));
 </script>
 
 {#if logo}

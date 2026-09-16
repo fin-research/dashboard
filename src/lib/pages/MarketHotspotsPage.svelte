@@ -1,5 +1,9 @@
 <script lang="ts">
-  export let embedded = false;
+  import { Button } from "$lib/components/ui/button/index.js";
+  import Modal from '$lib/components/Modal.svelte';
+  import * as Popover from '$lib/components/ui/popover/index.js';
+  import * as Tabs from '$lib/components/ui/tabs/index.js';
+  import { Input } from "$lib/components/ui/input/index.js";
   import { onDestroy, onMount } from "svelte";
 
   import WordCloud from "$lib/components/WordCloud.svelte";
@@ -9,25 +13,30 @@
     HotspotGenerationScope,
     HotspotScope,
   } from "$lib/hotspots";
+  interface Props {
+    embedded?: boolean;
+  }
 
-  let scopeMode: "rolling" | "range" = "rolling";
-  let rollingCount = 20;
-  let startDate = offsetShanghaiDate(-7);
-  let endDate = shanghaiDate(new Date());
-  let data: HotspotApiResponse | null = null;
-  let selected: Hotspot | null = null;
-  let loading = true;
-  let regenerating = false;
-  let errorMessage = "";
+  let { embedded = false }: Props = $props();
+
+  let scopeMode: "rolling" | "range" = $state("rolling");
+  let rollingCount = $state(20);
+  let startDate = $state(offsetShanghaiDate(-7));
+  let endDate = $state(shanghaiDate(new Date()));
+  let data = $state<HotspotApiResponse | null>(null);
+  let selected = $state<Hotspot | null>(null);
+  let loading = $state(true);
+  let regenerating = $state(false);
+  let errorMessage = $state("");
   let request: AbortController | null = null;
-  let configurationOpen = false;
+  let configurationOpen = $state(false);
 
-  $: scopeLabel =
-    data?.scope.mode === "rolling"
+  let scopeLabel =
+    $derived(data?.scope.mode === "rolling"
       ? `最近 ${data.scope.rollingCount} 篇`
       : data?.scope.mode === "range"
         ? `${data.scope.startDate} 至 ${data.scope.endDate}`
-        : "尚未生成";
+        : "尚未生成");
 
   onMount(loadLatestHotspots);
   onDestroy(() => request?.abort());
@@ -128,11 +137,6 @@
     configurationOpen = false;
   }
 
-  function handleWindowKeydown(event: KeyboardEvent): void {
-    if (event.key !== "Escape") return;
-    if (configurationOpen) closeConfiguration();
-    if (selected) closeDetails();
-  }
 
   function closeDetails(): void {
     selected = null;
@@ -197,7 +201,7 @@
   }
 </script>
 
-<svelte:window onkeydown={handleWindowKeydown} />
+
 
 <svelte:head>
 {#if !embedded}
@@ -214,11 +218,11 @@
   <header class="hotspot-header">
     {#if !embedded}
     <div class="brand-block">
-      <a class="btn btn-ghost back-link" href="/" aria-label="返回市场研究门户">
+      <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="ghost" class={"ui-button  back-link"} href="/" aria-label="返回市场研究门户">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="m15 18-6-6 6-6" />
         </svg>
-      </a>
+      </Button>
       <div>
         <div class="eyebrow">
           <span class="live-dot" aria-hidden="true"></span>
@@ -230,64 +234,44 @@
 
     {/if}
     <div class="header-controls" aria-label="热点控制">
-      <div class="scope-control">
-        <button
-          class="btn scope-button"
+      <Popover.Root bind:open={configurationOpen} onOpenChange={(open) => { if (open) openConfiguration(); }}>
+        <Popover.Trigger>
+          {#snippet child({ props })}
+        <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline"
+          class={"ui-button scope-button"} {...props}
+          aria-label={`证据范围：${scopeLabel}`}
           type="button"
-          aria-expanded={configurationOpen}
-          aria-controls="hotspot-scope-panel"
-          onclick={() => (configurationOpen ? closeConfiguration() : openConfiguration())}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6" />
           </svg>
           <span><span class="scope-label">证据范围</span>{scopeLabel}</span>
-        </button>
-        {#if configurationOpen}
-          <button
-            class="configuration-scrim"
-            type="button"
-            aria-label="关闭证据范围配置"
-            onclick={closeConfiguration}
-          ></button>
-          <div
-            id="hotspot-scope-panel"
-            class="scope-panel"
-            role="dialog"
-            aria-label="配置热点证据范围"
-          >
+        </Button>
+          {/snippet}
+        </Popover.Trigger>
+        <Popover.Content role="dialog" align="end" sideOffset={12} class="w-auto max-w-[calc(100vw-2rem)] p-0 gap-0" aria-label="配置热点证据范围">
+          <div id="hotspot-scope-panel" class="scope-panel">
             <div class="scope-panel__header">
               <div>
                 <span>EVIDENCE WINDOW</span>
                 <h2>配置证据范围</h2>
               </div>
-              <button class="btn" type="button" aria-label="关闭配置" onclick={closeConfiguration}>
+              <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭配置" onclick={closeConfiguration}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m6 6 12 12M18 6 6 18" />
                 </svg>
-              </button>
+              </Button>
             </div>
-            <div class="scope-tabs" role="tablist" aria-label="范围模式">
-              <button class="btn"
-                class:btn-active={scopeMode === "rolling"}
-                type="button"
-                role="tab"
-                aria-selected={scopeMode === "rolling"}
-                onclick={() => (scopeMode = "rolling")}
-              >滚动篇数</button>
-              <button class="btn"
-                class:btn-active={scopeMode === "range"}
-                type="button"
-                role="tab"
-                aria-selected={scopeMode === "range"}
-                onclick={() => (scopeMode = "range")}
-              >日期范围</button>
-            </div>
-            {#if scopeMode === "rolling"}
+            <Tabs.Root bind:value={() => scopeMode, (value) => scopeMode = value as "rolling" | "range"}>
+              <Tabs.List class="mt-4 w-full" aria-label="范围模式">
+                <Tabs.Trigger value="rolling" class="flex-1 min-h-11">滚动篇数</Tabs.Trigger>
+                <Tabs.Trigger value="range" class="flex-1 min-h-11">日期范围</Tabs.Trigger>
+              </Tabs.List>
+              <Tabs.Content value="rolling">
               <label class="scope-field">
                 <span>最近文章数</span>
                 <div class="number-field">
-                  <input class="input"
+                  <Input data-ui-owner="lib-pages-MarketHotspotsPage-svelte" class={"ui-input"}
                     type="number"
                     min="8"
                     max="100"
@@ -297,26 +281,28 @@
                   <span>篇</span>
                 </div>
               </label>
-            {:else}
+              </Tabs.Content>
+              <Tabs.Content value="range">
               <div class="range-fields">
                 <label class="scope-field">
                   <span>开始日期</span>
-                  <input class="input" type="date" bind:value={startDate} />
+                  <Input data-ui-owner="lib-pages-MarketHotspotsPage-svelte" class={"ui-input"} type="date" bind:value={startDate} />
                 </label>
                 <label class="scope-field">
                   <span>结束日期</span>
-                  <input class="input" type="date" bind:value={endDate} />
+                  <Input data-ui-owner="lib-pages-MarketHotspotsPage-svelte" class={"ui-input"} type="date" bind:value={endDate} />
                 </label>
               </div>
-            {/if}
-            <button class="btn apply-scope-button" type="button" onclick={applyConfiguration}>
+              </Tabs.Content>
+            </Tabs.Root>
+            <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline" class={"ui-button apply-scope-button"} type="button" onclick={applyConfiguration}>
               应用并生成热点
-            </button>
+            </Button>
           </div>
-        {/if}
-      </div>
-      <button
-        class="btn btn-primary regenerate-button"
+        </Popover.Content>
+      </Popover.Root>
+      <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="default"
+        class={"ui-button  regenerate-button"}
         type="button"
         disabled={loading || regenerating}
         onclick={regenerateCurrentScope}
@@ -326,7 +312,7 @@
           <path d="M20 4v7h-7" />
         </svg>
         <span>{regenerating ? "AI 聚合中" : "重新生成"}</span>
-      </button>
+      </Button>
     </div>
   </header>
 
@@ -348,7 +334,7 @@
           <strong>热点暂时无法生成</strong>
           <p>{errorMessage}</p>
         </div>
-        <button class="btn" type="button" onclick={loadLatestHotspots}>重新读取</button>
+        <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={loadLatestHotspots}>重新读取</Button>
       </section>
     {:else if data}
       <section class="cloud-panel" aria-labelledby="cloud-heading">
@@ -372,18 +358,8 @@
       </section>
 
       {#if selected}
-        <button
-          class="detail-scrim"
-          type="button"
-          aria-label="关闭热点详情"
-          onclick={closeDetails}
-        ></button>
-        <div
-          class="detail-panel"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${selected.keyword}热点详情`}
-        >
+        <Modal open aria-label={`${selected.keyword}热点详情`} onclose={closeDetails} class="p-0 gap-0 min-w-0 w-[min(30rem,calc(100vw-2rem))] sm:max-w-[30rem]">
+        <div class="detail-panel">
           <div class="detail-header">
             <div>
               <span class={`confidence confidence--${selected.confidence}`}>
@@ -392,11 +368,11 @@
               <span class="source-label">{selected.sourceLabel}</span>
               <p>热点强度 <strong>{selected.heat}</strong></p>
             </div>
-            <button class="btn" type="button" aria-label="关闭热点详情" onclick={closeDetails}>
+            <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭热点详情" onclick={closeDetails}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m6 6 12 12M18 6 6 18" />
               </svg>
-            </button>
+            </Button>
           </div>
 
           <div class="detail-scroll">
@@ -445,6 +421,7 @@
             </section>
           </div>
         </div>
+        </Modal>
       {/if}
     {/if}
   </svelte:element>
@@ -457,7 +434,7 @@
 
   .hotspot-page {
     --ink: var(--text-1);
-    --muted: var(--text-3);
+    --text-muted: var(--text-3);
     --line: var(--border-color);
     --surface: var(--bg-card);
     position: fixed;
@@ -498,8 +475,8 @@
   .brand-block,
   .header-controls,
   .eyebrow,
-  .scope-button,
-  .regenerate-button,
+  :global(.scope-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]),
+  :global(.regenerate-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]),
   .summary-meta,
   .detail-header,
   .aliases {
@@ -511,8 +488,8 @@
     gap: 14px;
   }
 
-  .back-link,
-  .detail-header button {
+  :global(.back-link[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]),
+  :global(.detail-header button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     display: grid;
     width: 44px;
     height: 44px;
@@ -529,10 +506,10 @@
       color 180ms ease;
   }
 
-  .back-link:hover,
-  .back-link:focus-visible,
-  .detail-header button:hover,
-  .detail-header button:focus-visible {
+  :global(.back-link[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]:hover),
+  :global(.back-link[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]:focus-visible),
+  :global(.detail-header button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]:hover),
+  :global(.detail-header button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]:focus-visible) {
     border-color: var(--brand);
     color: var(--text-1);
     background: var(--brand-soft);
@@ -540,11 +517,11 @@
     outline-offset: 2px;
   }
 
-  .back-link svg,
+  :global(.back-link[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"] svg),
   .detail-header svg,
-  .scope-button svg,
+  :global(.scope-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"] svg),
   .scope-panel__header svg,
-  .regenerate-button svg,
+  :global(.regenerate-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"] svg),
   .error-card svg {
     width: 22px;
     fill: none;
@@ -588,17 +565,14 @@
     gap: 10px;
   }
 
-  .scope-control {
-    position: relative;
-  }
 
-  .scope-button {
+  :global(.scope-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     gap: 9px;
     padding: 0 13px;
     text-align: left;
   }
 
-  .scope-button > span {
+  :global(.scope-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"] > span) {
     display: grid;
     gap: 1px;
     font-size: 0.875rem;
@@ -613,30 +587,12 @@
     letter-spacing: 0.08em;
   }
 
-  .configuration-scrim {
-    position: fixed;
-    z-index: 28;
-    inset: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    cursor: default;
-  }
 
   .scope-panel {
-    position: absolute;
-    z-index: 30;
-    top: calc(100% + 12px);
-    right: 0;
     width: min(400px, calc(100vw - 32px));
-    max-height: calc(100dvh - 120px);
+    max-height: min(70dvh, var(--bits-popover-content-available-height));
     overflow-y: auto;
     padding: 18px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-card);
-    background: var(--surface);
-    box-shadow: var(--shadow-card);
-    backdrop-filter: none;
   }
 
   .scope-panel__header {
@@ -657,23 +613,13 @@
     font-size: 1.125rem;
   }
 
-  .scope-panel__header button {
+  :global(.scope-panel__header button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     display: grid;
     width: 36px;
     padding: 0;
     place-items: center;
   }
 
-  .scope-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    margin-top: 18px;
-    padding: 4px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-tag);
-    background: var(--bg-page);
-  }
 
   .scope-field,
   .range-fields {
@@ -688,7 +634,7 @@
     font-weight: bold;
   }
 
-  .scope-field input {
+  :global(.scope-field input[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     width: 100%;
     padding: 0 11px;
   }
@@ -697,7 +643,7 @@
     position: relative;
   }
 
-  .number-field input {
+  :global(.number-field input[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     padding-right: 42px;
   }
 
@@ -714,17 +660,17 @@
     gap: 0 10px;
   }
 
-  .apply-scope-button {
+  :global(.apply-scope-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     width: 100%;
     margin-top: 18px;
   }
 
-  .regenerate-button {
+  :global(.regenerate-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     gap: 8px;
     padding: 0 16px;
   }
 
-  .regenerate-button .spinning {
+  :global(.regenerate-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"] .spinning) {
     animation: spin 900ms linear infinite;
   }
 
@@ -812,33 +758,15 @@
     min-height: 0;
   }
 
-  .detail-scrim {
-    position: absolute;
-    z-index: 10;
-    inset: 0;
-    display: block;
-    padding: 0;
-    border: 0;
-    background: rgba(0, 8, 18, 0.3);
-    cursor: pointer;
-  }
 
   .detail-panel {
-    position: absolute;
     display: flex;
     flex-direction: column;
-    z-index: 12;
-    top: 16px;
-    right: 16px;
-    bottom: 16px;
-    width: min(410px, calc(100vw - 32px));
+    width: 100%;
+    height: min(76dvh, 800px);
+    min-height: 0;
     overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-card);
     background: var(--surface);
-    box-shadow: var(--shadow-card);
-    backdrop-filter: none;
-    animation: detail-in 220ms ease-out;
   }
 
   .detail-header {
@@ -856,7 +784,7 @@
   }
 
   .detail-header p {
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 1rem;
   }
 
@@ -893,8 +821,8 @@
   }
 
   .confidence--low {
-    color: var(--color-secondary);
-    background: color-mix(in srgb, var(--color-secondary) 8%, var(--surface));
+    color: var(--business-purple);
+    background: color-mix(in srgb, var(--business-purple) 8%, var(--surface));
   }
 
   .detail-scroll {
@@ -1071,7 +999,7 @@
 
   .state-card p {
     margin-top: 7px;
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 0.875rem;
     line-height: 1.5;
   }
@@ -1099,7 +1027,7 @@
     flex: 1;
   }
 
-  .error-card button {
+  :global(.error-card button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     padding: 0 13px;
   }
 
@@ -1109,15 +1037,8 @@
     }
   }
 
-  @keyframes detail-in {
-    from {
-      opacity: 0;
-      transform: translateX(18px);
-    }
-  }
 
   @media (max-width: 860px) {
-    .hotspot-page--embedded .hotspot-stage:has(.detail-panel) { z-index: auto; }
     .hotspot-page {
       min-height: 520px;
     }
@@ -1141,28 +1062,22 @@
       gap: 9px;
     }
 
-    .scope-button {
+    :global(.scope-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
       padding: 0 9px;
     }
 
-    .scope-button > span {
+    :global(.scope-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"] > span) {
       font-size: 0.875rem;
     }
 
-    .scope-panel {
-      position: fixed;
-      top: 70px;
-      right: 8px;
-      width: min(370px, calc(100vw - 16px));
-    }
 
-    .regenerate-button {
+    :global(.regenerate-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
       width: 44px;
       padding: 0;
       justify-content: center;
     }
 
-    .regenerate-button span {
+    :global(.regenerate-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"] span) {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -1199,15 +1114,6 @@
       padding: 6px 10px 12px;
     }
 
-    .detail-panel {
-      top: auto;
-      right: 8px;
-      bottom: 8px;
-      left: 8px;
-      width: auto;
-      max-height: min(74dvh, 660px);
-      animation: detail-up 220ms ease-out;
-    }
 
     .detail-scroll {
       max-height: calc(min(74dvh, 660px) - 72px);
@@ -1220,7 +1126,7 @@
       min-height: 76px;
     }
 
-    .back-link {
+    :global(.back-link[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
       width: 40px;
       height: 40px;
     }
@@ -1239,24 +1145,18 @@
     }
   }
 
-  @keyframes detail-up {
-    from {
-      opacity: 0;
-      transform: translateY(18px);
-    }
-  }
 
   @media (prefers-reduced-motion: reduce) {
-    .regenerate-button .spinning,
+    :global(.regenerate-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"] .spinning),
     .loading-ring {
       animation-duration: 1.8s;
     }
 
     .detail-panel,
-    .back-link,
-    .scope-button,
+    :global(.back-link[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]),
+    :global(.scope-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]),
     .scope-panel,
-    .regenerate-button {
+    :global(.regenerate-button[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
       transition: none;
       animation: none;
     }
@@ -1268,27 +1168,7 @@
   .hotspot-page--embedded .state-card { width: min(480px, calc(100% - 32px)); }
 
   @media (max-width: 860px) {
-    .hotspot-page--embedded .scope-panel {
-      top: calc(var(--tr-topbar-height, 80px) + 74px);
-      right: 16px;
-      width: min(400px, calc(100vw - 32px));
-      max-height: calc(100dvh - var(--tr-topbar-height, 80px) - 94px);
-    }
-    .hotspot-page--embedded .detail-panel {
-      position: fixed;
-      z-index: 50;
-      top: calc(var(--tr-topbar-height, 80px) + 12px);
-      right: 12px;
-      bottom: 12px;
-      left: 12px;
-      max-height: none;
-    }
     .hotspot-page--embedded .detail-scroll { max-height: none; }
-    .hotspot-page--embedded .detail-scrim {
-      position: fixed;
-      z-index: 40;
-      top: var(--tr-topbar-height, 80px);
-    }
   }
   @media (max-width: 520px) {
     .hotspot-page--embedded { height: auto; min-height: 100%; }

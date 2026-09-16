@@ -21,7 +21,7 @@
   --shadow-card: 0 2px 8px rgba(23, 32, 51, 0.06);
   --chart-font-size: 16px;
   --ink: var(--text-1);
-  --muted: var(--text-3);
+  --text-muted: var(--text-3);
   --quiet: #98a2b3;
   --canvas: var(--bg-page);
   --paper: var(--bg-page);
@@ -80,12 +80,12 @@ body {
 }
 
 /* Dense report controls share one size; touch layouts retain larger targets. */
-.page-shell .btn {
+.page-shell .ui-button {
   min-width: var(--report-control-size);
   min-height: var(--report-control-size);
 }
 
-.page-shell :is(.input, .select, .file-input) {
+.page-shell :is(.ui-input, .ui-select, .ui-input) {
   min-height: var(--report-control-size);
 }
 
@@ -219,7 +219,7 @@ h1 {
 }
 
 .report-title__dot {
-  color: color-mix(in srgb, var(--color-primary) 72%, var(--muted));
+  color: color-mix(in srgb, var(--color-primary) 72%, var(--text-muted));
   font-size: 1rem;
   font-weight: 800;
 }
@@ -335,7 +335,7 @@ h1 {
 
 .card__label {
   overflow: hidden;
-  color: var(--muted);
+  color: var(--text-muted);
   font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -356,7 +356,7 @@ h1 {
 
 .card__detail {
   overflow: hidden;
-  color: var(--muted);
+  color: var(--text-muted);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -404,7 +404,7 @@ h1 {
 }
 
 .tone-flat {
-  color: var(--muted) !important;
+  color: var(--text-muted) !important;
 }
 
 .report-content {
@@ -451,7 +451,7 @@ h1 {
 
 .text-report__dirty {
   margin-right: auto;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
@@ -508,7 +508,7 @@ h1 {
 
 .module-data-warning span,
 .module-data-missing {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 1rem;
 }
 
@@ -924,7 +924,7 @@ h2 {
 .summary-strip__item span {
   overflow: hidden;
   max-width: 100%;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 1rem;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1002,7 +1002,7 @@ h2 {
   position: sticky;
   z-index: 2;
   top: 0;
-  color: var(--muted);
+  color: var(--text-muted);
   background: #f1f5fb;
   font-weight: 720;
 }
@@ -1064,7 +1064,7 @@ h2 {
   height: 100%;
   min-height: 100px;
   place-items: center;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 1rem;
 }
 
@@ -1092,7 +1092,7 @@ h2 {
 .loading-state p,
 .error-state p {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 1rem;
 }
 
@@ -1126,7 +1126,7 @@ h2 {
   height: 100%;
   min-height: 120px;
   place-items: center;
-  color: var(--muted);
+  color: var(--text-muted);
   background: var(--panel);
   font-size: 1rem;
 }

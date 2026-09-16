@@ -1,26 +1,36 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { registerHooks } from "node:module";
-import { compile } from "svelte/compiler";
+import { compile, compileModule } from "svelte/compiler";
+import { readFileSync } from "node:fs";
 import { Window } from "happy-dom";
 
 // Vite accepts extensionless TypeScript imports; reproduce that resolution in
 // the DOM-test subprocess without changing production modules for Node.
-registerHooks({ resolve(specifier, context, nextResolve) {
-  if (specifier.startsWith("$lib/")) {
-    const pathname = specifier.slice(5);
-    return nextResolve(new URL("../../src/lib/" + pathname + (/\.[a-z]+$/.test(pathname) ? "" : ".ts"), import.meta.url).href, context);
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier.startsWith("$lib/")) specifier = new URL("../../src/lib/" + specifier.slice(5), import.meta.url).href;
+    try { return nextResolve(specifier, context); }
+    catch (error) {
+      if (specifier.startsWith(".") || specifier.startsWith("file:")) {
+        if (specifier.endsWith(".svelte")) return nextResolve(specifier + ".js", context);
+        if (specifier.endsWith(".js")) return nextResolve(specifier.slice(0, -3) + ".ts", context);
+        if (!/\.[a-z]+$/.test(specifier)) return nextResolve(specifier + ".ts", context);
+      }
+      throw error;
+    }
+  },
+  load(url, context, nextLoad) {
+    if (url.endsWith('.css')) return { format: 'module', source: '', shortCircuit: true };
+    if (url.endsWith('.svelte')) return { format: 'module', source: compile(readFileSync(new URL(url), 'utf8'), { filename: new URL(url).pathname, generate: 'client', dev: false }).js.code, shortCircuit: true };
+    if (/\.svelte\.[jt]s$/.test(url)) return { format: 'module', source: compileModule(readFileSync(new URL(url), 'utf8'), { filename: new URL(url).pathname, generate: 'client', dev: false }).js.code, shortCircuit: true };
+    return nextLoad(url, context);
   }
-  try { return nextResolve(specifier, context); }
-  catch (error) {
-    if (specifier.startsWith(".") && !/\.[a-z]+$/.test(specifier)) return nextResolve(specifier + ".ts", context);
-    throw error;
-  }
-} });
+});
 
 export function installDom() {
   const window = new Window({ url: "http://localhost/credit-workbench/assistant" });
-  for (const key of ["window", "document", "navigator", "Node", "Element", "HTMLElement", "HTMLMediaElement", "HTMLInputElement", "HTMLTextAreaElement", "HTMLSelectElement", "HTMLDetailsElement", "SVGElement", "Text", "Comment", "Event", "MouseEvent", "KeyboardEvent", "CustomEvent", "MutationObserver", "ResizeObserver", "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame"]) {
+  for (const key of ["window", "document", "navigator", "Node", "Element", "HTMLElement", "HTMLButtonElement", "HTMLAnchorElement", "HTMLDialogElement", "Document", "DocumentFragment", "NodeFilter", "PointerEvent", "FocusEvent", "HTMLMediaElement", "HTMLInputElement", "HTMLTextAreaElement", "HTMLSelectElement", "HTMLDetailsElement", "SVGElement", "Text", "Comment", "Event", "MouseEvent", "KeyboardEvent", "CustomEvent", "MutationObserver", "ResizeObserver", "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame"]) {
     Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: key === "window" ? window : typeof window[key] === "function" && /^[a-z]/.test(key) ? window[key].bind(window) : window[key] });
   }
   return window;

@@ -1,10 +1,18 @@
 <script lang="ts">
+  import { defaults, superForm } from 'sveltekit-superforms';
+  import { zod4, zod4Client } from 'sveltekit-superforms/adapters';
+  import { projectCreateSchema } from '$lib/financing/project-form';
+  import Modal from "$lib/components/Modal.svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
 import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import ModuleCard from '../../../components/ModuleCard.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import { getContext, untrack } from 'svelte';
+	import { getContext, untrack, tick } from 'svelte';
 	import {
 		ArrowRight,
 		CalendarDays,
@@ -41,10 +49,13 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	let selectedStatuses = $state<string[]>([]);
 	let view = $state<'month' | 'quarter'>('month');
 	let expandedProject = $state<string | number | null>(null);
-	let newProjectDialog: HTMLDialogElement;
-	let editProjectDialog: HTMLDialogElement;
+	let newProjectDialog: Modal;
+	let editProjectDialog: Modal;
 	let editingProject = $state<any>(null);
-	let newProjectBookbuildingDate = $state('');
+	const { form: projectForm, errors: projectErrors, validateForm: validateProject, reset: resetProject } = superForm(
+    defaults(zod4(projectCreateSchema)),
+    { validators: zod4Client(projectCreateSchema), resetForm: false, applyAction: false, invalidateAll: false }
+  );
 	const initialProjectSources = untrack(() => data?.projectSources ?? []);
 	let projectSources = $state<any[]>([...initialProjectSources]);
 	let projectOptions = $state<{ people: any[]; projectSops: any[] }>({ people: [], projectSops: [] });
@@ -62,7 +73,17 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		actionState = { key: '', status: 'idle' };
 	}
 
-	const enhanceProjectAction = (key: string, dialog?: 'create'): SubmitFunction => ({ formElement }) => {
+	const enhanceProjectAction = (key: string, dialog?: 'create'): SubmitFunction => async ({ formElement, cancel }) => {
+    if (key === 'create') {
+      const validation = await validateProject({ update: true });
+      if (!validation.valid) {
+        cancel();
+        globalMessages.error(Object.values(validation.errors).flat().filter(Boolean).join('；'));
+        await tick();
+        formElement.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+        return;
+      }
+    }
 		const isAutoSave = key === 'edit';
 		const submittedRevision = isAutoSave ? getAutoSaveRevision(formElement) : 0;
 		actionState = { key, status: 'pending' };
@@ -99,11 +120,19 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					});
 					actionState = { key: '', status: 'idle' };
 				}
-				if (dialog === 'create') newProjectDialog?.close();
+				if (dialog === 'create') { newProjectDialog?.close(); resetProject(); }
 				if (isAutoSave) completeAutoSave(formElement, true);
 				return;
 			}
 			await update({ reset: false, invalidateAll: false });
+      if (key === 'create' && result.type === 'failure') {
+        const failedForm = result.data?.form as { errors?: typeof $projectErrors } | undefined;
+        if (failedForm?.errors) {
+          $projectErrors = failedForm.errors;
+          await tick();
+          formElement.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+        }
+      }
 			const message = result.type === 'failure'
 				? String(result.data?.message ?? '保存失败，请检查填写内容后重试。')
 				: result.type === 'error' && result.error?.message
@@ -148,7 +177,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	function openNewProject() {
-		newProjectBookbuildingDate = data.today;
+		$projectForm.plannedBookbuildingDate = data.today;
+    $projectForm.ownerId = data.viewContext.personId ?? '';
 		newProjectDialog.showModal();
 		void ensureProjectOptions();
 	}
@@ -225,9 +255,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 </section>
 
 <section class="toolbar" aria-label="甘特图筛选">
-	<label class="input search-field">
+	<label data-ui-owner="routes-financing-projects--page-svelte" class="search-field">
 		<Search size={15} />
-		<input aria-label="搜索项目" />
+		<Input class="pl-10" data-ui-owner="routes-financing-projects--page-svelte" aria-label="搜索项目" />
 	</label>
 	<div class="select-group">
 		<Filter size={14} />
@@ -251,9 +281,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		/>
 	</div>
 	<div class="view-switcher" aria-label="时间视图">
-		<button class="btn btn-ghost" class:btn-active={view === 'month'} type="button" onclick={() => (view = 'month')}>月</button>
-		<button class="btn btn-ghost" class:btn-active={view === 'quarter'} type="button" onclick={() => (view = 'quarter')}
-			>季</button
+		<Button data-ui-owner="routes-financing-projects--page-svelte" variant="ghost" class={["ui-button ", view === 'month' && "is-selected"]}  type="button" onclick={() => (view = 'month')}>月</Button>
+		<Button data-ui-owner="routes-financing-projects--page-svelte" variant="ghost" class={["ui-button ", view === 'quarter' && "is-selected"]}  type="button" onclick={() => (view = 'quarter')}
+			>季</Button
 		>
 	</div>
 </section>
@@ -280,8 +310,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		{#each visibleProjects as project (project.id)}
 			<div class:expanded={expandedProject === project.id} class="project-row">
 				<div class="project-info">
-					<button
-						class="btn btn-ghost expand-button"
+					<Button data-ui-owner="routes-financing-projects--page-svelte" variant="ghost"
+						class={"ui-button  expand-button"}
 						type="button"
 						aria-label={`${expandedProject === project.id ? '收起' : '展开'} ${project.name}`}
 						onclick={() => (expandedProject = expandedProject === project.id ? null : project.id)}
@@ -291,7 +321,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 						{:else}
 							<ChevronRight size={15} />
 						{/if}
-					</button>
+					</Button>
 					<div class="project-copy">
 						<a href={withBase(`/projects/${project.id}`)}>{project.name}</a>
 						<p>
@@ -308,13 +338,13 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					{#if canManage || canDelete}
 						<div class="project-row-actions">
               {#if canManage}
-							<button class="btn btn-ghost btn-square"
+							<Button data-ui-owner="routes-financing-projects--page-svelte" variant="ghost" size="icon" class={"ui-button  "}
 								type="button"
 								aria-label={`编辑 ${project.name}`}
 								onclick={() => openEditProject(project)}
 							>
 								<Pencil size={15} />
-							</button>
+							</Button>
               {/if}
               {#if canDelete}
 							<form
@@ -325,22 +355,22 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 									if (!confirm(`确定删除项目 ${project.name} 吗？项目任务和关联提醒将一并删除。`)) event.preventDefault();
 								}}
 							>
-								<input type="hidden" name="id" value={project.id} />
-								<button
+								<input data-ui-owner="routes-financing-projects--page-svelte" type="hidden" name="id" value={project.id} />
+								<Button data-ui-owner="routes-financing-projects--page-svelte" variant="ghost" size="icon"
 									type="submit"
-									class="btn btn-ghost btn-square danger-action"
+									class={"ui-button   danger-action"}
 									aria-label={`删除 ${project.name}`}
 									disabled={actionState.status === 'pending'}
 								>
 									<Trash2 size={15} />
-								</button>
+								</Button>
 							</form>
               {/if}
 						</div>
 					{/if}
 				</div>
 				<div class="project-status">
-					<span class={`badge status-pill ${project.tone}`}>{project.status}</span>
+					<span class={`ui-badge status-pill ${project.tone}`}>{project.status}</span>
 					<div class="progress-line">
 						<span style:width={`${project.progress}%`}></span>
 					</div>
@@ -404,18 +434,18 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 </ModuleCard>
 
 {#if canCreate}
-	<button
-		class="btn btn-primary floating-create-button"
+	<Button data-ui-owner="routes-financing-projects--page-svelte" variant="default"
+		class={"ui-button  floating-create-button"}
 		type="button"
 		onclick={openNewProject}
 		aria-label="新建项目"
 	>
 		<Plus size={23} />
-	</button>
+	</Button>
 {/if}
 
-<dialog class="modal" bind:this={newProjectDialog}>
-<div class="modal-box new-project-modal">
+<Modal  bind:this={newProjectDialog}>
+<div class="dialog-body new-project-modal">
 	<form method="post" action="?/createProject" use:enhance={enhanceProjectAction('create', 'create')}>
 		<div class="modal-header">
 			<div>
@@ -423,64 +453,64 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 				<h2>新建融资项目</h2>
 
 			</div>
-			<button class="btn" type="button" aria-label="关闭" onclick={() => newProjectDialog.close()}>×</button>
+			<Button data-ui-owner="routes-financing-projects--page-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => newProjectDialog.close()}>×</Button>
 		</div>
 		<div class="form-grid">
 			<label class="wide">
 				<span>项目名称</span>
-				<input class="input" name="name" maxlength="160" required />
+				<Input data-ui-owner="routes-financing-projects--page-svelte" class={"ui-input"} name="name" bind:value={$projectForm.name} aria-invalid={Boolean($projectErrors.name)} maxlength={160} required />
 			</label>
 			<label class="wide">
 				<span>融资品种 / SOP</span>
-				<select class="select" name="sopTemplateId" required disabled={projectOptionsStatus !== 'ready'}>
+				<NativeSelect data-ui-owner="routes-financing-projects--page-svelte" class={"ui-select"} name="sopTemplateId" bind:value={$projectForm.sopTemplateId} aria-invalid={Boolean($projectErrors.sopTemplateId)} required disabled={projectOptionsStatus !== 'ready'}>
 					<option value="">
 						{projectOptionsStatus === 'loading' ? '正在加载选项…' : projectOptionsStatus === 'error' ? '选项加载失败' : projectOptions.projectSops.length === 0 ? '暂无启用 SOP' : '请选择融资品种'}
 					</option>
 					{#each projectOptions.projectSops as sop}
 						<option value={sop.id}>{sop.debtType} · {sop.name}</option>
 					{/each}
-				</select>
-				{#if projectOptionsStatus === 'error'}<button class="btn btn-ghost" type="button" onclick={() => void ensureProjectOptions()}>重试</button>{/if}
+				</NativeSelect>
+				{#if projectOptionsStatus === 'error'}<Button data-ui-owner="routes-financing-projects--page-svelte" variant="ghost" class={"ui-button "} type="button" onclick={() => void ensureProjectOptions()}>重试</Button>{/if}
 			</label>
 			<label>
 				<span>项目规模（亿元）</span>
-				<input class="input" name="amountYi" type="number" min="0" step="0.01" inputmode="decimal" />
+				<Input data-ui-owner="routes-financing-projects--page-svelte" class={"ui-input"} name="amountYi" value={$projectForm.amountYi} oninput={(event) => $projectForm.amountYi = event.currentTarget.value} aria-invalid={Boolean($projectErrors.amountYi)} type="number" min="0" step="0.01" inputmode="decimal" />
 			</label>
 			<label>
 				<span>负责人</span>
-				<select class="select" name="ownerId" value={data.viewContext.personId ?? ''} disabled={projectOptionsStatus !== 'ready'}>
+				<NativeSelect data-ui-owner="routes-financing-projects--page-svelte" class={"ui-select"} name="ownerId" bind:value={$projectForm.ownerId} disabled={projectOptionsStatus !== 'ready'}>
 					<option value="">待分配</option>
 					{#each projectOptions.people as person}
 						<option value={person.id}>{person.name}</option>
 					{/each}
-				</select>
+				</NativeSelect>
 			</label>
 			<label>
 				<span>计划簿记</span>
-				<input class="input" name="plannedBookbuildingDate" type="date" bind:value={newProjectBookbuildingDate} required />
+				<Input data-ui-owner="routes-financing-projects--page-svelte" class={"ui-input"} name="plannedBookbuildingDate" type="date" aria-invalid={Boolean($projectErrors.plannedBookbuildingDate)} bind:value={$projectForm.plannedBookbuildingDate} required />
 			</label>
 			<label class="wide">
 				<span>项目说明</span>
-				<textarea class="textarea" name="notes" rows="3" maxlength="4000"></textarea>
+				<Textarea data-ui-owner="routes-financing-projects--page-svelte" class={"ui-textarea"} name="notes" bind:value={$projectForm.notes} aria-invalid={Boolean($projectErrors.notes)} rows={3} maxlength={4000}></Textarea>
 			</label>
 		</div>
 		<div class="modal-actions">
-			<button class="btn" type="button" disabled={actionState.status === 'pending'} onclick={() => newProjectDialog.close()}>取消</button>
-			<button
-				class="btn btn-primary primary-action"
+			<Button data-ui-owner="routes-financing-projects--page-svelte" variant="outline" class={"ui-button"} type="button" disabled={actionState.status === 'pending'} onclick={() => newProjectDialog.close()}>取消</Button>
+			<Button data-ui-owner="routes-financing-projects--page-svelte" variant="default"
+				class={"ui-button  primary-action"}
 				type="submit"
 				disabled={actionState.status === 'pending' || projectOptionsStatus !== 'ready' || projectOptions.projectSops.length === 0}
 			>
 				{#if actionState.status === 'pending' && actionState.key === 'create'}<LoaderCircle class="spin" size={16} />{/if}
 				{actionState.status === 'pending' && actionState.key === 'create' ? '创建中…' : '创建项目'}
-			</button>
+			</Button>
 		</div>
 	</form>
 </div>
-</dialog>
+</Modal>
 
-<dialog class="modal" bind:this={editProjectDialog}>
-<div class="modal-box new-project-modal">
+<Modal  bind:this={editProjectDialog}>
+<div class="dialog-body new-project-modal">
 	{#if editingProject}
 		<form method="post" action="?/updateProject" use:autoSave use:enhance={enhanceProjectAction('edit')}>
 			<div class="modal-header">
@@ -489,31 +519,31 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 					<h2>修改融资项目</h2>
 
 				</div>
-				<button class="btn" type="button" aria-label="关闭" onclick={() => editProjectDialog.close()}>×</button>
+				<Button data-ui-owner="routes-financing-projects--page-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => editProjectDialog.close()}>×</Button>
 			</div>
-			<input type="hidden" name="id" value={editingProject.id} />
+			<input data-ui-owner="routes-financing-projects--page-svelte" type="hidden" name="id" value={editingProject.id} />
 			<div class="form-grid">
 				<label class="wide">
 					<span>项目名称</span>
-					<input class="input" name="name" maxlength="160" required value={editingProject.name} />
+					<Input data-ui-owner="routes-financing-projects--page-svelte" class={"ui-input"} name="name" maxlength={160} required value={editingProject.name} />
 				</label>
 				<label class="wide">
 					<span>融资品种</span>
-					<input class="input" value={editingProject.type} readonly />
+					<Input data-ui-owner="routes-financing-projects--page-svelte" class={"ui-input"} value={editingProject.type} readonly />
 				</label>
 				<label>
 					<span>项目状态</span>
-					<select class="select" name="status" value={editingProject.rawStatus} required>
+					<NativeSelect data-ui-owner="routes-financing-projects--page-svelte" class={"ui-select"} name="status" value={editingProject.rawStatus} required>
 						<option value="planning">规划中</option>
 						<option value="in_progress">执行中</option>
 						<option value="at_risk">存在风险</option>
 						<option value="completed">已完成</option>
 						<option value="cancelled">已取消</option>
-					</select>
+					</NativeSelect>
 				</label>
 				<label>
 					<span>负责人</span>
-					<select class="select" name="ownerId" value={editingProject.ownerId ?? ''}>
+					<NativeSelect data-ui-owner="routes-financing-projects--page-svelte" class={"ui-select"} name="ownerId" value={editingProject.ownerId ?? ''}>
 						<option value="">待分配</option>
 						{#if projectOptionsStatus !== 'ready' && editingProject.ownerId}
 							<option value={editingProject.ownerId}>{editingProject.owner}</option>
@@ -521,27 +551,27 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 						{#each projectOptions.people as person}
 							<option value={person.id}>{person.name}</option>
 						{/each}
-					</select>
+					</NativeSelect>
 				</label>
 				<label>
 					<span>计划簿记</span>
-					<input class="input" name="plannedBookbuildingDate" type="date" value={editingProject.plannedBookbuildingDate} required />
+					<Input data-ui-owner="routes-financing-projects--page-svelte" class={"ui-input"} name="plannedBookbuildingDate" type="date" value={editingProject.plannedBookbuildingDate} required />
 				</label>
 				<label class="wide">
 					<span>项目说明</span>
-					<textarea class="textarea" name="notes" rows="4" maxlength="4000">{editingProject.notes}</textarea>
+					<Textarea data-ui-owner="routes-financing-projects--page-svelte" value={editingProject.notes} class={"ui-textarea"} name="notes" rows={4} maxlength={4000}></Textarea>
 				</label>
 			</div>
 			<div class="modal-actions">
-				<button class="btn" type="button" onclick={() => editProjectDialog.close()}>关闭</button>
+				<Button data-ui-owner="routes-financing-projects--page-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => editProjectDialog.close()}>关闭</Button>
 			</div>
 		</form>
 	{/if}
 </div>
-</dialog>
+</Modal>
 
 <style>
-	.primary-action {
+	:global(.primary-action[data-ui-owner="routes-financing-projects--page-svelte"]) {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -626,7 +656,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.financing-project-summary p span {
 		margin-top: 0.1875rem;
 		font-size: 0.75rem;
-		color: var(--muted);
+		color: var(--text-muted);
 	}
 
 	.toolbar {
@@ -643,17 +673,19 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	.search-field {
+		position: relative;
 		display: flex;
 		min-height: 2.75rem;
 		width: 15rem;
 		flex: 1 1 14rem;
 		align-items: center;
 		gap: 0.4375rem;
-		padding: 0 0.625rem;
-		color: var(--muted);
+		color: var(--text-muted);
 	}
 
-	.search-field input {
+	.search-field :global(svg) { position: absolute; left: 14px; pointer-events: none; }
+
+	:global(.search-field input[data-ui-owner="routes-financing-projects--page-svelte"]) {
 		width: 100%;
 	}
 
@@ -662,7 +694,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		align-items: center;
 		gap: 0.75rem;
 		flex-wrap: wrap;
-		color: var(--muted);
+		color: var(--text-muted);
 	}
 
 	.select-group :global(.multi-filter) {
@@ -680,7 +712,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		background: #f9fafb;
 	}
 
-	.view-switcher button {
+	:global(.view-switcher button[data-ui-owner="routes-financing-projects--page-svelte"]) {
 		min-width: 2rem;
 	}
 
@@ -781,7 +813,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		border-right: 1px solid #eaecf0;
 	}
 
-	.expand-button {
+	:global(.expand-button[data-ui-owner="routes-financing-projects--page-svelte"]) {
 		display: grid;
 		width: 2.75rem;
 		flex: 0 0 auto;
@@ -815,7 +847,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		flex-wrap: wrap;
 		margin: 0.25rem 0 0;
 		font-size: 0.75rem;
-		color: var(--muted);
+		color: var(--text-muted);
 	}
 
 	.project-info p i {
@@ -856,7 +888,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		display: contents;
 	}
 
-	.project-row-actions button {
+	:global(.project-row-actions button[data-ui-owner="routes-financing-projects--page-svelte"]) {
 		display: grid;
 		width: 2.75rem;
 		place-items: center;
@@ -924,7 +956,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.project-status small {
 		font-size: 0.75rem;
-		color: var(--muted);
+		color: var(--text-muted);
 	}
 
 	.timeline-cell,
@@ -990,7 +1022,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 	.project-bar.gray {
-		background: linear-gradient(90deg, #667085, var(--muted));
+		background: linear-gradient(90deg, #667085, var(--text-muted));
 	}
 
 	.project-bar span {
@@ -1057,7 +1089,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	.task-dot {
 		width: 0.4375rem;
 		height: 0.4375rem;
-		border: 2px solid var(--muted);
+		border: 2px solid var(--text-muted);
 		border-radius: 50%;
 	}
 
@@ -1071,14 +1103,14 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		background: #dbe8ff;
 	}
 
-	.task-date { display: block; margin-top: 0.2rem; font-size: 0.8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+	.task-date { display: block; margin-top: 0.2rem; font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 	.task-bar.task-point { height: 0.75rem; border-radius: 0; transform: translate(-50%, -50%) rotate(45deg); }
 	.task-bar {
 		position: absolute;
 		top: 0.9375rem;
 		height: 0.5rem;
 		border-radius: 6.1875rem;
-		background: var(--muted);
+		background: var(--text-muted);
 	}
 
 	.task-bar.done {
@@ -1124,7 +1156,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	}
 
 
-	.modal-header button {
+	:global(.modal-header button[data-ui-owner="routes-financing-projects--page-svelte"]) {
 		display: grid;
 		width: 2.75rem;
 		place-items: center;
@@ -1152,14 +1184,14 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		color: #475467;
 	}
 
-	.form-grid input,
-	.form-grid select,
-	.form-grid textarea {
+	:global(.form-grid input[data-ui-owner="routes-financing-projects--page-svelte"]),
+	:global(.form-grid select[data-ui-owner="routes-financing-projects--page-svelte"]),
+	:global(.form-grid textarea[data-ui-owner="routes-financing-projects--page-svelte"]) {
 		width: 100%;
 		padding: 0 0.625rem;
 	}
 
-	.form-grid textarea {
+	:global(.form-grid textarea[data-ui-owner="routes-financing-projects--page-svelte"]) {
 		padding-block: 0.625rem;
 		resize: vertical;
 	}
@@ -1172,7 +1204,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		padding-top: 1rem;
 	}
 
-	.modal-actions > button:not(.primary-action) {
+	:global(.modal-actions > button[data-ui-owner="routes-financing-projects--page-svelte"]:not(.primary-action[data-ui-owner="routes-financing-projects--page-svelte"])) {
 		padding: 0 0.8125rem;
 	}
 

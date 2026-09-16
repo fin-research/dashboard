@@ -186,11 +186,11 @@ test("上传模态框保留文件选择与上传主操作", async () => {
     new URL("../src/lib/FundReportUploadDialog.svelte", import.meta.url),
     "utf8",
   );
-  assert.match(page, /<dialog[\s\S]*?aria-labelledby="fund-report-upload-title"/);
-  assert.match(page, /class="upload-file-input"[\s\S]*?type="file"/);
+  assert.match(page, /<Modal[\s\S]*?aria-labelledby="fund-report-upload-title"/);
+  assert.match(page, /upload-file-input[\s\S]*?type="file"/);
   assert.match(
     page,
-    /<footer class="upload-actions">[\s\S]*?<button class="btn btn-primary upload-button" type="submit"/,
+    /<footer class="upload-actions">[\s\S]*?<Button[^>]*variant="default"[\s\S]*?upload-button[\s\S]*?type="submit"/,
   );
   assert.match(page, /disabled=\{!selectedFile \|\| uploading\}/);
 });

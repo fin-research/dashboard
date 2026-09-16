@@ -1,4 +1,5 @@
 <script>
+  import { Button } from "$lib/components/ui/button/index.js";
   import WorkbenchShell from '../../../src/lib/workbench/WorkbenchShell.svelte';
   import ModuleCard from '../../../src/components/ModuleCard.svelte';
   import ScheduleFields from '../../../src/lib/financing/components/ScheduleFields.svelte';
@@ -9,7 +10,7 @@
     <ModuleCard>
       <form>
         <ScheduleFields relative scheduleType="period" startValue={-5} endValue={-1} />
-        <button class="btn" type="reset">重置</button>
+        <Button type="reset">重置</Button>
       </form>
     </ModuleCard>
   </div>

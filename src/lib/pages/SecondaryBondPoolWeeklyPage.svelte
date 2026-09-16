@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
   import { onMount } from "svelte";
 
-  export let embedded = false;
   import "../../bond-ledger.css";
   import "../../layout-report.css";
   import "../../secondary-bond-pool.css";
@@ -39,93 +39,29 @@
   import { portal } from "$lib/portal";
   import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
   import { currentReportDate } from "../../report-date";
+  interface Props {
+    embedded?: boolean;
+  }
+
+  let { embedded = false }: Props = $props();
 
   const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
   const DEFAULT_RANGE = yearToLatestLedgerRange(currentReportDate(), []);
 
-  let analytics: BondLedgerReport = emptyBondLedgerReport();
-  let startDate = DEFAULT_RANGE.startDate;
-  let endDate = DEFAULT_RANGE.endDate;
+  let analytics: BondLedgerReport = $state(emptyBondLedgerReport());
+  let startDate = $state(DEFAULT_RANGE.startDate);
+  let endDate = $state(DEFAULT_RANGE.endDate);
   let followLatest = true;
-  let loading = true;
-  let exporting = false;
-  let exportLabel = "导出图片";
+  let loading = $state(true);
+  let exporting = $state(false);
+  let exportLabel = $state("导出图片");
   let exportTimer: number | null = null;
-  let rangeOpen = false;
-  let rangePhase: "start" | "end" = "start";
-  let rangeMonthLeft = monthStart(startDate);
+  let rangeOpen = $state(false);
+  let rangePhase: "start" | "end" = $state("start");
+  let rangeMonthLeft = $state(monthStart(DEFAULT_RANGE.startDate));
   let syncGeneration = 0;
-  let reportSurface: HTMLElement | null = null;
+  let reportSurface = $state<HTMLElement | null>(null);
 
-  $: current = analytics.currentPerformance;
-  $: currentOperating = analytics.operatingTrend.find(
-    (point) => point.date === current?.date,
-  ) ?? analytics.operatingTrend.at(-1) ?? null;
-  $: rangePerformance = analytics.performanceTrend.filter(
-    (point) =>
-      point.date.slice(5) !== "01-01" &&
-      point.date >= startDate &&
-      point.date <= endDate,
-  );
-  $: rangeOperating = analytics.operatingTrend.filter(
-    (point) => point.date >= startDate && point.date <= endDate,
-  );
-  $: actualStartDate = rangePerformance.at(0)?.date ?? startDate;
-  $: actualEndDate = rangePerformance.at(-1)?.date ?? current?.date ?? endDate;
-  $: currentWeekStart = current ? startOfBusinessWeek(current.date) : null;
-  $: weeklyRevenue = rangePerformance
-    .filter((point) => currentWeekStart !== null && point.date >= currentWeekStart)
-    .reduce((total, point) => total + point.dailyRevenue, 0);
-  $: tradingMarketValue = currentOperating?.tradingMarketValue ?? 0;
-  $: availableMarketValue = currentOperating?.availableMarketValue ?? 0;
-  $: calculatedLeverage =
-    current && current.principal > 0
-      ? analytics.detailMarketValue / current.principal
-      : null;
-  $: oneYearShare = analytics.tradingMaturityBuckets
-    .slice(0, 5)
-    .reduce((total, bucket) => total + bucket.share, 0);
-  $: categorySummary = analytics.tradingHoldingTypes
-    .slice(0, 3)
-    .map((item) => `${item.category} ${(item.share * 100).toFixed(1)}%`)
-    .join("、");
-  $: reportWeek = isoWeek(current?.date ?? endDate);
-  $: rangeMonths = [rangeMonthLeft, shiftMonth(rangeMonthLeft, 1)];
-  $: metricCards = [
-    {
-      label: "业务本金",
-      value: formatReportYi(current?.principal ?? null),
-      detail: `时间加权 ${formatReportYi(current?.timeWeightedPrincipal ?? null)}`,
-      tone: "blue" as const,
-    },
-    {
-      label: "全池持仓总市值",
-      value: formatReportYi(analytics.detailMarketValue || null),
-      detail: `交易户 ${formatReportYi(tradingMarketValue)} / 可供户 ${formatReportYi(availableMarketValue)}`,
-      tone: "cyan" as const,
-    },
-    {
-      label: "全池综合杠杆率",
-      value: formatDecimalPercent(calculatedLeverage),
-      detail: `对比平层基准 ${formatSignedPercentagePoint(calculatedLeverage === null ? null : calculatedLeverage - 1)}`,
-      tone: "blue" as const,
-    },
-    {
-      label: "年化收益率（含免税）",
-      value: formatDecimalPercent(
-        currentOperating?.fullPoolYtdAnnualizedReturn ?? null,
-        3,
-      ),
-      detail: `不含免税 ${formatDecimalPercent(currentOperating?.fullPoolYtdExTaxAnnualizedReturn ?? null, 3)} / 平层静态 ${formatStaticYield(currentOperating?.flatStatic ?? null)}`,
-      tone: "cyan" as const,
-    },
-    {
-      label: "累计毛利（含免税）",
-      value: formatWan(current?.cumulativeProfit ?? null),
-      detail: `免税增厚 ${formatWan(currentOperating?.cumulativeTaxExemptProfit ?? null)}`,
-      tone: "blue" as const,
-    },
-  ];
 
   onMount(() => {
     void refreshReport();
@@ -285,6 +221,75 @@
     const unit = check.key === "leverage" ? "" : " 万元";
     return `${(check.difference / divisor).toFixed(digits)}${unit}`;
   }
+  let current = $derived(analytics.currentPerformance);
+  let currentOperating = $derived(analytics.operatingTrend.find(
+    (point) => point.date === current?.date,
+  ) ?? analytics.operatingTrend.at(-1) ?? null);
+  let rangePerformance = $derived(analytics.performanceTrend.filter(
+    (point) =>
+      point.date.slice(5) !== "01-01" &&
+      point.date >= startDate &&
+      point.date <= endDate,
+  ));
+  let rangeOperating = $derived(analytics.operatingTrend.filter(
+    (point) => point.date >= startDate && point.date <= endDate,
+  ));
+  let actualStartDate = $derived(rangePerformance.at(0)?.date ?? startDate);
+  let actualEndDate = $derived(rangePerformance.at(-1)?.date ?? current?.date ?? endDate);
+  let currentWeekStart = $derived(current ? startOfBusinessWeek(current.date) : null);
+  let weeklyRevenue = $derived(rangePerformance
+    .filter((point) => currentWeekStart !== null && point.date >= currentWeekStart)
+    .reduce((total, point) => total + point.dailyRevenue, 0));
+  let tradingMarketValue = $derived(currentOperating?.tradingMarketValue ?? 0);
+  let availableMarketValue = $derived(currentOperating?.availableMarketValue ?? 0);
+  let calculatedLeverage =
+    $derived(current && current.principal > 0
+      ? analytics.detailMarketValue / current.principal
+      : null);
+  let oneYearShare = $derived(analytics.tradingMaturityBuckets
+    .slice(0, 5)
+    .reduce((total, bucket) => total + bucket.share, 0));
+  let categorySummary = $derived(analytics.tradingHoldingTypes
+    .slice(0, 3)
+    .map((item) => `${item.category} ${(item.share * 100).toFixed(1)}%`)
+    .join("、"));
+  let reportWeek = $derived(isoWeek(current?.date ?? endDate));
+  let rangeMonths = $derived([rangeMonthLeft, shiftMonth(rangeMonthLeft, 1)]);
+  let metricCards = $derived([
+    {
+      label: "业务本金",
+      value: formatReportYi(current?.principal ?? null),
+      detail: `时间加权 ${formatReportYi(current?.timeWeightedPrincipal ?? null)}`,
+      tone: "blue" as const,
+    },
+    {
+      label: "全池持仓总市值",
+      value: formatReportYi(analytics.detailMarketValue || null),
+      detail: `交易户 ${formatReportYi(tradingMarketValue)} / 可供户 ${formatReportYi(availableMarketValue)}`,
+      tone: "cyan" as const,
+    },
+    {
+      label: "全池综合杠杆率",
+      value: formatDecimalPercent(calculatedLeverage),
+      detail: `对比平层基准 ${formatSignedPercentagePoint(calculatedLeverage === null ? null : calculatedLeverage - 1)}`,
+      tone: "blue" as const,
+    },
+    {
+      label: "年化收益率（含免税）",
+      value: formatDecimalPercent(
+        currentOperating?.fullPoolYtdAnnualizedReturn ?? null,
+        3,
+      ),
+      detail: `不含免税 ${formatDecimalPercent(currentOperating?.fullPoolYtdExTaxAnnualizedReturn ?? null, 3)} / 平层静态 ${formatStaticYield(currentOperating?.flatStatic ?? null)}`,
+      tone: "cyan" as const,
+    },
+    {
+      label: "累计毛利（含免税）",
+      value: formatWan(current?.cumulativeProfit ?? null),
+      detail: `免税增厚 ${formatWan(currentOperating?.cumulativeTaxExemptProfit ?? null)}`,
+      tone: "blue" as const,
+    },
+  ]);
 </script>
 
 <svelte:window onclick={closeRangeFromWindow} />
@@ -312,8 +317,8 @@
         use:portal={embedded ? "#tr-topbar-actions" : null}
       >
         <div class="ledger-range-picker">
-          <button
-            class="btn ledger-range-trigger"
+          <Button data-ui-owner="lib-pages-SecondaryBondPoolWeeklyPage-svelte" variant="outline"
+            class={"ui-button ledger-range-trigger"}
             type="button"
             aria-label="选择周报数据范围"
             aria-expanded={rangeOpen}
@@ -326,13 +331,13 @@
             <time datetime={startDate}>{startDate}</time>
             <span aria-hidden="true">—</span>
             <time datetime={endDate}>{endDate}</time>
-          </button>
+          </Button>
           {#if rangeOpen}
             <div class="ledger-range-popover" role="dialog" aria-label="选择周报数据范围" tabindex="-1">
               <div class="range-calendar-nav">
-                <button class="btn" type="button" aria-label="向前一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, -1))}>‹</button>
+                <Button data-ui-owner="lib-pages-SecondaryBondPoolWeeklyPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="向前一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, -1))}>‹</Button>
                 <strong>{rangePhase === "start" ? "选择起始日期" : "选择结束日期"}</strong>
-                <button class="btn" type="button" aria-label="向后一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, 1))}>›</button>
+                <Button data-ui-owner="lib-pages-SecondaryBondPoolWeeklyPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="向后一个月" onclick={() => (rangeMonthLeft = shiftMonth(rangeMonthLeft, 1))}>›</Button>
               </div>
               <div class="range-calendar-pair">
                 {#each rangeMonths as month (month)}
@@ -343,15 +348,15 @@
                     </div>
                     <div class="calendar-grid">
                       {#each calendarDays(month) as day (day.date)}
-                        <button class="btn"
+                        <Button data-ui-owner="lib-pages-SecondaryBondPoolWeeklyPage-svelte" variant="outline" class={["ui-button", !day.inMonth && "outside", isSelectedDate(day.date) && "in-range", day.date === startDate || day.date === endDate && "endpoint"]}
                           type="button"
-                          class:outside={!day.inMonth}
-                          class:in-range={isSelectedDate(day.date)}
-                          class:endpoint={day.date === startDate || day.date === endDate}
+
+
+
                           disabled={!day.inMonth}
                           aria-label={day.date}
                           onclick={() => selectRangeDate(day.date)}
-                        >{day.day}</button>
+                        >{day.day}</Button>
                       {/each}
                     </div>
                   </section>
@@ -363,9 +368,9 @@
 
         <BondLedgerUploadButton onImported={refreshReport} />
 
-        <button
-          class="btn btn-primary secondary-weekly-export"
-          class:is-exporting={exporting}
+        <Button data-ui-owner="lib-pages-SecondaryBondPoolWeeklyPage-svelte" variant="default"
+          class={["ui-button  secondary-weekly-export", exporting && "is-exporting"]}
+
           type="button"
           disabled={!analytics.hasData || !analytics.auditPassed || loading || exporting}
           onclick={exportImage}
@@ -374,7 +379,7 @@
             <path d="M10 3v9" /><path d="m6.5 8.7 3.5 3.6 3.5-3.6" /><path d="M4 14.5v2h12v-2" />
           </svg>
           <span>{exportLabel}</span>
-        </button>
+        </Button>
       </div>
     </header>
 

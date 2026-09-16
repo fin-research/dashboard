@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { type Snippet } from "svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { setContext, type Snippet } from "svelte";
   import { afterNavigate } from "$app/navigation";
   import AuthMenu from "$lib/AuthMenu.svelte";
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
@@ -18,6 +19,7 @@
     integrated?: boolean; layoutReport?: boolean; reportKind?: "secondary" | "financing" | "liability" | null;
     visualVariant?: 'workspace' | 'report'; tone?: 'blue' | 'teal' | 'orange' | 'purple';
   } = $props();
+  setContext('ui-scope', () => className);
   let desktopCollapsed = $state(false);
   let mobileDrawerOpen = $state(false);
   let mainRegion: HTMLElement;
@@ -70,10 +72,10 @@
 >
   <a class="tr-skip-link" href="#tr-workbench-main">跳至工作台内容</a>
 
-  <header class="navbar tr-topbar" use:measureTopbar>
+  <header class="ui-topbar tr-topbar" use:measureTopbar>
     <div class="tr-topbar__title">
-      <button
-        class="btn btn-ghost btn-square tr-sidebar-toggle"
+      <Button data-ui-owner="lib-workbench-WorkbenchShell-svelte" variant="ghost" size="icon"
+        class={"ui-button   tr-sidebar-toggle"}
         type="button"
         aria-label={desktopCollapsed ? "展开侧边导航" : "折叠侧边导航"}
         aria-expanded={!desktopCollapsed}
@@ -81,9 +83,9 @@
         onclick={toggleDesktopSidebar}
       >
         <WorkbenchIcon name="sidebar" />
-      </button>
-      <button
-        class="btn btn-ghost btn-square tr-mobile-menu"
+      </Button>
+      <Button data-ui-owner="lib-workbench-WorkbenchShell-svelte" variant="ghost" size="icon"
+        class={"ui-button   tr-mobile-menu"}
         type="button"
         aria-label={mobileDrawerOpen ? "关闭导航菜单" : "打开导航菜单"}
         aria-expanded={mobileDrawerOpen}
@@ -91,7 +93,7 @@
         onclick={toggleMobileDrawer}
       >
         <WorkbenchIcon name="menu" />
-      </button>
+      </Button>
       <div class="tr-topbar__heading">
         <a class="tr-portal-link" href="/" aria-label="返回市场研究门户">
           东方财富证券 · 资金管理部
@@ -113,7 +115,7 @@
 
   <aside id="tr-workbench-drawer" class="tr-drawer" aria-label={`${title}导航`}>
     <nav class="tr-drawer__nav" aria-label="业务模块" data-sveltekit-preload-data="hover">
-      <ul class="menu tr-navigation-list">
+      <ul class="ui-menu tr-navigation-list">
       {#each views as view}
         <li><a
           class:active={activeViewId === view.id}
@@ -130,7 +132,7 @@
     </nav>
   </aside>
 
-  <button
+  <button data-ui-owner="lib-workbench-WorkbenchShell-svelte"
     class="tr-drawer-backdrop"
     type="button"
     aria-label="关闭导航菜单"

@@ -2,15 +2,19 @@
   import type { PrimaryIssueDetail } from "../types";
   import { primaryRows } from "../view-model";
 
-  export let points: PrimaryIssueDetail[];
+  interface Props {
+    points: PrimaryIssueDetail[];
+  }
 
-  $: rows = primaryRows(points);
+  let { points }: Props = $props();
+
+  let rows = $derived(primaryRows(points));
 </script>
 
 {#if !rows.length}
   <div class="primary-table__empty">今日暂无可比发行</div>
 {:else}
-  <table class="table primary-table">
+  <table class="ui-table primary-table">
     <thead>
       <tr>
         {#each ["类型", "日期", "发行人", "期限", "规模", "票息"] as label}
@@ -23,7 +27,7 @@
         <tr title={row.title}>
           <td>
             <span
-              class={`badge primary-badge primary-badge--${row.tagIndex}`}
+              class={`ui-badge primary-badge primary-badge--${row.tagIndex}`}
               >{row.values[0]}</span
             >
           </td>

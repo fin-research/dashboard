@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
 	import MultiSelectFilter from './MultiSelectFilter.svelte';
 
 	type Preset = { key: string; label: string; exclude: string[] };
@@ -44,15 +45,15 @@
 	});
 </script>
 
-<section class="card card-border bg-base-100 debt-filter" class:compact={compact} aria-label={ariaLabel}>
+<section class="ui-card border bg-card debt-filter" class:compact={compact} aria-label={ariaLabel}>
 	<label>
 		{#if !compact}<span>预设</span>{/if}
-		<select class="select" aria-label="预设筛选" value={preset} onchange={(event) => applyPreset(event.currentTarget.value)}>
+		<NativeSelect data-ui-owner="lib-financing-DebtPresetFilter-svelte" class={"ui-select"} aria-label="预设筛选" value={preset} onchange={(event) => applyPreset(event.currentTarget.value)}>
 			{#each presets as item}
 				<option value={item.key}>{item.label}</option>
 			{/each}
 			<option value="custom">自定义</option>
-		</select>
+		</NativeSelect>
 	</label>
 	<MultiSelectFilter
 		label="负债品种"
@@ -84,23 +85,23 @@
 		font-size: 0.875rem;
 		font-weight: bold;
 		letter-spacing: 0.02em;
-		color: var(--muted);
+		color: var(--text-muted);
 	}
 
-	select {
+	:global(select[data-ui-owner="lib-financing-DebtPresetFilter-svelte"]) {
 		width: 13.5rem;
 		min-width: 0;
 		padding: 0 2rem 0 0.75rem;
 	}
 
-	.filter-note { margin-left: auto; color: var(--muted); font-size: .8125rem; white-space: nowrap; }
+	.filter-note { margin-left: auto; color: var(--text-muted); font-size: .8125rem; white-space: nowrap; }
 
 	.debt-filter.compact {
 		min-height: 0;
 		padding: 0;
 	}
 
-	.debt-filter.compact select {
+	:global(.debt-filter.compact select[data-ui-owner="lib-financing-DebtPresetFilter-svelte"]) {
 		width: 12rem;
 	}
 
@@ -119,7 +120,7 @@
 			flex-direction: column;
 		}
 
-		select {
+		:global(select[data-ui-owner="lib-financing-DebtPresetFilter-svelte"]) {
 			width: 100%;
 		}
 	}

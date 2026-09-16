@@ -1,4 +1,10 @@
 <script lang="ts">
+  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+  import Modal from "$lib/components/Modal.svelte";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onDestroy, onMount } from "svelte";
 
   import ChartHost from "../../components/ChartHost.svelte";
@@ -83,7 +89,7 @@
   let calendarLimitFilters = $state<string[]>([]);
   let calendarUsageFilters = $state<string[]>([]);
   let calendarMonth = $state("");
-  let createDialog: HTMLDialogElement;
+  let createDialog: Modal;
   let creating = $state(false);
   let newName = $state("");
   let newType = $state("股份行");
@@ -471,9 +477,9 @@
     scheduleEditorSave(true);
   }
 
-  function setEditorConfidentiality(event: Event): void {
+  function setEditorConfidentiality(checked: boolean): void {
     if (!editor) return;
-    editor.confidentialityStatus = (event.currentTarget as HTMLInputElement).checked;
+    editor.confidentialityStatus = checked;
     queueInstitutionChange("confidentialityStatus", editor.confidentialityStatus);
     scheduleEditorSave(true);
   }
@@ -710,31 +716,31 @@
       <div class="tr-credit-toolbar__actions">
         <label>
           <span>数据日期</span>
-          <input class="input" type="date" min={report.availableDates[0]} value={report.summary.reportDate} disabled={saveState === "saving"} onchange={handleReportDateChange} />
+          <Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="date" min={report.availableDates[0]} value={report.summary.reportDate} disabled={saveState === "saving"} onchange={handleReportDateChange} />
         </label>
         {#if activeTab === "weekly"}
-          <button class="btn tr-credit-print" type="button" onclick={printWeeklyReport}>打印 / 导出 PDF</button>
+          <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-credit-print"} type="button" onclick={printWeeklyReport}>打印 / 导出 PDF</Button>
         {/if}
       </div>
     {/if}
-    {#if activeTab === "overview"}<button class="btn btn-primary" type="button" onclick={openCreate}>新增机构</button>{/if}
+    {#if activeTab === "overview"}<Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button "} type="button" onclick={openCreate}>新增机构</Button>{/if}
   </div>
 
-  <dialog class="modal" bind:this={createDialog} aria-labelledby="credit-create-title">
-    <div class="modal-box">
+  <Modal  bind:this={createDialog} aria-labelledby="credit-create-title">
+    <div class="dialog-body">
       <form onsubmit={createInstitution}>
         <h2 id="credit-create-title">新增授信机构</h2>
         <div class="tr-credit-editor-grid">
-          <label><span>机构名称</span><input class="input" required maxlength="200" bind:value={newName} /></label>
-          <label><span>机构性质</span><input class="input" required maxlength="100" bind:value={newType} /></label>
-          <label><span>变更生效日</span><input class="input" required type="date" bind:value={newDate} /></label>
-          <label><span>授信状态</span><select class="select" bind:value={newStatus}><option value="applying">申请中</option><option value="approved">已获批</option><option value="revoked">已撤销</option></select></label>
-          <label><span>授信总额（亿元）</span><input class="input" type="number" min="0" step="0.000001" bind:value={newTotal} /></label>
+          <label><span>机构名称</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} required maxlength={200} bind:value={newName} /></label>
+          <label><span>机构性质</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} required maxlength={100} bind:value={newType} /></label>
+          <label><span>变更生效日</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} required type="date" bind:value={newDate} /></label>
+          <label><span>授信状态</span><NativeSelect data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-select"} bind:value={newStatus}><option value="applying">申请中</option><option value="approved">已获批</option><option value="revoked">已撤销</option></NativeSelect></label>
+          <label><span>授信总额（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" min="0" step="0.000001" bind:value={newTotal} /></label>
         </div>
-        <div class="modal-action"><button class="btn" type="button" disabled={creating} onclick={() => createDialog.close()}>取消</button><button class="btn btn-primary" type="submit" disabled={creating}>{creating ? "保存中" : "新增"}</button></div>
+        <div class="dialog-actions"><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button"} type="button" disabled={creating} onclick={() => createDialog.close()}>取消</Button><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button "} type="submit" disabled={creating}>{creating ? "保存中" : "新增"}</Button></div>
       </form>
     </div>
-  </dialog>
+  </Modal>
 
   {#if loading}
     <section class="tr-empty-panel" aria-live="polite">
@@ -745,7 +751,7 @@
     <section class="tr-empty-panel" role="alert">
       <WorkbenchIcon name="warning" />
       <div><h2>授信数据暂不可用</h2><p>{errorMessage || "暂无授信记录"}</p></div>
-      <button class="btn tr-credit-retry" type="button" onclick={() => void loadReport()}>重新加载</button>
+      <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-credit-retry"} type="button" onclick={() => void loadReport()}>重新加载</Button>
     </section>
   {:else if activeTab === "overview"}
     <section aria-labelledby="credit-metrics-title">
@@ -802,11 +808,11 @@
           <label class="tr-search-control">
             <span class="sr-only">搜索授信机构</span>
             <WorkbenchIcon name="search" />
-            <input class="input" bind:value={query} type="search" />
+            <Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} bind:value={query} type="search" />
           </label>
           <label>
             <span class="sr-only">授信状态</span>
-            <select class="select" bind:value={statusFilter}>
+            <NativeSelect data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-select"} bind:value={statusFilter}>
               <option value="active">未撤销</option>
               <option value="all">全部状态</option>
               <option value="approved">已获批</option>
@@ -814,16 +820,16 @@
               <option value="pending">未生效</option>
               <option value="applying">申请中</option>
               <option value="revoked">已撤销</option>
-            </select>
+            </NativeSelect>
           </label>
           <label>
             <span class="sr-only">授信风险</span>
-            <select class="select" bind:value={riskFilter}>
+            <NativeSelect data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-select"} bind:value={riskFilter}>
               <option value="all">全部风险</option>
               <option value="attention">使用率60%及以上</option>
               <option value="warning">使用率80%及以上</option>
               <option value="expiry">近30日到期</option>
-            </select>
+            </NativeSelect>
           </label>
         </div>
       </PanelHeading>
@@ -833,15 +839,15 @@
           <thead>
             <tr>
               <th>序号</th>
-              <th aria-sort={ariaSort("institutionName")}><button class="btn tr-sort-button" type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span></button></th>
-              <th aria-sort={ariaSort("institutionType")}><button class="btn tr-sort-button" type="button" onclick={() => toggleSort("institutionType")}>机构性质<span aria-hidden="true">{sortIndicator("institutionType")}</span></button></th>
-              <th aria-sort={ariaSort("status")}><button class="btn tr-sort-button" type="button" onclick={() => toggleSort("status")}>状态<span aria-hidden="true">{sortIndicator("status")}</span></button></th>
-              <th class="is-numeric" aria-sort={ariaSort("totalLimit")}><button class="btn tr-sort-button tr-sort-button--numeric" type="button" onclick={() => toggleSort("totalLimit")}>总额度<span aria-hidden="true">{sortIndicator("totalLimit")}</span></button></th>
-              <th class="is-numeric" aria-sort={ariaSort("totalUsed")}><button class="btn tr-sort-button tr-sort-button--numeric" type="button" onclick={() => toggleSort("totalUsed")}>已使用<span aria-hidden="true">{sortIndicator("totalUsed")}</span></button></th>
-              <th class="is-numeric" aria-sort={ariaSort("availableAmount")}><button class="btn tr-sort-button tr-sort-button--numeric" type="button" onclick={() => toggleSort("availableAmount")}>可用<span aria-hidden="true">{sortIndicator("availableAmount")}</span></button></th>
-              <th class="is-numeric" aria-sort={ariaSort("utilization")}><button class="btn tr-sort-button tr-sort-button--numeric" type="button" onclick={() => toggleSort("utilization")}>使用率<span aria-hidden="true">{sortIndicator("utilization")}</span></button></th>
-              <th aria-sort={ariaSort("effectiveDate")}><button class="btn tr-sort-button" type="button" onclick={() => toggleSort("effectiveDate")}>生效日<span aria-hidden="true">{sortIndicator("effectiveDate")}</span></button></th>
-              <th aria-sort={ariaSort("expiryDate")}><button class="btn tr-sort-button" type="button" onclick={() => toggleSort("expiryDate")}>到期日<span aria-hidden="true">{sortIndicator("expiryDate")}</span></button></th>
+              <th aria-sort={ariaSort("institutionName")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span></Button></th>
+              <th aria-sort={ariaSort("institutionType")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionType")}>机构性质<span aria-hidden="true">{sortIndicator("institutionType")}</span></Button></th>
+              <th aria-sort={ariaSort("status")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("status")}>状态<span aria-hidden="true">{sortIndicator("status")}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("totalLimit")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalLimit")}>总额度<span aria-hidden="true">{sortIndicator("totalLimit")}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("totalUsed")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalUsed")}>已使用<span aria-hidden="true">{sortIndicator("totalUsed")}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("availableAmount")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("availableAmount")}>可用<span aria-hidden="true">{sortIndicator("availableAmount")}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("utilization")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("utilization")}>使用率<span aria-hidden="true">{sortIndicator("utilization")}</span></Button></th>
+              <th aria-sort={ariaSort("effectiveDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("effectiveDate")}>生效日<span aria-hidden="true">{sortIndicator("effectiveDate")}</span></Button></th>
+              <th aria-sort={ariaSort("expiryDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("expiryDate")}>到期日<span aria-hidden="true">{sortIndicator("expiryDate")}</span></Button></th>
               <th><span class="sr-only">操作</span></th>
             </tr>
           </thead>
@@ -858,7 +864,7 @@
                 <td class="is-numeric">{institution.utilization == null ? "—" : `${institution.utilization.toFixed(1)}%`}</td>
                 <td>{institution.effectiveDate ?? "—"}</td>
                 <td>{institution.expiryDate ?? "—"}</td>
-                <td><button class="btn btn-ghost tr-credit-detail-toggle" type="button" aria-expanded={expandedInstitution === institution.institutionName} onclick={() => toggleInstitution(institution)}>{expandedInstitution === institution.institutionName ? "收起" : "详情"}</button></td>
+                <td><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button  tr-credit-detail-toggle"} type="button" aria-expanded={expandedInstitution === institution.institutionName} onclick={() => toggleInstitution(institution)}>{expandedInstitution === institution.institutionName ? "收起" : "详情"}</Button></td>
               </tr>
               {#if expandedInstitution === institution.institutionName && editor}
                 <tr class="tr-credit-detail-row">
@@ -869,39 +875,39 @@
                         <span class:error={saveState === "error"} aria-live="polite">{saveMessage}</span>
                       </div>
                       <div class="tr-credit-editor-grid">
-                        <label><span>机构性质</span><input class="input" value={editor.institutionType} oninput={(event) => setEditorText("institutionType", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>审批状态</span><select class="select" value={editor.status} onchange={setEditorStatus}><option value="approved">已获批</option><option value="applying">申请中</option><option value="revoked">已撤销</option></select></label>
-                        <label><span>截至所选日状态</span><input class="input" readonly value={statusLabel(creditEffectiveStatus(editor))} /></label>
-                        <label class="tr-credit-checkbox"><input class="checkbox checkbox-primary" type="checkbox" checked={editor.confidentialityStatus} onchange={setEditorConfidentiality} /><span>已签署保密协议</span></label>
-                        <label><span>授信总额（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={editor.totalLimit ?? ""} oninput={(event) => setEditorAmount("totalLimit", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>已用额度（亿元）</span><input class="input" readonly value={formatAmount(editor.totalUsed)} /></label>
-                        <label><span>可用额度（亿元）</span><input class="input" readonly value={formatAmount(editor.totalLimit == null || editor.totalUsed == null ? null : editor.totalLimit - editor.totalUsed)} /></label>
-                        <label><span>生效日</span><input class="input" type="date" data-credit-date oninput={editDate} value={editor.effectiveDate ?? ""} onblur={(event) => setEditorDate("effectiveDate", event)} /></label>
-                        <label><span>到期日</span><input class="input" type="date" data-credit-date oninput={editDate} value={editor.expiryDate ?? ""} onblur={(event) => setEditorDate("expiryDate", event)} /></label>
-                        <label><span>关联客户</span><input class="input" readonly value={editor.clients?.map(client => client.name).join("、") || "待维护"} /></label>
-                        <label><span>银行经办机构</span><input class="input" value={editor.bankOffice ?? ""} oninput={(event) => setEditorText("bankOffice", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>我司申请部门</span><input class="input" value={editor.applyingDepartment ?? ""} oninput={(event) => setEditorText("applyingDepartment", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>我司经办人</span><input class="input" value={editor.handler ?? ""} oninput={(event) => setEditorText("handler", event)} onblur={() => void flushEditor()} /></label>
+                        <label><span>机构性质</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={editor.institutionType} oninput={(event) => setEditorText("institutionType", event)} onblur={() => void flushEditor()} /></label>
+                        <label><span>审批状态</span><NativeSelect data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-select"} value={editor.status} onchange={setEditorStatus}><option value="approved">已获批</option><option value="applying">申请中</option><option value="revoked">已撤销</option></NativeSelect></label>
+                        <label><span>截至所选日状态</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={statusLabel(creditEffectiveStatus(editor))} /></label>
+                        <label class="tr-credit-checkbox"><Checkbox data-ui-owner="lib-trading-research-CreditView-svelte"  checked={editor.confidentialityStatus} onCheckedChange={setEditorConfidentiality} /><span>已签署保密协议</span></label>
+                        <label><span>授信总额（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" step="0.000001" min="0" value={editor.totalLimit ?? ""} oninput={(event) => setEditorAmount("totalLimit", event)} onblur={() => void flushEditor()} /></label>
+                        <label><span>已用额度（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={formatAmount(editor.totalUsed)} /></label>
+                        <label><span>可用额度（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={formatAmount(editor.totalLimit == null || editor.totalUsed == null ? null : editor.totalLimit - editor.totalUsed)} /></label>
+                        <label><span>生效日</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="date" data-credit-date oninput={editDate} value={editor.effectiveDate ?? ""} onblur={(event) => setEditorDate("effectiveDate", event)} /></label>
+                        <label><span>到期日</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="date" data-credit-date oninput={editDate} value={editor.expiryDate ?? ""} onblur={(event) => setEditorDate("expiryDate", event)} /></label>
+                        <label><span>关联客户</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={editor.clients?.map(client => client.name).join("、") || "待维护"} /></label>
+                        <label><span>银行经办机构</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={editor.bankOffice ?? ""} oninput={(event) => setEditorText("bankOffice", event)} onblur={() => void flushEditor()} /></label>
+                        <label><span>我司申请部门</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={editor.applyingDepartment ?? ""} oninput={(event) => setEditorText("applyingDepartment", event)} onblur={() => void flushEditor()} /></label>
+                        <label><span>我司经办人</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={editor.handler ?? ""} oninput={(event) => setEditorText("handler", event)} onblur={() => void flushEditor()} /></label>
                       </div>
                       <div class="tr-credit-item-grid">
                         {#each editor.items as item, itemIndex (item.type)}
                           <fieldset>
                             <legend>{creditItemLabels[item.type]}</legend>
-                            <label><span>额度（亿元）</span><input class="input" type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>
-                            <label><span>{item.type === "bond_investment" ? "已用合计（亿元）" : item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><input class="input" type="number" step="0.000001" readonly={item.type === "bond_investment" || item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
+                            <label><span>额度（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>
+                            <label><span>{item.type === "bond_investment" ? "已用合计（亿元）" : item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" step="0.000001" readonly={item.type === "bond_investment" || item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
                             {#if item.type === "bond_investment"}
-                              <label><span>一级发行存续额（亿元）</span><input class="input" readonly value={formatAmount(item.primaryUsedAmount ?? null)} /></label>
-                              <label><span>债券投资——二级买卖（亿元）</span><input class="input" type="number" step="0.000001" value={item.secondaryUsedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "secondaryUsedAmount", event)} onblur={() => void flushEditor()} /></label>
+                              <label><span>一级发行存续额（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={formatAmount(item.primaryUsedAmount ?? null)} /></label>
+                              <label><span>债券投资——二级买卖（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" step="0.000001" value={item.secondaryUsedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "secondaryUsedAmount", event)} onblur={() => void flushEditor()} /></label>
                             {/if}
-                            {#if item.type !== "other"}<label><span>可用（亿元）</span><input class="input" readonly value={formatAmount(item.limitAmount == null || (item.usageSource !== "credit" && item.usedAmount == null) ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
-                            <label><span>说明</span><input class="input" value={item.details ?? ""} oninput={(event) => setItemDetails(itemIndex, event)} onblur={() => void flushEditor()} /></label>
+                            {#if item.type !== "other"}<label><span>可用（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={formatAmount(item.limitAmount == null || (item.usageSource !== "credit" && item.usedAmount == null) ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
+                            <label><span>说明</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={item.details ?? ""} oninput={(event) => setItemDetails(itemIndex, event)} onblur={() => void flushEditor()} /></label>
                           </fieldset>
                         {/each}
                       </div>
                       <div class="tr-credit-notes-grid">
-                        <label><span>授信额度描述</span><textarea class="textarea" rows="3" oninput={(event) => setEditorText("detail", event)} onblur={() => void flushEditor()}>{editor.detail ?? ""}</textarea></label>
-                        <label><span>债券投资偏好</span><textarea class="textarea" rows="3" oninput={(event) => setEditorText("bondPreference", event)} onblur={() => void flushEditor()}>{editor.bondPreference ?? ""}</textarea></label>
-                        <label><span>备注</span><textarea class="textarea" rows="3" oninput={(event) => setEditorText("notes", event)} onblur={() => void flushEditor()}>{editor.notes ?? ""}</textarea></label>
+                        <label><span>授信额度描述</span><Textarea data-ui-owner="lib-trading-research-CreditView-svelte" value={editor.detail ?? ""} class={"ui-textarea"} rows={3} oninput={(event) => setEditorText("detail", event)} onblur={() => void flushEditor()}></Textarea></label>
+                        <label><span>债券投资偏好</span><Textarea data-ui-owner="lib-trading-research-CreditView-svelte" value={editor.bondPreference ?? ""} class={"ui-textarea"} rows={3} oninput={(event) => setEditorText("bondPreference", event)} onblur={() => void flushEditor()}></Textarea></label>
+                        <label><span>备注</span><Textarea data-ui-owner="lib-trading-research-CreditView-svelte" value={editor.notes ?? ""} class={"ui-textarea"} rows={3} oninput={(event) => setEditorText("notes", event)} onblur={() => void flushEditor()}></Textarea></label>
                       </div>
                     </div>
                   </td>
@@ -924,9 +930,9 @@
             <MultiSelectFilter label="已用" options={[...creditItemTypes]} optionLabels={creditItemLabels} bind:values={calendarUsageFilters} />
           </div>
           <div class="tr-credit-calendar-nav">
-            <button class="btn" type="button" aria-label="上一个月" onclick={() => shiftCalendarMonth(-1)}>‹</button>
+            <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button"} type="button" aria-label="上一个月" onclick={() => shiftCalendarMonth(-1)}>‹</Button>
             <strong>{calendarMonthLabel(calendarMonth)}</strong>
-            <button class="btn" type="button" aria-label="下一个月" onclick={() => shiftCalendarMonth(1)}>›</button>
+            <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button"} type="button" aria-label="下一个月" onclick={() => shiftCalendarMonth(1)}>›</Button>
           </div>
         </div>
         <div class="tr-credit-calendar-scroll" role="region" aria-label="授信日历，左右滚动查看完整日期" use:scrollableRegion>

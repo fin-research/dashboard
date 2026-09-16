@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount } from "svelte";
 
-  export let embedded = false;
   import "../../layout-report.css";
 
   import {
@@ -31,96 +34,33 @@
   import { globalMessages } from "$lib/global-messages";
   import { portal } from "$lib/portal";
   import type { MetricIconName } from "../../view-model";
+  interface Props {
+    embedded?: boolean;
+  }
 
-  let report: FinancingModelReport | null = null;
-  let loading = true;
-  let loadingVersion = false;
-  let saving = false;
-  let savingSellSide = false;
-  let savingDecision = false;
-  let generatingResearch = false;
-  let editingConclusion = false;
-  let editingSellSide = false;
-  let editingDecision = false;
-  let futureWindowDetailsOpen = false;
-  let errorMessage = "";
-  let editVerdict = "";
-  let editNarrative = "";
-  let editSellSideSummary = "";
+  let { embedded = false }: Props = $props();
+
+  let report = $state<FinancingModelReport | null>(null);
+  let loading = $state(true);
+  let loadingVersion = $state(false);
+  let saving = $state(false);
+  let savingSellSide = $state(false);
+  let savingDecision = $state(false);
+  let generatingResearch = $state(false);
+  let editingConclusion = $state(false);
+  let editingSellSide = $state(false);
+  let editingDecision = $state(false);
+  let futureWindowDetailsOpen = $state(false);
+  let errorMessage = $state("");
+  let editVerdict = $state("");
+  let editNarrative = $state("");
+  let editSellSideSummary = $state("");
   let editDecisionRunId = "";
-  let editDecisionAction = "";
-  let editDecisionOutcome = "";
-  let selectedRunId = "";
-  let decisionHistory: TimingDecisionRecord[] = [];
+  let editDecisionAction = $state("");
+  let editDecisionOutcome = $state("");
+  let selectedRunId = $state("");
+  let decisionHistory = $state<TimingDecisionRecord[]>([]);
 
-  $: snapshot = report?.snapshot ?? null;
-  $: company = snapshot?.company_metrics ?? null;
-  $: validation = snapshot?.validation ?? null;
-  $: marketDrivers = snapshot?.market_drivers.slice(0, 5) ?? [];
-  $: productRecommendation = snapshot?.product_recommendation ?? null;
-  $: recommendedScenario =
-    productRecommendation?.scenarios.find((scenario) => scenario.is_recommended) ??
-    null;
-  $: versions = report?.versions ?? [];
-  $: businessMetrics = snapshot
-    ? [
-        {
-          label: "LCR",
-          value: formatRatioPercent(company?.ef_lcr),
-          unit: "%",
-          tone: "teal",
-          icon: "liquidity" as MetricIconName,
-        },
-        {
-          label: "NSFR",
-          value: formatRatioPercent(company?.ef_nsfr),
-          unit: "%",
-          tone: "blue",
-          icon: "leverage" as MetricIconName,
-        },
-        {
-          label: "主体利差",
-          value: formatNullable(company?.ef_subject_spread_bp, 2),
-          unit: "bp",
-          tone: "purple",
-          icon: "issuance" as MetricIconName,
-        },
-      ]
-    : [];
-  $: validationMetrics = validation
-    ? [
-        {
-          label: "样本量",
-          value: `${validation.tscv.sample_count ?? validation.tscv.validation_samples} 笔`,
-        },
-        {
-          label: "样本区间",
-          value: formatDateRange(
-            validation.tscv.sample_start_date,
-            validation.tscv.sample_end_date,
-          ),
-        },
-        {
-          label: "胜率",
-          value: `${(validation.timing_value.win_rate * 100).toFixed(1)}%`,
-        },
-        {
-          label: "历史节约",
-          value: `${formatSigned(validation.timing_value.cost_saving_bp, 2)} bp`,
-        },
-        {
-          label: "信息系数",
-          value: validation.tscv.ic.toFixed(3),
-        },
-        {
-          label: "平均误差",
-          value:
-            validation.tscv.mae === null
-              ? "—"
-              : `${validation.tscv.mae.toFixed(2)} bp`,
-        },
-      ]
-    : [];
 
   onMount(loadReport);
 
@@ -420,6 +360,74 @@
   }
 
 
+  let snapshot = $derived(report?.snapshot ?? null);
+  let company = $derived(snapshot?.company_metrics ?? null);
+  let validation = $derived(snapshot?.validation ?? null);
+  let marketDrivers = $derived(snapshot?.market_drivers.slice(0, 5) ?? []);
+  let productRecommendation = $derived(snapshot?.product_recommendation ?? null);
+  let recommendedScenario =
+    $derived(productRecommendation?.scenarios.find((scenario) => scenario.is_recommended) ??
+    null);
+  let versions = $derived(report?.versions ?? []);
+  let businessMetrics = $derived(snapshot
+    ? [
+        {
+          label: "LCR",
+          value: formatRatioPercent(company?.ef_lcr),
+          unit: "%",
+          tone: "teal",
+          icon: "liquidity" as MetricIconName,
+        },
+        {
+          label: "NSFR",
+          value: formatRatioPercent(company?.ef_nsfr),
+          unit: "%",
+          tone: "blue",
+          icon: "leverage" as MetricIconName,
+        },
+        {
+          label: "主体利差",
+          value: formatNullable(company?.ef_subject_spread_bp, 2),
+          unit: "bp",
+          tone: "purple",
+          icon: "issuance" as MetricIconName,
+        },
+      ]
+    : []);
+  let validationMetrics = $derived(validation
+    ? [
+        {
+          label: "样本量",
+          value: `${validation.tscv.sample_count ?? validation.tscv.validation_samples} 笔`,
+        },
+        {
+          label: "样本区间",
+          value: formatDateRange(
+            validation.tscv.sample_start_date,
+            validation.tscv.sample_end_date,
+          ),
+        },
+        {
+          label: "胜率",
+          value: `${(validation.timing_value.win_rate * 100).toFixed(1)}%`,
+        },
+        {
+          label: "历史节约",
+          value: `${formatSigned(validation.timing_value.cost_saving_bp, 2)} bp`,
+        },
+        {
+          label: "信息系数",
+          value: validation.tscv.ic.toFixed(3),
+        },
+        {
+          label: "平均误差",
+          value:
+            validation.tscv.mae === null
+              ? "—"
+              : `${validation.tscv.mae.toFixed(2)} bp`,
+        },
+      ]
+    : []);
 </script>
 
 <svelte:head>
@@ -441,7 +449,7 @@
           <path d="M4 6.5h12M6.5 3v3M13.5 3v3M4 4.5h12v12H4z" />
         </svg>
         <span>日期版本</span>
-        <select class="select"
+        <NativeSelect data-ui-owner="lib-pages-FinancingModelPage-svelte" class={"ui-select"}
           aria-label="融资择时模型日期版本"
           value={selectedRunId}
           onchange={loadVersion}
@@ -450,7 +458,7 @@
           {#each versions as version (version.runId)}
             <option value={version.runId}>{version.asOfDate}</option>
           {/each}
-        </select>
+        </NativeSelect>
       </label>
     {/if}
   </div>
@@ -485,7 +493,7 @@
     <section id="financing-model-report" class="error-state">
       <h2>模型数据暂不可用</h2>
       <p>{errorMessage}</p>
-      <button class="btn" type="button" onclick={loadReport}>重新读取</button>
+      <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={loadReport}>重新读取</Button>
     </section>
   {:else if report && snapshot}
     <section id="financing-model-report" class="report-stack">
@@ -516,27 +524,27 @@
         <ModuleCard class="conclusion-card" labelledBy="overall-conclusion-title">
             <PanelHeading id="overall-conclusion-title" title="整体结论" controlsInline>
               {#if !editingConclusion}
-                <button class="btn btn-ghost icon-button" type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
+                <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                   </svg>
-                </button>
+                </Button>
               {/if}
             </PanelHeading>
             {#if editingConclusion}
               <form onsubmit={(event) => { event.preventDefault(); saveConclusion(); }}>
                 <label>
                   <span>结论标题</span>
-                  <input class="input" bind:value={editVerdict} maxlength="120" required />
+                  <Input data-ui-owner="lib-pages-FinancingModelPage-svelte" class={"ui-input"} bind:value={editVerdict} maxlength={120} required />
                 </label>
                 <label>
                   <span>结论正文</span>
-                  <textarea class="textarea" bind:value={editNarrative} maxlength="4000" rows="5" required></textarea>
+                  <Textarea data-ui-owner="lib-pages-FinancingModelPage-svelte" class={"ui-textarea"} bind:value={editNarrative} maxlength={4000} rows={5} required></Textarea>
                 </label>
                 <div class="editor-actions">
-                  <button class="btn text-button" type="button" onclick={useBaseConclusion}>恢复模型基础内容</button>
-                  <button class="btn secondary-button" type="button" onclick={() => (editingConclusion = false)}>取消</button>
-                  <button class="btn btn-primary primary-button" type="submit" disabled={saving}>{saving ? "保存中" : "保存"}</button>
+                  <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="outline" class={"ui-button text-button"} type="button" onclick={useBaseConclusion}>恢复模型基础内容</Button>
+                  <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="outline" class={"ui-button secondary-button"} type="button" onclick={() => (editingConclusion = false)}>取消</Button>
+                  <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={"ui-button  primary-button"} type="submit" disabled={saving}>{saving ? "保存中" : "保存"}</Button>
                 </div>
               </form>
             {:else}
@@ -618,8 +626,8 @@
       <section class="supporting-grid" aria-label="未来发行窗口与模型验证">
         <ModuleCard class="forecast-panel" labelledBy="window-title">
           <PanelHeading id="window-title" title="未来发行窗口" controlsBesideTitle>
-            <button
-              class="btn btn-ghost window-details-toggle"
+            <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost"
+              class={"ui-button  window-details-toggle"}
               type="button"
               aria-label={futureWindowDetailsOpen ? "收起未来发行窗口明细" : "展开未来发行窗口明细"}
               aria-expanded={futureWindowDetailsOpen}
@@ -627,7 +635,7 @@
               onclick={() => (futureWindowDetailsOpen = !futureWindowDetailsOpen)}
             >
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
-            </button>
+            </Button>
           </PanelHeading>
             <ChartHost
               renderer={renderFinancingForecast}
@@ -681,9 +689,9 @@
       <ModuleCard class="decision-history-section" labelledBy="decision-history-title">
         <PanelHeading id="decision-history-title" title="历史择时决策记录" controlsBesideTitle>
           {#if !editingDecision}
-            <button class="btn btn-ghost icon-button" type="button" aria-label="录入当前决策" onclick={() => openDecisionEditor()}>
+            <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="录入当前决策" onclick={() => openDecisionEditor()}>
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
-            </button>
+            </Button>
           {/if}
         </PanelHeading>
 
@@ -691,17 +699,17 @@
           <form class="decision-editor" onsubmit={(event) => { event.preventDefault(); saveDecision(); }}>
             <label>
               <span>决策操作</span>
-              <textarea class="textarea" bind:value={editDecisionAction} maxlength="1000" rows="3" required></textarea>
+              <Textarea data-ui-owner="lib-pages-FinancingModelPage-svelte" class={"ui-textarea"} bind:value={editDecisionAction} maxlength={1000} rows={3} required></Textarea>
             </label>
             <label>
               <span>结果</span>
-              <textarea class="textarea" bind:value={editDecisionOutcome} maxlength="2000" rows="3"></textarea>
+              <Textarea data-ui-owner="lib-pages-FinancingModelPage-svelte" class={"ui-textarea"} bind:value={editDecisionOutcome} maxlength={2000} rows={3}></Textarea>
             </label>
             <div class="editor-actions">
-              <button class="btn secondary-button" type="button" onclick={closeDecisionEditor}>取消</button>
-              <button class="btn btn-primary primary-button" type="submit" disabled={savingDecision}>
+              <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="outline" class={"ui-button secondary-button"} type="button" onclick={closeDecisionEditor}>取消</Button>
+              <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={"ui-button  primary-button"} type="submit" disabled={savingDecision}>
                 {savingDecision ? "保存中" : "保存"}
-              </button>
+              </Button>
             </div>
           </form>
         {/if}
@@ -731,11 +739,11 @@
                   <td>
                     <div class="decision-result-cell">
                       <span>{record.outcome || "—"}</span>
-                      <button class="btn btn-ghost icon-button" type="button" aria-label={`编辑${record.decisionDate}择时决策记录`} onclick={() => openDecisionEditor(record)}>
+                      <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label={`编辑${record.decisionDate}择时决策记录`} onclick={() => openDecisionEditor(record)}>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                           <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                         </svg>
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -753,13 +761,13 @@
         <PanelHeading id="sell-side-title" title="卖方观点" controlsBesideTitle>
           <div class="section-actions heading-icon-actions">
             {#if report.sellSide && !editingSellSide}
-              <button class="btn btn-ghost icon-button" type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
+              <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                 </svg>
-              </button>
+              </Button>
             {/if}
-            <button class="btn btn-primary icon-button ai-generate-button" class:is-loading={generatingResearch} type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}
+            <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={["ui-button  icon-button ai-generate-button", generatingResearch && "is-loading"]}  type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}
               aria-label={generatingResearch ? "AI 生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
               aria-busy={generatingResearch}
             >
@@ -767,7 +775,7 @@
                 <path d="m10 2 1.1 4.2L15 8l-3.9 1.8L10 14l-1.1-4.2L5 8l3.9-1.8L10 2Z" />
                 <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
               </svg>
-            </button>
+            </Button>
           </div>
         </PanelHeading>
 
@@ -777,11 +785,11 @@
               <form onsubmit={(event) => { event.preventDefault(); saveSellSideSummary(); }}>
                 <label>
                   <span>卖方逻辑汇总</span>
-                  <textarea class="textarea" bind:value={editSellSideSummary} maxlength="4000" rows="6" required></textarea>
+                  <Textarea data-ui-owner="lib-pages-FinancingModelPage-svelte" class={"ui-textarea"} bind:value={editSellSideSummary} maxlength={4000} rows={6} required></Textarea>
                 </label>
                 <div class="editor-actions">
-                  <button class="btn secondary-button" type="button" onclick={() => (editingSellSide = false)}>取消</button>
-                  <button class="btn btn-primary primary-button" type="submit" disabled={savingSellSide}>{savingSellSide ? "保存中" : "保存"}</button>
+                  <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="outline" class={"ui-button secondary-button"} type="button" onclick={() => (editingSellSide = false)}>取消</Button>
+                  <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={"ui-button  primary-button"} type="submit" disabled={savingSellSide}>{savingSellSide ? "保存中" : "保存"}</Button>
                 </div>
               </form>
             {:else}
@@ -897,7 +905,7 @@
   }
 
   .model-title-dot {
-    color: color-mix(in srgb, var(--brand) 72%, var(--muted));
+    color: color-mix(in srgb, var(--brand) 72%, var(--text-muted));
   }
 
   .model-title-subject {
@@ -960,9 +968,13 @@
     white-space: nowrap;
   }
 
-  .model-version-control select {
+  :global(.model-version-control select[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     width: auto;
     min-width: 12.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 
   .report-stack {
@@ -989,11 +1001,11 @@
     font-size: 1.25rem;
   }
 
-  .text-button {
+  :global(.text-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     padding: 0 10px;
   }
 
-  .icon-button {
+  :global(.icon-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     display: grid;
     width: 44px;
     height: 44px;
@@ -1001,8 +1013,9 @@
     place-items: center;
   }
 
-  .icon-button svg {
+  :global(.icon-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"] svg) {
     width: 20px;
+    height: 20px;
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -1030,15 +1043,15 @@
     font-weight: bold;
   }
 
-  :global(.conclusion-card) input,
-  :global(.conclusion-card) textarea,
-  .sell-side-summary-card textarea {
+  :global(.conclusion-card input[data-ui-owner="lib-pages-FinancingModelPage-svelte"]),
+  :global(.conclusion-card textarea[data-ui-owner="lib-pages-FinancingModelPage-svelte"]),
+  :global(.sell-side-summary-card textarea[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     width: 100%;
     padding: 9px 11px;
   }
 
-  :global(.conclusion-card) textarea,
-  .sell-side-summary-card textarea {
+  :global(.conclusion-card textarea[data-ui-owner="lib-pages-FinancingModelPage-svelte"]),
+  :global(.sell-side-summary-card textarea[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     resize: vertical;
     min-height: 124px;
   }
@@ -1049,16 +1062,16 @@
     gap: 8px;
   }
 
-  .editor-actions .text-button {
+  :global(.editor-actions .text-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     margin-right: auto;
   }
 
-  .primary-button,
-  .secondary-button {
+  :global(.primary-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]),
+  :global(.secondary-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     padding: 0 16px;
   }
 
-  .window-details-toggle {
+  :global(.window-details-toggle[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     display: grid;
     width: 44px;
     height: 44px;
@@ -1066,7 +1079,7 @@
     place-items: center;
   }
 
-  .window-details-toggle svg {
+  :global(.window-details-toggle[data-ui-owner="lib-pages-FinancingModelPage-svelte"] svg) {
     width: 18px;
     fill: none;
     stroke: currentColor;
@@ -1076,7 +1089,7 @@
     transition: transform 180ms ease;
   }
 
-  .window-details-toggle[aria-expanded="true"] svg {
+  :global(.window-details-toggle[data-ui-owner="lib-pages-FinancingModelPage-svelte"][aria-expanded="true"] svg) {
     transform: rotate(180deg);
   }
 
@@ -1212,6 +1225,7 @@
   }
 
   .report-stack :global(.product-result) {
+    gap: 0;
     display: flex;
     flex-direction: column;
     border-color: color-mix(in srgb, var(--brand) 30%, var(--line));
@@ -1377,7 +1391,7 @@
     font-weight: bold;
   }
 
-  .decision-editor textarea {
+  :global(.decision-editor textarea[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     width: 100%;
     padding: 9px 11px;
     resize: vertical;
@@ -1450,9 +1464,9 @@
 
   .section-actions.heading-icon-actions { flex-wrap: nowrap; }
 
-  .ai-generate-button { padding: 3px; }
-  .ai-generate-button svg { width: 16px; height: 16px; stroke-width: 1.5; }
-  .ai-generate-button.is-loading svg { animation: spin 1.2s linear infinite; }
+  :global(.ai-generate-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) { padding: 3px; }
+  :global(.ai-generate-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"] svg) { width: 16px; height: 16px; stroke-width: 1.5; }
+  :global(.ai-generate-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"].is-loading svg) { animation: spin 1.2s linear infinite; }
 
   .sell-side-summary-card {
     padding: 18px;
@@ -1578,15 +1592,15 @@
     animation: spin 0.8s linear infinite;
   }
 
-  .error-state button {
+  :global(.error-state button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     padding: 0 16px;
   }
 
-  button:focus-visible,
+  :global(button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]:focus-visible),
   a:focus-visible,
-  input:focus-visible,
-  select:focus-visible,
-  textarea:focus-visible {
+  :global(input[data-ui-owner="lib-pages-FinancingModelPage-svelte"]:focus-visible),
+  :global(select[data-ui-owner="lib-pages-FinancingModelPage-svelte"]:focus-visible),
+  :global(textarea[data-ui-owner="lib-pages-FinancingModelPage-svelte"]:focus-visible) {
     outline: 3px solid color-mix(in srgb, var(--color-primary) 34%, transparent);
     outline-offset: 2px;
   }
@@ -1654,7 +1668,7 @@
       min-width: 0;
     }
 
-    .model-version-control select {
+    :global(.model-version-control select[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
       min-width: 0;
       flex: 1;
     }
@@ -1760,13 +1774,13 @@
 
   @media (prefers-reduced-motion: reduce) {
     .model-back,
-    .icon-button,
-    .window-details-toggle,
-    .window-details-toggle svg {
+    :global(.icon-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]),
+    :global(.window-details-toggle[data-ui-owner="lib-pages-FinancingModelPage-svelte"]),
+    :global(.window-details-toggle[data-ui-owner="lib-pages-FinancingModelPage-svelte"] svg) {
       transition: none;
     }
 
     .spinner,
-    .ai-generate-button.is-loading svg { animation: none; }
+    :global(.ai-generate-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"].is-loading svg) { animation: none; }
   }
 </style>

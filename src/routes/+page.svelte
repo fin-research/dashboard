@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
   import AuthMenu from '$lib/AuthMenu.svelte';
   import { currentReportDate } from "../report-date";
   const todayFundReportUrl = `/fund-report/${currentReportDate()}.html`;
@@ -12,7 +13,7 @@
 
 <div class="home-page">
   <header class="site-header">
-    <a href="/" aria-label="市场研究首页">
+    <a data-ui-owner="routes--page-svelte" href="/" aria-label="市场研究首页">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
       <span>资金管理部</span>
     </a>
@@ -22,7 +23,7 @@
   <main>
     <h1 class="sr-only">市场研究</h1>
     <nav class="tool-grid" aria-label="市场研究内容">
-      <article class="card tool-card tool-card--fund-report">
+      <article class="ui-card tool-card tool-card--fund-report">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M4 4h16v16H4zM7 8h10M7 12h4M7 16h6" />
@@ -43,22 +44,22 @@
           <h2>资金日报</h2>
         </span>
         <span class="tool-actions tool-actions--fund-report">
-          <a class="btn tool-action" href={todayFundReportUrl}>
+          <Button data-ui-owner="routes--page-svelte" variant="outline" class={"ui-button tool-action"} href={todayFundReportUrl}>
             今日资金日报
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 12h14m-5-5 5 5-5 5" />
             </svg>
-          </a>
-          <a class="btn tool-action" href="/fund-report">
+          </Button>
+          <Button data-ui-owner="routes--page-svelte" variant="outline" class={"ui-button tool-action"} href="/fund-report">
             历史资金日报
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 12h14m-5-5 5 5-5 5" />
             </svg>
-          </a>
+          </Button>
         </span>
       </article>
 
-      <a class="card tool-card tool-card--briefing" href="/market-briefing">
+      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--briefing" href="/market-briefing">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M5 3h10l4 4v14H5z" />
@@ -78,7 +79,7 @@
         <span class="tool-copy">
           <h2>市场点评</h2>
         </span>
-        <span class="btn tool-action">
+        <span data-ui-owner="routes--page-svelte" class="ui-button tool-action">
           打开市场点评
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 12h14m-5-5 5 5-5 5" />
@@ -86,7 +87,7 @@
         </span>
       </a>
 
-      <a class="card tool-card tool-card--trading-research" href="/trading-research">
+      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--trading-research" href="/trading-research">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -103,7 +104,7 @@
         <span class="tool-copy">
           <h2>交易研究工作台</h2>
         </span>
-        <span class="btn tool-action">
+        <span data-ui-owner="routes--page-svelte" class="ui-button tool-action">
           打开交易研究工作台
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 12h14m-5-5 5 5-5 5" />
@@ -111,7 +112,7 @@
         </span>
       </a>
 
-      <a class="card tool-card tool-card--credit-workbench" href="/credit-workbench">
+      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--credit-workbench" href="/credit-workbench">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M12 3 5 6v5c0 4.8 2.7 8.4 7 10 4.3-1.6 7-5.2 7-10V6l-7-3Z" />
@@ -132,7 +133,7 @@
         <span class="tool-copy">
           <h2>授信工作台</h2>
         </span>
-        <span class="btn tool-action">
+        <span data-ui-owner="routes--page-svelte" class="ui-button tool-action">
           打开授信工作台
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 12h14m-5-5 5 5-5 5" />
@@ -140,7 +141,7 @@
         </span>
       </a>
 
-      <a class="card tool-card tool-card--workspace" href="/financing/">
+      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--workspace" href="/financing/">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8M8 16h5" />
@@ -155,7 +156,7 @@
         <span class="tool-copy">
           <h2>融资工作台</h2>
         </span>
-        <span class="btn tool-action">
+        <span data-ui-owner="routes--page-svelte" class="ui-button tool-action">
           打开融资工作台
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 12h14m-5-5 5 5-5 5" />
@@ -163,11 +164,11 @@
         </span>
       </a>
 
-      <a class="card tool-card tool-card--management" href="/management">
+      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--management" href="/management">
         <span class="tool-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4 3 7 8 9 5-2 8-5 8-9V6z" /><path d="m8 12 3 3 5-6" /></svg></span>
         <span class="card-visual" aria-hidden="true"><svg viewBox="0 0 180 100"><rect x="24" y="14" width="132" height="72" rx="6" /><path d="M24 35h132M65 35v51M80 51h56M80 65h35M36 49h16M36 63h16" /></svg></span>
         <span class="tool-copy"><h2>管理</h2></span>
-        <span class="btn tool-action">打开管理<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></span>
+        <span data-ui-owner="routes--page-svelte" class="ui-button tool-action">打开管理<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></span>
       </a>
 
     </nav>
@@ -220,7 +221,7 @@
     border-bottom: 1px solid rgba(21, 36, 59, 0.16);
   }
 
-  .site-header a {
+  :global(.site-header a[data-ui-owner="routes--page-svelte"]) {
     display: inline-flex;
     min-height: 48px;
     align-items: center;
@@ -352,8 +353,8 @@
   }
 
   .tool-card:focus-visible,
-  .tool-action:focus-visible,
-  .site-header a:focus-visible {
+  :global(.tool-action[data-ui-owner="routes--page-svelte"]:focus-visible),
+  :global(.site-header a[data-ui-owner="routes--page-svelte"]:focus-visible) {
     outline: 3px solid #1d4ed8;
     outline-offset: 4px;
   }
@@ -372,7 +373,7 @@
   }
 
   .tool-icon svg,
-  .tool-action svg {
+  :global(.tool-action[data-ui-owner="routes--page-svelte"] svg) {
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -430,7 +431,7 @@
     overflow-wrap: anywhere;
   }
 
-  .tool-action {
+  :global(.tool-action[data-ui-owner="routes--page-svelte"]) {
     position: relative;
     z-index: 2;
     display: flex;
@@ -458,12 +459,12 @@
     gap: 8px;
   }
 
-  .tool-actions .tool-action {
+  :global(.tool-actions .tool-action[data-ui-owner="routes--page-svelte"]) {
     gap: 8px;
     padding-inline: 12px;
   }
 
-  .tool-action svg {
+  :global(.tool-action[data-ui-owner="routes--page-svelte"] svg) {
     width: 19px;
   }
 

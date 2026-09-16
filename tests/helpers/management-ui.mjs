@@ -59,17 +59,6 @@ assert.equal(document.querySelector('[href="/management"]'),null);
 flushSync(()=>accountApp.rename());assert.match(document.querySelector('a').textContent,/新姓名/);
 await unmount(accountApp);
 
-const Filter=await loadComponent('src/lib/financing/MultiSelectFilter.svelte');
-const filterApp=mount(Filter,{target:document.body,props:{label:'负债品种',options:['固定收益凭证','公司债'],values:[],allLabel:'全部品种',optionLabels:{'固定收益凭证':'固收'}}});flushSync();
-const details=document.querySelector('details');details.open=true;
-flushSync(()=>document.querySelector('input[type="checkbox"]').click());
-assert.match(document.querySelector('summary').textContent,/固收/);
-window.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape'}));
-assert.equal(details.open,false);
-assert.equal(document.activeElement,document.querySelector('summary'));
-details.open=true;
-flushSync(()=>document.querySelector('.filter-popover button').click());
-assert.match(document.querySelector('summary').textContent,/全部品种/);
-assert.ok([...document.querySelectorAll('input')].every(input=>!input.checked));
-await unmount(filterApp);await tick();await window.happyDOM.abort();
+// Popover interaction and focus are covered in tests/visual/ui-contracts.spec.mjs.
+await tick();await window.happyDOM.abort();
 console.log('Management and account interaction checks passed');

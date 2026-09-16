@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as Table from '$lib/components/ui/table/index.js';
   import type { Snippet } from 'svelte';
   import ModuleCard from '../../components/ModuleCard.svelte';
   import ChartHost from '../../components/ChartHost.svelte';
@@ -22,14 +23,14 @@
       {#if empty}<p class="empty-chart" role="status">所选范围暂无投资金额</p>{:else}<ChartHost {option} height={chartHeight} ariaLabel={`${title}，金额单位亿元`} />{/if}
     </div>
     <div class:scroll class="investor-table" role="region" aria-label={`${title}数据表格`}>
-      <table class="table">
+      <Table.Root scrollable={false}>
         <caption class="sr-only">{title}，金额单位亿元</caption>
-        <thead><tr>{#each headers as header, index}<th scope="col" class:numeric={index > 0}>{header}</th>{/each}</tr></thead>
-        <tbody>
-          {#each rows as row}<tr><th scope="row">{row.name}</th>{#each row.values as value, index}<td class="numeric">{display(value, index)}</td>{/each}</tr>{/each}
-        </tbody>
-        <tfoot><tr><th scope="row">合计</th>{#each total as value, index}<td class="numeric">{display(value, index)}</td>{/each}</tr></tfoot>
-      </table>
+        <Table.Header><Table.Row>{#each headers as header, index}<Table.Head scope="col" class={index > 0 ? 'numeric' : undefined}>{header}</Table.Head>{/each}</Table.Row></Table.Header>
+        <Table.Body>
+          {#each rows as row}<Table.Row><Table.Head scope="row">{row.name}</Table.Head>{#each row.values as value, index}<Table.Cell class="numeric">{display(value, index)}</Table.Cell>{/each}</Table.Row>{/each}
+        </Table.Body>
+        <Table.Footer><Table.Row><Table.Head scope="row">合计</Table.Head>{#each total as value, index}<Table.Cell class="numeric">{display(value, index)}</Table.Cell>{/each}</Table.Row></Table.Footer>
+      </Table.Root>
     </div>
   </div>
 </ModuleCard>
@@ -39,11 +40,11 @@
   .investor-chart, .investor-table { min-width: 0; overflow: auto; }
   .scroll { max-height: 34rem; }
   .empty-chart { min-height: 20rem; display: grid; place-items: center; }
-  table { width: 100%; font-size: 0.875rem; }
-  th { text-align: left; }
-  .numeric { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  thead { position: sticky; top: 0; background: var(--color-base-100); z-index: 1; }
-  tfoot { font-weight: bold; background: var(--color-base-200); }
-  tbody th { font-weight: normal; min-width: 6rem; }
+  .investor-table :global(table) { width: 100%; font-size: 0.875rem; }
+  .investor-table :global(th) { text-align: left; }
+  .investor-table :global(.numeric) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .investor-table :global(thead) { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .investor-table :global(tfoot) { font-weight: bold; background: var(--panel); }
+  .investor-table :global(tbody th) { font-weight: normal; min-width: 6rem; }
   @media (max-width: 1050px) { .investor-pair { grid-template-columns: minmax(0, 1fr); } }
 </style>

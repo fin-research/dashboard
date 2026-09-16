@@ -1,4 +1,6 @@
 <script lang="ts">
+
+  import { Button } from "$lib/components/ui/button/index.js";
   import cloud from "d3-cloud";
   import { onDestroy, onMount } from "svelte";
 
@@ -12,23 +14,27 @@
     rotate?: number;
   }
 
-  export let items: Hotspot[] = [];
-  export let selectedKeyword = "";
-  export let onSelect: (hotspot: Hotspot) => void;
+  interface Props {
+    items?: Hotspot[];
+    selectedKeyword?: string;
+    onSelect: (hotspot: Hotspot) => void;
+  }
 
-  let host: HTMLDivElement;
+  let { items = [], selectedKeyword = "", onSelect }: Props = $props();
+
+  let host = $state<HTMLDivElement>(null!);
   let observer: ResizeObserver | null = null;
   let layout: ReturnType<typeof cloud<CloudWord>> | null = null;
-  let placedWords: CloudWord[] = [];
-  let width = 1;
-  let height = 1;
-  let mounted = false;
+  let placedWords = $state<CloudWord[]>([]);
+  let width = $state(1);
+  let height = $state(1);
+  let mounted = $state(false);
   let layoutGeneration = 0;
-  let useListFallback = false;
-  let lastSignature = "";
+  let useListFallback = $state(false);
+  let lastSignature = $state("");
   let frame: number | null = null;
 
-  const colors = ["var(--color-warning-content)", "var(--brand-deep)", "var(--color-success-content)", "var(--color-secondary)", "var(--color-error-content)"];
+  const colors = ["var(--color-warning-content)", "var(--brand-deep)", "var(--color-success-content)", "var(--business-purple)", "var(--color-error-content)"];
 
   onMount(() => {
     mounted = true;
@@ -45,13 +51,6 @@
     if (frame !== null) cancelAnimationFrame(frame);
   });
 
-  $: if (mounted) {
-    const signature = items.map((item) => `${item.keyword}:${item.heat}`).join("|");
-    if (signature !== lastSignature) {
-      lastSignature = signature;
-      scheduleLayout();
-    }
-  }
 
   function scheduleLayout(): void {
     if (frame !== null) cancelAnimationFrame(frame);
@@ -153,17 +152,26 @@
   function clamp(value: number, minimum: number, maximum: number): number {
     return Math.min(maximum, Math.max(minimum, value));
   }
+  $effect(() => {
+    if (mounted) {
+      const signature = items.map((item) => `${item.keyword}:${item.heat}`).join("|");
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        scheduleLayout();
+      }
+    }
+  });
 </script>
 
 <div bind:this={host} class="cloud-host" aria-label="当日市场热点词云">
   {#if useListFallback}
     <div class="cloud-list" aria-label="完整热点列表">
       {#each items as word, index (word.keyword)}
-        <button class="btn btn-ghost" type="button" aria-pressed={selectedKeyword === word.keyword}
+        <Button data-ui-owner="lib-components-WordCloud-svelte" variant="ghost" class={"ui-button "} type="button" aria-pressed={selectedKeyword === word.keyword}
           aria-label={`${word.keyword}，热度 ${word.heat}`} onclick={() => onSelect(word)}>
           <strong style:color={wordColor(index, { ...word, text: word.keyword, size: 18 })}>{word.keyword}</strong>
           <span>热度 {word.heat}</span>
-        </button>
+        </Button>
       {/each}
     </div>
   {:else if placedWords.length === 0}
@@ -213,7 +221,7 @@
   }
 
   .cloud-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); align-content: start; gap: 12px; height: 100%; padding: 8px; overflow-y: auto; }
-  .cloud-list button { display: grid; justify-items: start; min-height: 64px; white-space: normal; text-align: left; }
+  :global(.cloud-list button[data-ui-owner="lib-components-WordCloud-svelte"]) { display: grid; justify-items: start; min-height: 64px; white-space: normal; text-align: left; }
   .cloud-list strong { min-width: 0; font-size: 1rem; overflow-wrap: anywhere; }
   .cloud-list span { color: var(--text-3); font-size: .875rem; font-weight: normal; }
 

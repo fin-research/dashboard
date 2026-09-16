@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Card } from "$lib/components/ui/card/index.js";
   import type { Snippet } from "svelte";
 
   let {
@@ -18,18 +19,16 @@
   } = $props();
 </script>
 
-<section
-  class:module-card--report={variant === "report"}
-  class:module-card--flush={padding === "none"}
-  class={`card card-border bg-base-100 module-card tr-panel ${className}`.trim()}
+<Card as="section" unstyled={variant === "report"}
+  class={["module-card tr-panel block overflow-visible text-base ring-0", variant === "report" && "module-card--report", padding === "none" && "module-card--flush", className]}
   aria-labelledby={labelledBy}
   {style}
 >
   {@render children()}
-</section>
+</Card>
 
 <style>
-  .module-card {
+  :global(.module-card) {
     display: block;
     min-width: 0;
     padding: 18px;
@@ -43,7 +42,7 @@
     );
   }
 
-  .module-card--report {
+  :global(.module-card--report) {
     padding: 0;
     border: 0;
     border-radius: 0;
@@ -52,17 +51,17 @@
   }
 
   @media (max-width: 720px) {
-    .module-card {
+    :global(.module-card) {
     display: block;
       padding: 15px;
     }
 
-    .module-card--report {
+    :global(.module-card--report) {
       padding: 0;
     }
   }
 
-  .module-card--flush {
+  :global(.module-card--flush) {
     padding: 0;
   }
 </style>

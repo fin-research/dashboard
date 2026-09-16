@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
   import { Search, Check, Minus, Layers, Box, ShieldCheck } from '@lucide/svelte';
   import { permissionTree } from './permission-tree';
   let { permissions, grantedOnly = false }: { permissions: string[]; grantedOnly?: boolean } = $props();
@@ -17,11 +19,11 @@
     <span><Box size={18} aria-hidden="true" /><strong>{resources}</strong>资源</span>
     <span><ShieldCheck size={18} aria-hidden="true" /><strong>{actions}</strong>已授权操作</span>
   </div>
-  <label class="input permission-search"><Search size={18} aria-hidden="true" /><input type="search" bind:value={query} aria-label="搜索权限" /></label>
+  <label class="permission-search"><Search size={18} aria-hidden="true" /><Input class="pl-10" type="search" bind:value={query} aria-label="搜索权限" /></label>
   <div class="scope-filters" aria-label="业务范围筛选">
-    <button type="button" class="btn btn-ghost" class:btn-active={!scope} aria-pressed={!scope} onclick={() => scope = ''}>全部范围</button>
+    <Button data-ui-owner="lib-permissions-PermissionExplorer-svelte" variant="ghost" type="button" class={["ui-button ", !scope && "is-selected"]}  aria-pressed={!scope} onclick={() => scope = ''}>全部范围</Button>
     {#each tree as group}
-      <button type="button" class="btn btn-ghost" class:btn-active={scope === group.scope} aria-pressed={scope === group.scope} onclick={() => scope = group.scope}>{group.label}</button>
+      <Button data-ui-owner="lib-permissions-PermissionExplorer-svelte" variant="ghost" type="button" class={["ui-button ", scope === group.scope && "is-selected"]}  aria-pressed={scope === group.scope} onclick={() => scope = group.scope}>{group.label}</Button>
     {/each}
   </div>
   <div class="permission-tree">
@@ -55,9 +57,10 @@
   .permission-overview > span { display: flex; align-items: center; gap: .5rem; color: var(--text-1); font-size: 1rem; }
   .permission-overview strong { color: var(--text-1); font-size: 1.25rem; }
   .permission-overview :global(svg) { color: var(--brand); }
-  .permission-search { width: 100%; }
+  .permission-search { position: relative; width: 100%; }
+  .permission-search :global(svg) { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
   .scope-filters { display: flex; flex-wrap: wrap; gap: .375rem; }
-  .scope-filters .btn { min-height: 44px; height: auto; }
+  :global(.scope-filters .ui-button[data-ui-owner="lib-permissions-PermissionExplorer-svelte"]) { min-height: 44px; height: auto; }
   .permission-tree { display: grid; gap: 1.5rem; }
   .scope-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .625rem; padding-bottom: .75rem; border-bottom: 1px solid var(--line); }
   .scope-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-control); background: var(--brand-soft); color: var(--brand); }
@@ -70,6 +73,6 @@
   .action-list { display: flex; flex-wrap: wrap; gap: .5rem; list-style: none; padding: 0; margin: 0; }
   .action-list li { display: inline-flex; align-items: center; gap: .25rem; border-radius: var(--radius-control); padding: .375rem .625rem; font-size: .875rem; }
   .action-granted { color: var(--brand); background: var(--brand-soft); }
-  .action-denied { color: var(--muted); background: var(--color-base-200); }
-  .permission-empty { margin: 0; padding: 1.5rem 0; color: var(--muted); }
+  .action-denied { color: var(--text-muted); background: var(--panel); }
+  .permission-empty { margin: 0; padding: 1.5rem 0; color: var(--text-muted); }
 </style>

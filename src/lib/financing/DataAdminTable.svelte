@@ -1,4 +1,10 @@
 <script lang="ts">
+  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+  import * as Table from "$lib/components/ui/table/index.js";
+  import * as Tabs from "$lib/components/ui/tabs/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
 	import { tick } from 'svelte';
 	import { createTable, FlexRender, tableFeatures, type ColumnDef } from '@tanstack/svelte-table';
 	import {
@@ -234,145 +240,134 @@
 
 {#snippet fieldEditor(field: FieldConfig)}
 	{#if field.type === 'select'}
-		<select class="select" aria-label={field.label} data-field={field.key} value={String(formValues[field.key] ?? '')} onchange={(event) => setField(field.key, event.currentTarget.value)}>
+		<NativeSelect data-ui-owner="lib-financing-DataAdminTable-svelte" class={"ui-select"} aria-label={field.label} data-field={field.key} value={String(formValues[field.key] ?? '')} onchange={(event) => setField(field.key, event.currentTarget.value)}>
 			{#if !field.required && !(field.options ?? []).some((choice) => choice.value === '')}<option value="">未设置</option>{/if}
 			{#each field.options ?? [] as choice}<option value={choice.value}>{choice.label}</option>{/each}
-		</select>
+		</NativeSelect>
 	{:else if field.type === 'boolean'}
-		<input class="checkbox checkbox-primary cell-checkbox" aria-label={field.label} data-field={field.key} type="checkbox" checked={Boolean(formValues[field.key])} onchange={(event) => setField(field.key, event.currentTarget.checked)} />
+		<Checkbox data-ui-owner="lib-financing-DataAdminTable-svelte" class="ui-checkbox  cell-checkbox" aria-label={field.label} data-field={field.key} checked={Boolean(formValues[field.key])} onCheckedChange={(checked) => setField(field.key, checked)} />
 	{:else}
-		<input class="input" aria-label={field.label} data-field={field.key} type={field.type === 'textarea' ? 'text' : field.type ?? 'text'} value={String(formValues[field.key] ?? '')} min={field.min} max={field.max} step={field.step} oninput={(event) => setField(field.key, event.currentTarget.value)} />
+		<Input data-ui-owner="lib-financing-DataAdminTable-svelte" class={"ui-input"} aria-label={field.label} data-field={field.key} type={field.type === 'textarea' ? 'text' : field.type ?? 'text'} value={String(formValues[field.key] ?? '')} min={field.min} max={field.max} step={field.step} oninput={(event) => setField(field.key, event.currentTarget.value)} />
 	{/if}
 {/snippet}
 
 <section class="data-editor" aria-label="融资数据表">
-	<div class="entity-tabs" role="tablist" aria-label="数据表">
+	<Tabs.Root value={activeKey} onValueChange={(key) => { const config = DATA_ENTITIES.find(item => item.key === key); if (config) switchEntity(config); }}>
+  <Tabs.List class="entity-tabs h-auto w-full justify-start overflow-x-auto rounded-none" aria-label="数据表">
 		{#each DATA_ENTITIES as config}
-			<button class="btn" type="button" role="tab" aria-selected={activeKey === config.key} class:btn-active={activeKey === config.key} onclick={() => switchEntity(config)}>{config.label}</button>
+			<Tabs.Trigger value={config.key}>{config.label}</Tabs.Trigger>
 		{/each}
-	</div>
+	</Tabs.List></Tabs.Root>
 
 	<div class="table-toolbar">
 		<form class="search-form" onsubmit={(event) => { event.preventDefault(); applySearch(); }}>
-			<label><span class="sr-only">搜索{activeConfig.label}</span><Search size={18} /><input class="input" bind:value={search} type="search" /></label>
-			<button class="btn" type="submit">查询</button>
+			<label><span class="sr-only">搜索{activeConfig.label}</span><Search size={18} /><Input data-ui-owner="lib-financing-DataAdminTable-svelte" class={"ui-input"} bind:value={search} type="search" /></label>
+			<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="submit">查询</Button>
 		</form>
 		<div class="table-meta">
 			<strong>{total.toLocaleString('zh-CN')} 条</strong>
-			<button type="button" class="btn btn-ghost icon-action" aria-label="刷新数据" onclick={() => void loadRows()} disabled={loading}><RefreshCw size={18} class={loading ? 'spin' : ''} /></button>
+			<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="ghost" type="button" class={"ui-button  icon-action"} aria-label="刷新数据" onclick={() => void loadRows()} disabled={loading}><RefreshCw size={18} class={loading ? 'spin' : ''} /></Button>
 		</div>
 	</div>
 
 	<div class="table-shell" aria-busy={loading}>
-		<table class="table">
-			<thead>
+		<Table.Root scrollable={false} class="ui-table">
+			<Table.Header>
 				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-					<tr>
+					<Table.Row>
 						{#each headerGroup.headers as header (header.id)}
-							<th scope="col"><button type="button" class="btn sort-button" onclick={() => toggleSort(header.column.id)}><FlexRender {header} />{#if sortKey === header.column.id}{#if sortDirection === 'asc'}<ChevronUp size={15} />{:else}<ChevronDown size={15} />{/if}{/if}</button></th>
+							<Table.Head scope="col"><Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" type="button" class={"ui-button sort-button"} onclick={() => toggleSort(header.column.id)}><FlexRender {header} />{#if sortKey === header.column.id}{#if sortDirection === 'asc'}<ChevronUp size={15} />{:else}<ChevronDown size={15} />{/if}{/if}</Button></Table.Head>
 						{/each}
-						<th scope="col" class="action-column">操作</th>
-					</tr>
+						<Table.Head scope="col" class="action-column">操作</Table.Head>
+					</Table.Row>
 				{/each}
-			</thead>
-			<tbody>
+			</Table.Header>
+			<Table.Body>
 				{#if editorMode === 'create'}
-					<tr class="editing-row" data-new-row>
+					<Table.Row class="editing-row" data-new-row>
 						{#each visibleFields as field (field.key)}
-							<td>{#if canEditField(field, 'create')}{@render fieldEditor(field)}{:else}—{/if}</td>
+							<Table.Cell>{#if canEditField(field, 'create')}{@render fieldEditor(field)}{:else}—{/if}</Table.Cell>
 						{/each}
-						<td class="row-actions"><div>
-							<button class="btn" type="button" aria-label="保存新增行" onclick={() => void saveRow()} disabled={savingKey === '__new__'}>{#if savingKey === '__new__'}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
-							<button class="btn" type="button" aria-label="取消新增" onclick={cancelEdit} disabled={savingKey === '__new__'}><X size={17} /></button>
-						</div></td>
-					</tr>
+						<Table.Cell class="row-actions"><div>
+							<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="保存新增行" onclick={() => void saveRow()} disabled={savingKey === '__new__'}>{#if savingKey === '__new__'}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</Button>
+							<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="取消新增" onclick={cancelEdit} disabled={savingKey === '__new__'}><X size={17} /></Button>
+						</div></Table.Cell>
+					</Table.Row>
 				{/if}
 				{#if loading}
-					<tr><td colspan={visibleFields.length + 1} class="empty-row"><LoaderCircle size={20} class="spin" /> 正在读取…</td></tr>
+					<Table.Row><Table.Cell colspan={visibleFields.length + 1} class="empty-row"><LoaderCircle size={20} class="spin" /> 正在读取…</Table.Cell></Table.Row>
 				{:else if table.getRowModel().rows.length === 0 && editorMode !== 'create'}
-					<tr><td colspan={visibleFields.length + 1} class="empty-row">暂无记录</td></tr>
+					<Table.Row><Table.Cell colspan={visibleFields.length + 1} class="empty-row">暂无记录</Table.Cell></Table.Row>
 				{:else}
 					{#each table.getRowModel().rows as row (rowKey(activeConfig, row.original))}
 						{@const identityKey = rowKey(activeConfig, row.original)}
 						{@const editing = editorMode === 'edit' && editingKey === identityKey}
-						<tr class:editing-row={editing}>
+						<Table.Row class={editing ? "editing-row" : ""}>
 							{#each visibleFields as field (field.key)}
-								<td
-									class:editable-cell={!editing && canEditField(field, 'edit')}
+								<Table.Cell
+									class={!editing && canEditField(field, 'edit') ? "editable-cell" : ""}
 									onclick={(event) => { if (!editing && canEditField(field, 'edit')) void beginEdit(row.original, field.key, event.currentTarget); }}
 								>
 									{#if editing && canEditField(field, 'edit')}{@render fieldEditor(field)}{:else}{formatDataValue(field, row.original[field.key])}{/if}
-								</td>
+								</Table.Cell>
 							{/each}
-							<td class="row-actions"><div>
+							<Table.Cell class="row-actions"><div>
 								{#if editing}
-									<button class="btn" type="button" aria-label="保存本行" onclick={() => void saveRow()} disabled={savingKey === identityKey}>{#if savingKey === identityKey}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</button>
-									<button class="btn" type="button" aria-label="取消编辑" onclick={cancelEdit} disabled={savingKey === identityKey}><X size={17} /></button>
+									<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="保存本行" onclick={() => void saveRow()} disabled={savingKey === identityKey}>{#if savingKey === identityKey}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</Button>
+									<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="取消编辑" onclick={cancelEdit} disabled={savingKey === identityKey}><X size={17} /></Button>
 								{:else}
-									<button class="btn" type="button" aria-label="编辑本行" onclick={() => void beginEdit(row.original)}><Pencil size={17} /></button>
-									{#if activeConfig.canDelete}<button type="button" class="btn btn-error danger" aria-label="删除本行" onclick={() => void deleteRow(row.original)} disabled={savingKey === identityKey}><Trash2 size={17} /></button>{/if}
+									<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="编辑本行" onclick={() => void beginEdit(row.original)}><Pencil size={17} /></Button>
+									{#if activeConfig.canDelete}<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="destructive" type="button" class={"ui-button  danger"} aria-label="删除本行" onclick={() => void deleteRow(row.original)} disabled={savingKey === identityKey}><Trash2 size={17} /></Button>{/if}
 								{/if}
-							</div></td>
-						</tr>
+							</div></Table.Cell>
+						</Table.Row>
 					{/each}
 				{/if}
-			</tbody>
-		</table>
+			</Table.Body>
+		</Table.Root>
 	</div>
 
 	<div class="pagination-bar">
-		<label>每页 <select class="select" value={pageSize} onchange={(event) => { pageSize = Number(event.currentTarget.value); page = 0; }}><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></label>
+		<label>每页 <NativeSelect data-ui-owner="lib-financing-DataAdminTable-svelte" class={"ui-select"} value={pageSize} onchange={(event) => { pageSize = Number(event.currentTarget.value); page = 0; }}><option value="25">25</option><option value="50">50</option><option value="100">100</option></NativeSelect></label>
 		<span>第 {page + 1} / {totalPages} 页</span>
-		<div><button class="btn" type="button" aria-label="上一页" onclick={() => goTo(page - 1)} disabled={page === 0 || loading}><ChevronLeft size={18} /></button><button class="btn" type="button" aria-label="下一页" onclick={() => goTo(page + 1)} disabled={page + 1 >= totalPages || loading}><ChevronRight size={18} /></button></div>
+		<div><Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="上一页" onclick={() => goTo(page - 1)} disabled={page === 0 || loading}><ChevronLeft size={18} /></Button><Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="下一页" onclick={() => goTo(page + 1)} disabled={page + 1 >= totalPages || loading}><ChevronRight size={18} /></Button></div>
 	</div>
 </section>
 
 {#if activeConfig.canCreate && !activeConfig.readOnly}
-	<button class="btn btn-primary floating-create-button data-create" type="button" aria-label="新增一行" onclick={() => void beginCreate()} disabled={loading || editorMode !== null}><Plus size={24} /></button>
+	<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="default" class={"ui-button  floating-create-button data-create"} type="button" aria-label="新增一行" onclick={() => void beginCreate()} disabled={loading || editorMode !== null}><Plus size={24} /></Button>
 {/if}
 
 <style>
-	.data-editor { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: .625rem; background: var(--surface); box-shadow: var(--shadow); }
-	.entity-tabs { display: flex; gap: .25rem; overflow-x: auto; padding: .75rem 1rem 0; border-bottom: 1px solid var(--line); }
-	.entity-tabs button { padding: .625rem .875rem; white-space: nowrap; }
-	.table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 1rem; }
-	.search-form { display: flex; align-items: center; gap: .5rem; min-width: min(100%, 26rem); }
-	.search-form label { display: flex; flex: 1; align-items: center; gap: .5rem; min-height: 2.75rem; padding: 0 .75rem; border: 1px solid var(--line); border-radius: .5rem; background: #fff; }
-	.search-form label :global(svg) { display: block; flex: 0 0 auto; }
-	.search-form input { width: 100%; min-width: 0; }
-	.search-form button, .pagination-bar button, .icon-action, .row-actions button { min-width: 2.75rem; }
-	.search-form button { padding-inline: .875rem; }
-	.icon-action, .pagination-bar button, .row-actions button, .data-create { display: inline-grid; place-items: center; padding: 0; }
-	.icon-action :global(svg), .pagination-bar button :global(svg), .row-actions button :global(svg), .data-create :global(svg) { display: block; }
-	.table-meta { display: flex; align-items: center; gap: .75rem; white-space: nowrap; }
-	.table-shell { min-width: 0; max-width: 100%; overflow: auto; border-block: 1px solid var(--line); }
-	table { width: max(100%, 70rem); border-collapse: collapse; font-size: 1rem; }
-	th, td { padding: .75rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; white-space: nowrap; font-variant-numeric: tabular-nums; }
-	th { position: sticky; top: 0; z-index: 2; background: #f8fafc; color: var(--ink); }
-	tbody tr:hover { background: #f8fbff; }
-	.editing-row { background: var(--blue-soft); }
-	.editable-cell { cursor: text; }
-	.editable-cell:hover { box-shadow: inset 0 0 0 1px #b2ccff; }
-	.sort-button { display: inline-flex; align-items: center; gap: .25rem; width: 100%; padding: 0; }
-	.action-column { position: sticky; right: 0; z-index: 3; min-width: 7rem; }
-	.row-actions { position: sticky; right: 0; z-index: 1; background: inherit; }
-	.row-actions > div { display: flex; align-items: center; justify-content: center; gap: .375rem; }
-	.row-actions button { min-width: 2.75rem; }
-	td input:not([type='checkbox']), td select { width: max(100%, 8rem); padding: .375rem .5rem; }
-	td .cell-checkbox { display: block; width: 1.25rem; margin: auto; }
-	.empty-row { height: 8rem; text-align: center; color: var(--muted); }
-	.empty-row :global(svg) { display: inline-block; vertical-align: middle; margin-right: .375rem; }
-	.pagination-bar { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; padding: .75rem 1rem; }
-	.pagination-bar label, .pagination-bar > div { display: flex; align-items: center; gap: .5rem; }
-	.pagination-bar select { padding-inline: .5rem; }
-	.data-create { z-index: 15; }
-	:global(.spin) { animation: spin .8s linear infinite; }
-	@keyframes spin { to { transform: rotate(360deg); } }
-	@media (max-width: 64rem) { .table-toolbar { align-items: stretch; flex-direction: column; } .table-meta { justify-content: flex-end; } }
-	@media (max-width: 35rem) {
-		.entity-tabs, .table-toolbar, .pagination-bar { padding-inline: .75rem; }
-		.search-form { min-width: 0; }
-		.pagination-bar { justify-content: space-between; flex-wrap: wrap; }
-	}
-	@media (prefers-reduced-motion: reduce) { :global(.spin) { animation: none; } }
+  .data-editor { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
+  :global(.data-editor .entity-tabs) { padding: .75rem 1rem; border-bottom: 1px solid var(--line); }
+  .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 1rem; }
+  .search-form { display: flex; align-items: center; gap: .5rem; min-width: min(100%, 26rem); }
+  .search-form label { display: flex; flex: 1; align-items: center; gap: .5rem; min-width: 0; }
+  .table-meta { display: flex; align-items: center; gap: .75rem; white-space: nowrap; }
+  .table-shell { min-width: 0; max-width: 100%; overflow: auto; border-block: 1px solid var(--line); }
+  :global(.data-editor table) { width: max(100%, 70rem); border-collapse: collapse; font-size: 1rem; }
+  :global(.data-editor th), :global(.data-editor td) { padding: .75rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  :global(.data-editor th) { position: sticky; top: 0; z-index: 2; background: #f8fafc; color: var(--ink); font-weight: bold; }
+  :global(.data-editor tbody tr:hover) { background: #f8fbff; }
+  :global(.data-editor .editing-row) { background: var(--brand-soft); }
+  :global(.data-editor .editable-cell) { cursor: text; }
+  :global(.data-editor .editable-cell:hover) { box-shadow: inset 0 0 0 1px var(--border-strong); }
+  :global(.data-editor .sort-button) { gap: .25rem; width: 100%; padding: 0; border: 0; background: transparent; justify-content: flex-start; }
+  :global(.data-editor .action-column) { position: sticky; right: 0; z-index: 3; min-width: 7rem; }
+  :global(.data-editor .row-actions) { position: sticky; right: 0; z-index: 1; background: inherit; }
+  :global(.data-editor .row-actions > div) { display: flex; align-items: center; justify-content: center; gap: .375rem; }
+  :global(.data-editor .row-actions button), :global(.data-editor .icon-action) { width: 44px; padding: 0; }
+  :global(.data-editor td input:not([type='checkbox'])), :global(.data-editor td select) { width: max(100%, 8rem); padding: .375rem .5rem; }
+  :global(.data-editor .cell-checkbox) { display: block; width: 1.25rem; margin: auto; }
+  :global(.data-editor .empty-row) { height: 8rem; text-align: center; color: var(--text-muted); }
+  :global(.data-editor .empty-row svg) { display: inline-block; vertical-align: middle; margin-right: .375rem; }
+  .pagination-bar { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; padding: .75rem 1rem; }
+  .pagination-bar label, .pagination-bar > div { display: flex; align-items: center; gap: .5rem; }
+  :global(.data-create) { z-index: 15; }
+  :global(.spin) { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 64rem) { .table-toolbar { align-items: stretch; flex-direction: column; } .table-meta { justify-content: flex-end; } }
+  @media (max-width: 35rem) { .table-toolbar, .pagination-bar { padding-inline: .75rem; } .search-form { min-width: 0; } .pagination-bar { justify-content: space-between; flex-wrap: wrap; } }
+  @media (prefers-reduced-motion: reduce) { :global(.spin) { animation: none; } }
 </style>

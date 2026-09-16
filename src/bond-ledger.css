@@ -68,7 +68,7 @@
 }
 
 .ledger-title-dot {
-  color: color-mix(in srgb, var(--brand) 72%, var(--muted));
+  color: color-mix(in srgb, var(--brand) 72%, var(--text-muted));
 }
 
 .ledger-title-subject {
@@ -193,7 +193,7 @@
   display: grid;
   min-height: 28px;
   place-items: center;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: bold;
 }
@@ -280,7 +280,7 @@
   min-height: 44px;
   align-items: center;
   gap: 7px;
-  color: var(--muted);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 1rem;
   font-weight: normal;
@@ -302,7 +302,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 18px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 1rem;
   font-weight: normal;
   margin-left: auto;
@@ -386,7 +386,7 @@
 }
 
 .ledger-table thead th {
-  color: var(--muted);
+  color: var(--text-muted);
   background: #f1f5fb;
   font-weight: bold;
 }
@@ -411,7 +411,7 @@
 
 .ledger-table-empty td {
   height: 88px;
-  color: var(--muted);
+  color: var(--text-muted);
   text-align: center !important;
 }
 
@@ -438,7 +438,7 @@
   padding: 0 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius-tag);
-  color: var(--muted);
+  color: var(--text-muted);
   background: var(--surface);
   font-size: 0.75rem;
   font-weight: bold;
@@ -577,7 +577,7 @@
 }
 
 .ledger-management-toolbar > span {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.875rem;
   font-weight: bold;
 }
@@ -628,7 +628,7 @@
 
 .ledger-management-detail span {
   overflow: hidden;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 0.8125rem;
   text-overflow: ellipsis;
   white-space: nowrap;

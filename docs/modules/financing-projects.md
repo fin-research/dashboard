@@ -51,3 +51,7 @@
 ## 路由与增量动作
 
 项目列表与详情分别在 `src/routes/financing/projects/` 和 `[id]/`。`/financing/projects/options` 只在表单打开时读取选项。自动保存共用 `src/lib/financing/auto-save.ts`；创建和删除仍显式提交。普通 mutation 返回单一确认实体或删除 ID，就地合并，仅在需要时失效 `financing:reminders`，不得重读全页。
+
+## 创建表单
+
+新建项目使用 Superforms 和 `src/lib/financing/project-form.ts` 的 Zod schema 做客户端与 named action 双重校验。名称、SOP、有效计划簿记日期为必填；规模允许空值或最多八位小数的非负亿元值。校验失败保留草稿并定位错误字段。权限、SOP/负责人查询与写库仍只在服务端执行；其余表单继续使用原生 SvelteKit forms 与已有增量动作。

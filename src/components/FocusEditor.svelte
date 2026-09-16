@@ -1,4 +1,5 @@
 <script lang="ts">
+
   import { prefersReducedMotion } from "svelte/motion";
   import { fly } from "svelte/transition";
   import {
@@ -11,64 +12,42 @@
   } from "../focus-editor";
   import type { MarketBriefing } from "../types";
 
-  export let generating = false;
-  export let disabled = false;
-  export let progressText = "正在分析股债市场";
-  export let summaries: Array<{ id: string; text: string }> = [];
 
-  export let reportDate: string;
-  export let generatedBriefing: MarketBriefing | null = null;
-  export let initialText = "";
-  export let finalizedAt: string | null = null;
-  export let onTextChange: (value: string) => void = () => {};
-  export let onBriefingApplied: (value: MarketBriefing) => void = () => {};
-
-  let editor: HTMLDivElement;
-  let loadedSource = "";
-  let html = "";
-  let empty = true;
-  let appliedBriefing: MarketBriefing | null = null;
-  let wasGenerating = false;
-
-  $: currentProgress = summaries.at(-1) ?? { id: `status:${progressText}`, text: progressText };
-  $: progressMessage = currentProgress.text.replace(/\*\*/g, "");
-
-  $: if (
-    reportDate &&
-    `${reportDate}:${finalizedAt ?? "draft"}` !== loadedSource
-  ) {
-    loadedSource = `${reportDate}:${finalizedAt ?? "draft"}`;
-    try {
-      const saved = window.localStorage.getItem(
-        `${FOCUS_STORAGE_PREFIX}${reportDate}`,
-      );
-      const legacy = window.localStorage.getItem(
-        `${LEGACY_FOCUS_STORAGE_PREFIX}${reportDate}`,
-      );
-      html = finalizedAt
-        ? plainTextToFocusHtml(initialText)
-        : saved
-          ? migrateLegacyEmphasis(saved)
-          : plainTextToFocusHtml(legacy ?? "");
-      if (saved && html !== saved) {
-        window.localStorage.setItem(
-          `${FOCUS_STORAGE_PREFIX}${reportDate}`,
-          html,
-        );
-      }
-      empty = !visibleText(html);
-      onTextChange(focusHtmlToPlainText(html));
-    } catch {
-      html = "";
-      empty = true;
-      onTextChange("");
-    }
+  interface Props {
+    generating?: boolean;
+    disabled?: boolean;
+    progressText?: string;
+    summaries?: Array<{ id: string; text: string }>;
+    reportDate: string;
+    generatedBriefing?: MarketBriefing | null;
+    initialText?: string;
+    finalizedAt?: string | null;
+    onTextChange?: (value: string) => void;
+    onBriefingApplied?: (value: MarketBriefing) => void;
   }
 
-  $: if (generating !== wasGenerating) {
-    wasGenerating = generating;
-    if (generating) clearForGeneration();
-  }
+  let {
+    generating = false,
+    disabled = false,
+    progressText = "正在分析股债市场",
+    summaries = [],
+    reportDate,
+    generatedBriefing = null,
+    initialText = "",
+    finalizedAt = null,
+    onTextChange = () => {},
+    onBriefingApplied = () => {}
+  }: Props = $props();
+
+  let editor = $state<HTMLDivElement>(null!);
+  let loadedSource = $state("");
+  let html = $state("");
+  let empty = $state(true);
+  let appliedBriefing = $state<MarketBriefing | null>(null);
+  let wasGenerating = $state(false);
+
+
+
 
   function clearForGeneration(): void {
     html = "";
@@ -82,25 +61,6 @@
     }
   }
 
-  $: if (
-    generatedBriefing &&
-    generatedBriefing !== appliedBriefing &&
-    generatedBriefing.report_date === reportDate
-  ) {
-    appliedBriefing = generatedBriefing;
-    html = plainTextToFocusHtml(`1、${generatedBriefing.stock}\n2、${generatedBriefing.bond}`);
-    empty = !visibleText(html);
-    onTextChange(focusHtmlToPlainText(html));
-    try {
-      window.localStorage.setItem(
-        `${FOCUS_STORAGE_PREFIX}${reportDate}`,
-        html,
-      );
-    } catch {
-      // The generated text remains editable if browser storage is unavailable.
-    }
-    onBriefingApplied(generatedBriefing);
-  }
 
   function save(): void {
     if (!reportDate) return;
@@ -169,6 +129,68 @@
       .getPropertyValue("--color-primary")
       .trim();
   }
+  let currentProgress = $derived(summaries.at(-1) ?? { id: `status:${progressText}`, text: progressText });
+  let progressMessage = $derived(currentProgress.text.replace(/\*\*/g, ""));
+  $effect(() => {
+    if (
+      reportDate &&
+      `${reportDate}:${finalizedAt ?? "draft"}` !== loadedSource
+    ) {
+      loadedSource = `${reportDate}:${finalizedAt ?? "draft"}`;
+      try {
+        const saved = window.localStorage.getItem(
+          `${FOCUS_STORAGE_PREFIX}${reportDate}`,
+        );
+        const legacy = window.localStorage.getItem(
+          `${LEGACY_FOCUS_STORAGE_PREFIX}${reportDate}`,
+        );
+        html = finalizedAt
+          ? plainTextToFocusHtml(initialText)
+          : saved
+            ? migrateLegacyEmphasis(saved)
+            : plainTextToFocusHtml(legacy ?? "");
+        if (saved && html !== saved) {
+          window.localStorage.setItem(
+            `${FOCUS_STORAGE_PREFIX}${reportDate}`,
+            html,
+          );
+        }
+        empty = !visibleText(html);
+        onTextChange(focusHtmlToPlainText(html));
+      } catch {
+        html = "";
+        empty = true;
+        onTextChange("");
+      }
+    }
+  });
+  $effect(() => {
+    if (generating !== wasGenerating) {
+      wasGenerating = generating;
+      if (generating) clearForGeneration();
+    }
+  });
+  $effect(() => {
+    if (
+      generatedBriefing &&
+      generatedBriefing !== appliedBriefing &&
+      generatedBriefing.report_date === reportDate
+    ) {
+      appliedBriefing = generatedBriefing;
+      html = plainTextToFocusHtml(`1、${generatedBriefing.stock}\n2、${generatedBriefing.bond}`);
+      empty = !visibleText(html);
+      onTextChange(focusHtmlToPlainText(html));
+      try {
+        window.localStorage.setItem(
+          `${FOCUS_STORAGE_PREFIX}${reportDate}`,
+          html,
+        );
+      } catch {
+        // The generated text remains editable if browser storage is unavailable.
+      }
+      onBriefingApplied(generatedBriefing);
+    }
+  });
 </script>
 
 {#if generating}

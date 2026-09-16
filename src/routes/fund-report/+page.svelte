@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "$lib/components/ui/button/index.js";
 
   import { getContext, onMount } from 'svelte';
   import { invalidate } from '$app/navigation';
@@ -72,10 +73,10 @@
       </h1>
     </div>
     <div class="header-actions">
-      <button class="btn upload-entry" type="button" disabled={checkingLogin} onclick={openUpload}>
+      <Button data-ui-owner="routes-fund-report--page-svelte" variant="outline" class={"ui-button upload-entry"} type="button" disabled={checkingLogin} onclick={openUpload}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6" /></svg>
         {checkingLogin ? '正在检查登录' : '上传资金日报'}
-      </button>
+      </Button>
       <AuthMenu />
     </div>
   </header>
@@ -137,8 +138,8 @@
 
 <style>
   .header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
-  .upload-entry { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; }
-  .upload-entry svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  :global(.upload-entry[data-ui-owner="routes-fund-report--page-svelte"]) { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; }
+  :global(.upload-entry[data-ui-owner="routes-fund-report--page-svelte"] svg) { width: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   @media (max-width: 720px) { .fund-report-header { flex-wrap: wrap; gap: 12px; } }
 
   .fund-report-page {
@@ -186,7 +187,7 @@
   }
 
   .title-dot {
-    color: color-mix(in srgb, var(--brand) 72%, var(--muted));
+    color: color-mix(in srgb, var(--brand) 72%, var(--text-muted));
   }
 
   .title-subject {
@@ -340,7 +341,7 @@
   .report-meta {
     flex-wrap: wrap;
     gap: 6px 18px;
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
   }
@@ -368,7 +369,7 @@
     align-content: center;
     gap: 14px;
     padding: 32px;
-    color: var(--muted);
+    color: var(--text-muted);
     text-align: center;
   }
 

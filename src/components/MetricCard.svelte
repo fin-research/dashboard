@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Card } from "$lib/components/ui/card/index.js";
   import type { Component, Snippet } from "svelte";
 
   type MetricTone =
@@ -47,11 +48,13 @@
   } = $props();
 </script>
 
-<article
-  class:research-metric-card--compact={compact}
-  class:research-metric-card--report={variant === "report"}
-  class:research-metric-card--icon-end={Boolean(IconComponent) && iconPosition === "end"}
-  class={`card research-metric-card research-metric-card--${tone}`}
+<Card as="article" unstyled={variant === "report"}
+  class={[
+    `research-metric-card research-metric-card--${tone} ring-0 overflow-visible`,
+    compact && "research-metric-card--compact",
+    variant === "report" && "research-metric-card--report",
+    Boolean(IconComponent) && iconPosition === "end" && "research-metric-card--icon-end"
+  ]}
 >
   {#if IconComponent && iconPosition === "start"}
     <span class="research-metric-card__icon" aria-hidden="true">
@@ -81,10 +84,10 @@
       <IconComponent {...iconProps} />
     </span>
   {/if}
-</article>
+</Card>
 
 <style>
-  .research-metric-card {
+  :global(.research-metric-card) {
     --metric-accent: var(--color-primary, #2f6fd6);
     --metric-soft: var(--color-primary-soft, #eaf1fd);
     display: flex;
@@ -104,16 +107,16 @@
     box-shadow: var(--shadow-card, 0 2px 8px rgba(23, 32, 51, 0.06));
   }
 
-  .research-metric-card--icon-end {
+  :global(.research-metric-card--icon-end) {
     flex-direction: row;
   }
 
-  .research-metric-card--compact {
+  :global(.research-metric-card--compact) {
     justify-content: flex-start;
     padding-block: 6px;
   }
 
-  .research-metric-card--report {
+  :global(.research-metric-card--report) {
     --metric-report-background: #f8fafc;
     min-height: 78px;
     align-items: stretch;
@@ -127,66 +130,66 @@
     box-shadow: none;
   }
 
-  .research-metric-card--report.research-metric-card--cyan {
+  :global(.research-metric-card--report).research-metric-card--cyan {
     --metric-accent: #0284c7;
     --metric-report-background: #eff6ff;
   }
 
-  .research-metric-card--report .research-metric-card__content {
+  :global(.research-metric-card--report) .research-metric-card__content {
     justify-content: flex-start;
   }
 
-  .research-metric-card--report .research-metric-card__label {
+  :global(.research-metric-card--report) .research-metric-card__label {
     font-size: 0.6875rem;
   }
 
-  .research-metric-card--report .research-metric-card__value strong {
+  :global(.research-metric-card--report) .research-metric-card__value strong {
     color: #0f3d6c;
     font-size: 1.125rem;
     line-height: 1.45;
   }
 
-  .research-metric-card--report .research-metric-card__detail {
+  :global(.research-metric-card--report) .research-metric-card__detail {
     color: #64748b;
     font-size: 0.65625rem;
     line-height: 1.35;
   }
 
-  .research-metric-card--blue,
-  .research-metric-card--primary {
+  :global(.research-metric-card--blue),
+  :global(.research-metric-card--primary) {
     --metric-accent: #2f6fd6;
     --metric-soft: #eaf1fd;
   }
 
-  .research-metric-card--cyan {
+  :global(.research-metric-card--cyan) {
     --metric-accent: #277b91;
     --metric-soft: #e9f5f8;
   }
 
-  .research-metric-card--teal,
-  .research-metric-card--green,
-  .research-metric-card--good {
+  :global(.research-metric-card--teal),
+  :global(.research-metric-card--green),
+  :global(.research-metric-card--good) {
     --metric-accent: #12a873;
     --metric-soft: #e7f6f0;
   }
 
-  .research-metric-card--orange {
+  :global(.research-metric-card--orange) {
     --metric-accent: #c66a23;
     --metric-soft: #fff1e7;
   }
 
-  .research-metric-card--purple {
+  :global(.research-metric-card--purple) {
     --metric-accent: #6f63c6;
     --metric-soft: #efedfb;
   }
 
-  .research-metric-card--red,
-  .research-metric-card--bad {
+  :global(.research-metric-card--red),
+  :global(.research-metric-card--bad) {
     --metric-accent: #d92d20;
     --metric-soft: #fceceb;
   }
 
-  .research-metric-card--neutral {
+  :global(.research-metric-card--neutral) {
     --metric-accent: #667085;
     --metric-soft: #f2f4f7;
   }
@@ -276,7 +279,7 @@
   }
 
   @media (max-width: 900px) {
-    .research-metric-card {
+    :global(.research-metric-card) {
       min-height: 82px;
       justify-content: flex-start;
       padding: 8px;
@@ -304,7 +307,7 @@
   }
 
   @media (max-width: 420px) {
-    .research-metric-card {
+    :global(.research-metric-card) {
       min-height: 78px;
       gap: 6px;
       padding: 7px 6px;

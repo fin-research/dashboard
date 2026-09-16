@@ -1,5 +1,10 @@
 <script lang="ts">
-  export let embedded = false;
+  import Modal from "$lib/components/Modal.svelte";
+  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount } from "svelte";
 
   import ModuleCard from "../../components/ModuleCard.svelte";
@@ -14,23 +19,28 @@
     type PolicyTimelineResponse,
     type ResearchCommentary,
   } from "$lib/policies";
+  interface Props {
+    embedded?: boolean;
+  }
 
-  let policies: PolicyEvent[] = [];
-  let loading = true;
-  let errorMessage = "";
-  let startDate = offsetDate(-30);
-  let endDate = offsetDate(0);
-  let category: PolicyCategory | "" = "";
-  let articlePolicy: PolicyEvent | null = null;
-  let articleQuery = "";
-  let articleResults: ArticleSearchResult[] = [];
-  let selectedArticleIds = new Set<string>();
-  let searchingArticles = false;
-  let savingArticles = false;
-  let commentaryPolicy: PolicyEvent | null = null;
-  let commentaryDraft: CommentaryContent | null = null;
-  let generatingPolicyId = "";
-  let savingCommentary = false;
+  let { embedded = false }: Props = $props();
+
+  let policies = $state<PolicyEvent[]>([]);
+  let loading = $state(true);
+  let errorMessage = $state("");
+  let startDate = $state(offsetDate(-30));
+  let endDate = $state(offsetDate(0));
+  let category: PolicyCategory | "" = $state("");
+  let articlePolicy = $state<PolicyEvent | null>(null);
+  let articleQuery = $state("");
+  let articleResults = $state<ArticleSearchResult[]>([]);
+  let selectedArticleIds = $state(new Set<string>());
+  let searchingArticles = $state(false);
+  let savingArticles = $state(false);
+  let commentaryPolicy = $state<PolicyEvent | null>(null);
+  let commentaryDraft = $state<CommentaryContent | null>(null);
+  let generatingPolicyId = $state("");
+  let savingCommentary = $state(false);
 
   onMount(loadPolicies);
 
@@ -244,15 +254,15 @@
     </div>
     {/if}
     <form class="filters" onsubmit={(event) => { event.preventDefault(); void loadPolicies(); }}>
-      <label><span>开始日期</span><input class="input" type="date" bind:value={startDate} /></label>
-      <label><span>结束日期</span><input class="input" type="date" bind:value={endDate} /></label>
-      <label><span>政策类型</span><select class="select" bind:value={category}>
+      <label><span>开始日期</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} type="date" bind:value={startDate} /></label>
+      <label><span>结束日期</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} type="date" bind:value={endDate} /></label>
+      <label><span>政策类型</span><NativeSelect data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-select"} bind:value={category}>
         <option value="">全部</option>
         {#each Object.entries(policyCategoryLabels) as [value, label]}
           <option value={value}>{label}</option>
         {/each}
-      </select></label>
-      <button class="btn" type="submit" disabled={loading}>{loading ? "读取中" : "查询"}</button>
+      </NativeSelect></label>
+      <Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="submit" disabled={loading}>{loading ? "读取中" : "查询"}</Button>
     </form>
   </header>
 
@@ -260,7 +270,7 @@
     {#if loading}
       <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取政策时间轴</strong></section>
     {:else if errorMessage}
-      <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><button class="btn" type="button" onclick={loadPolicies}>重新读取</button></section>
+      <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={loadPolicies}>重新读取</Button></section>
     {:else if policies.length === 0}
       <section class="page-state"><strong>所选范围内暂无已聚合政策</strong></section>
     {:else}
@@ -295,7 +305,7 @@
                 </section>
 
                 <section>
-                  <div class="section-heading"><h3>关联研报 <span>{policy.articles.length}</span></h3><button class="btn" type="button" onclick={() => openArticleEditor(policy)}>调整关联</button></div>
+                  <div class="section-heading"><h3>关联研报 <span>{policy.articles.length}</span></h3><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => openArticleEditor(policy)}>调整关联</Button></div>
                   {#if policy.articles.length > 0}
                     <ul class="article-list">
                       {#each policy.articles as article}
@@ -313,9 +323,9 @@
 
                 <section class="commentary-section">
                   <div class="section-heading"><div class="section-title"><h3>研究点评</h3>
-                    <button
-                      class="btn btn-primary ai-generate-button"
-                      class:is-loading={generatingPolicyId === policy.id}
+                    <Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="default"
+                      class={["ui-button  ai-generate-button", generatingPolicyId === policy.id && "is-loading"]}
+
                       type="button"
                       disabled={generatingPolicyId === policy.id}
                       aria-label={generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
@@ -325,9 +335,9 @@
                         <path d="m10 2 1.1 4.2L15 8l-3.9 1.8L10 14l-1.1-4.2L5 8l3.9-1.8L10 2Z" />
                         <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
                       </svg>
-                    </button>
+                    </Button>
                   </div><div class="heading-actions">
-                    {#if policy.commentary}<a class="detail-link" href={`/commentaries/${encodeURIComponent(policy.commentary.id)}`}>查看完整点评</a><button class="btn" type="button" onclick={() => openCommentaryEditor(policy)}>编辑</button>{/if}
+                    {#if policy.commentary}<a class="detail-link" href={`/commentaries/${encodeURIComponent(policy.commentary.id)}`}>查看完整点评</a><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => openCommentaryEditor(policy)}>编辑</Button>{/if}
                   </div></div>
                   {#if policy.commentary}
                     <article class="commentary">
@@ -349,36 +359,34 @@
 </div>
 
 {#if articlePolicy}
-  <div class="modal-layer" role="presentation">
-    <button class="modal-scrim" type="button" aria-label="关闭研报关联" onclick={() => (articlePolicy = null)}></button>
-    <div class="policy-dialog" role="dialog" aria-modal="true" aria-labelledby="article-modal-title">
-      <header><div><span>关联研报</span><h2 id="article-modal-title">{articlePolicy.title}</h2></div><button class="btn" type="button" aria-label="关闭" onclick={() => (articlePolicy = null)}>×</button></header>
-      <form class="article-search" onsubmit={(event) => { event.preventDefault(); void searchArticles(); }}><label><span>检索标题、机构或摘要</span><input class="input" bind:value={articleQuery} /></label><button class="btn" type="submit" disabled={searchingArticles}>{searchingArticles ? "检索中" : "检索"}</button></form>
+  <Modal open onclose={() => articlePolicy = null} class="p-0 gap-0 sm:max-w-[840px]" aria-labelledby="article-modal-title">
+    <div class="policy-dialog">
+      <header><div><span>关联研报</span><h2 id="article-modal-title">{articlePolicy.title}</h2></div><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => (articlePolicy = null)}>×</Button></header>
+      <form class="article-search" onsubmit={(event) => { event.preventDefault(); void searchArticles(); }}><label><span>检索标题、机构或摘要</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} bind:value={articleQuery} /></label><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="submit" disabled={searchingArticles}>{searchingArticles ? "检索中" : "检索"}</Button></form>
       <div class="modal-scroll article-options">
         {#each articleResults as article (article.id)}
-          <label class:selected={selectedArticleIds.has(article.id)}><input class="checkbox checkbox-primary" type="checkbox" checked={selectedArticleIds.has(article.id)} onchange={() => toggleArticle(article.id)} /><span><strong>{article.title}</strong><small>{article.author || "未标注机构"} · {formatDate(article.publishedAt.slice(0, 10))}</small><p>{article.summary}</p></span></label>
+          <label class:selected={selectedArticleIds.has(article.id)}><Checkbox data-ui-owner="lib-pages-PolicyTrackingPage-svelte"  checked={selectedArticleIds.has(article.id)} onCheckedChange={() => toggleArticle(article.id)} /><span><strong>{article.title}</strong><small>{article.author || "未标注机构"} · {formatDate(article.publishedAt.slice(0, 10))}</small><p>{article.summary}</p></span></label>
         {/each}
       </div>
-      <footer><span>已选择 {selectedArticleIds.size} 篇</span><button class="btn btn-primary primary-action" type="button" disabled={savingArticles} onclick={saveArticles}>{savingArticles ? "保存中" : "保存关联"}</button></footer>
+      <footer><span>已选择 {selectedArticleIds.size} 篇</span><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="default" class={"ui-button  primary-action"} type="button" disabled={savingArticles} onclick={saveArticles}>{savingArticles ? "保存中" : "保存关联"}</Button></footer>
     </div>
-  </div>
+  </Modal>
 {/if}
 
 {#if commentaryPolicy && commentaryDraft}
-  <div class="modal-layer" role="presentation">
-    <button class="modal-scrim" type="button" aria-label="关闭点评编辑" onclick={() => (commentaryPolicy = null)}></button>
-    <div class="policy-dialog commentary-modal" role="dialog" aria-modal="true" aria-labelledby="commentary-modal-title">
-      <header><div><span>政策跟踪</span><h2 id="commentary-modal-title">编辑研究点评</h2></div><button class="btn" type="button" aria-label="关闭" onclick={() => (commentaryPolicy = null)}>×</button></header>
+  <Modal open onclose={() => commentaryPolicy = null} class="p-0 gap-0 sm:max-w-[980px]" aria-labelledby="commentary-modal-title">
+    <div class="policy-dialog commentary-modal">
+      <header><div><span>政策跟踪</span><h2 id="commentary-modal-title">编辑研究点评</h2></div><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => (commentaryPolicy = null)}>×</Button></header>
       <div class="modal-scroll commentary-form">
-        <label><span>事件名称</span><input class="input" bind:value={commentaryDraft.eventName} /></label>
-        <div class="form-grid"><label><span>消息来源</span><input class="input" bind:value={commentaryDraft.sources} /></label><label><span>发布时间</span><input class="input" type="date" bind:value={commentaryDraft.eventPublishedAt} /></label><label><span>点评时间</span><input class="input" type="date" bind:value={commentaryDraft.commentaryDate} /></label></div>
-        <label><span>事件摘要</span><textarea class="textarea" rows="5" bind:value={commentaryDraft.eventSummary}></textarea></label>
-        <label><span>政策点评</span><textarea class="textarea" rows="12" bind:value={commentaryDraft.commentary}></textarea></label>
-        <label><span>应对建议</span><textarea class="textarea" rows="7" bind:value={commentaryDraft.recommendation}></textarea></label>
+        <label><span>事件名称</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} bind:value={commentaryDraft.eventName} /></label>
+        <div class="form-grid"><label><span>消息来源</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} bind:value={commentaryDraft.sources} /></label><label><span>发布时间</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} type="date" bind:value={commentaryDraft.eventPublishedAt} /></label><label><span>点评时间</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} type="date" bind:value={commentaryDraft.commentaryDate} /></label></div>
+        <label><span>事件摘要</span><Textarea data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-textarea"} rows={5} bind:value={commentaryDraft.eventSummary}></Textarea></label>
+        <label><span>政策点评</span><Textarea data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-textarea"} rows={12} bind:value={commentaryDraft.commentary}></Textarea></label>
+        <label><span>应对建议</span><Textarea data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-textarea"} rows={7} bind:value={commentaryDraft.recommendation}></Textarea></label>
       </div>
-      <footer><span>保存后标记为人工修订</span><button class="btn btn-primary primary-action" type="button" disabled={savingCommentary} onclick={saveCommentary}>{savingCommentary ? "保存中" : "保存点评"}</button></footer>
+      <footer><span>保存后标记为人工修订</span><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="default" class={"ui-button  primary-action"} type="button" disabled={savingCommentary} onclick={saveCommentary}>{savingCommentary ? "保存中" : "保存点评"}</Button></footer>
     </div>
-  </div>
+  </Modal>
 {/if}
 
 <style>
@@ -394,9 +402,9 @@
   .filters { flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
   .filters label { gap: 7px; color: #475467; font-size: .875rem; font-weight: bold; }
   .filters label > span { flex: 0 0 auto; white-space: nowrap; }
-  .filters input, .filters select { width: 10rem; padding: 0 10px; }
-  button { padding: 0 14px; }
-  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid rgba(47, 111, 214, .25); outline-offset: 2px; }
+  :global(.filters input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]), :global(.filters select[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { width: 10rem; padding: 0 10px; }
+  :global(button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { padding: 0 14px; }
+  :global(button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:focus-visible), :global(input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:focus-visible), :global(select[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:focus-visible), :global(textarea[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:focus-visible), a:focus-visible { outline: 3px solid rgba(47, 111, 214, .25); outline-offset: 2px; }
   .policy-main { width: min(1600px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0 64px; }
   .page-state { display: flex; min-height: 240px; align-items: center; justify-content: center; gap: 14px; border: 1px solid #d8e2f0; border-radius: 10px; background: #fff; }
   .page-state--error { color: #b42318; }
@@ -432,9 +440,9 @@
   .section-heading h3 { margin: 0; font-size: 1.125rem; font-weight: bold; }
   .section-heading h3 span { color: #667085; font-size: .875rem; }
   .heading-actions { flex-wrap: wrap; gap: 8px; }
-  .ai-generate-button { display: inline-grid; width: 44px; min-width: 44px; place-items: center; padding: 3px; }
-  .ai-generate-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
-  .ai-generate-button.is-loading svg { animation: spin 1.2s linear infinite; }
+  :global(.ai-generate-button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { display: inline-grid; width: 44px; min-width: 44px; place-items: center; padding: 3px; }
+  :global(.ai-generate-button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"] svg) { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
+  :global(.ai-generate-button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"].is-loading svg) { animation: spin 1.2s linear infinite; }
   .detail-link { display: inline-flex; min-height: 44px; align-items: center; padding: 0 12px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; font-size: .875rem; font-weight: bold; text-decoration: none; }
   .detail-link:hover { border-color: #2f6fd6; background: #f5f9ff; }
   .detail-link:focus-visible { outline: 3px solid rgba(47, 111, 214, .28); outline-offset: 2px; }
@@ -459,29 +467,27 @@
   .commentary dd { margin: 0; }
   .commentary h4 { margin: 18px 0 7px; color: #175cd3; font-size: 1rem; }
   .commentary p { margin: 0; color: #344054; line-height: 1.85; white-space: pre-wrap; }
-  .modal-layer { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 16px; }
-  .modal-scrim { position: absolute; inset: 0; width: 100%; height: 100%; backdrop-filter: blur(3px); border: 0; border-radius: 0; background: rgba(15, 23, 42, .42); }
-  .policy-dialog { position: relative; display: grid; width: min(840px, 100%); max-height: calc(100dvh - 32px); grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; box-shadow: 0 28px 72px rgba(15, 23, 42, .25); }
-  .commentary-modal { width: min(980px, 100%); grid-template-rows: auto minmax(0, 1fr) auto; }
+  .policy-dialog { position: relative; display: grid; width: min(840px, calc(100vw - 3rem)); max-height: calc(100dvh - 32px); grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid #cbd5e1; border-radius: inherit; background: var(--surface); box-shadow: none; }
+  .commentary-modal { width: min(980px, calc(100vw - 3rem)); grid-template-rows: auto minmax(0, 1fr) auto; }
   .policy-dialog header, .policy-dialog footer { justify-content: space-between; gap: 14px; padding: 18px 20px; border-bottom: 1px solid #e4e7ec; }
   .policy-dialog footer { border-top: 1px solid #e4e7ec; border-bottom: 0; color: #667085; }
   .policy-dialog h2 { max-width: 720px; margin: 3px 0 0; font-size: 1.25rem; }
-  .policy-dialog header > button { width: 44px; padding: 0; }
+  :global(.policy-dialog header > button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { width: 44px; padding: 0; }
   .article-search { gap: 10px; padding: 14px 20px; border-bottom: 1px solid #e4e7ec; }
   .article-search label { flex: 1; }
   .article-search label span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-  .article-search input { width: 100%; padding: 0 12px; }
+  :global(.article-search input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { width: 100%; padding: 0 12px; }
   .modal-scroll { min-height: 0; overflow-y: auto; }
   .article-options { display: grid; gap: 10px; padding: 18px 20px; }
   .article-options > label { display: grid; grid-template-columns: 24px 1fr; gap: 12px; padding: 14px; border: 1px solid #e4e7ec; border-radius: 8px; cursor: pointer; }
   .article-options > label.selected { border-color: #2f6fd6; background: #f5f9ff; }
-  .article-options input { width: 20px; accent-color: #2f6fd6; }
+  :global(.article-options input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { width: 20px; accent-color: #2f6fd6; }
   .article-options strong, .article-options small { display: block; }
   .article-options small { margin-top: 5px; color: #667085; }
   .article-options p { margin: 8px 0 0; color: #475467; font-size: .875rem; line-height: 1.5; }
   .commentary-form { display: grid; gap: 16px; padding: 20px; }
   .commentary-form label { display: grid; gap: 7px; font-weight: bold; }
-  .commentary-form input, .commentary-form textarea { width: 100%; padding: 10px 12px; resize: vertical; }
+  :global(.commentary-form input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]), :global(.commentary-form textarea[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { width: 100%; padding: 10px 12px; resize: vertical; }
   .form-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (max-width: 900px) {
@@ -496,8 +502,8 @@
   @media (max-width: 620px) {
     .policy-main { width: min(100% - 28px, 1600px); padding-top: 20px; }
     .filters label { width: 100%; justify-content: space-between; }
-    .filters input, .filters select { flex: 1; }
-    .filters > button { width: 100%; }
+    :global(.filters input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]), :global(.filters select[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { flex: 1; }
+    :global(.filters > button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { width: 100%; }
     :global(.policy-card) { padding: 16px; }
     .section-heading { align-items: flex-start; flex-direction: column; }
     .news-list li { grid-template-columns: 1fr; gap: 4px; }

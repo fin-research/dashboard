@@ -365,9 +365,9 @@
 
 :where(.financing-scope) .simulation-baseline { display: grid; gap: .75rem; margin: 1.25rem 0 0; padding: 1rem; border-radius: var(--radius-control); background: var(--canvas); }
 :where(.financing-scope) .simulation-baseline > div { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
-:where(.financing-scope) .simulation-baseline dt { color: var(--muted); font-size: .875rem; }
+:where(.financing-scope) .simulation-baseline dt { color: var(--text-muted); font-size: .875rem; }
 :where(.financing-scope) .simulation-baseline dd { margin: 0; font-weight: bold; font-variant-numeric: tabular-nums; }
-:where(.financing-scope) .simulation-baseline dd span { font-size: .875rem; color: var(--muted); font-weight: normal; }
+:where(.financing-scope) .simulation-baseline dd span { font-size: .875rem; color: var(--text-muted); font-weight: normal; }
 
 :where(.financing-scope) .simulation-results > div {
 	display: flex;
@@ -442,7 +442,7 @@
 }
 
 :where(.financing-scope) .regulatory-value-row { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
-:where(.financing-scope) .regulatory-value-row > span { font-size: .75rem; color: var(--muted); white-space: nowrap; }
+:where(.financing-scope) .regulatory-value-row > span { font-size: .75rem; color: var(--text-muted); white-space: nowrap; }
 :where(.financing-scope) .regulatory-title > span:first-child { font-size: .8125rem; line-height: 1.4; }
 :where(.financing-scope) .regulatory-details { font-size: .8125rem; }
 :where(.financing-scope) .issuance-panel :is(th, td):not(:first-child),
