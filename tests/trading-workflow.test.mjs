@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { buildGraph, timelineCursor, workflowGroups, nodeComplete } from '../src/lib/trading-workflow/graph.ts';
+import { buildGraph, timelineCursor, workflowGroups, workflowBranchFrames, nodeComplete } from '../src/lib/trading-workflow/graph.ts';
 import { activeTasks, childrenOf, dayKey, descendants, dueReminders, emptyDay, removeNode, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
 import { readWorkflowConfig, saveWorkflowConfig } from '../src/lib/server/trading-workflow.ts';
 
@@ -165,6 +165,18 @@ test('flow graph folds conditions, centers common steps, joins paths and preserv
   day.branches['reverse-change'] = true;
   const expanded = buildGraph(defaults, day, options);
   assert.ok(expanded.nodes.some(n => n.id === 'reverse-position'));
+  for (const edge of expanded.edges) {
+    assert.equal(edge.sourceHandle, edge.data.side ? 'side' : 'bottom', 'main paths must never select the side outlet');
+    assert.equal(edge.targetHandle, edge.data.side ? 'side' : 'top');
+  }
+  assert.deepEqual(workflowBranchFrames(folded.nodes), []);
+  const frame = workflowBranchFrames(expanded.nodes).find(frame => frame.id === 'reverse-change');
+  assert.ok(frame);
+  for (const child of expanded.nodes.filter(node => node.data.node.parentId === frame.id)) {
+    assert.ok(frame.left < child.position.x && frame.top < child.position.y);
+    assert.ok(frame.left + frame.width > child.position.x + child.data.width);
+    assert.ok(frame.top + frame.height > child.position.y + child.measured.height);
+  }
   assert.ok(expanded.edges.some(e => e.source === 'reverse-change' && e.target === 'reverse-position'));
   assert.ok(expanded.edges.some(e => e.source === 'reverse-change' && e.target === 'reverse-counterparty'));
   assert.equal(expanded.edges.some(e => e.source === 'reverse-ccdc' && e.target === 'reverse-counterparty'), false);

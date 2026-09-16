@@ -95,6 +95,49 @@ test('workflow branches expand to the right without displacing the main path', a
   await screenshot(page, 'workflow-branch');
 });
 
+test('workflow main connectors use bottom centers and branch rails animate in both directions', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/trading-research/workflow');
+  const trigger = page.locator('[data-workflow-node="reverse-change"] .node-surface');
+  await expect(trigger).toBeVisible();
+  await expect(page.locator('path[id="loan-send:loan-deal"]')).toBeAttached();
+  const anchor = await page.evaluate(() => {
+    const node = document.querySelector('[data-workflow-node="loan-send"]').getBoundingClientRect();
+    const path = document.querySelector('path[id="loan-send:loan-deal"]');
+    const point = path.getPointAtLength(0).matrixTransform(path.getScreenCTM());
+    return { dx: Math.abs(point.x - (node.left + node.width / 2)), dy: Math.abs(point.y - node.bottom) };
+  });
+  expect(anchor.dx).toBeLessThan(4);
+  expect(anchor.dy).toBeLessThan(4);
+  async function sampleToggle() {
+    return page.evaluate(async () => {
+      document.querySelector('[data-workflow-node="reverse-change"] .node-surface').click();
+      const samples = [];
+      const start = performance.now();
+      while (performance.now() - start < 360) {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        const node = document.querySelector('[data-workflow-node="reverse-position"]')?.closest('.svelte-flow__node');
+        const frame = document.querySelector('[data-workflow-branch="reverse-change"]');
+        if (node && frame) samples.push({ opacity: Number(getComputedStyle(node).opacity), x: node.getBoundingClientRect().x,
+          frameOpacity: Number(getComputedStyle(frame).opacity) });
+      }
+      return samples;
+    });
+  }
+  const opening = await sampleToggle();
+  expect(opening.some(sample => sample.opacity > 0 && sample.opacity < 1)).toBe(true);
+  expect(opening.some(sample => sample.frameOpacity > 0 && sample.frameOpacity < 1)).toBe(true);
+  expect(new Set(opening.map(sample => Math.round(sample.x))).size).toBeGreaterThan(1);
+  await expect(page.locator('[data-workflow-branch="reverse-change"]')).toBeVisible();
+  const closing = await sampleToggle();
+  expect(closing.some(sample => sample.opacity > 0 && sample.opacity < 1)).toBe(true);
+  await expect(page.locator('[data-workflow-node="reverse-position"]')).toHaveCount(0);
+  await expect(page.locator('[data-workflow-branch="reverse-change"]')).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await trigger.click();
+  await expect(page.locator('[data-workflow-node="reverse-position"]').locator('..')).toHaveCSS('opacity', '1');
+});
+
 test('credit failure is visible instead of an empty success', async ({ page }) => {
   await page.unrouteAll();
   requests = await mockResources(page, { creditError: true });
