@@ -23,6 +23,7 @@
   let lastEnabled = '';
   let animation = 0;
   let animating = false;
+  let pendingHeights: Record<string, number> = {};
   let viewportWidth = $state(1040);
   let dragging = $state(false);
   let inquiries = $state<Record<string, boolean>>({});
@@ -30,7 +31,19 @@
   let heights = $state<Record<string, number>>({});
   let graph = $state.raw<FlowGraph>({ nodes: [], edges: [], bases: {}, timeline: [], height: 680, width: 1040, lanes: {} });
   const cursor = $derived(timelineCursor(graph.timeline, clockMinutes));
-  function measureHeight(id: string, height: number) { if (!animating && height > 0 && heights[id] !== height) heights = { ...heights, [id]: height }; }
+  function measureHeight(id: string, height: number) {
+    if (height <= 0) return;
+    // ResizeObserver may deliver the final size during the lane animation.
+    // Keep it until the animation finishes instead of losing the measurement.
+    if (animating) { pendingHeights[id] = height; return; }
+    if (heights[id] !== height) heights = { ...heights, [id]: height };
+  }
+  function finishAnimation() {
+    animating = false;
+    const pending = pendingHeights;
+    pendingHeights = {};
+    if (Object.entries(pending).some(([id, height]) => heights[id] !== height)) heights = { ...heights, ...pending };
+  }
   function complete(members: WorkflowNode[]) {
     onComplete(members.map(node => node.id), !members.every(node => day.completed[node.id]));
   }
@@ -50,7 +63,7 @@
     lastEnabled = enabled;
     const old = new Map(flowNodes.map(node => [node.id, node]));
     graph = next;
-    if (!animate) { animating = false; flowNodes = next.nodes; return; }
+    if (!animate) { flowNodes = next.nodes; finishAnimation(); return; }
     animating = true;
     const start = performance.now();
     function frame(time: number) {
@@ -60,7 +73,7 @@
         const width = from.data.width + (node.data.width - from.data.width) * eased;
         return { ...node, position: { x: from.position.x + (node.position.x - from.position.x) * eased, y: from.position.y + (node.position.y - from.position.y) * eased }, width, measured: { ...node.measured, width }, data: { ...node.data, width } };
       });
-      if (progress < 1) animation = requestAnimationFrame(frame); else { animating = false; flowNodes = next.nodes; }
+      if (progress < 1) animation = requestAnimationFrame(frame); else { flowNodes = next.nodes; finishAnimation(); }
     }
     animation = requestAnimationFrame(frame);
   }
