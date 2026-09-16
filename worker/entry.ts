@@ -1,5 +1,4 @@
 import svelteKitWorker from "../.svelte-kit/cloudflare/_worker.js";
-import { runEconomicIndicatorScheduledSync } from "./economic-indicator-scheduled.ts";
 import { creditAssistantHttp } from "./credit-assistant-http.ts";
 import { dashboardAccessFailure } from '../src/lib/server/dashboard-access.ts';
 import { readBindingContext, CONTEXT_HEADER } from '../src/lib/server/gateway-context.ts';
@@ -21,7 +20,6 @@ export class GatewayDashboard extends WorkerEntrypoint<Cloudflare.Env> {
 }
 
 export { BondLedgerImportWorkflow } from "./bond-ledger-workflow.ts";
-export { EconomicIndicatorSyncWorkflow } from "./economic-indicator-workflow.ts";
 export { CreditAgent } from "./credit-agent.ts";
 export { DebtImportWorkflow } from './financing-debt-import.ts';
 
@@ -34,10 +32,6 @@ const worker: ExportedHandler<Cloudflare.Env> = {
         .then(summary => { console.log(JSON.stringify(summary)); }));
       return;
     }
-    controller.noRetry();
-    context.waitUntil(
-      runEconomicIndicatorScheduledSync(env, controller.scheduledTime),
-    );
   },
 };
 
