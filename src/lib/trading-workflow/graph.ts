@@ -11,7 +11,7 @@ export type FlowData = {
   rows: InquiryRow[]; directory: InquiryDirectory; rates: ShiborRate[]; date: string; now: Date;
   writeRows: (rows: InquiryRow[]) => void; remember: (row: InquiryRow) => void;
   done?: boolean; active?: boolean; expanded?: boolean; editing: boolean; selected?: boolean;
-  note?: string; measureHeight?: (height: number) => void;
+  reveal?: number; note?: string; measureHeight?: (height: number) => void;
   activate: () => void; writeNote: (value: string) => void; complete?: () => void;
 };
 export type FlowNode = Node<FlowData, 'workflow'>;
@@ -130,7 +130,7 @@ export function buildGraph(config: WorkflowNode[], day: WorkflowDay, options: {
     const from = graph.nodes.find(node => node.id === source)!, to = graph.nodes.find(node => node.id === target)!;
     const scope = to.data.scope === 'shared' ? from.data.scope : to.data.scope;
     const color = scope === 'reverse' ? '#00a773' : scope === 'exchange' ? '#8090aa' : '#087cff';
-    graph.edges.push({ id: `${source}:${target}`, source, target, type: 'workflow', sourceHandle: sideEdges.has(`${source}:${target}`) ? 'side' : undefined, targetHandle: sideEdges.has(`${source}:${target}`) ? 'side' : undefined, data: { joinY, side: sideEdges.has(`${source}:${target}`) },
+    graph.edges.push({ id: `${source}:${target}`, source, target, type: 'workflow', sourceHandle: sideEdges.has(`${source}:${target}`) ? 'side' : 'bottom', targetHandle: sideEdges.has(`${source}:${target}`) ? 'side' : 'top', data: { joinY, side: sideEdges.has(`${source}:${target}`) },
       markerEnd: { type: 'arrowclosed' as import('@xyflow/svelte').MarkerType, width: 16, height: 16, color }, style: `stroke: ${color}; stroke-width: 1.8;` });
   }
   const pending = [...groups];
@@ -174,4 +174,18 @@ export function timelineCursor(marks: TimelineMark[], minute: number): number | 
   if (next < 0) return marks.at(-1)!.y;
   const a = marks[next - 1]!, b = marks[next]!;
   return a.y + (b.y - a.y) * (minute - a.minute) / (b.minute - a.minute);
+}
+
+/** Frame each expanded sibling rail; nested branches get their own adjacent frame. */
+export function workflowBranchFrames(nodes: FlowNode[]) {
+  return nodes.flatMap(parent => {
+    const children = nodes.filter(node => node.data.node?.parentId === parent.id);
+    if (!children.length) return [];
+    const left = Math.min(...children.map(node => node.position.x)) - 14;
+    const top = Math.min(...children.map(node => node.position.y)) - 14;
+    const right = Math.max(...children.map(node => node.position.x + node.data.width)) + 14;
+    const bottom = Math.max(...children.map(node => node.position.y + (node.measured?.height ?? 52))) + 14;
+    return [{ id: parent.id, title: parent.data.title, scope: parent.data.scope, left, top,
+      width: right - left, height: bottom - top, opacity: Math.max(...children.map(node => node.data.reveal ?? 1)) }];
+  });
 }

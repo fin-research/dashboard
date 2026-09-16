@@ -7,7 +7,7 @@
   import '@xyflow/svelte/dist/style.css';
   import WorkflowNodeView from './WorkflowNode.svelte';
   import WorkflowEdgeView from './WorkflowEdge.svelte';
-  import { buildGraph, timelineCursor, type FlowGraph, type FlowNode } from './graph';
+  import { buildGraph, timelineCursor, workflowBranchFrames, type FlowGraph, type FlowNode } from './graph';
   import { isInquiry, products, type WorkflowNode, type WorkflowDay, type Product } from './model';
   let { nodes, day, clockMinutes, editing = false, selectedId = '', onSelect, onMove, onComplete, onBranch, onEnable, onNote, onRows, onRemember, directory, rates, now }: {
     onRows: (id: string, rows: InquiryRow[]) => void; onRemember: (row: InquiryRow) => void; directory: InquiryDirectory; rates: ShiborRate[]; now: Date;
@@ -20,14 +20,16 @@
   const edgeTypes = { workflow: WorkflowEdgeView };
   let reducedMotion = $state(false);
   const enabledProducts = $derived(products.filter(product => day.enabled[product.id]));
-  let lastEnabled = '';
+  let lastStructure = '';
   let animation = 0;
   let animating = false;
+  let pendingGraph: FlowGraph | undefined;
   let pendingHeights: Record<string, number> = {};
   let viewportWidth = $state(1040);
   let dragging = $state(false);
   let inquiries = $state<Record<string, boolean>>({});
   let flowNodes = $state.raw<FlowNode[]>([]);
+  const branchFrames = $derived(workflowBranchFrames(flowNodes));
   let heights = $state<Record<string, number>>({});
   let graph = $state.raw<FlowGraph>({ nodes: [], edges: [], bases: {}, timeline: [], height: 680, width: 1040, lanes: {} });
   const cursor = $derived(timelineCursor(graph.timeline, clockMinutes));
@@ -57,31 +59,59 @@
     else if (node.kind === 'branch') onBranch(members.map(item => item.id), !members.some(item => day.branches[item.id]));
     else complete(members);
   }
-  function displayGraph(next: FlowGraph, enabled: string) {
+  function displayGraph(next: FlowGraph, structure: string) {
+    // Mount/clock/size updates must not turn a running reveal into an instant swap.
+    if (animating && lastStructure === structure && !reducedMotion) { pendingGraph = next; return; }
+    pendingGraph = undefined;
     cancelAnimationFrame(animation);
-    const animate = lastEnabled !== '' && lastEnabled !== enabled && !reducedMotion;
-    lastEnabled = enabled;
+    const animate = lastStructure !== '' && lastStructure !== structure && !reducedMotion;
+    lastStructure = structure;
+    const previousGraph = graph;
     const old = new Map(flowNodes.map(node => [node.id, node]));
-    graph = next;
-    if (!animate) { flowNodes = next.nodes; finishAnimation(); return; }
+    if (!animate) { graph = next; flowNodes = next.nodes; finishAnimation(); return; }
     animating = true;
+    const nextIds = new Set(next.nodes.map(node => node.id));
+    const leaving = flowNodes.filter(node => !nextIds.has(node.id));
+    const oldEdges = new Map(previousGraph.edges.map(edge => [edge.id, edge]));
+    const nextEdgeIds = new Set(next.edges.map(edge => edge.id));
+    const edges = [...next.edges, ...previousGraph.edges.filter(edge => !nextEdgeIds.has(edge.id))];
     const start = performance.now();
     function frame(time: number) {
       const progress = Math.min(1, (time - start) / 240), eased = 1 - (1 - progress) ** 3;
-      flowNodes = next.nodes.map(node => {
-        const from = old.get(node.id); if (!from) return node;
-        const width = from.data.width + (node.data.width - from.data.width) * eased;
-        return { ...node, position: { x: from.position.x + (node.position.x - from.position.x) * eased, y: from.position.y + (node.position.y - from.position.y) * eased }, width, measured: { ...node.measured, width }, data: { ...node.data, width } };
-      });
-      if (progress < 1) animation = requestAnimationFrame(frame); else { flowNodes = next.nodes; finishAnimation(); }
+      flowNodes = [...next.nodes.map(node => {
+        const from = old.get(node.id);
+        const width = (from?.data.width ?? node.data.width) + (node.data.width - (from?.data.width ?? node.data.width)) * eased;
+        const reveal = (from?.data.reveal ?? (from ? 1 : 0)) * (1 - eased) + eased;
+        const x = from?.position.x ?? node.position.x - 24;
+        const y = from?.position.y ?? node.position.y;
+        return { ...node, style: `opacity: ${reveal};`, position: { x: x + (node.position.x - x) * eased, y: y + (node.position.y - y) * eased },
+          width, measured: { ...node.measured, width }, data: { ...node.data, width, reveal } };
+      }), ...leaving.map(node => {
+        const reveal = (node.data.reveal ?? 1) * (1 - eased);
+        return { ...node, draggable: false, style: `opacity: ${reveal}; pointer-events: none;`,
+          position: { x: node.position.x - 24 * eased, y: node.position.y }, data: { ...node.data, reveal } };
+      })];
+      const opacity = new Map(flowNodes.map(node => [node.id, node.data.reveal ?? 1]));
+      graph = { ...next, width: Math.max(previousGraph.width, next.width), height: Math.max(previousGraph.height, next.height),
+        edges: edges.map(edge => {
+          const from = oldEdges.get(edge.id)?.data?.joinY ?? edge.data!.joinY;
+          return { ...edge, style: `${edge.style} opacity: ${Math.min(opacity.get(edge.source) ?? 0, opacity.get(edge.target) ?? 0)};`,
+            data: { ...edge.data!, joinY: from + (edge.data!.joinY - from) * eased } };
+        }) };
+      if (progress < 1) animation = requestAnimationFrame(frame);
+      else {
+        const finalGraph = pendingGraph ?? next;
+        pendingGraph = undefined;
+        graph = finalGraph; flowNodes = finalGraph.nodes; finishAnimation();
+      }
     }
-    animation = requestAnimationFrame(frame);
+    frame(start);
   }
   $effect(() => {
     const next = buildGraph(nodes, day, { editing, selectedId, clockMinutes: 0, width: viewportWidth, activate, heights, inquiries, measureHeight,
       toggleProduct: product => onEnable(product, !day.enabled[product]), note: onNote, rows: onRows, remember: onRemember, directory, rates, now });
-    const enabled = enabledProducts.map(product => product.id).join(',') || 'none';
-    if (!dragging) untrack(() => displayGraph(next, enabled));
+    const structure = JSON.stringify([enabledProducts.map(product => product.id), next.nodes.map(node => node.id)]);
+    if (!dragging) untrack(() => displayGraph(next, structure));
   });
   onMount(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -115,6 +145,10 @@
         {/each}
         {#if cursor !== null}<circle class="clock-cursor" cx="88" cy={cursor} r="4" fill="#087cff" />{/if}
       </svg>
+      {#each branchFrames as frame (frame.id)}
+        <div class="branch-frame" data-workflow-branch={frame.id} data-scope={frame.scope} role="group" aria-label={frame.title}
+          style:left={`${frame.left}px`} style:top={`${frame.top}px`} style:width={`${frame.width}px`} style:height={`${frame.height}px`} style:opacity={frame.opacity}></div>
+      {/each}
       <SvelteFlow bind:nodes={flowNodes} edges={graph.edges} {nodeTypes} {edgeTypes} viewport={{ x: 0, y: 0, zoom: 1 }}
         proOptions={{ hideAttribution: true }} minZoom={1} maxZoom={1} nodesDraggable={editing} nodesConnectable={false} elementsSelectable={false}
         panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false}
@@ -132,8 +166,8 @@
   </div>
   <aside class="product-toggles" aria-label="流程展开与折叠">
     {#each products as product (product.id)}
-      <button type="button" class="product-toggle" aria-label={`${day.enabled[product.id] ? '折叠' : '展开'}${product.label}`} aria-expanded={day.enabled[product.id]} onclick={() => onEnable(product.id, !day.enabled[product.id])}>
-        {#if day.enabled[product.id]}<ChevronRight size={16} />{:else}<ChevronLeft size={16} />{/if}<span>{product.label}</span>
+      <button type="button" class="product-toggle" data-scope={product.id} aria-label={`${day.enabled[product.id] ? '折叠' : '展开'}${product.label}`} aria-expanded={day.enabled[product.id]} onclick={() => onEnable(product.id, !day.enabled[product.id])}>
+        <span class="product-dot" aria-hidden="true"></span><span>{product.label}</span>{#if day.enabled[product.id]}<ChevronRight size={16} />{:else}<ChevronLeft size={16} />{/if}
       </button>
     {/each}
   </aside>
@@ -145,13 +179,27 @@
   .product-category { position: absolute; max-width: 460px; min-height: 52px; border: 1px solid color-mix(in srgb, var(--category-tone) 25%, white); border-radius: 8px; --category-tone: #087cff; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 1rem; font-weight: bold; color: var(--category-tone); background: color-mix(in srgb, var(--category-tone) 9%, white); }
   .product-category[data-workflow-product="reverse"] { --category-tone: #00a773; }
   .product-category[data-workflow-product="exchange"] { --category-tone: #8090aa; }
-  .product-toggles { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 12px; align-self: flex-start; padding-block: 12px; width: 44px; flex: none; }
-  .product-toggle { display: flex; align-items: center; flex-direction: column; gap: 8px; width: 44px; min-height: 44px; padding: 12px 8px; background: white; border: 1px solid var(--tr-border); border-radius: 8px; color: var(--tr-muted); cursor: pointer; transition: color 150ms, background 150ms; }
-  .product-toggle span { writing-mode: vertical-rl; text-orientation: upright; font-size: .875rem; }
-  .product-toggle[aria-expanded="true"] { color: var(--brand); background: var(--accent); border-color: var(--brand); }
-  .product-toggle:hover { border-color: currentColor; }
+  .product-toggles { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 12px; align-self: flex-start; padding: 12px 8px 12px 0; width: 140px; flex: none; }
+  .product-toggle { --product-tone: #087cff; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 10px; background: var(--surface, white); border: 1px solid var(--tr-border); border-radius: 8px; color: var(--tr-muted); cursor: pointer; transition: color 150ms, background 150ms, border-color 150ms; }
+  .product-toggle[data-scope="reverse"] { --product-tone: #00a773; }
+  .product-toggle[data-scope="exchange"] { --product-tone: #8090aa; }
+  .product-toggle span:not(.product-dot) { flex: 1; white-space: nowrap; text-align: left; font-size: .875rem; font-weight: bold; }
+  .product-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; opacity: .5; }
+  .product-toggle[aria-expanded="true"] { color: var(--product-tone); background: color-mix(in srgb, var(--product-tone) 7%, white); border-color: color-mix(in srgb, var(--product-tone) 24%, white); }
+  .product-toggle[aria-expanded="true"] .product-dot { opacity: 1; }
+  .product-toggle:hover { border-color: var(--product-tone); }
+  .branch-frame { --frame-tone: #087cff; position: absolute; pointer-events: none; border: 1px solid color-mix(in srgb, var(--frame-tone) 28%, white); border-radius: 14px; background: color-mix(in srgb, var(--frame-tone) 3%, white); }
+  .branch-frame[data-scope="reverse"] { --frame-tone: #00a773; }
+  .branch-frame[data-scope="exchange"] { --frame-tone: #8090aa; }
   .product-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) { .product-toggle { transition: none; } }
+  @media (max-width: 700px) {
+    .workflow-diagram { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .product-toggles { grid-row: 1; flex-direction: row; width: 100%; padding: 8px; gap: 6px; background: white; z-index: 10; top: 0; }
+    .product-toggle { flex: 1; min-width: 0; padding: 8px 6px; gap: 4px; }
+    .product-dot { display: none; }
+    .flow-scroll { grid-row: 2; }
+  }
   .flow-scroll { flex: 1; min-width: 0; overflow-x: auto; }
   .flow-canvas { position: relative; }
   .workflow-timeline { position: absolute; inset: 0; pointer-events: none; overflow: visible; }

@@ -4,6 +4,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { installDom } from './svelte-dom.mjs';
 import { loadWorkflowView } from './workflow-bundle.mjs';
 const window = installDom();
+// This harness checks settled DOM/state contracts. Real 240ms motion is covered
+// by Playwright; happy-dom schedules rAF with setImmediate instead of paint frames.
+window.happyDOM.settings.device.prefersReducedMotion = 'reduce';
 // happy-dom rejects animation.finished during cancellation without the browser's
 // handled-promise behavior; observe that promise while retaining real transitions.
 const nativeAnimate = window.HTMLElement.prototype.animate;

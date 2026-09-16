@@ -2,7 +2,7 @@
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount } from 'svelte';
   import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-  import { ChevronDown, ChevronRight } from '@lucide/svelte';
+  import { ChevronRight } from '@lucide/svelte';
   import InquiryTable from './InquiryTable.svelte';
   import { isInquiry } from './model';
   import { nodeIcon, workflowIcons } from './icons';
@@ -17,7 +17,7 @@
   });
 </script>
 
-<Handle type="target" position={Position.Top} isConnectable={false} aria-hidden="true" tabindex={-1} />
+<Handle id="top" type="target" position={Position.Top} isConnectable={false} aria-hidden="true" tabindex={-1} />
 <Handle id="side" type="target" position={Position.Left} isConnectable={false} aria-hidden="true" tabindex={-1} />
 <Handle id="side" type="source" position={Position.Right} isConnectable={false} aria-hidden="true" tabindex={-1} />
 <div bind:this={body} class="workflow-node" class:decision={data.node?.kind === 'branch'}
@@ -32,7 +32,7 @@
       <Icon size={21} />
     </span>
     <span class="node-copy"><span class="node-title">{data.title}</span>{#if data.node?.detail}<span class="node-detail">{data.node.detail}</span>{/if}</span>
-    {#if data.node?.kind === 'branch' || (data.node && isInquiry(data.node))}<span class="node-chevron" aria-hidden="true">{#if data.expanded}<ChevronDown size={17} />{:else}<ChevronRight size={17} />{/if}</span>{/if}
+    {#if data.node?.kind === 'branch' || (data.node && isInquiry(data.node))}<span class="node-chevron" class:expanded={data.expanded} aria-hidden="true"><ChevronRight size={17} /></span>{/if}
   </button>
   {#if data.node && !isInquiry(data.node)}<span id={`workflow-state-${data.node.id}`} class="sr-only">{data.done ? '已完成' : '未完成'}</span>{/if}
   {#if data.node && isInquiry(data.node) && data.expanded && !data.editing}
@@ -41,7 +41,7 @@
     {#if data.note}<Textarea data-ui-owner="lib-trading-workflow-WorkflowNode-svelte" class={"ui-textarea legacy-note nodrag nopan nowheel"} aria-label="原询价记录" value={data.note} oninput={event => data.writeNote(event.currentTarget.value)}></Textarea>{/if}
   {/if}
 </div>
-<Handle type="source" position={Position.Bottom} isConnectable={false} aria-hidden="true" tabindex={-1} />
+<Handle id="bottom" type="source" position={Position.Bottom} isConnectable={false} aria-hidden="true" tabindex={-1} />
 
 <style>
   .workflow-node { position: relative; --node-tone: #087cff; }
@@ -59,10 +59,11 @@
   .node-title, .node-detail { line-height: 1.4; overflow-wrap: anywhere; }
   .node-title { font-size: 1.125rem; font-weight: bold; }
   .node-detail { font-size: .875rem; font-weight: normal; color: var(--tr-muted); white-space: pre-line; }
-  .node-chevron { color: var(--node-tone); display: flex; }
+  .node-chevron { color: var(--node-tone); display: flex; transition: transform 240ms ease; }
+  .node-chevron.expanded { transform: rotate(90deg); }
   .done .node-surface { background: color-mix(in srgb, var(--node-tone) 20%, white); border-color: color-mix(in srgb, var(--node-tone) 60%, white); }
   .workflow-node:has(:global(.inquiry-table)) .node-surface { border-radius: 8px 8px 0 0; }
   :global(.legacy-note[data-ui-owner="lib-trading-workflow-WorkflowNode-svelte"]) { width: 100%; font-size: .875rem; }
   :global(.svelte-flow__handle) { opacity: 0; pointer-events: none; }
-  @media (prefers-reduced-motion: reduce) { .node-surface { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .node-surface, .node-chevron { transition: none; } }
 </style>
