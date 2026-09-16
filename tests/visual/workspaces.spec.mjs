@@ -54,6 +54,9 @@ test('portal exposes real destinations', async ({ page }) => {
 
 test('workflow expands a branch and opens the real editor', async ({ page }) => {
   await page.goto('/trading-research/workflow');
+  const collapse = page.getByRole('button', { name: '折叠拆借', exact: true });
+  await expect(collapse).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(collapse).toHaveCSS('box-shadow', 'none');
   await page.getByRole('button', { name: '展开交易所回购', exact: true }).click();
   await expect(page.locator('[data-workflow-node="exchange-o32"]')).toBeVisible();
   await screenshot(page, 'workflow-expanded');

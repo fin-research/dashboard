@@ -87,7 +87,7 @@
       <div class="product-categories" style:grid-template-columns={`repeat(${Math.max(1, enabledProducts.length)}, minmax(0, 1fr))`}>
         {#each enabledProducts as product (product.id)}
           <div class="product-category" data-workflow-product={product.id} in:receive={{ key: product.id, duration: reducedMotion ? 0 : 240 }} out:send={{ key: product.id, duration: reducedMotion ? 0 : 240 }}>
-            <span>{product.label}</span><button type="button" class="btn btn-ghost" aria-label={`折叠${product.label}`} aria-expanded="true" onclick={() => onEnable(product.id, false)}><Archive size={18} /></button>
+            <span>{product.label}</span><button type="button" class="category-collapse" aria-label={`折叠${product.label}`} aria-expanded="true" onclick={() => onEnable(product.id, false)}><Archive size={18} /></button>
           </div>
         {/each}
       </div>
@@ -135,7 +135,10 @@
   .product-category { margin-inline: auto; width: calc(100% - 36px); max-width: 460px; min-height: 52px; border: 1px solid color-mix(in srgb, var(--category-tone) 25%, white); border-radius: 8px; --category-tone: #087cff; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 1rem; font-weight: bold; color: var(--category-tone); background: color-mix(in srgb, var(--category-tone) 9%, white); }
   .product-category[data-workflow-product="reverse"] { --category-tone: #00a773; }
   .product-category[data-workflow-product="exchange"] { --category-tone: #8090aa; }
-  .product-category .btn { color: var(--tr-muted, #667085); min-height: 44px; width: 44px; padding: 0; }
+  .category-collapse { display: inline-grid; place-items: center; flex: none; color: inherit; height: 44px; width: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; cursor: pointer; border-radius: 6px; transition: opacity 150ms; }
+  .category-collapse:hover { opacity: .7; }
+  .category-collapse:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
+  @media (prefers-reduced-motion: reduce) { .category-collapse { transition: none; } }
   .archived-products { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 12px; align-self: flex-start; padding-block: 12px; width: 32px; flex: none; }
   .archived-products:empty { display: none; }
   .archived-product { display: flex; align-items: center; flex-direction: column; gap: 8px; width: 30px; padding: 10px 4px; background: white; border: 1px solid var(--tr-border, #dbe7f7); border-radius: 6px; color: var(--tr-muted, #667085); cursor: pointer; }
