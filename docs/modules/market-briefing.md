@@ -36,3 +36,9 @@
 - 东财存量债成交收益率须大于零且偏离该券估值不超过 500bp，防止净价（如 100）混入收益率；收藏成交无效时仅回退有效的今日成交。均无效则成交及利差留空，债券、估值和报价保留；回退成交的利差按所用收益率与估值重算。
 
 交易日历来源：[上交所2026年休市安排](https://www.sse.com.cn/disclosure/dealinstruc/closed/c/c_20251222_10802510.shtml)。
+
+## 验证与恢复
+
+2026-09-16 本地验证：类型检查、Worker 类型检查、生产构建、544 项 Node 测试、53 项浏览器用例通过；1 项手机矩形拖拽按原规则跳过。CI 候选运行 `35077845510` 通过 5 项 Python、544 项 Node、构建与 53 项浏览器用例。市场点评桌面/手机的 darwin 与 macos-ci 基线已人工对照；本轮不更新其他模块基线。
+
+手动触发使用 `pnpm exec wrangler workflows trigger market-briefing '{"reportDate":"YYYY-MM-DD"}' --id market-briefing-YYYY-MM-DD`。运行失败时先检查失败步骤，同日可执行 `pnpm exec wrangler workflows instances restart market-briefing <id>`；仅邮件步骤失败时从 `--from-step-name notify-success` 恢复，避免重新采集或覆盖报告。跨日不能补跑实时行情。休市日期应在新年度交易所公告发布后更新 `src/lib/server/market-calendar.ts`。
