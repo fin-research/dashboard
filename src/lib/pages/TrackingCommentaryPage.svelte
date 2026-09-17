@@ -10,7 +10,7 @@
   import { NativeSelect } from "$lib/components/ui/native-select/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { globalMessages } from "$lib/global-messages";
-  import { commentaryTypeLabels, shanghaiDate, trackingText, type TrackingCommentary, type TrackingDraft, type TrackingRevision } from "$lib/tracking-commentary";
+  import { commentaryTypeLabels, shanghaiDate, trackingText, type TrackingCommentary, type TrackingDraft, type TrackingRevision, type CommentaryPdfArchive } from "$lib/tracking-commentary";
 
   type Item = Pick<TrackingCommentary, "id" | "eventName" | "type" | "commentaryDate" | "origin" | "edited" | "generatedAt">;
   let items = $state<Item[]>([]), query = $state(""), typeFilter = $state("");
@@ -144,6 +144,17 @@
     try { const result = await json<{ revisions: TrackingRevision[] }>(`/api/tracking-commentaries/${encodeURIComponent(id)}/revisions`); if (mounted && selected?.id === id) revisions = result.revisions; }
     catch (error) { fail(error); }
   }
+  async function archivePdf() {
+    if (busy) return; busy = true;
+    try {
+      const current = dirty || !selected ? await persist() : selected;
+      const pdf = await json<CommentaryPdfArchive>(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/pdf`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updatedAt: current.updatedAt }),
+      });
+      if (mounted && selected?.id === current.id) selected = { ...selected, pdf };
+      globalMessages.success("PDF 已归档");
+    } catch(error) { fail(error); } finally { busy = false; }
+  }
   async function copy() { try { await navigator.clipboard.writeText(trackingText(draft)); globalMessages.success("点评已复制"); } catch { globalMessages.error("复制失败"); } }
   function fail(error: unknown) { globalMessages.error(error instanceof Error ? error.message : "操作失败"); }
 </script>
@@ -156,6 +167,8 @@
       <Button variant="outline" disabled={busy || opening || !draft.eventName.trim()} onclick={save}>保存</Button>
       <Button variant="outline" disabled={opening} aria-pressed={preview} onclick={() => preview = !preview}>{preview ? "继续编辑" : "预览"}</Button>
       <Button variant="outline" disabled={!draft.commentary} onclick={copy}>复制正文</Button>
+      <Button variant="outline" disabled={busy || !draft.commentary.trim()} onclick={archivePdf}>归档 PDF</Button>
+      {#if selected?.pdf && !dirty}<Button variant="outline" href={`/api/tracking-commentaries/${encodeURIComponent(selected.id)}/pdf`}>下载 PDF</Button>{/if}
       {#if selected}<Button variant="outline" onclick={loadRevisions}>版本记录</Button>{/if}
       <Badge tone={dirty ? "warning" : "neutral"}>{dirty ? "未保存" : selected ? "已保存" : "新稿"}</Badge>
     </div>

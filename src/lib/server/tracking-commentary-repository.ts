@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { createTrackingSchema, TrackingDraft, TrackingCommentary, TrackingRevision, CommentaryEvidence } from "../tracking-commentary.ts";
+import type { createTrackingSchema, TrackingDraft, TrackingCommentary, TrackingRevision, CommentaryEvidence, CommentaryPdfArchive } from "../tracking-commentary.ts";
 import { PolicyRepositoryError } from "./policy-repository.ts";
 
 interface TrackingRow {
@@ -26,7 +26,10 @@ function fromRow(row: TrackingRow): TrackingCommentary {
 export async function getTrackingCommentary(db: Env["DB"], id: string): Promise<TrackingCommentary> {
   const row = await db.prepare(`${select} WHERE rc.id = ?`).bind(id).first<TrackingRow>();
   if (!row) throw new PolicyRepositoryError(404, "跟踪点评不存在");
-  return fromRow(row);
+  const value = fromRow(row);
+  value.pdf = await db.prepare(`SELECT revision_at AS revisionAt, r2_key AS key, file_name AS fileName, sha256, byte_size AS size,
+    archived_at AS archivedAt FROM research_commentary_pdf WHERE commentary_id=? AND revision_at=?`).bind(id,row.updated_at).first<CommentaryPdfArchive>();
+  return value;
 }
 export async function listTrackingCommentaries(db: Env["DB"], filters: { q?: string; type?: string; offset?: number; policyId?: string }) {
   const conditions: string[] = []; const values: (string | number)[] = [];

@@ -6,11 +6,13 @@ import { spawnSync } from 'node:child_process';
 import { compileExtractiveCommentary, extractiveCommentarySchema, retrieveTrackingResearch } from '../src/lib/server/tracking-commentary-generation.ts';
 import { createTrackingCommentary, updateTrackingCommentary, getTrackingCommentary, trackingRevisions, listTrackingCommentaries } from '../src/lib/server/tracking-commentary-repository.ts';
 import { generateTrackingSchema, trackingDraftSchema } from '../src/lib/tracking-commentary.ts';
+import { renderCommentaryPdf, commentaryPdfKey } from '../src/lib/research-commentary-pdf.ts';
+import { archiveCommentaryPdf, downloadCommentaryPdf } from '../src/lib/server/tracking-commentary-pdf.ts';
 import { parseResearchContent } from '../src/lib/report-content.ts';
 
 const sentence = '融资需求下降，资金价格中枢下移，发行窗口已经打开。';
 const source = { sourceId:'S1',sourceKey:'report/2026-09-17/报告.md',title:'报告',institution:'机构甲',publishedAt:'2026-09-17',text:`核心观点\n${sentence}\n如果资金保持宽松，长端利率将继续下行。` };
-const output = { eventSummary:{sourceId:'S1',text:sentence},sections:[{heading:'资金价格下移打开融资窗口',quotes:[{sourceId:'S1',text:sentence}]},{heading:'融资需求下降支撑债市',quotes:[{sourceId:'S1',text:sentence}]}],recommendation:'融资发行方面，前置安排中长期公司债发行，利用资金价格中枢下移的窗口锁定负债成本。',recommendationSources:['S1'] };
+const output = { eventSummary:{sourceId:'S1',text:sentence},sections:[{heading:'资金价格下移打开融资窗口',quotes:[{sourceId:'S1',text:sentence}]},{heading:'宽松资金支撑长端利率下行',quotes:[{sourceId:'S1',text:'如果资金保持宽松，长端利率将继续下行。'}]}],recommendation:'融资发行方面，前置安排中长期公司债发行，利用资金价格中枢下移的窗口锁定负债成本。',recommendationSources:['S1'] };
 
 test('excerpt compiler keeps source words and offsets, rejects rewritten or condition-stripped quotations', () => {
   const result = compileExtractiveCommentary(extractiveCommentarySchema.parse(output),[source]);
@@ -38,7 +40,7 @@ test('research retrieval sends Shanghai hard bounds, max 50 and preserves full r
 function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON; CREATE TABLE article(id TEXT PRIMARY KEY);');
-  for (const name of ['1004_create_policy_tracking.sql','1017_tracking_commentary_workspace.sql']) sqlite.exec(readFileSync(new URL(`../migrations/${name}`,import.meta.url),'utf8'));
+  for (const name of ['1004_create_policy_tracking.sql','1017_tracking_commentary_workspace.sql','1018_research_commentary_pdf.sql']) sqlite.exec(readFileSync(new URL(`../migrations/${name}`,import.meta.url),'utf8'));
   const db = {prepare(sql) { return { values:[],bind(...args){this.values=args;return this;},async first(){return sqlite.prepare(sql).get(...this.values) ?? null;},async all(){return {results:sqlite.prepare(sql).all(...this.values)};},async run(){const r=sqlite.prepare(sql).run(...this.values);return {meta:{changes:Number(r.changes)}};} }; },async batch(statements){sqlite.exec('BEGIN');try {const result=[];for(const s of statements)result.push(await s.run());sqlite.exec('COMMIT');return result;}catch(error){sqlite.exec('ROLLBACK');throw error;}}};
   return {db,sqlite};
 }
@@ -77,4 +79,33 @@ test('archive parser preserves all numbered headings, missing fields and idempot
   const result=JSON.parse(process.stdout);const {sqlite}=database();sqlite.exec(result.sql);sqlite.exec(result.sql);
   assert.equal(sqlite.prepare('SELECT COUNT(*) n FROM research_commentary').get().n,1);
   assert.equal(sqlite.prepare('SELECT commentary FROM research_commentary').get().commentary,result.r.commentary);sqlite.close();
+});
+
+
+test('PDF archive uses classified version keys, is idempotent, and downloads only indexed R2 objects', async () => {
+  const {db,sqlite}=database();
+  const current=await createTrackingCommentary(db,{...draft,policyId:null});
+  const objects=new Map();let writes=0;
+  const env={DB:db,EASTMONEY:{async put(key,bytes,options){writes++;objects.set(key,{bytes,options});return {size:bytes.length};},async get(key){const value=objects.get(key);return value ? {body:value.bytes,httpEtag:'"pdf"'} : null;}}};
+  const result=await archiveCommentaryPdf(env,current.id,current.updatedAt);
+  assert.equal(result.key,commentaryPdfKey(current));assert.ok(result.key.startsWith('research-commentary/时事快评/'));
+  assert.equal(result.sha256.length,64);assert.equal(result.size,objects.get(result.key).bytes.length);
+  assert.deepEqual(await archiveCommentaryPdf(env,current.id,current.updatedAt),result);assert.equal(writes,1);
+  const response=await downloadCommentaryPdf(env,current.id);
+  assert.equal(response.headers.get('Content-Type'),'application/pdf');assert.equal(response.headers.get('Cache-Control'),'private, no-store');
+  const bytes=new Uint8Array(await response.arrayBuffer());assert.equal(new TextDecoder().decode(bytes.slice(0,5)),'%PDF-');
+  const changed=await updateTrackingCommentary(db,current.id,{...draft,commentary:'新版本正文内容'},current.updatedAt);
+  await assert.rejects(archiveCommentaryPdf(env,current.id,current.updatedAt),/已更新/);
+  await assert.rejects(downloadCommentaryPdf(env,current.id),/尚未归档/);
+  await archiveCommentaryPdf(env,current.id,changed.updatedAt);assert.equal(objects.size,2);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM research_commentary_pdf').get().n,2);sqlite.close();
+});
+
+test('PDF renderer preserves Chinese text, escapes PDF syntax and paginates without truncation',()=>{
+  const body=renderCommentaryPdf({...draft,eventName:'融资 (研究) \\ 测试',commentary:'资金价格下移，融资窗口已经打开。'.repeat(400)});
+  const text=new TextDecoder().decode(body);
+  assert.match(text,/\/BaseFont \/STSong-Light/);assert.match(text,/\/ToUnicode/);
+  const count=Number(text.match(/\/Type \/Pages \/Kids \[[^\]]+\] \/Count (\d+)/)[1]);assert.ok(count>1);
+  const streams=[...text.matchAll(/<([0-9a-f]+)> Tj/g)].map(match=>match[1].match(/.{4}/g).map(hex=>String.fromCharCode(parseInt(hex,16))).join('')).join('');
+  assert.ok(streams.includes('融资 (研究) \\ 测试'));assert.equal((streams.match(/资金价格下移/g)||[]).length,400);
 });
