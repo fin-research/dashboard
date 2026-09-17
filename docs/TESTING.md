@@ -1,15 +1,16 @@
 # Dashboard 测试与视觉回归
 
-测试取舍遵循[项目组测试规范](../../eastmoney/docs/TESTING.md)。自 2026-09-16 起，日常单元、浏览器测试和构建验收只在 GitHub CI 执行；本地不重复运行，用户明确要求本地排障时例外。下方审计记录保留历史执行环境，覆盖率只代表注明的执行范围。
+测试取舍遵循[项目组测试规范](../../eastmoney/docs/TESTING.md)。自 2026-09-17 起，本地推送前执行 `pnpm check:quick` 和改动直接相关的轻量单元测试，完整覆盖率、浏览器测试及构建验收由 GitHub CI 执行；纯文档修改仅检查差异，本地排障可运行所需检查。下方审计记录保留历史执行环境，覆盖率只代表注明的执行范围。
 
 ## CI 命令
 
-每次分支推送和 PR 更新运行 `Dashboard CI`，包括以下测试与生产构建（含类型检查）。`test:coverage` 已运行完整 Node 测试集，不再重复调用 `test`。本地可下载 CI 证据并使用报告查看命令；推送、CI 等待与核验由子代理负责，详见 [DEVELOPMENT](DEVELOPMENT.md#默认验证与合并)。
+每次 PR 创建/更新和 `main` 推送运行 `Dashboard CI`，包括以下测试与生产构建；普通分支 push 不重复运行。类型检查前置，构建阶段只打包；`test:coverage` 已运行完整 Node 测试集，不再重复调用 `test`。本地可下载 CI 证据并使用报告查看命令；推送、CI 等待与核验由子代理负责，详见 [DEVELOPMENT](DEVELOPMENT.md#默认验证与合并)。
 
 ```bash
-pnpm test:coverage
+pnpm check:quick
 pnpm test:python
-pnpm build
+pnpm test:coverage
+pnpm exec vite build
 pnpm exec playwright install chromium
 pnpm test:visual
 pnpm test:visual:report
@@ -23,13 +24,13 @@ pnpm test:visual:report
 
 当前场景：门户、交易总览与管理、交易流程及展开/编辑态、授信总览/日历/周报/失败态、研究辅助、二级池非空与空态、市场点评、融资时点/时段控件及重置，融资择时非空报告，以及 Maia 多选、弹窗、日历筛选与热点键盘交互。桌面 1440×900、手机 390×844 都运行。固定夹具覆盖实际图表与表格，不访问真实业务网络；未注册请求与浏览器异常会失败。
 
-默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。新增或有意改变页面时，推送任务分支后手动触发独立候选 workflow：
+默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。新增或有意改变页面时，先在本地通过快速检查并推送任务分支，在创建 PR 前手动触发独立候选 workflow；已有 PR 时也可主动触发，不必先等普通 CI 失败：
 
 ```bash
 gh workflow run visual-baselines.yml --ref <task-branch>
 ```
 
-下载 `visual-baseline-candidates` artifact，核对预期后只提交有意变化的截图，再推送并等待普通 `Dashboard CI` 比较通过；候选任务成功不构成验收。日常比较由每次 push/PR 自动完成，不需要每次人工或 AI 看图。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。保留历史 `darwin` 基线；日常只维护 macOS 26/ARM64、锁定 Chromium 的 `macos-ci` 基线，不要求本地生成。普通 push/PR 和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。系统字体/渲染版本变化须在 CI 重新确认基线。CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
+下载 `visual-baseline-candidates` artifact，核对生成提交 SHA 和预期后只提交有意变化的截图，在同一 PR 说明预期变化与审阅依据，再推送并等待普通 `Dashboard CI` 比较通过；代码发生变化后不得直接使用旧候选。候选任务成功不构成验收；同一分支重新生成会取消旧候选运行。日常比较由每次 PR 更新和 `main` push 自动完成，不需要每次人工或 AI 看图。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。保留历史 `darwin` 基线；日常只维护 macOS 26/ARM64、锁定 Chromium 的 `macos-ci` 基线，不要求本地生成。普通 PR、`main` push 和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。系统字体/渲染版本变化须在 CI 重新确认基线。CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
 
 ## 审计与替换
 
@@ -63,4 +64,4 @@ PR #1 的首次检查 `35086092645` 捕获交易流程展开截图的测量竞�
 
 ## 跟踪点评工作台
 
-新增原文句界与来源校验、检索硬过滤、D1真实SQLite版本归档/乐观锁、历史导入幂等与缺项保持测试；浏览器组件场景覆盖历史稿、保存冲突保留输入、生成与取材原句。与其它场景一样只在CI运行，不代表生产鉴权验收。
+新增原文句界与来源校验、检索硬过滤、D1真实SQLite版本归档/乐观锁、历史导入幂等与缺项保持测试；浏览器组件场景覆盖历史稿、保存冲突保留输入、生成与取材原句。浏览器组件场景默认在 CI 运行，不代表生产鉴权验收。

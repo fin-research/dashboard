@@ -16,11 +16,13 @@ pnpm dev
 
 ## 默认验证与合并
 
-单元测试、浏览器组件集成测试和构建验收统一交给 GitHub Actions，本地不再运行 `pnpm test*`、Playwright、类型检查或重复构建验收；用户明确要求本地排障时例外。本地完成修改、审阅差异和 `git diff --check` 后进入交付流程。
+本地负责快速反馈，GitHub Actions 负责完整合并验收。使用与 CI 一致的 Node 24 和仓库 `packageManager` 指定的 pnpm；推送前必须运行 `pnpm check:quick`，依次检查差异、Svelte/应用类型和 Worker 类型。逻辑变更或缺陷修复还须运行直接相关的轻量单元测试，例如 `node --test tests/market-briefing-workflow.test.mjs`；同一份改动已有通过结果时不重复运行。纯文档修改只需 `git diff --check`。
+
+本地默认不重复全量覆盖率、浏览器截图或生产构建；排障需要时可以运行，无需额外申请。`pnpm build` 仍包含两类类型检查，已经对同一份改动成功构建时无需另跑类型检查。`check:quick` 不连接业务数据库、不调用线上服务；SvelteKit 类型同步会写入本地生成目录 `.svelte-kit`。本地检查通过后才进入以下流程，不能用本地结果替代 CI。
 
 1. 主代理修改代码并划定本任务文件，每次派一个新的子代理负责提交、推送任务分支和创建/更新 PR；禁止直接推送 `main`。
-2. 每次分支 push 和 PR 更新触发 `.github/workflows/tests.yml` 的 `Dashboard CI`，依次执行 Python 测试、Node 单元/契约测试与覆盖率、`pnpm build`（含 Svelte/Worker 类型检查）、Playwright 截图比较与浏览器交互、`git diff --check`。所有改动均运行完整检查，不按路径跳过。
-3. 子代理等待当前提交的 push/PR 运行结束，核对 PR 最新 head SHA、check 名称、结论与运行链接。失败、取消、跳过或尚未完成均不能作为通过；返回失败日志，由主代理修复并重新委派推送和核验。
+2. PR 创建/更新和 `main` push 触发 `.github/workflows/tests.yml` 的 `Dashboard CI`；普通任务分支 push 不单独触发，推送后须创建 PR（草稿 PR 也运行），避免同一更新 push/PR 双跑。依次执行 `pnpm check:quick`、Python 测试、Node 单元/契约测试与覆盖率、`pnpm exec vite build`、Playwright 截图比较与浏览器交互。CI 构建复用前序类型检查结果，不在同一次运行重复检查；所有改动均运行完整检查，不按路径跳过。依赖下载使用 pnpm 缓存，安装仍采用 frozen lockfile。
+3. 子代理等待当前提交的 PR 运行结束，核对 PR 最新 head SHA、check 名称、结论与运行链接。同一 PR 新提交自动取消旧 CI，只以最新提交的检查为准；`main` 正在运行的检查不自动取消。失败、取消、跳过或尚未完成均不能作为通过；返回失败日志，由主代理修复并重新委派推送和核验。
 4. `main` ruleset 要求 PR 和 GitHub Actions 来源的 `Dashboard CI`，分支必须基于最新 `main` 通过检查；不要求额外人工批准，不设置管理员或应用 bypass，禁止删除/强推。配置源为 `.github/main-ruleset.json`；修改此文件不会自动修改 GitHub 规则，须使用仓库 rulesets API 应用并读回核验。
 5. CI 通过且交付范围允许合并时，子代理通过普通 PR 合并（禁止 `--admin`），核对合并提交、`main` CI 和 Cloudflare 构建状态。报告记录 SHA 与实际运行结果；CI 成功不代表生产鉴权或全部路由 E2E 已验收。
 
@@ -28,7 +30,7 @@ pnpm dev
 
 ## 专项验证
 
-下列测试也以 CI 为执行环境；涉及真实数据、权限或线上服务的专项验证按任务单独安排，不因常规 CI 通过而省略或声称通过。
+下列轻量测试可在本地按改动范围先运行，完整测试集仍由 CI 执行；涉及真实数据、权限或线上服务的专项验证按任务单独安排，不因常规 CI 通过而省略或声称通过。
 
 - 报告口径：运行 `report-view`、`text-report`、`primary-issues` 相关测试，并核对视觉/文字共用字段。
 - 热点：运行热点、快照、AI Gateway 测试；必要时在本地 D1 请求 GET/POST。
