@@ -3,9 +3,9 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 import { getContext, onMount } from 'svelte';
 import ModuleCard from '../../../components/ModuleCard.svelte';
 import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
-import { Button } from '$lib/components/ui/button';
-import { Input } from '$lib/components/ui/input';
-import { Checkbox } from '$lib/components/ui/checkbox';
+import { Button } from '$lib/components/ui/button/index.js';
+import { Input } from '$lib/components/ui/input/index.js';
+import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 import { globalMessages } from '$lib/global-messages';
 type Category='workflow'|'trading'|'financing';
 type Channel='email'|'telegram'|'webpush';

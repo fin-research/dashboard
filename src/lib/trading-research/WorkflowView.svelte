@@ -204,7 +204,6 @@
 
 <div class="workflow-view">
   <div class="workflow-header" use:portal={'#tr-topbar-actions'}>
-    <Button variant="ghost" href="/management/notifications">通知</Button>
     <time class="workflow-clock" datetime={`${clock.date}T${clock.time}+08:00`} aria-label="当前时间"><Clock size={18} aria-hidden="true" />{clock.time}</time>
     {#if canEdit && config}
       <label class="edit-mode"><Checkbox  bind:checked={() => editing, (value) => { value ? startEditing() : cancelEditing(); }} disabled={saving} />编辑模式</label>

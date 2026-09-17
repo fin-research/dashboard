@@ -95,7 +95,8 @@ export async function collectDueReminders({ asOf, asOfDate, db, directory } = {}
 			targetType: 'project_task',
 			targetId: row.targetId,
 			projectId: row.projectId,
-			userIds: row.recipientMode === 'owner' ? [row.ownerId] : row.recipientMode === 'assignee' ? [row.assigneeId] : people.filter(person => person.active && recipients.includes(person.email)).map(person => person.id),
+			unresolvedRecipients: row.recipientMode === 'custom' ? recipients.filter(email => !people.some(person => person.active && person.email.toLowerCase() === email.toLowerCase())) : [],
+			userIds: row.recipientMode === 'owner' ? [row.ownerId] : row.recipientMode === 'assignee' ? [row.assigneeId] : people.filter(person => person.active && recipients.some(email => email.toLowerCase() === person.email.toLowerCase())).map(person => person.id),
 			projectName: row.projectName,
 			taskName: row.taskName,
 			debtType: row.debtType,
@@ -150,6 +151,7 @@ export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, con
 		}
 
 		try {
+			if (!reminder.userIds?.length || reminder.unresolvedRecipients?.length) throw new Error('提醒收件人未关联有效本站账号');
 			const response = await messengerJson(messenger, '/notifications', {
                 source: 'financing', category: 'financing',
                 idempotencyKey: `reminder/${reminder.ruleId}/${reminder.targetId}/${reminder.periodId}`,

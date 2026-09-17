@@ -73,13 +73,13 @@ test('page loads defer form-only options and remove duplicate identity queries',
 		readFile(new URL('../../src/routes/financing/projects/options/+server.ts', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/projects/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/management/financing-profile/+page.server.ts', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/routes/profile/+page.svelte', import.meta.url), 'utf8'),
+		readFile(new URL('../../src/routes/management/me/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/sop/[id]/+page.server.ts', import.meta.url), 'utf8')
 	]);
 	assert.doesNotMatch(projectsPage, /getProjectFormOptions|getActiveProjectSopOptions/);
 	assert.match(projectOptions, /getProjectFormOptions/);
 	assert.match(projectComponent, /fetch\(withBase\('\/projects\/options'\)/);
-	assert.match(settingsPage, /redirect\(303, '\/profile'\)/);
+	assert.match(settingsPage, /redirect\(303, '\/management\/me'\)/);
 	assert.match(settingsComponent, /profile\.name/);
 	assert.match(sopDetail, /async function loadSopDetail/);
 	assert.match(sopDetail, /jsonb_agg\(jsonb_build_object/);

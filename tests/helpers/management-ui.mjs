@@ -5,9 +5,12 @@ const window = installDom();
 const { mount, unmount, flushSync, tick } = await import('svelte');
 const { globalMessages } = await import('../../src/lib/global-messages.ts');
 const { PERMISSION_CODES } = await import('../../src/lib/permissions.ts');
+const {createClientSession}=await import('../../src/lib/client-session.ts');
+const session=createClientSession({user:{id:'auth0|test',email:'test@18.cn'},account:{name:'测试人员',department:'资金管理部'},roles:[{id:'rol_TestAdmin',name:'admin'}],permissions:[...PERMISSION_CODES],expiresAt:Date.now()/1000+3600});
+const context=new Map([['site-session',session]]);
 globalThis.fetch = async () => Response.json({user:null,account:null});
 const Page = await loadComponent('src/routes/management/people/+page.svelte', (await readFile(new URL('../../src/routes/management/people/+page.svelte',import.meta.url),'utf8')).replace("import { invalidate } from '$app/navigation';", "const invalidate=async()=>{};"));
-const app = mount(Page,{target:document.body,props:{data:{roles:[{id:'rol_A',name:'测试管理员',description:''},{id:'rol_B',name:'测试成员',description:''}],configurations:{rol_A:{permissions:[PERMISSION_CODES[0]]},rol_B:{permissions:[]}},permissions:['auth.permission:update'],updatedAt:Date.now(),mode:'enforce'}}});
+const app = mount(Page,{context,target:document.body,props:{data:{roles:[{id:'rol_A',name:'测试管理员',description:''},{id:'rol_B',name:'测试成员',description:''}],configurations:{rol_A:{permissions:[PERMISSION_CODES[0]]},rol_B:{permissions:[]}},permissions:['auth.permission:update'],updatedAt:Date.now(),mode:'enforce'}}});
 flushSync();
 assert.equal(document.querySelector('a[target="_blank"]').getAttribute('href'),'https://manage.auth0.com/dashboard/eu/hasbai/roles');
 assert.equal(document.querySelector('.permission-editor form'),null);
@@ -21,27 +24,23 @@ assert.ok(document.querySelector('.permission-editor').textContent.includes('无
 await unmount(app);
 globalMessages.clear();
 
-const profileSource=(await readFile(new URL('../../src/routes/profile/+page.svelte',import.meta.url),'utf8'))
+const profileSource=(await readFile(new URL('../../src/routes/management/me/+page.svelte',import.meta.url),'utf8'))
   .replace("import { invalidate } from '$app/navigation';", "const invalidate=async()=>{};")
   .replace("import { isLoginRedirecting } from '$lib/auth-client';", "const isLoginRedirecting=()=>false;");
-const ProfilePage=await loadComponent('src/routes/profile/+page.svelte',profileSource);
-globalThis.fetch=async url=>Response.json(String(url)==='/auth/permissions'
-  ? {permissions:[PERMISSION_CODES[0]],updatedAt:Date.now()}
-  : {name:'测试人员',email:'test@18.cn',emailVerified:true,roles:[{name:'authenticated'},{name:'financing:admin'}],permissions:[]});
-const profileApp=mount(ProfilePage,{target:document.body,props:{data:{email:'test@18.cn',account:{name:'测试人员',department:'资金管理部'}}}});
-flushSync();
-for(let i=0;i<10&&!document.querySelector('.permission-roles');i++){await new Promise(resolve=>setTimeout(resolve,0));flushSync();}
-assert.deepEqual([...document.querySelectorAll('.permission-roles li')].map(node=>node.textContent.trim()),['基础用户','融资管理员']);
-const refreshLinks=[...document.querySelectorAll('a')].filter(node=>node.textContent.trim()==='刷新权限');
-assert.equal(refreshLinks.length,1);
-assert.ok(refreshLinks[0].closest('.permission-footer'));
-assert.equal(refreshLinks[0].getAttribute('href'),'/auth/login?returnTo=%2Fprofile');
-assert.equal(document.querySelector('.profile-permissions .tr-panel-heading button'),null);
-assert.equal(document.querySelector('.profile-permissions .tr-panel-heading a'),null);
-assert.equal(document.querySelector('.profile-header form'),null);
-assert.doesNotMatch(document.body.textContent,/刷新登录角色|刷新我的权限|授权缓存更新于|权限由 Auth0|仅支持 18.cn/);
+const ProfilePage=await loadComponent('src/routes/management/me/+page.svelte',profileSource);
+globalThis.fetch=async()=>Response.json({name:'测试人员',email:'test@18.cn',emailVerified:true,roles:[],permissions:[]});
+const profileApp=mount(ProfilePage,{context,target:document.body,props:{data:{email:'test@18.cn',account:{name:'测试人员',department:'资金管理部'}}}});
+for(let i=0;i<10;i++){await new Promise(resolve=>setTimeout(resolve,0));flushSync();}
+assert.equal(document.querySelector('input[name="name"]').value,'测试人员');
+assert.equal(document.querySelector('.profile-permissions'),null,'permissions moved to their own page');
 await unmount(profileApp);
-globalThis.fetch=async()=>Response.json({user:null,account:null});
+const PermissionPage=await loadComponent('src/routes/management/permissions/+page.svelte');
+session.seed({...session.current(),roles:[{id:'rol_A',name:'authenticated'},{id:'rol_B',name:'financing:admin'}],permissions:[PERMISSION_CODES[0]]});
+const permissionsApp=mount(PermissionPage,{context,target:document.body});flushSync();
+assert.deepEqual([...document.querySelectorAll('.permission-roles li')].map(node=>node.textContent.trim()),['基础用户','融资管理员']);
+assert.equal([...document.querySelectorAll('a')].find(node=>node.textContent.trim()==='刷新权限').getAttribute('href'),'/auth/login?returnTo=%2Fmanagement%2Fpermissions');
+assert.equal(document.querySelectorAll('.action-granted').length,1);
+await unmount(permissionsApp);
 
 const AccountHost=await loadComponent('tests/helpers/AccountHost.svelte',`<script>
 import {setContext} from 'svelte';
@@ -50,9 +49,9 @@ let account=$state({name:'测试人员',department:'资金管理部'});
 setContext('site-account',()=>account);
 export function rename(){account={name:'新姓名',department:'资金管理部'}};
 </script><AuthMenu />`);
-const accountApp=mount(AccountHost,{target:document.body});flushSync();
+const accountApp=mount(AccountHost,{context,target:document.body});flushSync();
 assert.equal(document.querySelectorAll('a').length,1);
-assert.equal(document.querySelector('a').getAttribute('href'),'/profile');
+assert.equal(document.querySelector('a').getAttribute('href'),'/management/me');
 assert.match(document.querySelector('a').textContent,/测试人员\s*\/\s*资金管理部/);
 assert.ok(document.querySelector('a svg'));
 assert.equal(document.querySelector('[href="/management"]'),null);
