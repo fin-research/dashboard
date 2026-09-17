@@ -176,6 +176,7 @@ test('workflow successor edits save and reload without duplicating a shared node
       expect(body.expectedVersion).toBe(stored.version);
       expect(body.flows.map(flow => flow.id)).toEqual(['loan', 'reverse', 'exchange']);
       stored = { ...stored, nodes: body.nodes, flows: body.flows, version: stored.version + 1 };
+      return route.fulfill({ json: { version: stored.version, flows: stored.flows, nodes: stored.nodes } });
     }
     return route.fulfill({ json: stored });
   });
