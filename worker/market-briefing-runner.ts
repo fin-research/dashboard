@@ -1,10 +1,11 @@
 import { knownMarketClosure } from "../src/lib/server/market-calendar.ts";
 import type { WorkflowStep } from "cloudflare:workers";
-import { industrySnapshotSchema } from "../src/data-contracts.ts";
+import { industrySnapshotSchema, stockSummarySchema } from "../src/data-contracts.ts";
+import { buildReportData } from "../src/market-report-resources.ts";
 import { reportDataSchema } from "../src/market-report.ts";
 import { currentReportDate } from "../src/report-date.ts";
-import { fetchDataJson, generateMarketBriefing } from "../src/lib/server/market-briefing.ts";
-import { collectMarketReport, MARKET_DATA_STEP_OPTIONS } from "./market-report-collector.ts";
+import { completeAll, fetchBriefingNews, generateMarketBriefingFromNews } from "../src/lib/server/market-briefing.ts";
+import { collectMarketReport, createMarketDataLoader, MARKET_DATA_STEP_OPTIONS } from "./market-report-collector.ts";
 import { saveMarketReport } from "../src/lib/server/market-report.ts";
 import { sendMarketBriefingResult } from "../src/lib/server/market-briefing-email.ts";
 
@@ -14,6 +15,7 @@ export const MARKET_BRIEFING_CRON = "0 9 * * MON-FRI";
 
 export async function startMarketBriefing(env: Env, scheduledTime: number) {
   const reportDate = currentReportDate(new Date(scheduledTime));
+  if (knownMarketClosure(reportDate) === true) return;
   const id = `market-briefing-${reportDate}`;
   // create is atomic by ID; get only confirms a duplicate after an uncertain create.
   try { return await env.MARKET_BRIEFING.create({ id, params: { reportDate } }); }
@@ -32,39 +34,33 @@ export async function runMarketBriefing(
   step: WorkflowStep,
   params: MarketBriefingParams,
   instanceId: string,
-  dependencies = { collectMarketReport, generateMarketBriefing, saveMarketReport, sendMarketBriefingResult },
+  dependencies = { generateMarketBriefingFromNews, saveMarketReport, sendMarketBriefingResult },
 ) {
   const { reportDate } = params;
   let result: { finalizedAt: string | null; focus: string };
   try {
-    const industry = await step.do("trading-day", MARKET_DATA_STEP_OPTIONS, async () => {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)
-        || new Date(`${reportDate}T00:00:00Z`).toISOString().slice(0, 10) !== reportDate) throw new Error("报告日期无效");
-      // The live-only sources cannot replay earlier days. Never label current trades as history.
-      if (currentReportDate() !== reportDate) throw new Error("仅支持生成当日市场点评，历史行情不可回放");
-      if (knownMarketClosure(reportDate) === true) return null;
-      const industry = await fetchDataJson(env,
-        `https://data.internal/data/industry?date=${reportDate}&fields=dataDate,equities,industries,turnoverYi,turnoverChangeYi,tradingDates`,
-        industrySnapshotSchema);
-      if (!industry.tradingDates.includes(reportDate)) throw new Error("当日行情尚未更新或交易日历未确认，请重试");
-      return industry;
-    });
-    if (!industry) return { reportDate, status: "skipped", reason: "非交易日" };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)
+      || new Date(`${reportDate}T00:00:00Z`).toISOString().slice(0, 10) !== reportDate) throw new Error("报告日期无效");
+    if (knownMarketClosure(reportDate) === true) return { reportDate, status: "skipped", reason: "非交易日" };
 
-    // allSettled waits for every durable branch, including its configured retries.
-    const branches = await Promise.allSettled([
-      dependencies.collectMarketReport(env, step, reportDate, industry),
-      step.do("generate-focus", {
-        retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "15 minutes",
-      }, () => dependencies.generateMarketBriefing(env, reportDate)),
+    const load = createMarketDataLoader(env, step, reportDate);
+    const industry = load("industry",
+      `industry?date=${reportDate}&fields=dataDate,equities,industries,turnoverYi,turnoverChangeYi,tradingDates`,
+      industrySnapshotSchema, snapshot => {
+        if (!snapshot.tradingDates.includes(reportDate)) throw new Error("当日行情尚未更新或交易日历未确认，请重试");
+      });
+    const stock = load("stock", `stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema);
+    const [resources, focus] = await completeAll([
+      collectMarketReport(load, reportDate, industry, stock),
+      fetchBriefingNews(env, reportDate, undefined, { stock, load }).then(news =>
+        step.do("generate-focus", {
+          retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "15 minutes",
+        }, () => dependencies.generateMarketBriefingFromNews(env, reportDate, news, { retry: false }))),
     ]);
-    const failures = branches.filter(branch => branch.status === "rejected");
-    if (failures.length) throw new Error(failures.map(branch => String(branch.reason instanceof Error ? branch.reason.message : branch.reason)).join("；"));
-    const [report, focus] = branches;
-    if (report.status !== "fulfilled" || focus.status !== "fulfilled") throw new Error("市场点评数据不完整");
     result = await step.do("aggregate-and-save-r2", MARKET_DATA_STEP_OPTIONS, async () => {
       const snapshot = await dependencies.saveMarketReport(env.EASTMONEY, reportDate,
-        reportDataSchema.parse(report.value), `1、${focus.value.stock}\n2、${focus.value.bond}`);
+        reportDataSchema.parse(buildReportData({ ...resources, generatedAt: new Date().toISOString() })),
+        `1、${focus.stock}\n2、${focus.bond}`);
       return { finalizedAt: snapshot.finalized_at, focus: snapshot.focus_text };
     });
   } catch (error) {

@@ -39,6 +39,8 @@ export interface AiGatewayOptions {
   requestTimeoutMs: number;
   taskType: AiGatewayTaskType;
   tools?: readonly AiGatewayTool[];
+  /** Workflow callers delegate every retry to their durable step. */
+  retry?: boolean;
   signal?: AbortSignal;
   onAttempt?: (attempt: "primary" | "retry") => void;
   onReasoningSummary?: (summary: { id: string; text: string }) => void;
@@ -194,8 +196,8 @@ export async function generateAiGatewayObject<OUTPUT>(
   );
   options.signal?.throwIfAborted();
   if (primary.ok) return primary.value;
-  // Keep the existing single-attempt budget for credit answers.
-  if (options.taskType === "credit_answer") throw primary.error;
+  // Workflow steps and credit answers own their attempt budget.
+  if (options.retry === false || options.taskType === "credit_answer") throw primary.error;
   if (!primary.error.retryable) throw primary.error;
 
   console.warn(

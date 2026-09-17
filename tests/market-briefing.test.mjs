@@ -5,6 +5,7 @@ import {
   buildMarketBriefingPrompt,
   filterMarketBriefingNews,
   generateMarketBriefing,
+  generateMarketBriefingFromNews,
   MARKET_BRIEFING_SYSTEM,
 } from "../src/lib/server/market-briefing.ts";
 
@@ -178,4 +179,19 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     globalThis.fetch = originalFetch;
     console.log = originalLog;
   }
+});
+
+
+test("Workflow AI 单次尝试且只使用传入新闻，失败交给step重试", async t => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    calls.push({ url: String(url), body: JSON.parse(init.body) });
+    return Response.json({ error: { message: "unavailable" } }, { status: 503 });
+  });
+  const env = { CLOUDFLARE_ACCOUNT_ID: "account", AI_GATEWAY_ID: "default", CF_AIG_TOKEN: "test",
+    DATA: { fetch: () => { throw new Error("must not refetch news"); } } };
+  await assert.rejects(generateMarketBriefingFromNews(env, "2026-08-25",
+    { news_text: "持久化的新闻材料", news_count: 2 }, { retry: false }), /HTTP 503/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.input[0].content, "持久化的新闻材料");
 });
