@@ -282,7 +282,7 @@
 <div class="credit-chat" bind:this={chat}>
   <!-- Keep the component's root in place; only move its nested toolbar. -->
   <div class="chat-toolbar" use:portal={"#tr-topbar-actions"}>
-    <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button chat-button--new"} type="button" disabled={busy || !selectedCustomer} onclick={() => void newSession()}>
+    <Button permission="credit.assistant:ask" data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button chat-button--new"} type="button" disabled={busy || !selectedCustomer} onclick={() => void newSession()}>
       <WorkbenchIcon name="plus" /><span>{creating ? "正在新建…" : "新对话"}</span>
     </Button>
   </div>
@@ -352,7 +352,7 @@
             <CreditActivityView {session} {sending} notice={streamNotice} />
             {#if draftText}<div class="streaming-answer" aria-label="正在生成的答复" aria-live="off"><span class="draft-label">答复草稿 · 正在核对</span><p class="answer-paragraph">{draftText}</p></div>{/if}
           {:else if session.error}
-            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button"} type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</Button>{/if}</div>
+            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<Button permission="credit.assistant:ask" data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button"} type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</Button>{/if}</div>
           {/if}
         </div>
       </article>
@@ -386,7 +386,7 @@
       </div>
       <span class="customer-status" aria-live="polite" title={selectedCustomer ? `授信列表快照：${selectedCustomer.reportDate}` : undefined}>{selectedCustomer ? confidentialityLabel(selectedCustomer.confidentialityStatus) : "请选择机构"}</span>
     </div>
-    <form class="chat-composer" onsubmit={send} bind:this={form}>
+    <form data-permission="credit.assistant:ask" class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
       <Textarea data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" class={"ui-textarea textarea-ghost"} id="credit-question" bind:ref={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows={2} disabled={creating}></Textarea>
       <div class="composer-actions">

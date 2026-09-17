@@ -223,7 +223,7 @@
                 </section>
 
                 <section>
-                  <div class="section-heading"><h3>关联研报 <span>{policy.articles.length}</span></h3><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => openArticleEditor(policy)}>调整关联</Button></div>
+                  <div class="section-heading"><h3>关联研报 <span>{policy.articles.length}</span></h3><Button permission="research.policy:update" data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => openArticleEditor(policy)}>调整关联</Button></div>
                   {#if policy.articles.length > 0}
                     <ul class="article-list">
                       {#each policy.articles as article}
@@ -267,7 +267,7 @@
           <label class:selected={selectedArticleIds.has(article.id)}><Checkbox data-ui-owner="lib-pages-PolicyTrackingPage-svelte"  checked={selectedArticleIds.has(article.id)} onCheckedChange={() => toggleArticle(article.id)} /><span><strong>{article.title}</strong><small>{article.author || "未标注机构"} · {formatDate(article.publishedAt.slice(0, 10))}</small><p>{article.summary}</p></span></label>
         {/each}
       </div>
-      <footer><span>已选择 {selectedArticleIds.size} 篇</span><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="default" class={"ui-button  primary-action"} type="button" disabled={savingArticles} onclick={saveArticles}>{savingArticles ? "保存中" : "保存关联"}</Button></footer>
+      <footer><span>已选择 {selectedArticleIds.size} 篇</span><Button permission="research.policy:update" data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="default" class={"ui-button  primary-action"} type="button" disabled={savingArticles} onclick={saveArticles}>{savingArticles ? "保存中" : "保存关联"}</Button></footer>
     </div>
   </Modal>
 {/if}

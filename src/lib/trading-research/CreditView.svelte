@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { permissionVisibility } from "$lib/permission-visibility";
+  const allowed=permissionVisibility();
   import { Checkbox } from "$lib/components/ui/checkbox/index.js";
   import Modal from "$lib/components/Modal.svelte";
   import { Input } from "$lib/components/ui/input/index.js";
@@ -723,7 +725,7 @@
         {/if}
       </div>
     {/if}
-    {#if activeTab === "overview"}<Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button "} type="button" onclick={openCreate}>新增机构</Button>{/if}
+    {#if activeTab === "overview"}<Button permission="credit.institution:update" data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button "} type="button" onclick={openCreate}>新增机构</Button>{/if}
   </div>
 
   <Modal  bind:this={createDialog} aria-labelledby="credit-create-title">
@@ -864,9 +866,9 @@
                 <td class="is-numeric">{institution.utilization == null ? "—" : `${institution.utilization.toFixed(1)}%`}</td>
                 <td>{institution.effectiveDate ?? "—"}</td>
                 <td>{institution.expiryDate ?? "—"}</td>
-                <td><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button  tr-credit-detail-toggle"} type="button" aria-expanded={expandedInstitution === institution.institutionName} onclick={() => toggleInstitution(institution)}>{expandedInstitution === institution.institutionName ? "收起" : "详情"}</Button></td>
+                <td><Button permission="credit.institution:update" data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button  tr-credit-detail-toggle"} type="button" aria-expanded={expandedInstitution === institution.institutionName} onclick={() => toggleInstitution(institution)}>{expandedInstitution === institution.institutionName ? "收起" : "详情"}</Button></td>
               </tr>
-              {#if expandedInstitution === institution.institutionName && editor}
+              {#if expandedInstitution === institution.institutionName && editor && $allowed("credit.institution:update")}
                 <tr class="tr-credit-detail-row">
                   <td colspan="11">
                     <div class="tr-credit-detail">

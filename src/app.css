@@ -83,3 +83,5 @@
 
 .dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
 .dialog-body { min-width: 0; max-width: 100%; }
+
+[data-auth-hidden] { display: none !important; }

@@ -6,7 +6,7 @@
   import { page } from '$app/state';
   import AuthMenu from '$lib/AuthMenu.svelte';
   import FundReportUploadDialog from '$lib/FundReportUploadDialog.svelte';
-  import { requireClientLogin, isLoginRedirecting } from '$lib/auth-client';
+  import { requireClientPermission, isLoginRedirecting } from '$lib/auth-client';
   import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
   import { globalMessages } from '$lib/global-messages';
   import type { PageData } from "./$types";
@@ -20,7 +20,7 @@
     if (checkingLogin) return;
     checkingLogin = true;
     try {
-      if (await requireClientLogin('/fund-report?upload=1', session)) uploadDialog.open();
+      if (await requireClientPermission('admin', '/fund-report?upload=1', session)) uploadDialog.open();
     } catch (error) {
       if (!isLoginRedirecting()) globalMessages.error(error instanceof Error ? error.message : '登录状态读取失败');
     } finally { checkingLogin = false; }
@@ -28,7 +28,7 @@
   function refreshReports() {
     void invalidate('app:fund-reports').catch(() => globalMessages.error('日报已保存，列表刷新失败，请重新加载'));
   }
-  onMount(() => { if (page.url.searchParams.get('upload') === '1') void openUpload(); });
+  onMount(() => { if ($session?.roles.some(role=>role.name==='admin') && page.url.searchParams.get('upload') === '1') void openUpload(); });
 
   function formatReportDate(date: string): string {
     const [year, month, day] = date.split("-");
@@ -73,7 +73,7 @@
       </h1>
     </div>
     <div class="header-actions">
-      <Button data-ui-owner="routes-fund-report--page-svelte" variant="outline" class={"ui-button upload-entry"} type="button" disabled={checkingLogin} onclick={openUpload}>
+      <Button permission="admin" data-ui-owner="routes-fund-report--page-svelte" variant="outline" class={"ui-button upload-entry"} type="button" disabled={checkingLogin} onclick={openUpload}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6" /></svg>
         {checkingLogin ? '正在检查登录' : '上传资金日报'}
       </Button>

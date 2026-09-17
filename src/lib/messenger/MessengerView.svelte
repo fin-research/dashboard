@@ -15,9 +15,9 @@
   <PanelHeading id="messenger-heading" title="消息投递" />
   <ModuleCard>
     <form method="GET" class="filters">
-      <label>渠道<NativeSelect class="min-h-11" name="channel" value={filters.channel??''}><option value="">全部</option><option value="email">邮件</option><option value="telegram">Telegram</option></NativeSelect></label>
+      <label>渠道<NativeSelect class="min-h-11" name="channel" value={filters.channel??''}><option value="">全部</option><option value="email">邮件</option><option value="telegram">Telegram</option><option value="webpush">Web Push</option></NativeSelect></label>
       <label>状态<NativeSelect class="min-h-11" name="status" value={filters.status??''}><option value="">全部</option>{#each Object.entries(labels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
-      <label>来源<NativeSelect class="min-h-11" name="source" value={filters.source??''}><option value="">全部</option><option value="market-briefing">市场点评</option><option value="financing">融资提醒</option><option value="ingest">央行资讯</option></NativeSelect></label>
+      <label>来源<NativeSelect class="min-h-11" name="source" value={filters.source??''}><option value="">全部</option><option value="market-briefing">市场点评</option><option value="financing">融资提醒</option><option value="ingest">央行资讯</option><option value="notification">用户订阅</option><option value="workflow">Workflow</option></NativeSelect></label>
       <Button type="submit">筛选</Button><Button variant="outline" href="/management/messenger">刷新</Button>
     </form>
     <div class="counts" aria-label="消息统计">{#each list.counts as item}<span>{labels[item.status]??item.status} <strong>{item.count}</strong></span>{/each}</div>
@@ -26,7 +26,7 @@
       <table><thead><tr><th>创建时间</th><th>消息</th><th>渠道 / 来源</th><th>收件人</th><th>状态</th><th>尝试</th><th>操作</th></tr></thead>
         <tbody>{#each list.items as row}<tr>
           <td>{stamp(row.createdAt)}</td><td class="subject"><a href={link({id:row.id})}>{row.subject}</a></td>
-          <td>{row.channel==='email'?'邮件':'Telegram'} / {row.source}</td><td class="recipient">{row.recipient}</td>
+          <td>{row.channel==='email'?'邮件':row.channel==='webpush'?'Web Push':'Telegram'} / {row.source}</td><td class="recipient">{row.recipient}</td>
           <td><span class:failure={row.status==='failed'||row.status==='uncertain'} class:success={row.status==='accepted'}>{labels[row.status]??row.status}</span></td>
           <td>{row.attempts}</td><td>{#if canRetry&&['failed','uncertain'].includes(row.status)}<Button variant="outline" onclick={()=>retryTarget=row} aria-label={`重试 ${row.subject}`}>重试</Button>{:else}—{/if}</td>
         </tr>{:else}<tr><td colspan="7">暂无消息</td></tr>{/each}</tbody>

@@ -29,7 +29,7 @@ export async function requestLogin(returnTo = '/'): Promise<boolean> {
 
 export function sessionAllows(session: ClientSessionData, permission: string | undefined): boolean {
   return permission === 'public' || !!session.user && !!permission
-    && (permission === 'login' || session.permissions.includes(permission));
+    && (permission === 'login' || permission === 'admin' && session.roles.some(role => role.name === 'admin') || session.permissions.includes(permission));
 }
 
 export async function requireClientPermission(permission: string, returnTo: string, state: ClientSession): Promise<boolean> {

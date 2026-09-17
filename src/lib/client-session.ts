@@ -22,7 +22,7 @@ export function createClientSession(
   function seedFromServer(next: ClientSessionData) {
     // A page load is not a new login. Keep the login's presentation permissions
     // until a new token/session or an explicit refresh supplies a new snapshot.
-    if (value?.user && next.user?.id === value.user.id && next.expiresAt === value.expiresAt) return;
+    if (value?.user && next.user?.id === value.user.id && next.expiresAt === value.expiresAt && JSON.stringify(next.permissions) === JSON.stringify(value.permissions) && JSON.stringify(next.roles) === JSON.stringify(value.roles)) return;
     seed(next);
   }
   function current() {

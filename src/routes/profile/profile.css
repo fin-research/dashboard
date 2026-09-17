@@ -1,4 +1,4 @@
-.profile-page { width: min(100%, 2100px); min-height: 100dvh; margin-inline: auto; padding: 12px 16px 40px; color: var(--text-1); background: var(--bg-page); }
+.profile-page { width: min(100%, 2100px); min-height: 0; margin-inline: auto; padding: 12px 16px 40px; color: var(--text-1); background: var(--bg-page); }
 .profile-header { display: flex; min-height: 64px; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
 .profile-header h1 { margin: 0; font-size: 1.5rem; font-weight: bolder; }
 .profile-back { display: grid; place-items: center; width: 44px; height: 44px; }

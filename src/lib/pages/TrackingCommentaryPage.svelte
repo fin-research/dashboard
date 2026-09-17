@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { permissionVisibility } from "$lib/permission-visibility";
+  const allowed=permissionVisibility();
   import { onMount, tick } from "svelte";
   import { beforeNavigate } from "$app/navigation";
   import CommentaryReport from "$lib/tracking-commentary/CommentaryReport.svelte";
@@ -32,12 +34,12 @@
 
   $effect(() => {
     const value=JSON.stringify(draft);
-    if (!mounted || !selected || busy || savingDraft || saveConflict || value===savedDraft || value===failedSaveDraft) return;
+    if (!$allowed("research.policy_commentary:update") || !mounted || !selected || busy || savingDraft || saveConflict || value===savedDraft || value===failedSaveDraft) return;
     const timer=setTimeout(() => { autosavePromise=syncDraft(); },800);
     return () => clearTimeout(timer);
   });
   async function syncDraft() {
-    if (!selected || savingDraft || busy) return;
+    if (!$allowed("research.policy_commentary:update") || !selected || savingDraft || busy) return;
     const requestId=generation, id=selected.id, snapshot=JSON.parse(JSON.stringify(draft)) as TrackingDraft;
     savingDraft=true;
     try {
@@ -215,12 +217,12 @@
 <div class="tracking-workspace">
   <div class="writing">
     <div class="writing-toolbar">
-      <Button variant="outline" disabled={busy} onclick={newDraft}>新建点评</Button>
-      <Button variant="outline" disabled={busy || opening || saveConflict || !draft.eventName.trim()} onclick={save}>保存草稿</Button>
+      <Button permission="research.policy_commentary:update" variant="outline" disabled={busy} onclick={newDraft}>新建点评</Button>
+      <Button permission="research.policy_commentary:update" variant="outline" disabled={busy || opening || saveConflict || !draft.eventName.trim()} onclick={save}>保存草稿</Button>
       {#if saveConflict}<Button variant="outline" disabled={busy} onclick={reloadDraft}>重新读取</Button>{/if}
       <Button variant="outline" disabled={opening} aria-pressed={preview} onclick={() => preview = !preview}>{preview ? "继续编辑" : "预览"}</Button>
       <Button variant="outline" disabled={!draft.commentary} onclick={copy}>复制正文</Button>
-      <Button variant="outline" disabled={busy || saveConflict || !draft.commentary.trim()} onclick={archivePdf}>保存 PDF</Button>
+      <Button permission="research.policy_commentary:update" variant="outline" disabled={busy || saveConflict || !draft.commentary.trim()} onclick={archivePdf}>保存 PDF</Button>
       <Button variant="outline" disabled={busy || !draft.commentary.trim()} onclick={printDraft}>打印</Button>
       {#if selected?.pdf && !dirty}<Button variant="outline" href={`/api/tracking-commentaries/${encodeURIComponent(selected.id)}/pdf?revisionAt=${encodeURIComponent(selected.pdf.revisionAt)}`}>下载 PDF</Button>{/if}
       {#if selected}<Button variant="outline" onclick={loadRevisions}>版本记录</Button>{/if}
@@ -230,7 +232,7 @@
     {:else}
       <ModuleCard>
         <PanelHeading id="tracking-write" title="撰写点评" />
-        <fieldset disabled={busy}>
+        <fieldset disabled={busy || !$allowed("research.policy_commentary:update")}>
           <label><span>主题</span><Input bind:value={draft.eventName} maxlength={240} /></label>
           <div class="metadata-fields">
             <label><span>类型</span><NativeSelect bind:value={draft.type} disabled={!!policyId}>{#each Object.entries(commentaryTypeLabels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
@@ -240,17 +242,17 @@
           <div class="generation-toolbar">
             <label><span>研报起始日期</span><Input type="date" bind:value={startDate} /></label>
             <label><span>研报截止日期</span><Input type="date" bind:value={endDate} /></label>
-            <Button disabled={busy || saveConflict || draft.eventName.trim().length < 2 || !startDate || !endDate || startDate > endDate} onclick={generateDraft}>{busy && progress ? progress : "检索并生成"}</Button>
+            <Button permission="research.policy:generate&research.policy_commentary:update" disabled={busy || saveConflict || draft.eventName.trim().length < 2 || !startDate || !endDate || startDate > endDate} onclick={generateDraft}>{busy && progress ? progress : "检索并生成"}</Button>
           </div>
         </fieldset>
       </ModuleCard>
       <div class="editor-grid">
         <ModuleCard>
           <PanelHeading id="tracking-body" title={preview ? "点评预览" : "点评正文"} />
-          {#if preview}
+          {#if preview || !$allowed("research.policy_commentary:update")}
             <CommentaryReport {draft} />
           {:else}
-            <fieldset disabled={busy}>
+            <fieldset disabled={busy || !$allowed("research.policy_commentary:update")}>
               <label><span>消息来源</span><Input bind:value={draft.sources} /></label>
               <label><span>事件摘要</span><Textarea rows={5} bind:value={draft.eventSummary} /></label>
               <label><span>跟踪点评</span><Textarea rows={18} bind:value={draft.commentary} /></label>

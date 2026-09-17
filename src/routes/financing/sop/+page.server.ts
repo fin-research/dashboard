@@ -14,6 +14,7 @@ export const load: PageServerLoad = async () => ({
 
 export const actions: Actions = {
 	createReminder: async (event) => {
+		if (!hasPermission(event.locals.permissions, "financing.reminder:create")) return fail(403,{message:"无权新增提醒"});
 		const data = await event.request.formData();
 		const name = String(data.get('name') ?? '').trim();
 		const recipientMode = String(data.get('recipientMode') ?? 'assignee');

@@ -9,9 +9,9 @@
   import { onMount } from 'svelte';
   import { descendants, isInquiry, nodeFlowIds, flowLabel, insertNode, reparentNode, moveNode, nodesSchema, type Product, type WorkflowConfig, type WorkflowNode } from './model';
   import { globalMessages } from '../global-messages';
-  let { flows, nodes = $bindable(), selectedId, disabled, onSelect, onClose, onBranch, expanded, onSave, onDelete, onAdd, onReset, notificationsEnabled, notificationsSupported, onNotifications }: {
+  let { flows, nodes = $bindable(), selectedId, disabled, onSelect, onClose, onBranch, expanded, onSave, onDelete, onAdd, onReset }: {
     flows: WorkflowConfig['flows']; nodes: WorkflowNode[]; selectedId: string; disabled: boolean; onSelect: (id: string) => void;
-    onDelete: (id: string) => void; onSave: () => void; onAdd: () => void; onReset: () => void; notificationsEnabled: boolean; notificationsSupported: boolean; onNotifications: () => void;
+    onDelete: (id: string) => void; onSave: () => void; onAdd: () => void; onReset: () => void;
     onClose: () => void; onBranch: (id: string, value: boolean) => void; expanded: boolean;
   } = $props();
   const selected = $derived(nodes.find(node => node.id === selectedId));
@@ -84,7 +84,6 @@
         </NativeSelect>
         <div class="editor-pair"><Button variant="outline" type="button" disabled={moveNode(nodes, selectedId, -1) === nodes} onclick={() => apply(moveNode(nodes, selectedId, -1))}>上移</Button><Button variant="outline" type="button" disabled={moveNode(nodes, selectedId, 1) === nodes} onclick={() => apply(moveNode(nodes, selectedId, 1))}>下移</Button></div>
       </fieldset>
-      <label class="editor-checkbox"><Checkbox data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"  bind:checked={() => notificationsEnabled, () => onNotifications()} disabled={!notificationsSupported} />浏览器提醒</label>
       <label>备注<Textarea data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-textarea"} maxlength={1200} rows={4} bind:value={selected.detail}></Textarea></label>
       <Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="default" class={"ui-button  editor-save"} type="button" onclick={onSave}>{disabled ? '保存中…' : '保存'}</Button>
       <div class="editor-actions"><Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="destructive" type="button" class={"ui-button  "} onclick={() => selected && remove(selected)}>删除节点</Button><Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="outline" type="button" class={"ui-button  "} onclick={() => selected && addChild(selected)}>新增下级节点</Button></div>
