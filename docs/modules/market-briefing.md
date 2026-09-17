@@ -17,7 +17,7 @@
 ## 读取与页面
 
 - `GET /api/market-report?date=YYYY-MM-DD` 只读取并校验指定日期的 R2 定稿，512 KiB 上限不变；缺失返回 404 `REPORT_NOT_FINALIZED`，损坏返回 503。
-- 不带 date 时，服务端按上海当前时间选日：17:00 前从交易日数据选择严格早于当日的最近交易日；17:00 起严格读取当日报告。日历失败或观测日期落后于已确认的上一交易日返回 503；不会因为报告缺失而改读更早日期。选择非交易日的报告也会明确报错。
+- 不带 date 时，服务端按上海当前时间选日：17:00 前优先使用已核实的交易所休市日历，选择严格早于当日的最近交易日，不依赖实时 Choice 行情；17:00 起严格读取当日报告。只有日历未覆盖的年度或跨年边界才读取 DATA 的交易日证据，无法取得时返回 503 `TRADING_CALENDAR_UNAVAILABLE`，来源为 `Dashboard Calendar`。不会因为报告缺失而改读更早日期。选择非交易日的报告也会明确报错。
 - 前端打开、换日期和刷新只 GET 定稿，绝不请求原始行情、不触发 AI、不回退现场生成。数据不存在显示整页错误和重试操作。文字版与视觉版消费同一已归档规范数据，今日聚焦和文字版只读。
 - 日期、视图切换、刷新、导出图片和复制保留；导出 PNG 只下载，不上传或覆盖 R2。控件具有可辨识的主次、选中、hover、active、键盘 focus 与 disabled 状态，继续使用既有报告尺寸与品牌令牌。
 - 旧 `PUT /api/market-report`、`POST /api/market-briefing` 保留兼容及原写权限，但新版页面不调用；旧 `/api/market-resources/*` 继续仅为已有客户端的公开只读兼容通道。
@@ -38,6 +38,8 @@
 交易日历来源：[上交所2026年休市安排](https://www.sse.com.cn/disclosure/dealinstruc/closed/c/c_20251222_10802510.shtml)。
 
 ## 验证与恢复
+
+`tests/market-report.test.mjs` 直接执行无 date 的 GET handler，覆盖 Choice 不可达/503/异常日历仍读取准确 R2 定稿、缺失不回退、17:00 切日及未知年度失败边界；`tests/report-date.test.mjs` 覆盖周末、长假、调休周末与跨年。浏览器固定报告夹具只验证展示与交互，不能证明真实 DATA/Choice/R2 可用；发布后须程序化请求生产 `/api/market-report` 及显式日期接口核对 HTTP 状态和 `report_date`。
 
 Cloudflare 流程图由静态语法分析生成，并不回放实际执行。`completeAll(...).then(...)` 曾使解析器把依赖步骤全部标为 `starts=1`，因此 Workflow 编排使用原生 Promise 批次与直接 await。发布后通过 `GET /accounts/{account}/workflows/market-briefing/versions/{version}/graph` 核对并行节点及 AI、保存、通知的顺序；测试通过不能替代平台图核验。见 [Cloudflare 流程图文档](https://developers.cloudflare.com/workflows/build/visualizer/)。
 
