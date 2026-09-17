@@ -319,7 +319,6 @@
   .policy-summary { margin: 0; color: #344054; font-size: 1rem; line-height: 1.75; }
   .policy-sections { display: grid; gap: 22px; margin-top: 24px; padding-top: 22px; border-top: 1px solid #eaecf0; }
   .section-heading { min-height: 44px; justify-content: space-between; gap: 12px; }
-  .section-title { display: flex; align-items: center; gap: 8px; }
   .section-heading h3 { margin: 0; font-size: 1.125rem; font-weight: bold; }
   .section-heading h3 span { color: #667085; font-size: .875rem; }
   .heading-actions { flex-wrap: wrap; gap: 8px; }

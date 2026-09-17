@@ -90,5 +90,5 @@ export async function trackingRevisions(db: Env["DB"], id: string): Promise<Trac
   const current = await getTrackingCommentary(db, id);
   const previous = await db.prepare(`SELECT saved_at, content_json FROM tracking_commentary_revision
     WHERE commentary_id=? ORDER BY saved_at DESC LIMIT 50`).bind(id).all<{ saved_at: string; content_json: string }>();
-  return [{ savedAt: current.updatedAt, content: current }, ...previous.results.map(row => ({ savedAt: row.saved_at, content: JSON.parse(row.content_json) as TrackingCommentary }))];
+  return [{ savedAt: current.updatedAt, content: current }, ...previous.results.map((row: { saved_at: string; content_json: string }) => ({ savedAt: row.saved_at, content: JSON.parse(row.content_json) as TrackingCommentary }))];
 }

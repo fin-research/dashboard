@@ -29,8 +29,11 @@ test.afterEach(()=>{expect(errors).toEqual([]);expect(unexpected).toEqual([]);})
 test('tracking archive opens, edits, generates and retains source evidence',async({page})=>{
   await page.goto('/trading-research/tracking-commentary?id=archive-1');
   await expect(page.getByLabel('主题',{exact:true})).toHaveValue(original.eventName);
-  await expect(page.getByText('时事快评.docx',{exact:true})).toBeVisible();
-  await expect(page).toHaveScreenshot('tracking-commentary.png',{fullPage:true});
+  await expect(page.getByText('时事快评.docx',{exact:true})).toBeAttached();
+  await expect(page).toHaveScreenshot('tracking-commentary.png');
+  await page.getByLabel('应对建议',{exact:true}).scrollIntoViewIfNeeded();
+  await expect(page.getByLabel('应对建议',{exact:true})).toBeInViewport();
+  await expect(page).toHaveScreenshot('tracking-commentary-editor.png');
   await page.getByLabel('跟踪点评',{exact:true}).fill('人工修改后的点评正文');
   await page.getByRole('button',{name:'保存',exact:true}).click();
   await expect(page.getByText('点评已保存',{exact:true})).toBeVisible();

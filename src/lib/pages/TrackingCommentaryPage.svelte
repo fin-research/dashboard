@@ -150,26 +150,6 @@
 
 <svelte:window onbeforeunload={beforeUnload} />
 <div class="tracking-workspace">
-  <aside class="archive" aria-label="点评档案">
-    <ModuleCard>
-      <PanelHeading id="tracking-archive" title="点评档案" />
-      <form class="archive-filter" onsubmit={(event) => { event.preventDefault(); void loadList(); }}>
-        <label>检索主题<Input bind:value={query} /></label>
-        <label>类型<NativeSelect bind:value={typeFilter}><option value="">全部</option>{#each Object.entries(commentaryTypeLabels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
-        <Button variant="outline" type="submit" disabled={loading}>查询</Button>
-      </form>
-      {#if loading}<p aria-live="polite">读取中</p>
-      {:else if listError}<p role="alert">{listError}</p><Button variant="outline" onclick={() => loadList()}>重试</Button>
-      {:else if !items.length}<p>暂无点评</p>
-      {:else}<ol class="archive-list">{#each items as item (item.id)}<li>
-        <button class:active={selected?.id === item.id} aria-current={selected?.id === item.id ? "true" : undefined} disabled={busy} onclick={() => open(item.id)}>
-          <span class="item-date">{item.commentaryDate || "日期未注明"} · {commentaryTypeLabels[item.type]}</span>
-          <strong>{item.eventName}</strong><span>{item.origin === "import" ? "手写稿" : item.edited ? "人工稿" : "AI 草稿"}</span>
-        </button>
-      </li>{/each}</ol>{/if}
-      {#if hasMore}<Button variant="outline" disabled={loadingMore} onclick={() => loadList(true)}>{loadingMore ? "读取中" : "加载更多"}</Button>{/if}
-    </ModuleCard>
-  </aside>
   <div class="writing">
     <div class="writing-toolbar">
       <Button variant="outline" disabled={busy} onclick={newDraft}>新建点评</Button>
@@ -184,15 +164,15 @@
       <ModuleCard>
         <PanelHeading id="tracking-write" title="撰写点评" />
         <fieldset disabled={busy}>
-          <label>主题<Input bind:value={draft.eventName} maxlength={240} /></label>
+          <label><span>主题</span><Input bind:value={draft.eventName} maxlength={240} /></label>
           <div class="metadata-fields">
-            <label>类型<NativeSelect bind:value={draft.type} disabled={!!policyId}>{#each Object.entries(commentaryTypeLabels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
-            <label>发布时间<Input type="date" bind:value={draft.eventPublishedAt} /></label>
-            <label>点评时间<Input type="date" bind:value={draft.commentaryDate} /></label>
+            <label><span>类型</span><NativeSelect bind:value={draft.type} disabled={!!policyId}>{#each Object.entries(commentaryTypeLabels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
+            <label><span>发布时间</span><Input type="date" bind:value={draft.eventPublishedAt} /></label>
+            <label><span>点评时间</span><Input type="date" bind:value={draft.commentaryDate} /></label>
           </div>
           <div class="generation-toolbar">
-            <label>研报起始日期<Input type="date" bind:value={startDate} /></label>
-            <label>研报截止日期<Input type="date" bind:value={endDate} /></label>
+            <label><span>研报起始日期</span><Input type="date" bind:value={startDate} /></label>
+            <label><span>研报截止日期</span><Input type="date" bind:value={endDate} /></label>
             <Button disabled={busy || draft.eventName.trim().length < 2 || !startDate || !endDate || startDate > endDate} onclick={generateDraft}>{busy && progress ? progress : "检索并生成"}</Button>
           </div>
         </fieldset>
@@ -206,10 +186,10 @@
             </article>
           {:else}
             <fieldset disabled={busy}>
-              <label>消息来源<Input bind:value={draft.sources} /></label>
-              <label>事件摘要<Textarea rows={5} bind:value={draft.eventSummary} /></label>
-              <label>跟踪点评<Textarea rows={18} bind:value={draft.commentary} /></label>
-              <label>应对建议<Textarea rows={7} bind:value={draft.recommendation} /></label>
+              <label><span>消息来源</span><Input bind:value={draft.sources} /></label>
+              <label><span>事件摘要</span><Textarea rows={5} bind:value={draft.eventSummary} /></label>
+              <label><span>跟踪点评</span><Textarea rows={18} bind:value={draft.commentary} /></label>
+              <label><span>应对建议</span><Textarea rows={7} bind:value={draft.recommendation} /></label>
             </fieldset>
           {/if}
         </ModuleCard>
@@ -236,15 +216,39 @@
       </div>
     {/if}
   </div>
+  <aside class="archive" aria-label="点评档案">
+    <ModuleCard>
+      <PanelHeading id="tracking-archive" title="点评档案" />
+      <form class="archive-filter" onsubmit={(event) => { event.preventDefault(); void loadList(); }}>
+        <label><span>检索主题</span><Input bind:value={query} /></label>
+        <label><span>类型</span><NativeSelect bind:value={typeFilter}><option value="">全部</option>{#each Object.entries(commentaryTypeLabels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
+        <Button variant="outline" type="submit" disabled={loading}>查询</Button>
+      </form>
+      {#if loading}<p aria-live="polite">读取中</p>
+      {:else if listError}<p role="alert">{listError}</p><Button variant="outline" onclick={() => loadList()}>重试</Button>
+      {:else if !items.length}<p>暂无点评</p>
+      {:else}<ol class="archive-list">{#each items as item (item.id)}<li>
+        <button class:active={selected?.id === item.id} aria-current={selected?.id === item.id ? "true" : undefined} disabled={busy} onclick={() => open(item.id)}>
+          <span class="item-date">{item.commentaryDate || "日期未注明"} · {commentaryTypeLabels[item.type]}</span>
+          <strong>{item.eventName}</strong><span>{item.origin === "import" ? "手写稿" : item.edited ? "人工稿" : "AI 草稿"}</span>
+        </button>
+      </li>{/each}</ol>{/if}
+      {#if hasMore}<Button variant="outline" disabled={loadingMore} onclick={() => loadList(true)}>{loadingMore ? "读取中" : "加载更多"}</Button>{/if}
+    </ModuleCard>
+  </aside>
+
 </div>
 
 <style>
   .tracking-workspace { display:grid; grid-template-columns: minmax(220px, 280px) minmax(0,1fr); gap:24px; align-items:start; }
+  .archive { grid-column:1; grid-row:1; min-width:0; }
+  .writing { grid-column:2; grid-row:1; }
   .writing, .evidence-column { display:grid; gap:20px; min-width:0; }
   .writing-toolbar, .generation-toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
   .writing-toolbar { align-items:center; }
   .archive-filter, fieldset { display:grid; gap:16px; min-width:0; padding:0; border:0; margin:0; }
-  label { display:grid; gap:8px; min-width:0; font-weight:bold; }
+  label { display:grid; gap:8px; min-width:0; }
+  label > span { font-weight:bold; }
   .metadata-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
   .archive-list { list-style:none; margin:20px 0; padding:0; display:grid; gap:4px; }
   .archive-list button { display:grid; gap:8px; width:100%; text-align:left; border:0; border-bottom:1px solid var(--border-color); padding:16px 8px; color:var(--text-1); background:transparent; font:inherit; cursor:pointer; }
@@ -262,5 +266,5 @@
   blockquote { margin:12px 0; padding-inline-start:12px; border-inline-start:3px solid var(--primary); }
   .evidence-column p, .evidence-column li { overflow-wrap:anywhere; line-height:1.7; }
   @media(max-width:1300px) { .editor-grid { grid-template-columns:minmax(0,1fr); } }
-  @media(max-width:760px) { .tracking-workspace { grid-template-columns:minmax(0,1fr); } .metadata-fields { grid-template-columns:minmax(0,1fr); } .generation-toolbar { display:grid; } }
+  @media(max-width:760px) { .tracking-workspace { grid-template-columns:minmax(0,1fr); } .writing { grid-column:1; grid-row:1; } .archive { grid-column:1; grid-row:2; } .metadata-fields { grid-template-columns:minmax(0,1fr); } .generation-toolbar { display:grid; } }
 </style>

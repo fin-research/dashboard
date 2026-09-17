@@ -13,6 +13,7 @@
       {#if block.ordered}<ol>{#each block.items as item}<li>{item}</li>{/each}</ol>
       {:else}<ul>{#each block.items as item}<li>{item}</li>{/each}</ul>{/if}
     {:else if block.kind === "table"}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex (keyboard users must be able to scroll a wide comparison table) -->
       <div class="table-scroll" role="region" aria-label="点评对比表" tabindex="0"><table><thead><tr>{#each block.headers as cell}<th>{cell}</th>{/each}</tr></thead>
         <tbody>{#each block.rows as row}<tr>{#each row as cell}<td>{cell}</td>{/each}</tr>{/each}</tbody></table></div>
     {:else}<p>{block.text}</p>{/if}
