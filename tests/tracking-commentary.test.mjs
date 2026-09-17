@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
-import { compileExtractiveCommentary, extractiveCommentarySchema, retrieveTrackingResearch } from '../src/lib/server/tracking-commentary-generation.ts';
+import { compileExtractiveCommentary, extractiveCommentarySchema, retrieveTrackingResearch, trackingGenerationOptions } from '../src/lib/server/tracking-commentary-generation.ts';
 import { createTrackingCommentary, updateTrackingCommentary, getTrackingCommentary, trackingRevisions, listTrackingCommentaries, loadTrackingStyleReferences } from '../src/lib/server/tracking-commentary-repository.ts';
 import { generateTrackingSchema, trackingDraftSchema } from '../src/lib/tracking-commentary.ts';
 import { renderCommentaryPdf, commentaryPdfKey } from '../src/lib/research-commentary-pdf.ts';
@@ -13,6 +13,20 @@ import { parseResearchContent } from '../src/lib/report-content.ts';
 const sentence = '融资需求下降，资金价格中枢下移，发行窗口已经打开。';
 const source = { sourceId:'S1',sourceKey:'report/2026-09-17/报告.md',title:'报告',institution:'机构甲',publishedAt:'2026-09-17',text:`核心观点\n${sentence}\n如果资金保持宽松，长端利率将继续下行。` };
 const output = { eventSummary:{sourceId:'S1',text:sentence},sections:[{heading:'资金价格下移打开融资窗口',quotes:[{sourceId:'S1',text:sentence}]},{heading:'宽松资金支撑长端利率下行',quotes:[{sourceId:'S1',text:'如果资金保持宽松，长端利率将继续下行。'}]}],recommendation:'融资发行方面，前置安排中长期公司债发行，利用资金价格中枢下移的窗口锁定负债成本。',recommendationSources:['S1'] };
+
+test('interactive generation streams phase labels without exposing unvalidated model content and reports retries', () => {
+  const phases = [];
+  const options = trackingGenerationOptions('draft',20,message => phases.push(message));
+  assert.equal(options.requestTimeoutMs,120000);
+  options.onAttempt('primary');
+  options.onReasoningSummary({id:'r',text:'private reasoning'});
+  options.onReasoningSummary({id:'r',text:'more reasoning'});
+  options.onTextDelta('unvalidated JSON');
+  options.onTextDelta('more JSON');
+  options.onAttempt('retry');
+  options.onTextDelta('replacement JSON');
+  assert.deepEqual(phases,['AI 选取原文','组织判断与建议','生成点评','AI 重试选材','生成点评']);
+});
 
 test('excerpt compiler keeps source words and offsets, rejects rewritten or condition-stripped quotations', () => {
   const result = compileExtractiveCommentary(extractiveCommentarySchema.parse(output),[source]);

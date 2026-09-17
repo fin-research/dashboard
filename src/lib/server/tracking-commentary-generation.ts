@@ -1,12 +1,36 @@
 import { z } from "zod";
 import { type CommentaryEvidence, type TrackingDraft, type generateTrackingSchema, shanghaiDate } from "../tracking-commentary.ts";
-import { AI_GATEWAY_MODEL, generateAiGatewayObject } from "./ai-gateway.ts";
+import { AI_GATEWAY_MODEL, generateAiGatewayObject, type AiGatewayOptions } from "./ai-gateway.ts";
 import { buildAiSearchToolCall, parseAiSearchResponse, readTextBounded, type ResearchDocument } from "./financing-model-research.ts";
 import { loadCommentaryGenerationContext, PolicyRepositoryError } from "./policy-repository.ts";
 import { fetchDataNewsDetail } from "./data-news.ts";
 import { getTrackingCommentary, updateTrackingCommentary, loadTrackingStyleReferences } from "./tracking-commentary-repository.ts";
 
 export const TRACKING_COMMENTARY_PROMPT_VERSION = "tracking-commentary-extract-v3";
+export function trackingGenerationOptions(id: string, documentCount: number, progress: (message: string) => void): AiGatewayOptions {
+  let reportedReasoning = false, reportedWriting = false;
+  return {
+    taskType: "policy_commentary", requestTimeoutMs: 120_000,
+    promptCacheKey: TRACKING_COMMENTARY_PROMPT_VERSION,
+    metadata: { commentary_id: id, prompt_version: TRACKING_COMMENTARY_PROMPT_VERSION, document_count: documentCount, tags: "tracking-commentary,verbatim" },
+    onAttempt(attempt) {
+      reportedReasoning = false; reportedWriting = false;
+      progress(attempt === "primary" ? "AI 选取原文" : "AI 重试选材");
+      console.log(JSON.stringify({ event: "tracking_commentary_attempt", commentary_id: id, attempt, document_count: documentCount }));
+    },
+    // Streaming lets the provider return incremental events during long reasoning.
+    // Only phase labels leave the server; partial, unvalidated text is never saved.
+    onReasoningSummary() {
+      if (!reportedReasoning) { reportedReasoning = true; progress("组织判断与建议"); }
+    },
+    onTextDelta() {
+      if (!reportedWriting) { reportedWriting = true; progress("生成点评"); }
+    },
+    onTelemetry(metadata) {
+      console.log(JSON.stringify({ event: "tracking_commentary_response", commentary_id: id, ...metadata }));
+    },
+  };
+}
 const quoteSchema = z.object({ sourceId: z.string().min(1), text: z.string().min(12).max(1200) }).strict();
 export const extractiveCommentarySchema = z.object({
   eventSummary: quoteSchema.extend({ text: z.string().min(12).max(120) }),
@@ -114,9 +138,7 @@ export async function generateTrackingCommentary(env: Env, id: string, input: z.
     { accountId: env.CLOUDFLARE_ACCOUNT_ID, gatewayId: env.AI_GATEWAY_ID || "default", token: env.CF_AIG_TOKEN },
     [{ role: "system", content: TRACKING_COMMENTARY_INSTRUCTIONS }, { role: "user", content: JSON.stringify({ topic: current.eventName,
       eventDate: current.eventPublishedAt, period: { startDate: input.startDate, endDate: input.endDate }, evidence: documents, styleReferences }) }],
-    schema, "tracking_commentary", { taskType: "policy_commentary", requestTimeoutMs: 300_000,
-      promptCacheKey: TRACKING_COMMENTARY_PROMPT_VERSION,
-      metadata: { commentary_id: id, prompt_version: TRACKING_COMMENTARY_PROMPT_VERSION, document_count: documents.length, tags: "tracking-commentary,verbatim" } },
+    schema, "tracking_commentary", trackingGenerationOptions(id, documents.length, progress),
   );
   progress("校验原文并保存");
   const compiled = compileExtractiveCommentary(output, documents);

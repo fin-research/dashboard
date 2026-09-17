@@ -26,6 +26,8 @@ AI Gateway使用 `policy_commentary` effort与版本化Prompt，输出选材而�
 
 接口 `/api/tracking-commentaries` GET/POST（列表/建稿）、`/[id]` GET/PUT（读取/修订）、`/[id]/generate` POST（NDJSON进度/完成/失败，15秒心跳）、`/[id]/revisions` GET。创建/修订使用既有 `research.policy_commentary:update`，生成使用 `research.policy:generate`，读取使用 `research.policy:read`；由 Gateway 登记并同步展示契约。连接中断不保证后台继续生成，用户重新打开草稿读取实际保存结果。
 
+交互式生成通过统一 adapter 的 Responses 流接收模型事件，页面只展示选材、组织判断、生成与重试阶段，不展示推理正文或未校验JSON。单次AI请求120秒，保留统一的一次重试；日志只记录稿件ID、尝试序号、材料数、状态、Gateway log ID和token计数。NDJSON禁止代理转换/缓冲，失败不保存半成品。
+
 ## 手写稿与旧 AI 稿诊断
 
 38篇历史稿的共同优势：判断先行、边际变化清楚、传导后落到具体融资安排；会议类需要对比表，不应强制全部变成三段。4篇没有单列建议，不能导入时补写。原D1仅有1条 `policy-commentary-v3` 且 edited=1，未保留修改前AI稿，不能声称完成同题原始AI与手写稿的严格对照。用户随后提供了完整旧提示词与9月17日AI原稿，已据此补充下面的同题分析。

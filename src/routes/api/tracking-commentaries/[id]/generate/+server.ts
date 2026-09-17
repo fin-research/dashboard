@@ -23,6 +23,6 @@ export const POST: RequestHandler = async ({ platform, params, request }) => {
       },
       cancel() { closed = true; },
     });
-    return new Response(body, { headers: { ...trackingHeaders, "Content-Type": "application/x-ndjson; charset=utf-8", "X-Content-Type-Options": "nosniff" } });
+    return new Response(body, { headers: { ...trackingHeaders, "Cache-Control": "no-store, no-transform", "X-Accel-Buffering": "no", "Content-Type": "application/x-ndjson; charset=utf-8", "X-Content-Type-Options": "nosniff" } });
   } catch (error) { return trackingError(error); }
 };
