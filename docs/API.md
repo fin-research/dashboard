@@ -26,7 +26,7 @@
 
 本地 Vite 完整保留 `/data` 前缀并代理到 `DATA_PROXY_TARGET`。线上由独立数据服务处理，Dashboard Worker 不注册这些路由。
 
-原始资源字段变化必须与 `worker/market-report-collector.ts` 请求编排、`src/market-report-resources.ts` 加工、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/market-report/*` 或 GraphQL 市场报告聚合，也不要为视觉版或文字版增加单独的数据源。
+原始资源字段变化必须与 `worker/market-briefing-runner.ts` Workflow 请求编排、`src/market-report-resources.ts` 加工、`src/report-view.ts`、`src/text-report.ts` 及相关测试同步。不要恢复 `/data/market-report/*` 或 GraphQL 市场报告聚合，也不要为视觉版或文字版增加单独的数据源。
 
 Data 错误保留安全诊断字段；市场点评 Workflow 对失败资源独立重试，耗尽后明确失败且不归档残缺报告。稀疏 OMO/CFETS/期货数值和今日成交收益率以 `null` 表示，不转换为 0。空列表是否有业务意义仍由原 DTO 与共享派生层解释。
 

@@ -21,13 +21,13 @@ const briefingNewsSummarySchema = z.object({
   important: z.boolean().optional(),
 });
 const briefingNewsListSchema = z.array(briefingNewsSummarySchema);
-const briefingNewsResponseSchema = z
+export const briefingNewsResponseSchema = z
   .union([
     briefingNewsListSchema,
     z.object({ list: briefingNewsListSchema }),
   ])
   .transform((value) => Array.isArray(value) ? value : value.list);
-const briefingNewsDetailSchema = briefingNewsSummarySchema.extend({
+export const briefingNewsDetailSchema = briefingNewsSummarySchema.extend({
   content: z.string().default(""),
   link: z.string().url().optional(),
 });
@@ -205,35 +205,34 @@ export interface BriefingNews {
   news_text: string;
 }
 
-/** A caller may checkpoint each Data request without coupling the news adapter to Workflows. */
-export type MarketDataLoader = <T>(
-  name: string, path: string, schema: z.ZodType<T>, validate?: (value: T) => void,
-) => Promise<T>;
-
 export async function fetchBriefingNews(
   env: Env,
   reportDate: string,
   signal?: AbortSignal,
-  sources?: { stock: Promise<z.infer<typeof stockSummarySchema>>; load: MarketDataLoader },
 ): Promise<BriefingNews> {
   const baseUrl = env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
-  const load: MarketDataLoader = sources?.load ?? ((_name, path, schema) =>
-    fetchDataJson(env, `${baseUrl}/${path}`, schema, signal));
   const newsQuery = new URLSearchParams({
     date: reportDate, important: "true", pageSize: "40",
     fields: "sentimentId,title,time,tags,important",
   });
-  const details = load("news", `news?${newsQuery}`, briefingNewsResponseSchema).then(news =>
+  const details = fetchDataJson(env, `${baseUrl}/news?${newsQuery}`, briefingNewsResponseSchema, signal).then(news =>
     mapWithConcurrency(news, 5, async summary => {
       const query = new URLSearchParams({ fields: "sentimentId,title,time,tags,important,content,link" });
-      const detail = await load(`news-${summary.sentimentId}`,
-        `news/${encodeURIComponent(summary.sentimentId)}?${query}`, briefingNewsDetailSchema);
+      const detail = await fetchDataJson(env,
+        `${baseUrl}/news/${encodeURIComponent(summary.sentimentId)}?${query}`, briefingNewsDetailSchema, signal);
       return { ...summary, ...detail };
     }));
   const [stockPayload, newsDetails] = await completeAll([
-    sources?.stock ?? load("stock", `stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema),
+    fetchDataJson(env, `${baseUrl}/stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema, signal),
     details,
   ]);
+  return buildBriefingNews(stockPayload, newsDetails);
+}
+
+export function buildBriefingNews(
+  stockPayload: z.infer<typeof stockSummarySchema>,
+  newsDetails: z.infer<typeof briefingNewsDetailSchema>[],
+): BriefingNews {
   const paragraphs = stockPayload.paragraphs.filter(item => item.length > 0);
   if (paragraphs.length === 0) throw new MarketBriefingError(503, "新闻数据为空，请稍后重试");
   const items: Array<Record<string, unknown>> = [
@@ -315,7 +314,7 @@ export async function fetchDataJson<T>(
   return parsed.data;
 }
 
-async function mapWithConcurrency<T, R>(
+export async function mapWithConcurrency<T, R>(
   items: readonly T[],
   concurrency: number,
   task: (item: T) => Promise<R>,

@@ -6,13 +6,13 @@
 
 - Dashboard 共两项 Cron：`0 * * * *` 为每小时整点融资提醒（支持任意提前小时，不能缩成每日一次）；`0 9 * * MON-FRI` 为北京时间工作日 17:00 市场点评。Cron 使用 UTC。Data 午夜同步、Ingest 采集分别由各自 Worker 持有。
 - `MARKET_BRIEFING` 绑定 `MarketBriefingWorkflow`，平台名称固定 `market-briefing`。实例 ID 为 `market-briefing-YYYY-MM-DD`，同日重复 Cron 不重复创建。
-- Cron 创建实例前及 Workflow 入口用代码判断 workday，按上交所已公布休市日及周末直接跳过，不创建交易日判断 step，当前内置2026年公告。`fetch-industry` 要求 DATA `/data/industry` 的 `tradingDates` 包含当天，否则视为行情滞后，由 step 重试并失败，不能误判假期。未知年度只允许有当日行情证据时生成；每年须按交易所公告更新休市日。
-- 无依赖的行情和新闻列表各为独立 `fetch-*` step 并发执行。股票收评只请求一次，供报告与 AI 共用；一级发行等待行业数据中的上一交易日；债券基础信息等待今日成交和收藏报价后去重批量查询一次；新闻详情等待列表，每条独立 step、最多五条并发。新闻和收评齐备后启动 `generate-focus`，不等待其他行情。各 step 返回最小 DTO 或 AI 结果，通过 Workflow 检查点向下游传递，不在中途写报告。
+- Cron 在创建 Workflow 实例前判断 workday；`knownMarketClosure(reportDate) === true` 时立即返回，完全不进入 Workflow。Workflow 内不再判断或返回非交易日 skipped 状态，当前内置2026年公告。`fetch-industry` 要求 DATA `/data/industry` 的 `tradingDates` 包含当天，否则视为行情滞后，由 step 重试并失败，不能误判假期。未知年度只允许有当日行情证据时生成；每年须按交易所公告更新休市日。
+- 所有 `step.do` 及其并行、依赖关系直接写在 `worker/market-briefing-runner.ts`，不使用创建 step 的 loader 或 collector 封装。无依赖的行情和新闻列表各为独立 `fetch-*` step 并发执行。股票收评只请求一次，供报告与 AI 共用；一级发行等待行业数据中的上一交易日；债券基础信息等待今日成交和收藏报价后去重批量查询一次；新闻详情等待列表，每条独立 step、最多五条并发。新闻和收评齐备后启动 `generate-focus`，不等待其他行情。各 step 返回最小 DTO 或 AI 结果，通过 Workflow 检查点向下游传递，不在中途写报告。
 - 数据步骤最多重试 3 次，30 秒起指数退避，单步超时 3 分钟；AI 步骤最多重试 2 次，1 分钟起指数退避，单步超时 15 分钟，AI adapter 显式关闭内部重试（本工作流的共享 AI 默认规则例外）。采集、AI、保存和通知的重试均只由 Workflow step 配置负责，业务代码不执行重试循环。
 - 等所有并行步骤完成或耗尽重试，在唯一 `aggregate-and-save-r2` step 内使用共享 `buildReportData` 与报告 Schema 汇总并保存原 `market-briefing/YYYY-MM-DD.json`。任何必需请求失败不归档残缺报告，也不把失败伪装成零行情。
 - 当日成交、期货及报价不支持历史重放；每个未完成的采集 step 校验上海当天，跨日恢复未完成采集会失败，不能以当前行情冒充历史报告。已完成数据步骤与归档步骤可由平台恢复。
-- `notify-success` 在 R2 成功后通过 Resend 发给 `MARKET_BRIEFING_RECIPIENTS`（当前 `shiyue@18.cn`）；生成或归档失败走 `notify-failure`，通知失败保留原错误。邮件独立重试，成功邮件失败不删除报告、不发送“生成失败”邮件。
-- 邮件使用 `FROM_EMAIL=no-reply@hasbai.xyz` 和专用 Secret `MARKET_BRIEFING_RESEND_API_KEY`；不启用融资提醒的独立 `RESEND_API_KEY`。幂等键由 Workflow 实例 ID 和结果类型组成。`accepted` 仅代表 Resend 接受，不代表收件箱送达。
+- 最后统一执行唯一 `notify-result` step：等待前面的并发请求、AI 和归档结果完成，在此 step 内判断结果、组装通知并通过 Resend 发给 `MARKET_BRIEFING_RECIPIENTS`（当前 `shiyue@18.cn`）。不设成功/失败通知分支或独立 step。通知完成后生成错误继续使 Workflow 失败；邮件自身重试不重新生成报告，也不删除已归档报告。
+- 邮件使用 `FROM_EMAIL=no-reply@hasbai.xyz` 和专用 Secret `MARKET_BRIEFING_RESEND_API_KEY`；不启用融资提醒的独立 `RESEND_API_KEY`。统一使用 `market-briefing/<instanceId>/result` 幂等键。`accepted` 仅代表 Resend 接受，不代表收件箱送达。
 
 ## 读取与页面
 
@@ -41,4 +41,4 @@
 
 2026-09-16 本地验证：类型检查、Worker 类型检查、生产构建、544 项 Node 测试、53 项浏览器用例通过；1 项手机矩形拖拽按原规则跳过。CI 候选运行 `35077845510` 通过 5 项 Python、544 项 Node、构建与 53 项浏览器用例。市场点评桌面/手机的 darwin 与 macos-ci 基线已人工对照；本轮不更新其他模块基线。
 
-手动触发使用 `pnpm exec wrangler workflows trigger market-briefing '{"reportDate":"YYYY-MM-DD"}' --id market-briefing-YYYY-MM-DD`。运行失败时先检查失败步骤，同日可执行 `pnpm exec wrangler workflows instances restart market-briefing <id>`；仅邮件步骤失败时从 `--from-step-name notify-success` 恢复，避免重新采集或覆盖报告。跨日不能补跑实时行情。休市日期应在新年度交易所公告发布后更新 `src/lib/server/market-calendar.ts`。
+手动触发使用 `pnpm exec wrangler workflows trigger market-briefing '{"reportDate":"YYYY-MM-DD"}' --id market-briefing-YYYY-MM-DD`。运行失败时先检查失败步骤，同日可执行 `pnpm exec wrangler workflows instances restart market-briefing <id>`；仅邮件步骤失败时从 `--from-step-name notify-result` 恢复，避免重新采集或覆盖报告。跨日不能补跑实时行情。休市日期应在新年度交易所公告发布后更新 `src/lib/server/market-calendar.ts`。
