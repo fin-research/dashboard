@@ -12,7 +12,7 @@ const idSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/).refine(id => !Object.
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 export const nodeSchema = z.object({
   id: idSchema,
-  flowIds: z.array(z.enum(['loan', 'reverse', 'exchange'])).min(1).max(3),
+  flowIds: z.array(z.enum(['loan', 'reverse', 'exchange'])).min(1, '至少选择一个所属流程').max(3),
   nextIds: z.array(idSchema).max(150),
   parentId: idSchema.nullable(),
   kind: z.enum(['task', 'branch']),
@@ -134,6 +134,25 @@ export function insertNode(nodes: WorkflowNode[], source: WorkflowNode, child: W
   const outgoing = source.nextIds.filter(id => nodes.find(node => node.id === id)?.parentId === (branch ? source.id : source.parentId));
   return [...nodes.map(node => node.id === source.id ? { ...node, nextIds: [...node.nextIds.filter(id => !outgoing.includes(id)), child.id] } : node),
     { ...child, nextIds: outgoing }];
+}
+
+/** Move a node with its conditional subtree, reconnecting the path it leaves. */
+export function reparentNode(nodes: WorkflowNode[], id: string, parentId: string | null): WorkflowNode[] {
+  const selected = nodes.find(node => node.id === id);
+  if (!selected || selected.parentId === parentId) return nodes;
+  const continuation = selected.nextIds.filter(next => nodes.find(node => node.id === next)?.parentId === selected.parentId);
+  const side = selected.nextIds.filter(next => !continuation.includes(next));
+  const next = nodes.map(node => ({ ...node,
+    parentId: node.id === id ? parentId : node.parentId,
+    nextIds: node.id === id ? side : [...new Set(node.nextIds.flatMap(target => target === id ? continuation : [target]))],
+  }));
+  const parent = next.find(node => node.id === parentId);
+  if (parent) {
+    const entries = parent.nextIds.filter(target => next.find(node => node.id === target)?.parentId === parentId);
+    parent.nextIds = [...parent.nextIds.filter(target => !entries.includes(target)), id];
+    next.find(node => node.id === id)!.nextIds = [...new Set([...side, ...entries])];
+  }
+  return next;
 }
 
 const flags = z.record(z.string(), z.boolean());

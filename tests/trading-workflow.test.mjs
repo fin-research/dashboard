@@ -4,7 +4,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { buildGraph, timelineCursor, workflowGroups, workflowBranchFrames, nodeComplete } from '../src/lib/trading-workflow/graph.ts';
-import { activeTasks, defaultFlows, nodeScope, nodeFlowIds, insertNode, childrenOf, dayKey, descendants, dueReminders, emptyDay, removeNode, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
+import { activeTasks, defaultFlows, nodeScope, nodeFlowIds, insertNode, reparentNode, childrenOf, dayKey, descendants, dueReminders, emptyDay, removeNode, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
 import { readWorkflowConfig, saveWorkflowConfig } from '../src/lib/server/trading-workflow.ts';
 
 function database() {
@@ -327,4 +327,14 @@ test('graph migration preserves edited legacy data and is idempotent; flow and n
     assert.deepEqual(await readWorkflowConfig(adapter), persisted);
     assert.equal(Array.isArray(JSON.parse(sqlite.prepare('SELECT nodes FROM trading_workflow_config').get().nodes)), false);
   } finally { sqlite.close(); }
+});
+
+
+test('moving a step into a condition reconnects its former path and inserts it before the condition children', () => {
+  const moved = reparentNode(defaults, 'reverse-hengtai', 'reverse-change');
+  assert.equal(nodesSchema.safeParse(moved).success, true);
+  assert.ok(moved.find(node => node.id === 'reverse-counterparty').nextIds.includes('reverse-confirm'));
+  assert.ok(moved.find(node => node.id === 'reverse-change').nextIds.includes('reverse-hengtai'));
+  assert.deepEqual(moved.find(node => node.id === 'reverse-hengtai').nextIds, ['reverse-position']);
+  assert.equal(moved.find(node => node.id === 'reverse-hengtai').parentId, 'reverse-change');
 });

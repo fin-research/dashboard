@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockResources } from './fixtures.mjs';
+import { mockResources, workflow } from './fixtures.mjs';
 import { VERTICAL_GAP } from '../../src/lib/trading-workflow/graph.ts';
 
 let errors, requests;
@@ -165,4 +165,33 @@ test('secondary pool empty state is a successful empty report', async ({ page })
   await expect(page.getByRole('heading', { name: '所选范围暂无二级池数据' })).toBeVisible();
   await expect(page.getByRole('button', { name: /更新中/ })).toHaveCount(0);
   await screenshot(page, 'secondary-empty');
+});
+
+
+test('workflow successor edits save and reload without duplicating a shared node', async ({ page }) => {
+  let stored = structuredClone(workflow);
+  await page.route('**/api/trading-workflow/config', async route => {
+    if (route.request().method() === 'PUT') {
+      const body = route.request().postDataJSON();
+      expect(body.expectedVersion).toBe(stored.version);
+      expect(body.flows.map(flow => flow.id)).toEqual(['loan', 'reverse', 'exchange']);
+      stored = { ...stored, nodes: body.nodes, flows: body.flows, version: stored.version + 1 };
+    }
+    return route.fulfill({ json: stored });
+  });
+  await page.goto('/trading-research/workflow');
+  await page.getByRole('checkbox', { name: '编辑模式' }).check();
+  await page.locator('[data-workflow-node="loan-deal"] .node-surface').click();
+  await page.getByRole('button', { name: '上移', exact: true }).click();
+  await expect(page.getByLabel('后续节点 1', { exact: true })).toHaveValue('loan-send');
+  // A second successor turns the existing reverse node into a single merge target.
+  await page.getByLabel('添加后续节点', { exact: true }).selectOption('reverse-change');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.locator('.workflow-editor')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('path[id="loan-deal:loan-send"]')).toBeAttached();
+  await expect(page.locator('path[id="loan-deal:reverse-change"]')).toBeAttached();
+  await expect(page.locator('[data-workflow-node="reverse-change"]')).toHaveCount(1);
+  await expect(page.locator('[data-workflow-node="reverse-change"]')).toHaveAttribute('data-scope', 'shared');
+  expect(stored.nodes.every(node => !('scope' in node))).toBe(true);
 });

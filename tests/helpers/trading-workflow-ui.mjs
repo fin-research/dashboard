@@ -148,6 +148,7 @@ assert.equal(JSON.parse(localStorage.getItem(dayKey('test-actor','2026-09-15')))
 const name=document.querySelector('.editor-fields input');
 flushSync(()=>{name.value='修改后的协同节点';name.dispatchEvent(new window.Event('input',{bubbles:true}));}); await settle();
 // Coordinate inputs provide a keyboard/pointer alternative to direct graph dragging.
+document.querySelector('.editor-advanced').open = true;
 const position = document.querySelector('.editor-fields input[type="number"]');
 flushSync(()=>{position.value='120'; position.dispatchEvent(new window.Event('input',{bubbles:true}));}); await settle();
 window.confirm = () => false;
@@ -187,6 +188,7 @@ assert.equal(config.nodes.some(node => node.id === 'reverse-counterparty'), fals
 assert.equal(config.nodes.find(node => node.id === 'reverse-check').parentId, null);
 flushSync(()=>document.querySelector('.edit-mode [role=checkbox]').click()); await settle();
 await clickNode('loan-send');
+document.querySelector('.editor-advanced').open = true;
 flushSync(()=>document.querySelector('.icon-options [aria-label="审批"]').click()); await settle();
 flushSync(()=>button('保存').click()); await settle();
 assert.equal(config.nodes.find(node => node.id === 'loan-send').icon, 'clipboard-check');
