@@ -15,7 +15,7 @@ export const MARKET_DATA_STEP_OPTIONS = {
 
 /** Project DTOs before checkpointing; live requests may not cross the report date. */
 export function createMarketDataLoader(env: Env, step: WorkflowStep, reportDate: string): MarketDataLoader {
-  return async function load<T extends Rpc.Serializable<T>>(
+  return async function load<T>(
     name: string, path: string, schema: z.ZodType<T>, validate?: (value: T) => void,
   ): Promise<T> {
     const value = await step.do(`fetch-${name}`, MARKET_DATA_STEP_OPTIONS, async () => {
@@ -23,7 +23,8 @@ export function createMarketDataLoader(env: Env, step: WorkflowStep, reportDate:
       const data = await fetchDataJson(env, `https://data.internal/data/${path}`, schema);
       validate?.(data);
       if (new TextEncoder().encode(JSON.stringify(data)).byteLength > 900 * 1024) throw new Error(`${name} 数据超过步骤大小限制`);
-      return data;
+      // Data schemas project JSON DTOs; keep the platform serialization type at this boundary.
+      return data as Rpc.Serializable<T>;
     });
     return value as T;
   };

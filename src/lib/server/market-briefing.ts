@@ -206,7 +206,7 @@ export interface BriefingNews {
 }
 
 /** A caller may checkpoint each Data request without coupling the news adapter to Workflows. */
-export type MarketDataLoader = <T extends Rpc.Serializable<T>>(
+export type MarketDataLoader = <T>(
   name: string, path: string, schema: z.ZodType<T>, validate?: (value: T) => void,
 ) => Promise<T>;
 
