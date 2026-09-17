@@ -10,6 +10,7 @@
     "preview": "pnpm build && wrangler dev",
     "test": "node --test tests/*.test.mjs tests/financing/*.test.mjs",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:quick": "git diff --check && pnpm typecheck && pnpm worker:typecheck",
     "worker:dev": "pnpm build && wrangler dev",
     "worker:deploy": "pnpm build && wrangler deploy",
     "worker:typegen": "node scripts/generate-worker-types.mjs",

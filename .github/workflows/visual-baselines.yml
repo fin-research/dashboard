@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   visual-baseline-candidates:
     name: Visual baseline candidates
@@ -10,10 +13,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - run: npm install --global pnpm@10.33.2
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install --global pnpm@10.33.2
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install chromium
       - run: pnpm test:visual:update

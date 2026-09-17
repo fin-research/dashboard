@@ -2,10 +2,13 @@ name: Tests and visual regression
 on:
   pull_request:
   push:
-    branches: ['**']
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   test:
     name: Dashboard CI
@@ -14,19 +17,23 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - run: npm install --global pnpm@10.33.2
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install --global pnpm@10.33.2
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Check types and diff
+        run: pnpm check:quick
       - uses: astral-sh/setup-uv@v6
       - run: pnpm test:python
       - run: pnpm test:coverage
-      - run: pnpm build
+      # Types already passed above; the normal pnpm build retains both checks.
+      - name: Build production bundle
+        run: pnpm exec vite build
       - run: pnpm exec playwright install chromium
       - name: Compare visual baselines
         run: pnpm test:visual
-      - run: git diff --check
       - uses: actions/upload-artifact@v4
         if: always()
         with:
