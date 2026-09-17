@@ -6,13 +6,15 @@
 
 - Dashboard 共两项 Cron：`0 * * * *` 为每小时整点融资提醒（支持任意提前小时，不能缩成每日一次）；`0 9 * * MON-FRI` 为北京时间工作日 17:00 市场点评。Cron 使用 UTC。Data 午夜同步、Ingest 采集分别由各自 Worker 持有。
 - `MARKET_BRIEFING` 绑定 `MarketBriefingWorkflow`，平台名称固定 `market-briefing`。实例 ID 为 `market-briefing-YYYY-MM-DD`，同日重复 Cron 不重复创建。
-- Cron 在创建 Workflow 实例前判断 workday；`knownMarketClosure(reportDate) === true` 时立即返回，完全不进入 Workflow。Workflow 内不再判断或返回非交易日 skipped 状态，当前内置2026年公告。`fetch-industry` 要求 DATA `/data/industry` 的 `tradingDates` 包含当天，否则视为行情滞后，由 step 重试并失败，不能误判假期。未知年度只允许有当日行情证据时生成；每年须按交易所公告更新休市日。
-- 所有 `step.do` 及其并行、依赖关系直接写在 `worker/market-briefing-runner.ts`，不使用创建 step 的 loader 或 collector 封装。无依赖的行情和新闻列表各为独立 `fetch-*` step 并发执行。股票收评只请求一次，供报告与 AI 共用；一级发行等待行业数据中的上一交易日；债券基础信息等待今日成交和收藏报价后去重批量查询一次；新闻详情等待列表，每条独立 step、最多五条并发。按依赖使用原生 `await Promise.allSettled([...])` 划分并行批次：第一批独立行情与新闻列表，第二批一级发行、债券基础信息及前五条新闻详情，其余详情每五条一批；全部数据完成后，显式依次 `await generate-focus → aggregate-and-save-r2 → notify-result`。批次之间等待该批全部请求结束，不使用 `.then()` 或自定义 Promise 汇总函数串联 step。各 step 返回最小 DTO 或 AI 结果，通过 Workflow 检查点向下游传递，不在中途写报告。
-- 数据步骤最多重试 3 次，30 秒起指数退避，单步超时 3 分钟；AI 步骤最多重试 2 次，1 分钟起指数退避，单步超时 15 分钟，AI adapter 显式关闭内部重试（本工作流的共享 AI 默认规则例外）。采集、AI、保存和通知的重试均只由 Workflow step 配置负责，业务代码不执行重试循环。
-- 等所有并行步骤完成或耗尽重试，在唯一 `aggregate-and-save-r2` step 内使用共享 `buildReportData` 与报告 Schema 汇总并保存原 `market-briefing/YYYY-MM-DD.json`。任何必需请求失败不归档残缺报告，也不把失败伪装成零行情。
+- Cron 在创建 Workflow 实例前判断 workday；`knownMarketClosure(reportDate) === true` 时立即返回，完全不进入 Workflow。Workflow 内不再判断或返回非交易日 skipped 状态，当前内置2026年公告。`collect-equity` 与 `collect-primary` 各自要求 DATA `/data/industry` 的 `tradingDates` 包含当天，否则视为行情滞后，由 step 重试并失败，不能误判假期。未知年度只允许有当日行情证据时生成；每年须按交易所公告更新休市日。
+- Workflow 只保留一组七个并行模块 step，直接写在 `worker/market-briefing-runner.ts` 的原生 `await Promise.allSettled([...])` 中：今日聚焦 `collect-focus-news`、公开市场操作 `collect-open-market`、固收市场 `collect-fixed-income`、权益市场 `collect-equity`、一级发行 `collect-primary`、二级行情 `collect-secondary`、东财债券 `collect-inventory`。
+- 每个模块自己完成抓取、DTO 校验、解析、业务换算和结果组装，返回已校验的报告字段；不依赖其他模块 step 的输出。一级发行独立读取交易日期；二级与东财各自补全所需债券信息，东财另自取今日成交作收益率回退。共享接口可由不同模块独立请求，不设跨模块缓存或前置步骤。
+- 今日聚焦只抓取 DM 新闻列表和详情，在模块内完成正文合并、筛选及提示材料组装，详情最多五个并发。股票收评由权益模块负责，不作为今日聚焦的依赖。模块内部不创建子 step，不做业务重试。
+- 七个模块全部结束后，显式依次 `await generate-focus → archive-report → notify-result`。AI 只消费今日聚焦模块的新闻材料，关闭 adapter 内部重试；归档只合并已经解析完成的模块字段、校验完整报告并保存原 `market-briefing/YYYY-MM-DD.json`，不再解析上游数据。任一必需模块失败不影响其他模块完成，但不生成或归档残缺报告。
+- 模块 step 最多重试 3 次，30 秒起指数退避；行情模块单步超时 3 分钟，今日聚焦采集超时 10 分钟。AI step 最多重试 2 次，1 分钟起指数退避、超时 15 分钟。所有采集、AI、归档和通知重试由 Workflow step 配置负责。
 - 当日成交、期货及报价不支持历史重放；每个未完成的采集 step 校验上海当天，跨日恢复未完成采集会失败，不能以当前行情冒充历史报告。已完成数据步骤与归档步骤可由平台恢复。
-- 最后统一执行唯一 `notify-result` step：等待前面的并发请求、AI 和归档结果完成，在此 step 内判断结果、组装通知并通过 Resend 发给 `MARKET_BRIEFING_RECIPIENTS`（当前 `shiyue@18.cn`）。不设成功/失败通知分支或独立 step。通知完成后生成错误继续使 Workflow 失败；邮件自身重试不重新生成报告，也不删除已归档报告。
-- 邮件使用 `FROM_EMAIL=no-reply@hasbai.xyz` 和专用 Secret messenger 的 `RESEND_API_KEY`；不启用融资提醒的独立 `RESEND_API_KEY`。统一使用 `market-briefing/<instanceId>/result` 幂等键。`accepted` 仅代表 Resend 接受，不代表收件箱送达。
+- 最后统一执行唯一 `notify-result` step：等待前面的并发请求、AI 和归档结果完成，在此 step 内判断结果、组装通知并通过 Messenger 提交给 `MARKET_BRIEFING_RECIPIENTS`（当前 `shiyue@18.cn`）。不设成功/失败通知分支或独立 step。通知完成后生成错误继续使 Workflow 失败；邮件自身重试不重新生成报告，也不删除已归档报告。
+- 邮件渠道与凭据由 Messenger 管理。统一使用 `market-briefing/<instanceId>/result` 幂等键；`queued` 仅代表消息中台接受入队，不代表收件箱送达。
 
 ## 读取与页面
 
@@ -41,7 +43,7 @@
 
 `tests/market-report.test.mjs` 直接执行无 date 的 GET handler，覆盖 Choice 不可达/503/异常日历仍读取准确 R2 定稿、缺失不回退、17:00 切日及未来年度无需日历配置；`tests/report-date.test.mjs` 覆盖周末全天、节假日按工作日选日、跨年与闰日。浏览器固定报告夹具只验证展示与交互，不能证明真实 DATA/Choice/R2 可用；发布后须程序化请求生产 `/api/market-report` 及显式日期接口核对 HTTP 状态和 `report_date`。
 
-Cloudflare 流程图由静态语法分析生成，并不回放实际执行。`completeAll(...).then(...)` 曾使解析器把依赖步骤全部标为 `starts=1`，因此 Workflow 编排使用原生 Promise 批次与直接 await。发布后通过 `GET /accounts/{account}/workflows/market-briefing/versions/{version}/graph` 核对并行节点及 AI、保存、通知的顺序；测试通过不能替代平台图核验。见 [Cloudflare 流程图文档](https://developers.cloudflare.com/workflows/build/visualizer/)。
+Cloudflare 流程图由静态语法分析生成，并不回放实际执行。`completeAll(...).then(...)` 曾使解析器把依赖步骤全部标为 `starts=1`，因此 Workflow 编排使用原生 Promise 批次与直接 await。发布后通过 `GET /accounts/{account}/workflows/market-briefing/versions/{version}/graph` 核对唯一并行组恰有七个模块 step，及其后 AI、归档、通知三个串行 step；测试通过不能替代平台图核验。见 [Cloudflare 流程图文档](https://developers.cloudflare.com/workflows/build/visualizer/)。
 
 2026-09-16 本地验证：类型检查、Worker 类型检查、生产构建、544 项 Node 测试、53 项浏览器用例通过；1 项手机矩形拖拽按原规则跳过。CI 候选运行 `35077845510` 通过 5 项 Python、544 项 Node、构建与 53 项浏览器用例。市场点评桌面/手机的 darwin 与 macos-ci 基线已人工对照；本轮不更新其他模块基线。
 
