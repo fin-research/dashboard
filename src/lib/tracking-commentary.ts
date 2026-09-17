@@ -33,7 +33,7 @@ export interface TrackingCommentary extends ResearchCommentary {
   originalText: string;
   sourceFiles: Array<{ name: string; sha256: string }>;
   evidence: CommentaryEvidence[];
-  search: { startDate: string; endDate: string; query: string } | null;
+  search: { startDate: string; endDate: string; query: string; references?: Array<{ id: string; title: string; date: string }> } | null;
 }
 export interface TrackingRevision { savedAt: string; content: TrackingCommentary }
 export const commentaryTypeLabels = { current_affairs: "时事快评", policy_tracking: "政策跟踪", overseas_event: "海外事件" };

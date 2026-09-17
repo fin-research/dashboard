@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { type CommentaryEvidence, type TrackingDraft, type generateTrackingSchema } from "../tracking-commentary.ts";
+import { type CommentaryEvidence, type TrackingDraft, type generateTrackingSchema, shanghaiDate } from "../tracking-commentary.ts";
 import { AI_GATEWAY_MODEL, generateAiGatewayObject } from "./ai-gateway.ts";
 import { buildAiSearchToolCall, parseAiSearchResponse, readTextBounded, type ResearchDocument } from "./financing-model-research.ts";
 import { loadCommentaryGenerationContext, PolicyRepositoryError } from "./policy-repository.ts";
 import { fetchDataNewsDetail } from "./data-news.ts";
-import { getTrackingCommentary, updateTrackingCommentary } from "./tracking-commentary-repository.ts";
+import { getTrackingCommentary, updateTrackingCommentary, loadTrackingStyleReferences } from "./tracking-commentary-repository.ts";
 
-export const TRACKING_COMMENTARY_PROMPT_VERSION = "tracking-commentary-extract-v2";
+export const TRACKING_COMMENTARY_PROMPT_VERSION = "tracking-commentary-extract-v3";
 const quoteSchema = z.object({ sourceId: z.string().min(1), text: z.string().min(12).max(1200) }).strict();
 export const extractiveCommentarySchema = z.object({
   eventSummary: quoteSchema.extend({ text: z.string().min(12).max(120) }),
@@ -25,7 +25,8 @@ export const TRACKING_COMMENTARY_INSTRUCTIONS = `你是东方财富证券资金�
 5. 选材不能停留在数据复述：只保留能改变判断的核心数字，优先研报已提炼的结构变化、超预期之处、传导链条、定价差与发行时点判断。不得把“资金需求弱”直接套用成“立即前置融资”：比较等待利率下行的收益与季末融资成本，先辨明本次证据支持前置还是后置，再给动作。前置/后置均不是默认答案；原文有相反意见时明确采用哪条证据，不杜撰共识。
 6. 禁止无结论的防御性/保守性套话：“中性偏防御”“谨慎乐观”“保持谨慎”“不排除”“有待观察”“密切关注”“择机而动”“控制风险”。明确观点必须来自材料，不为追求强势措辞删除原文的真实条件或凭空断言。材料不足时不要凑稿。
 7. 历史手写稿的优点是判断先行、讲清边际变化和融资窗口；只学习这个组织方式，绝不沿用历史稿中的数据、仓位上限或结论。会议主题优先挑选新旧表述及其变化的现成分析，宏观数据优先选择结构分化与传导，海外事件优先选择政策预期与境内融资影响。
-8. 不在正文添加机构、标题、URL或脚注，来源由系统单独展示。严格输出JSON，不输出思考过程。`;
+8. styleReferences 是数据库中最近三期同类型人工稿，只学习判断式标题、篇幅、层次递进和资金部建议的表达；它们不是本次证据，不引用旧稿数字/时点/方向，不把参考稿前置或后置的结论当作默认答案。所有摘录仍只能来自 evidence；新事件与旧稿同题也必须重查本期事实与研报。
+9. 不在正文添加机构、标题、URL或脚注，来源由系统单独展示。严格输出JSON，不输出思考过程。`;
 
 export function compileExtractiveCommentary(output: z.infer<typeof extractiveCommentarySchema>, documents: ResearchDocument[]) {
   const byId = new Map(documents.map(doc => [doc.sourceId, doc]));
@@ -84,6 +85,7 @@ export async function generateTrackingCommentary(env: Env, id: string, input: z.
   const current = await getTrackingCommentary(env.DB, id);
   if (current.updatedAt !== input.updatedAt) throw new PolicyRepositoryError(409, "点评已更新，请重新打开");
   if (!env.CF_AIG_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) throw new PolicyRepositoryError(503, "AI Gateway 尚未配置");
+  const styleReferences = await loadTrackingStyleReferences(env.DB, id, current.type, current.commentaryDate || shanghaiDate());
   progress("检索研报");
   const documents = await retrieveTrackingResearch(current.eventName, input.startDate, input.endDate);
   if (current.policyId) {
@@ -111,7 +113,7 @@ export async function generateTrackingCommentary(env: Env, id: string, input: z.
   const output = await generateAiGatewayObject(
     { accountId: env.CLOUDFLARE_ACCOUNT_ID, gatewayId: env.AI_GATEWAY_ID || "default", token: env.CF_AIG_TOKEN },
     [{ role: "system", content: TRACKING_COMMENTARY_INSTRUCTIONS }, { role: "user", content: JSON.stringify({ topic: current.eventName,
-      eventDate: current.eventPublishedAt, period: { startDate: input.startDate, endDate: input.endDate }, evidence: documents }) }],
+      eventDate: current.eventPublishedAt, period: { startDate: input.startDate, endDate: input.endDate }, evidence: documents, styleReferences }) }],
     schema, "tracking_commentary", { taskType: "policy_commentary", requestTimeoutMs: 300_000,
       promptCacheKey: TRACKING_COMMENTARY_PROMPT_VERSION,
       metadata: { commentary_id: id, prompt_version: TRACKING_COMMENTARY_PROMPT_VERSION, document_count: documents.length, tags: "tracking-commentary,verbatim" } },
@@ -128,5 +130,5 @@ export async function generateTrackingCommentary(env: Env, id: string, input: z.
     eventSummary: compiled.eventSummary, commentary: compiled.commentary, recommendation: compiled.recommendation };
   return await updateTrackingCommentary(env.DB, id, draft, input.updatedAt, { model: AI_GATEWAY_MODEL,
     promptVersion: TRACKING_COMMENTARY_PROMPT_VERSION, evidence: compiled.evidence,
-    search: { startDate: input.startDate, endDate: input.endDate, query: current.eventName } });
+    search: { startDate: input.startDate, endDate: input.endDate, query: current.eventName, references: styleReferences.map((item: {id:string;eventName:string;commentaryDate:string}) => ({id:item.id,title:item.eventName,date:item.commentaryDate})) } });
 }
