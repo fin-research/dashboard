@@ -4,7 +4,6 @@
   import { Input } from "$lib/components/ui/input/index.js";
   import { NativeSelect } from "$lib/components/ui/native-select/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
-  import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount } from "svelte";
 
   import ModuleCard from "../../components/ModuleCard.svelte";
@@ -13,11 +12,9 @@
     policyCategoryLabels,
     policyImportanceLabels,
     type ArticleSearchResult,
-    type CommentaryContent,
     type PolicyCategory,
     type PolicyEvent,
     type PolicyTimelineResponse,
-    type ResearchCommentary,
   } from "$lib/policies";
   interface Props {
     embedded?: boolean;
@@ -37,10 +34,7 @@
   let selectedArticleIds = $state(new Set<string>());
   let searchingArticles = $state(false);
   let savingArticles = $state(false);
-  let commentaryPolicy = $state<PolicyEvent | null>(null);
-  let commentaryDraft = $state<CommentaryContent | null>(null);
-  let generatingPolicyId = $state("");
-  let savingCommentary = $state(false);
+
 
   onMount(loadPolicies);
 
@@ -122,77 +116,6 @@
     }
   }
 
-  async function generateCommentary(policy: PolicyEvent): Promise<void> {
-    if (policy.commentary && !window.confirm("重新生成将覆盖当前点评初版，是否继续？")) return;
-    generatingPolicyId = policy.id;
-    globalMessages.info("正在生成政策点评，可能需要数分钟", {
-      key: `policy-commentary-${policy.id}`,
-      duration: 300_000,
-    });
-    try {
-      const response = await fetch(`/api/policies/${policy.id}/commentary`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: "{}",
-      });
-      const payload = (await response.json()) as ResearchCommentary & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "政策点评生成失败");
-      replaceCommentary(policy.id, payload);
-      openCommentaryEditor({ ...policy, commentary: payload });
-      globalMessages.success("政策点评初版已生成并保存", {
-        key: `policy-commentary-${policy.id}`,
-      });
-    } catch (error) {
-      globalMessages.error(error instanceof Error ? error.message : String(error), {
-        key: `policy-commentary-${policy.id}`,
-      });
-    } finally {
-      generatingPolicyId = "";
-    }
-  }
-
-  function openCommentaryEditor(policy: PolicyEvent): void {
-    if (!policy.commentary) return;
-    commentaryPolicy = policy;
-    commentaryDraft = {
-      eventName: policy.commentary.eventName,
-      sources: policy.commentary.sources,
-      eventPublishedAt: policy.commentary.eventPublishedAt,
-      commentaryDate: policy.commentary.commentaryDate,
-      eventSummary: policy.commentary.eventSummary,
-      commentary: policy.commentary.commentary,
-      recommendation: policy.commentary.recommendation,
-    };
-  }
-
-  async function saveCommentary(): Promise<void> {
-    if (!commentaryPolicy || !commentaryDraft) return;
-    savingCommentary = true;
-    try {
-      const response = await fetch(`/api/policies/${commentaryPolicy.id}/commentary`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(commentaryDraft),
-      });
-      const payload = (await response.json()) as ResearchCommentary & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "政策点评保存失败");
-      replaceCommentary(commentaryPolicy.id, payload);
-      commentaryPolicy = null;
-      commentaryDraft = null;
-      globalMessages.success("政策点评修改已保存");
-    } catch (error) {
-      globalMessages.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      savingCommentary = false;
-    }
-  }
-
-  function replaceCommentary(policyId: string, commentary: ResearchCommentary): void {
-    policies = policies.map((policy) =>
-      policy.id === policyId ? { ...policy, commentary } : policy,
-    );
-  }
-
   function formatDate(value: string): string {
     return new Intl.DateTimeFormat("zh-CN", {
       timeZone: "Asia/Shanghai",
@@ -225,11 +148,6 @@
 
   function handleKeydown(event: KeyboardEvent): void {
     if (event.key !== "Escape") return;
-    if (commentaryPolicy) {
-      commentaryPolicy = null;
-      commentaryDraft = null;
-      return;
-    }
     if (articlePolicy) articlePolicy = null;
   }
 </script>
@@ -321,33 +239,14 @@
                   {:else}<p class="empty-text">暂无直接相关研报</p>{/if}
                 </section>
 
-                <section class="commentary-section">
-                  <div class="section-heading"><div class="section-title"><h3>研究点评</h3>
-                    <Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="default"
-                      class={["ui-button  ai-generate-button", generatingPolicyId === policy.id && "is-loading"]}
-
-                      type="button"
-                      disabled={generatingPolicyId === policy.id}
-                      aria-label={generatingPolicyId === policy.id ? "AI 生成中" : policy.commentary ? "重新生成政策点评初版" : "AI 生成点评初版"}
-                      onclick={() => generateCommentary(policy)}
-                    >
-                      <svg viewBox="0 0 20 20" aria-hidden="true">
-                        <path d="m10 2 1.1 4.2L15 8l-3.9 1.8L10 14l-1.1-4.2L5 8l3.9-1.8L10 2Z" />
-                        <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
-                      </svg>
-                    </Button>
-                  </div><div class="heading-actions">
-                    {#if policy.commentary}<a class="detail-link" href={`/commentaries/${encodeURIComponent(policy.commentary.id)}`}>查看完整点评</a><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => openCommentaryEditor(policy)}>编辑</Button>{/if}
-                  </div></div>
-                  {#if policy.commentary}
-                    <article class="commentary">
-                      <div class="commentary-title"><strong>【东财证券】资金管理部 · 政策跟踪</strong><span>{policy.commentary.edited ? "人工修订" : "AI 初版"}</span></div>
-                      <dl><div><dt>事件名称</dt><dd>{policy.commentary.eventName}</dd></div><div><dt>消息来源</dt><dd>{policy.commentary.sources}</dd></div><div><dt>发布时间</dt><dd>{formatDate(policy.commentary.eventPublishedAt)}</dd></div><div><dt>点评时间</dt><dd>{formatDate(policy.commentary.commentaryDate)}</dd></div></dl>
-                      <h4>事件摘要</h4><p>{policy.commentary.eventSummary}</p>
-                      <h4>政策点评</h4><p>{policy.commentary.commentary}</p>
-                      <h4>应对建议</h4><p>{policy.commentary.recommendation}</p>
-                    </article>
-                  {:else}<p class="empty-text">尚未生成</p>{/if}
+                <section>
+                  <div class="section-heading"><h3>跟踪点评</h3>
+                    <a class="detail-link" href={policy.commentary
+                      ? `/trading-research/tracking-commentary?id=${encodeURIComponent(policy.commentary.id)}`
+                      : `/trading-research/tracking-commentary?policy=${encodeURIComponent(policy.id)}`}>
+                      {policy.commentary ? "查看点评" : "撰写点评"}
+                    </a>
+                  </div>
                 </section>
               </div>
             </ModuleCard>
@@ -373,27 +272,11 @@
   </Modal>
 {/if}
 
-{#if commentaryPolicy && commentaryDraft}
-  <Modal open onclose={() => commentaryPolicy = null} class="p-0 gap-0 sm:max-w-[980px]" aria-labelledby="commentary-modal-title">
-    <div class="policy-dialog commentary-modal">
-      <header><div><span>政策跟踪</span><h2 id="commentary-modal-title">编辑研究点评</h2></div><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => (commentaryPolicy = null)}>×</Button></header>
-      <div class="modal-scroll commentary-form">
-        <label><span>事件名称</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} bind:value={commentaryDraft.eventName} /></label>
-        <div class="form-grid"><label><span>消息来源</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} bind:value={commentaryDraft.sources} /></label><label><span>发布时间</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} type="date" bind:value={commentaryDraft.eventPublishedAt} /></label><label><span>点评时间</span><Input data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-input"} type="date" bind:value={commentaryDraft.commentaryDate} /></label></div>
-        <label><span>事件摘要</span><Textarea data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-textarea"} rows={5} bind:value={commentaryDraft.eventSummary}></Textarea></label>
-        <label><span>政策点评</span><Textarea data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-textarea"} rows={12} bind:value={commentaryDraft.commentary}></Textarea></label>
-        <label><span>应对建议</span><Textarea data-ui-owner="lib-pages-PolicyTrackingPage-svelte" class={"ui-textarea"} rows={7} bind:value={commentaryDraft.recommendation}></Textarea></label>
-      </div>
-      <footer><span>保存后标记为人工修订</span><Button data-ui-owner="lib-pages-PolicyTrackingPage-svelte" variant="default" class={"ui-button  primary-action"} type="button" disabled={savingCommentary} onclick={saveCommentary}>{savingCommentary ? "保存中" : "保存点评"}</Button></footer>
-    </div>
-  </Modal>
-{/if}
-
 <style>
   :global(*) { box-sizing: border-box; }
   .policy-page { min-height: 100dvh; color: #172033; background: #f6f8fb; }
   .policy-header { position: sticky; z-index: 20; top: 0; display: flex; min-height: 82px; align-items: center; justify-content: space-between; gap: 24px; padding: 14px max(24px, calc((100vw - 1600px) / 2)); border-bottom: 1px solid #d8e2f0; background: rgba(246, 248, 251, .94); backdrop-filter: blur(14px); }
-  .header-title, .filters, .filters label, .policy-meta, .section-heading, .heading-actions, .commentary-title, .policy-dialog header, .policy-dialog footer, .article-search { display: flex; align-items: center; }
+  .header-title, .filters, .filters label, .policy-meta, .section-heading, .heading-actions, .policy-dialog header, .policy-dialog footer, .article-search { display: flex; align-items: center; }
   .header-title { gap: 14px; }
   .header-title > a { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid #cbd5e1; border-radius: 8px; color: #344054; background: #fff; }
   .header-title svg { width: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
@@ -422,7 +305,7 @@
   :global(.policy-card) { padding: 24px; }
   .policy-card-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   .policy-meta { flex-wrap: wrap; gap: 8px; }
-  .policy-meta span, .manual-badge, .commentary-title span { padding: 4px 8px; border-radius: 6px; font-size: .75rem; font-weight: bold; }
+  .policy-meta span, .manual-badge span { padding: 4px 8px; border-radius: 6px; font-size: .75rem; font-weight: bold; }
   .category { color: #175cd3; background: #eff4ff; }
   .category--real_estate { color: #b54708; background: #fffaeb; }
   .category--fiscal { color: #027a48; background: #ecfdf3; }
@@ -440,9 +323,6 @@
   .section-heading h3 { margin: 0; font-size: 1.125rem; font-weight: bold; }
   .section-heading h3 span { color: #667085; font-size: .875rem; }
   .heading-actions { flex-wrap: wrap; gap: 8px; }
-  :global(.ai-generate-button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { display: inline-grid; width: 44px; min-width: 44px; place-items: center; padding: 3px; }
-  :global(.ai-generate-button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"] svg) { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
-  :global(.ai-generate-button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"].is-loading svg) { animation: spin 1.2s linear infinite; }
   .detail-link { display: inline-flex; min-height: 44px; align-items: center; padding: 0 12px; border: 1px solid #b8c6da; border-radius: 8px; color: #2f6fd6; font-size: .875rem; font-weight: bold; text-decoration: none; }
   .detail-link:hover { border-color: #2f6fd6; background: #f5f9ff; }
   .detail-link:focus-visible { outline: 3px solid rgba(47, 111, 214, .28); outline-offset: 2px; }
@@ -458,17 +338,7 @@
   .article-list li > small { display: block; line-height: 1.5; }
   .manual-badge { color: #027a48 !important; background: #ecfdf3; }
   .empty-text { margin: 10px 0 0; color: #667085; }
-  .commentary { margin-top: 12px; padding: 20px; border: 1px solid #d8e2f0; border-radius: 8px; background: #fbfcfe; }
-  .commentary-title { justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 2px solid #344054; }
-  .commentary-title span { color: #475467; background: #f2f4f7; }
-  .commentary dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; margin: 16px 0 20px; }
-  .commentary dl div { display: grid; grid-template-columns: 80px 1fr; gap: 8px; }
-  .commentary dt { color: #667085; font-weight: bold; }
-  .commentary dd { margin: 0; }
-  .commentary h4 { margin: 18px 0 7px; color: #175cd3; font-size: 1rem; }
-  .commentary p { margin: 0; color: #344054; line-height: 1.85; white-space: pre-wrap; }
   .policy-dialog { position: relative; display: grid; width: min(840px, calc(100vw - 3rem)); max-height: calc(100dvh - 32px); grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid #cbd5e1; border-radius: inherit; background: var(--surface); box-shadow: none; }
-  .commentary-modal { width: min(980px, calc(100vw - 3rem)); grid-template-rows: auto minmax(0, 1fr) auto; }
   .policy-dialog header, .policy-dialog footer { justify-content: space-between; gap: 14px; padding: 18px 20px; border-bottom: 1px solid #e4e7ec; }
   .policy-dialog footer { border-top: 1px solid #e4e7ec; border-bottom: 0; color: #667085; }
   .policy-dialog h2 { max-width: 720px; margin: 3px 0 0; font-size: 1.25rem; }
@@ -485,10 +355,6 @@
   .article-options strong, .article-options small { display: block; }
   .article-options small { margin-top: 5px; color: #667085; }
   .article-options p { margin: 8px 0 0; color: #475467; font-size: .875rem; line-height: 1.5; }
-  .commentary-form { display: grid; gap: 16px; padding: 20px; }
-  .commentary-form label { display: grid; gap: 7px; font-weight: bold; }
-  :global(.commentary-form input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]), :global(.commentary-form textarea[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { width: 100%; padding: 10px 12px; resize: vertical; }
-  .form-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (max-width: 900px) {
     .policy-header { position: static; align-items: flex-start; flex-direction: column; min-height: 82px; }
@@ -497,7 +363,6 @@
     .timeline-date { justify-content: flex-start; padding-top: 0; text-align: left; }
     .timeline-date time { position: static; }
     .timeline-date::before, .timeline-date::after, .timeline-date span { display: none; }
-    .commentary dl, .form-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 620px) {
     .policy-main { width: min(100% - 28px, 1600px); padding-top: 20px; }
@@ -507,8 +372,6 @@
     :global(.policy-card) { padding: 16px; }
     .section-heading { align-items: flex-start; flex-direction: column; }
     .news-list li { grid-template-columns: 1fr; gap: 4px; }
-    .commentary { padding: 14px; }
-    .commentary dl div { grid-template-columns: 1fr; gap: 2px; }
   }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 

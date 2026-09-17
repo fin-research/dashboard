@@ -47,25 +47,8 @@ test("政策点评标准化字段通过运行时 Schema 校验", () => {
   assert.equal(policyImportanceLabels.related, "关联");
 });
 
-test("政策点评 Prompt 遵循资金部时事快评规范并移除来源链接", async () => {
-  const prompt = await readFile(
-    new URL("../src/lib/server/policy-commentary.ts", import.meta.url),
-    "utf8",
-  );
-
-  assert.match(prompt, /POLICY_COMMENTARY_PROMPT_VERSION = "policy-commentary-v3"/);
-  assert.match(prompt, /全文控制在一页纸以内/);
-  assert.match(prompt, /eventSummary：只写一段，120 字以内/);
-  assert.match(prompt, /commentary：固定写 3 点编号分析/);
-  assert.match(prompt, /recommendation：必须以“融资发行方面，”开头/);
-  assert.match(prompt, /不得包含 URL、Markdown 链接、来源脚注或来源列表/);
-  assert.match(prompt, /风格样例仅用于学习结构与密度/);
-  assert.equal(
-    stripCommentarySourceLinks(
-      "详见[政策原文](https://example.com/policy)及 https://example.com/review。结论不变。",
-    ),
-    "详见政策原文及。结论不变。",
-  );
+test("点评正文清理仍支持旧稿链接", () => {
+  assert.equal(stripCommentarySourceLinks("详见[政策原文](https://example.com/policy)及 https://example.com/review。结论不变。"), "详见政策原文及。结论不变。");
 });
 
 test("政策时间轴一次装配政策资讯、自动研报关系与一对一点评", async () => {
@@ -89,10 +72,10 @@ test("政策页面展示重要性并使用隔离的时间轴类名", async () =>
     readFile(new URL("../migrations/1014_add_policy_importance.sql", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /<Button[^>]*variant="default"[\s\S]*?ai-generate-button/);
-  assert.match(page, /disabled=\{generatingPolicyId === policy\.id\}/);
+  assert.match(page, /\/trading-research\/tracking-commentary/);
+  assert.doesNotMatch(page, /generateCommentary|commentaryDraft/);
   assert.doesNotMatch(page, /请先关联至少一篇研报/);
-  assert.match(page, /<p class="empty-text">尚未生成<\/p>/);
+  assert.match(page, /撰写点评/);
   assert.match(page, /\.policy-timeline \{ display: grid; gap: 2rem;/);
   assert.match(page, /\.policy-timeline-item \{ display: grid; grid-template-columns: 126px minmax\(0, 1fr\); gap: 2rem;/);
   assert.doesNotMatch(page, /class="timeline(?:-item)?"/);
@@ -137,7 +120,7 @@ test("政策资讯、研报与点评使用独立深链并从政策页面进入",
 
   assert.match(policyPage, /\/news\/\$\{encodeURIComponent\(item\.id\)\}/);
   assert.match(policyPage, /\/articles\/\$\{encodeURIComponent\(article\.id\)\}/);
-  assert.match(policyPage, /\/commentaries\/\$\{encodeURIComponent\(policy\.commentary\.id\)\}/);
+  assert.match(policyPage, /tracking-commentary\?id=\$\{encodeURIComponent\(policy\.commentary\.id\)\}/);
   assert.match(newsPage, /\/api\/news\/\$\{encodeURIComponent\(data\.id\)\}/);
   assert.match(newsPage, /DM 原文/);
   assert.match(newsPage, /查看政策原文/);

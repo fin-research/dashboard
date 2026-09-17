@@ -12,6 +12,9 @@
     {:else if block.kind === "list"}
       {#if block.ordered}<ol>{#each block.items as item}<li>{item}</li>{/each}</ol>
       {:else}<ul>{#each block.items as item}<li>{item}</li>{/each}</ul>{/if}
+    {:else if block.kind === "table"}
+      <div class="table-scroll" role="region" aria-label="点评对比表" tabindex="0"><table><thead><tr>{#each block.headers as cell}<th>{cell}</th>{/each}</tr></thead>
+        <tbody>{#each block.rows as row}<tr>{#each row as cell}<td>{cell}</td>{/each}</tr>{/each}</tbody></table></div>
     {:else}<p>{block.text}</p>{/if}
   {/each}
 </article>
@@ -22,5 +25,9 @@
   .document-body h3 { margin: 26px 0 10px; color: #172033; font-size: 1.125rem; }
   .document-body p { margin: 0 0 18px; white-space: pre-wrap; }
   .document-body ol, .document-body ul { display: grid; gap: 10px; margin: 0 0 20px; padding-left: 24px; }
+  .table-scroll { overflow-x: auto; margin-block: 16px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px; border: 1px solid var(--border-color); text-align: left; white-space: pre-wrap; vertical-align: top; }
+  th { background: var(--muted); }
   @media (max-width: 620px) { .document-body { line-height: 1.8; } }
 </style>
