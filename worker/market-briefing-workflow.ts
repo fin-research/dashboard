@@ -3,6 +3,6 @@ import { runMarketBriefing, type MarketBriefingParams } from "./market-briefing-
 
 export class MarketBriefingWorkflow extends WorkflowEntrypoint<Env, MarketBriefingParams> {
   async run(event: Readonly<WorkflowEvent<MarketBriefingParams>>, step: WorkflowStep) {
-    return await runMarketBriefing(this.env, step, event.payload, event.instanceId);
+    return await runMarketBriefing(this.env, step, event.payload);
   }
 }

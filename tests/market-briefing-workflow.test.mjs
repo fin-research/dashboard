@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runMarketBriefing, startMarketBriefing } from '../worker/market-briefing-runner.ts';
 import { saveMarketReport } from '../src/lib/server/market-report.ts';
-import { sendMarketBriefingResult } from '../src/lib/server/market-briefing-email.ts';
 import { directResponse } from './fixtures/market-resources.mjs';
 
 const date = '2026-08-25';
@@ -13,7 +12,7 @@ function newsItem(index) {
   return { sentimentId: `news-${index}`, title: `要闻${index}`, time: `${date}T15:00:00+08:00`, tags: ['债市'], content: '新闻正文' };
 }
 function harness(override) {
-  const calls = [], steps = [], objects = new Map(), checkpoints = new Map(), notifications = [];
+  const calls = [], steps = [], objects = new Map(), checkpoints = new Map();
   const completed = Object.fromEntries(moduleSteps.map(name => [name, deferred()]));
   const env = { DATA: { fetch: async req => {
     calls.push(req.url);
@@ -36,13 +35,12 @@ function harness(override) {
   const dependencies = {
     generateMarketBriefingFromNews: async () => ({ stock: '股市判断', bond: '债市判断' }),
     saveMarketReport,
-    sendMarketBriefingResult: async (_env, result) => { notifications.push(result); return { messageId: '1', status: 'accepted' }; },
   };
-  const run = () => runMarketBriefing(env, step, { reportDate: date }, 'test', dependencies);
-  return { env, step, calls, steps, objects, checkpoints, completed, notifications, dependencies, run };
+  const run = () => runMarketBriefing(env, step, { reportDate: date }, dependencies);
+  return { env, step, calls, steps, objects, checkpoints, completed, dependencies, run };
 }
 
-test('七模块并发且互不等待，step内完成解析，之后仅AI、归档和通知', async t => {
+test('七模块并发且互不等待，step内完成解析，之后仅AI和归档', async t => {
   clock(t);
   const equityGate = deferred();
   const h = harness(url => {
@@ -62,7 +60,6 @@ test('七模块并发且互不等待，step内完成解析，之后仅AI、归�
     return { stock: '股市判断', bond: '债市判断' };
   };
   h.dependencies.saveMarketReport = async (...args) => { events.push('r2'); return saveMarketReport(...args); };
-  h.dependencies.sendMarketBriefingResult = async () => { events.push('mail'); return { messageId: '1', status: 'queued' }; };
   const pending = h.run();
   await Promise.all(moduleSteps.filter(name => name !== 'collect-equity').map(name => h.completed[name].promise));
   assert.deepEqual(h.steps.map(row => row.name), moduleSteps);
@@ -76,8 +73,8 @@ test('七模块并发且互不等待，step内完成解析，之后仅AI、归�
   assert.equal(h.checkpoints.get('collect-inventory').inventory_bonds[0].bid_yield, 2.01);
   equityGate.resolve();
   assert.equal((await pending).status, 'complete');
-  assert.deepEqual(events, ['ai', 'r2', 'mail']);
-  assert.deepEqual(h.steps.map(row => row.name), [...moduleSteps, 'generate-focus', 'archive-report', 'notify-result']);
+  assert.deepEqual(events, ['ai', 'r2']);
+  assert.deepEqual(h.steps.map(row => row.name), [...moduleSteps, 'generate-focus', 'archive-report']);
   assert.equal(h.calls.filter(url => url.includes('/stock-summary?')).length, 1);
   assert.equal(h.calls.filter(url => url.includes('/industry?')).length, 2);
   assert.equal(h.calls.filter(url => url.includes('/bond-infos?')).length, 2);
@@ -102,19 +99,17 @@ test('个别国债收益率缺失保留其他行情且不归零', async t => {
 });
 
 for (const source of ['stock-summary', 'industry', 'bond-infos', 'news/news-1']) {
-  test(`${source}的step失败后通知，不写残缺R2`, async t => {
+  test(`${source}的step失败直接传播，不写残缺R2`, async t => {
     clock(t);
     const h = harness(url => url.includes(`/data/${source}?`) ? Response.json({ detail: '源不可用' }, { status: 503 }) : undefined);
     await assert.rejects(h.run());
-    assert.equal(h.notifications[0].status, 'failed');
-    assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), ['notify-result']);
-    assert.equal(h.steps.at(-1).name, 'notify-result');
+    assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), []);
     assert.equal(h.objects.size, 0);
     assert.equal(h.steps.some(row => row.name === 'archive-report'), false);
   });
 }
 
-test('失败通知等待所有并发step结束', async t => {
+test('失败状态等待所有并发step结束', async t => {
   clock(t);
   const gate = deferred(), started = deferred();
   const h = harness(url => {
@@ -123,10 +118,10 @@ test('失败通知等待所有并发step结束', async t => {
   });
   const pending = assert.rejects(h.run());
   await started.promise;
-  assert.deepEqual(h.notifications, []);
+  assert.equal(h.objects.size, 0);
   gate.resolve();
   await pending;
-  assert.equal(h.notifications[0].status, 'failed');
+  assert.equal(h.objects.size, 0);
 });
 
 test('今日聚焦模块内新闻详情并发上限五；AI失败重放不重新采集', async t => {
@@ -171,19 +166,18 @@ for (const reportDate of ['2026-09-25', '2026-08-23']) {
   });
 }
 
-test('邮件失败保留报告，跨日恢复仅重做邮件，不重新采集、生成或保存', async t => {
+test('成功结果携带归档时间与聚焦正文供事件消费者通知，重放不重复归档', async t => {
   clock(t);
-  const h = harness(), statuses = [];
-  h.dependencies.sendMarketBriefingResult = async (_env, result) => { statuses.push(result.status); throw new Error('mail failed'); };
-  await assert.rejects(h.run(), /mail failed/);
-  assert.equal(h.objects.size, 1);
-  assert.deepEqual(statuses, ['success']);
+  const h = harness();
+  const result = await h.run();
+  assert.equal(result.status, 'complete');
+  assert.equal(result.focus, '1、股市判断\n2、债市判断');
+  assert.ok(result.finalizedAt);
   const calls = h.calls.length, steps = h.steps.length;
   t.mock.timers.setTime(new Date('2026-08-26T09:00:00Z').valueOf());
-  h.dependencies.sendMarketBriefingResult = async () => ({ messageId: '2', status: 'accepted' });
-  assert.equal((await h.run()).status, 'complete');
+  assert.deepEqual(await h.run(), result);
   assert.equal(h.calls.length, calls);
-  assert.deepEqual(h.steps.slice(steps).map(row => row.name), ['notify-result']);
+  assert.equal(h.steps.length, steps);
 });
 
 test('跨日的未完成实时采集失败，不保存错日行情', async t => {
@@ -205,17 +199,6 @@ test('重复Cron使用上海日确定性ID且只确认真实存在的实例', as
   await assert.rejects(startMarketBriefing(env, Date.parse('2026-08-25T09:00:00Z')), /exists/);
 });
 
-test('消息中台收到固定幂等键和业务内容；提交失败由step重试', async () => {
-  let payload;
-  const env = { MESSENGER: { fetch: async request => { payload = await request.json(); return Response.json({ id: 'message-id', status: 'queued' }); } }, FROM_EMAIL: 'no-reply@example.test', MARKET_BRIEFING_RECIPIENTS: 'test@example.test' };
-  const result = { reportDate: date, instanceId: 'workflow-id', status: 'success', detail: '已归档' };
-  assert.deepEqual(await sendMarketBriefingResult(env, result), { messageId: 'message-id', status: 'queued' });
-  assert.equal(payload.idempotencyKey, 'market-briefing/workflow-id/result');
-  assert.deepEqual(payload.to, ['test@example.test']);
-  env.MESSENGER.fetch = async () => Response.json({ error: 'unavailable' }, { status: 503 });
-  await assert.rejects(sendMarketBriefingResult(env, result), /消息中台请求失败/);
-});
-
 test('工作日行情滞后不能被误判休市跳过', async t => {
   clock(t);
   const h = harness(async url => url.includes('/industry?')
@@ -226,16 +209,13 @@ test('工作日行情滞后不能被误判休市跳过', async t => {
 
 
 for (const stage of ['generateMarketBriefingFromNews', 'saveMarketReport']) {
-  test(`${stage}失败也只执行最后一个notify-result并保留失败状态`, async t => {
+  test(`${stage}失败直接传播原错误且没有通知步骤`, async t => {
     clock(t);
     const h = harness();
     h.dependencies[stage] = async () => { throw new Error(`${stage} failed`); };
     await assert.rejects(h.run(), new RegExp(`${stage} failed`));
     assert.equal(h.objects.size, 0);
-    assert.equal(h.notifications.length, 1);
-    assert.equal(h.notifications[0].status, 'failed');
-    assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), ['notify-result']);
-    assert.equal(h.steps.at(-1).name, 'notify-result');
+    assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), []);
   });
 }
 
@@ -263,7 +243,7 @@ test('AI和归档有明确await边界，后续step不能提前启动', async t =
   assert.equal(h.steps.some(row => row.name === 'notify-result'), false);
   saveDone.resolve();
   await pending;
-  assert.deepEqual(h.steps.slice(-3).map(row => row.name), ['generate-focus', 'archive-report', 'notify-result']);
+  assert.deepEqual(h.steps.slice(-2).map(row => row.name), ['generate-focus', 'archive-report']);
 });
 
 
