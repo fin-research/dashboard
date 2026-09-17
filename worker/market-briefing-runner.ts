@@ -45,13 +45,27 @@ export async function runMarketBriefing(
   let outcome: PromiseSettledResult<{ finalizedAt: string | null; focus: string }>;
   try {
     const modules = await Promise.allSettled([
-      step.do("collect-focus-news", { ...DATA_STEP_OPTIONS, timeout: "10 minutes" }, () => collectFocusNews(env, reportDate)),
-      step.do("collect-open-market", DATA_STEP_OPTIONS, () => collectOpenMarket(env, reportDate)),
-      step.do("collect-fixed-income", DATA_STEP_OPTIONS, () => collectFixedIncome(env, reportDate)),
-      step.do("collect-equity", DATA_STEP_OPTIONS, () => collectEquity(env, reportDate)),
-      step.do("collect-primary", DATA_STEP_OPTIONS, () => collectPrimary(env, reportDate)),
-      step.do("collect-secondary", DATA_STEP_OPTIONS, () => collectSecondary(env, reportDate)),
-      step.do("collect-inventory", DATA_STEP_OPTIONS, () => collectInventory(env, reportDate)),
+      step.do("collect-focus-news", { ...DATA_STEP_OPTIONS, timeout: "10 minutes" }, async () => {
+        return await collectFocusNews(env, reportDate);
+      }),
+      step.do("collect-open-market", DATA_STEP_OPTIONS, async () => {
+        return await collectOpenMarket(env, reportDate);
+      }),
+      step.do("collect-fixed-income", DATA_STEP_OPTIONS, async () => {
+        return await collectFixedIncome(env, reportDate);
+      }),
+      step.do("collect-equity", DATA_STEP_OPTIONS, async () => {
+        return await collectEquity(env, reportDate);
+      }),
+      step.do("collect-primary", DATA_STEP_OPTIONS, async () => {
+        return await collectPrimary(env, reportDate);
+      }),
+      step.do("collect-secondary", DATA_STEP_OPTIONS, async () => {
+        return await collectSecondary(env, reportDate);
+      }),
+      step.do("collect-inventory", DATA_STEP_OPTIONS, async () => {
+        return await collectInventory(env, reportDate);
+      }),
     ]);
     const news = stepValue(modules[0]);
     const report = {
