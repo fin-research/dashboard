@@ -40,36 +40,44 @@ export async function runMarketBriefing(
 ) {
   const { reportDate } = params;
 
-  const modules = await Promise.allSettled([
-    step.do("collect-focus-news", { ...DATA_STEP_OPTIONS, timeout: "10 minutes" }, () => collectFocusNews(env, reportDate)),
-    step.do("collect-open-market", DATA_STEP_OPTIONS, () => collectOpenMarket(env, reportDate)),
-    step.do("collect-fixed-income", DATA_STEP_OPTIONS, () => collectFixedIncome(env, reportDate)),
-    step.do("collect-equity", DATA_STEP_OPTIONS, () => collectEquity(env, reportDate)),
-    step.do("collect-primary", DATA_STEP_OPTIONS, () => collectPrimary(env, reportDate)),
-    step.do("collect-secondary", DATA_STEP_OPTIONS, () => collectSecondary(env, reportDate)),
-    step.do("collect-inventory", DATA_STEP_OPTIONS, () => collectInventory(env, reportDate)),
-  ]);
-  const news = stepValue(modules[0]);
-  const report = {
-    report_date: reportDate,
-    generated_at: new Date().toISOString(),
-    ...stepValue(modules[1]),
-    ...stepValue(modules[2]),
-    ...stepValue(modules[3]),
-    ...stepValue(modules[4]),
-    ...stepValue(modules[5]),
-    ...stepValue(modules[6]),
-  };
-  const focus = await step.do("generate-focus", {
-    retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "15 minutes",
-  }, () => dependencies.generateMarketBriefingFromNews(env, reportDate, news, { retry: false }));
+  try {
+    const modules = await Promise.allSettled([
+      step.do("collect-focus-news", { ...DATA_STEP_OPTIONS, timeout: "10 minutes" }, () => collectFocusNews(env, reportDate)),
+      step.do("collect-open-market", DATA_STEP_OPTIONS, () => collectOpenMarket(env, reportDate)),
+      step.do("collect-fixed-income", DATA_STEP_OPTIONS, () => collectFixedIncome(env, reportDate)),
+      step.do("collect-equity", DATA_STEP_OPTIONS, () => collectEquity(env, reportDate)),
+      step.do("collect-primary", DATA_STEP_OPTIONS, () => collectPrimary(env, reportDate)),
+      step.do("collect-secondary", DATA_STEP_OPTIONS, () => collectSecondary(env, reportDate)),
+      step.do("collect-inventory", DATA_STEP_OPTIONS, () => collectInventory(env, reportDate)),
+    ]);
+    const news = stepValue(modules[0]);
+    const report = {
+      report_date: reportDate,
+      generated_at: new Date().toISOString(),
+      ...stepValue(modules[1]),
+      ...stepValue(modules[2]),
+      ...stepValue(modules[3]),
+      ...stepValue(modules[4]),
+      ...stepValue(modules[5]),
+      ...stepValue(modules[6]),
+    };
+    const focus = await step.do("generate-focus", {
+      retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "15 minutes",
+    }, () => dependencies.generateMarketBriefingFromNews(env, reportDate, news, { retry: false }));
 
-  const saved = await step.do("archive-report", DATA_STEP_OPTIONS, async () => {
-    const snapshot = await dependencies.saveMarketReport(env.EASTMONEY, reportDate,
-      report, `1、${focus.stock}\n2、${focus.bond}`);
-    return { finalizedAt: snapshot.finalized_at, focus: snapshot.focus_text };
-  });
-  return { reportDate, status: "complete", finalizedAt: saved.finalizedAt, focus: saved.focus };
+    const saved = await step.do("archive-report", DATA_STEP_OPTIONS, async () => {
+      const snapshot = await dependencies.saveMarketReport(env.EASTMONEY, reportDate,
+        report, `1、${focus.stock}\n2、${focus.bond}`);
+      return { finalizedAt: snapshot.finalized_at, focus: snapshot.focus_text };
+    });
+    return { reportDate, status: "complete", finalizedAt: saved.finalizedAt, focus: saved.focus };
+  } catch (error) {
+    // Errors thrown outside a durable step become generic runtime errors in instance.status().
+    // Keep the final business failure in a step so the event consumer receives its real details.
+    return await step.do("workflow-failure", { retries: { limit: 0, delay: "1 second" } }, async () => {
+      throw error instanceof Error ? error : new Error(String(error));
+    });
+  }
 }
 
 function stepValue<T>(result: PromiseSettledResult<T>): T {

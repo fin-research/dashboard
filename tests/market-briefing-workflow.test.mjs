@@ -105,6 +105,7 @@ for (const source of ['stock-summary', 'industry', 'bond-infos', 'news/news-1'])
     await assert.rejects(h.run());
     assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), []);
     assert.equal(h.objects.size, 0);
+    assert.equal(h.steps.at(-1).name, 'workflow-failure');
     assert.equal(h.steps.some(row => row.name === 'archive-report'), false);
   });
 }
