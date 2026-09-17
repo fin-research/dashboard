@@ -12,6 +12,7 @@ test.beforeEach(async ({page}) => {
   unexpected=await mockResources(page);
   await page.route('**/api/tracking-commentaries**',async route=>{
     const url=new URL(route.request().url());const method=route.request().method();
+    if(url.pathname.endsWith('/pdf')) return route.fulfill({json:{revisionAt:stored.updatedAt,key:'research-commentary/时事快评/archive-1/v1.pdf',fileName:'点评.pdf',sha256:'hash',size:100,archivedAt:'2026-09-15T03:03:00Z'}});
     if(url.pathname.endsWith('/generate')) {
       const input=route.request().postDataJSON();expect(input.startDate).toBe('2026-09-09');
       stored={...stored,commentary:'1. 融资需求下降\n资金需求回落，融资成本下移。',edited:false,origin:'ai',updatedAt:'2026-09-15T03:02:00Z',evidence:[{sourceId:'S1',sourceKey:'report/2026-09-15/报告.md',title:'融资窗口分析',institution:'研究机构甲',publishedAt:'2026-09-15',section:'融资需求下降',text:'资金需求回落，融资成本下移。',startOffset:0,endOffset:18}]};
@@ -42,6 +43,8 @@ test('tracking archive opens, edits, generates and retains source evidence',asyn
   await expect(page.getByLabel('跟踪点评',{exact:true})).toHaveValue(stored.commentary);
   await expect(page.getByRole('heading',{name:'取材原句'})).toBeVisible();
   await expect(page.getByText('融资窗口分析',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'归档 PDF',exact:true}).click();
+  await expect(page.getByRole('link',{name:'下载 PDF',exact:true})).toHaveAttribute('href','/api/tracking-commentaries/archive-1/pdf');
   await page.getByRole('button',{name:'版本记录',exact:true}).click();
   await expect(page.getByRole('button',{name:/2026-09-15 03:00:00/})).toBeVisible();
 });

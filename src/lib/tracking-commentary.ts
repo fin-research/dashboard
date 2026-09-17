@@ -25,7 +25,9 @@ export interface CommentaryEvidence {
   sourceId: string; sourceKey: string; title: string; institution: string; publishedAt: string;
   text: string; section: string; startOffset: number; endOffset: number; documentHash?: string;
 }
+export interface CommentaryPdfArchive { revisionAt: string; key: string; fileName: string; sha256: string; size: number; archivedAt: string }
 export interface TrackingCommentary extends ResearchCommentary {
+  pdf?: CommentaryPdfArchive | null;
   policyId: string | null;
   origin: "legacy" | "manual" | "import" | "ai";
   originalText: string;
