@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { stockSummarySchema } from "../../data-contracts.ts";
 import { formatDataApiError } from "../../data-api-error.ts";
 import type { MarketBriefing, MarketBriefingProgress } from "../../types";
 import { generateAiGatewayObject } from "./ai-gateway.ts";
@@ -12,11 +13,6 @@ const marketBriefingOutputSchema = z
     bond: z.string().trim().min(1).describe("债市点评正文，不含序号或标题"),
   })
   .strict();
-const briefingStockSchema = z.object({
-  title: z.string(),
-  time: z.string().nullable(),
-  paragraphs: z.array(z.string()),
-});
 const briefingNewsSummarySchema = z.object({
   sentimentId: z.string(),
   title: z.string(),
@@ -143,11 +139,24 @@ export class MarketBriefingError extends Error {
 export async function generateMarketBriefing(
   env: Env,
   reportDate: string,
-  options: { signal?: AbortSignal; onProgress?: (event: MarketBriefingProgress) => void } = {},
+  options: MarketBriefingOptions = {},
 ): Promise<MarketBriefing> {
   options.signal?.throwIfAborted();
   options.onProgress?.({ type: "status", text: "正在读取新闻" });
   const news = await fetchBriefingNews(env, reportDate, options.signal);
+  return generateMarketBriefingFromNews(env, reportDate, news, options);
+}
+
+interface MarketBriefingOptions {
+  signal?: AbortSignal;
+  onProgress?: (event: MarketBriefingProgress) => void;
+  retry?: boolean;
+}
+
+/** AI consumes checkpointed news; retrying it never fetches live inputs again. */
+export async function generateMarketBriefingFromNews(
+  env: Env, reportDate: string, news: BriefingNews, options: MarketBriefingOptions = {},
+): Promise<MarketBriefing> {
   options.signal?.throwIfAborted();
   options.onProgress?.({ type: "status", text: "正在分析股债市场" });
   const output = await generateAiGatewayObject(
@@ -169,6 +178,7 @@ export async function generateMarketBriefing(
     "market_briefing",
     {
       signal: options.signal,
+      retry: options.retry,
       ...(options.onProgress ? {
         onReasoningSummary: (summary: { id: string; text: string }) =>
           options.onProgress?.({ type: "summary", ...summary }),
@@ -190,69 +200,60 @@ export async function generateMarketBriefing(
   return { report_date: reportDate, ...output, news_count: news.news_count };
 }
 
-interface BriefingNews {
+export interface BriefingNews {
   news_count: number;
   news_text: string;
 }
 
-async function fetchBriefingNews(
+/** A caller may checkpoint each Data request without coupling the news adapter to Workflows. */
+export type MarketDataLoader = <T extends Rpc.Serializable<T>>(
+  name: string, path: string, schema: z.ZodType<T>, validate?: (value: T) => void,
+) => Promise<T>;
+
+export async function fetchBriefingNews(
   env: Env,
   reportDate: string,
   signal?: AbortSignal,
+  sources?: { stock: Promise<z.infer<typeof stockSummarySchema>>; load: MarketDataLoader },
 ): Promise<BriefingNews> {
-  const baseUrl =
-    env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
-  const query = new URLSearchParams({ date: reportDate });
+  const baseUrl = env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
+  const load: MarketDataLoader = sources?.load ?? ((_name, path, schema) =>
+    fetchDataJson(env, `${baseUrl}/${path}`, schema, signal));
   const newsQuery = new URLSearchParams({
-    date: reportDate,
-    important: "true",
-    pageSize: "40",
+    date: reportDate, important: "true", pageSize: "40",
     fields: "sentimentId,title,time,tags,important",
   });
-  const [stockPayload, newsPayload] = await Promise.all([
-    fetchDataJson(
-      env,
-      `${baseUrl}/stock-summary?${query}&fields=title,time,paragraphs`,
-      briefingStockSchema,
-      signal,
-    ),
-    fetchDataJson(env, `${baseUrl}/news?${newsQuery}`, briefingNewsResponseSchema, signal),
-  ]);
-  const paragraphs = stockPayload.paragraphs.filter((item) => item.length > 0);
-  if (paragraphs.length === 0) {
-    throw new MarketBriefingError(503, "新闻数据为空，请稍后重试");
-  }
-  const details = await mapWithConcurrency(
-    newsPayload,
-    5,
-    async (summary) => {
-      const detailQuery = new URLSearchParams({
-        fields: "sentimentId,title,time,tags,important,content,link",
-      });
-      const detail = await fetchDataJson(
-        env,
-        `${baseUrl}/news/${encodeURIComponent(summary.sentimentId)}?${detailQuery}`,
-        briefingNewsDetailSchema,
-        signal,
-      );
+  const details = load("news", `news?${newsQuery}`, briefingNewsResponseSchema).then(news =>
+    mapWithConcurrency(news, 5, async summary => {
+      const query = new URLSearchParams({ fields: "sentimentId,title,time,tags,important,content,link" });
+      const detail = await load(`news-${summary.sentimentId}`,
+        `news/${encodeURIComponent(summary.sentimentId)}?${query}`, briefingNewsDetailSchema);
       return { ...summary, ...detail };
-    },
-  );
+    }));
+  const [stockPayload, newsDetails] = await completeAll([
+    sources?.stock ?? load("stock", `stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema),
+    details,
+  ]);
+  const paragraphs = stockPayload.paragraphs.filter(item => item.length > 0);
+  if (paragraphs.length === 0) throw new MarketBriefingError(503, "新闻数据为空，请稍后重试");
   const items: Array<Record<string, unknown>> = [
-    {
-      title: stockPayload.title,
-      time: stockPayload.time,
-      tags: ["股市", "行情"],
-      content: paragraphs.join("\n"),
-    },
-    ...details,
+    { title: stockPayload.title, time: stockPayload.time, tags: ["股市", "行情"], content: paragraphs.join("\n") },
+    ...newsDetails,
   ];
   return {
     news_count: items.length,
-    news_text: items
-      .map((item, index) => formatBriefingItem(index + 1, item))
-      .join("\n\n"),
+    news_text: items.map((item, index) => formatBriefingItem(index + 1, item)).join("\n\n"),
   };
+}
+
+/** Drain every branch (including durable retries) before propagating a failure. */
+export async function completeAll<T extends readonly unknown[] | []>(
+  promises: T,
+): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
+  const results = await Promise.allSettled(promises);
+  const failure = results.find(result => result.status === "rejected");
+  if (failure?.status === "rejected") throw failure.reason;
+  return Promise.all(promises);
 }
 
 export async function fetchDataJson<T>(
@@ -329,7 +330,7 @@ async function mapWithConcurrency<T, R>(
       if (item !== undefined) results[index] = await task(item);
     }
   };
-  await Promise.all(
+  await completeAll(
     Array.from({ length: Math.min(concurrency, items.length) }, worker),
   );
   return results;
