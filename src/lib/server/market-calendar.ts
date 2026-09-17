@@ -13,15 +13,3 @@ export function knownMarketClosure(date: string): boolean | null {
   if (!closures) return null;
   return closures.some(([start, end]) => date.slice(5) >= start && date.slice(5) <= end);
 }
-
-export function expectedPreviousTradingDate(date: string): string | null {
-  let cursor = new Date(`${date}T00:00:00Z`);
-  for (let i = 0; i < 30; i++) {
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-    const day = cursor.toISOString().slice(0, 10);
-    const closed = knownMarketClosure(day);
-    if (closed === null) return null;
-    if (!closed) return day;
-  }
-  throw new Error("交易日历无上一交易日");
-}

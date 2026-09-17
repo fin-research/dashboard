@@ -9,7 +9,7 @@ import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform, url }) => {
   try {
-    const reportDate = url.searchParams.has("date") ? requiredDate(url) : await defaultReportDate(platform?.env);
+    const reportDate = url.searchParams.has("date") ? requiredDate(url) : defaultReportDate();
     const snapshot = await readMarketReport(platform?.env.EASTMONEY, reportDate);
     return Response.json(snapshot, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
