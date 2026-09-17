@@ -7,7 +7,8 @@ import { buildBondLedgerAnalytics, toBondLedgerReport, emptyBondLedgerReport } f
 export const today = '2026-09-15';
 const db = new DatabaseSync(':memory:');
 db.exec(readFileSync(new URL('../../migrations/1015_trading_workflow_config.sql', import.meta.url), 'utf8'));
-export const workflow = { version: 1, nodes: JSON.parse(db.prepare('SELECT nodes FROM trading_workflow_config').get().nodes), actorKey: 'visual-fixture', canEdit: true };
+db.exec(readFileSync(new URL('../../migrations/1016_trading_workflow_graph.sql', import.meta.url), 'utf8'));
+export const workflow = { version: 2, ...JSON.parse(db.prepare('SELECT nodes FROM trading_workflow_config').get().nodes), actorKey: 'visual-fixture', canEdit: true };
 db.close();
 const summary = { reportDate: today, institutionCount: 2, approvedCount: 2, totalLimit: 30, totalUsed: 8, totalAvailable: 22, utilization: 26.67, expiringWithin30Days: 1 };
 export const credit = {
