@@ -21,7 +21,7 @@ export async function sendMarketBriefingResult(
     to: recipients,
     subject: `【市场点评】${result.reportDate} ${label}`,
     text: `${result.reportDate} 市场点评${label}\n\n${result.detail}\n\n报告：https://eastmoney.hasbai.xyz/market-briefing?date=${result.reportDate}\n任务：${result.instanceId}`,
-  }, { idempotencyKey: `market-briefing/${result.instanceId}/${result.status}` });
+  }, { idempotencyKey: `market-briefing/${result.instanceId}/result` });
   if (response.error || !response.data?.id) throw new Error(`市场点评邮件发送失败：${response.error?.name ?? "NO_MESSAGE_ID"}`);
   return { messageId: response.data.id, status: "accepted" };
 }

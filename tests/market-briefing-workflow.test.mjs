@@ -66,6 +66,8 @@ test('独立行情和新闻step并发，AI不等待行业行情；共用收评�
   assert.ok(h.steps.filter(row => row.name.startsWith('fetch-')).every(({ config }) => config.retries.limit === 3));
   assert.equal(h.steps.find(row => row.name === 'generate-focus').config.retries.limit, 2);
   assert.equal(h.steps.some(row => ['trading-day', 'assemble-report'].includes(row.name)), false);
+  assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), ['notify-result']);
+  assert.equal(h.steps.at(-1).name, 'notify-result');
   const report = h.objects.get(`market-briefing/${date}.json`);
   assert.equal(report.focus_text, '1、股市判断\n2、债市判断');
   assert.equal(report.omo_operations[0].amount_yi, 1000);
@@ -92,6 +94,8 @@ for (const source of ['stock-summary', 'industry', 'bond-infos', 'news/news-1'])
     const h = harness(url => url.includes(`/data/${source}?`) ? Response.json({ detail: '源不可用' }, { status: 503 }) : undefined);
     await assert.rejects(h.run());
     assert.equal(h.notifications[0].status, 'failed');
+    assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), ['notify-result']);
+    assert.equal(h.steps.at(-1).name, 'notify-result');
     assert.equal(h.objects.size, 0);
     assert.equal(h.steps.some(row => row.name === 'aggregate-and-save-r2'), false);
   });
@@ -146,11 +150,10 @@ test('新闻详情各自持久化，并发上限五；AI失败重放不重新采
 
 for (const reportDate of ['2026-09-25', '2026-08-23']) {
   test(`${reportDate}非交易日直接跳过，不创建Workflow或step`, async () => {
-    const h = harness();
-    assert.equal((await runMarketBriefing(h.env, h.step, { reportDate }, 'test')).status, 'skipped');
-    assert.equal(await startMarketBriefing({}, Date.parse(`${reportDate}T09:00:00Z`)), undefined);
-    assert.equal(h.steps.length, 0);
-    assert.equal(h.calls.length, 0);
+    let created = 0;
+    const env = { MARKET_BRIEFING: { create: async () => { created++; throw new Error('must not enter Workflow'); } } };
+    assert.equal(await startMarketBriefing(env, Date.parse(`${reportDate}T09:00:00Z`)), undefined);
+    assert.equal(created, 0);
   });
 }
 
@@ -166,7 +169,7 @@ test('邮件失败保留报告，跨日恢复仅重做邮件，不重新采集�
   h.dependencies.sendMarketBriefingResult = async () => ({ messageId: '2', status: 'accepted' });
   assert.equal((await h.run()).status, 'complete');
   assert.equal(h.calls.length, calls);
-  assert.deepEqual(h.steps.slice(steps).map(row => row.name), ['notify-success']);
+  assert.deepEqual(h.steps.slice(steps).map(row => row.name), ['notify-result']);
 });
 
 test('跨日的未完成实时采集失败，不保存错日行情', async t => {
@@ -194,7 +197,7 @@ test('Resend带幂等键、固定结果收件人；provider错误可交给step�
   const result = { reportDate: date, instanceId: 'workflow-id', status: 'success', detail: '已归档' };
   assert.deepEqual(await sendMarketBriefingResult(env, result), { messageId: 'mail-id', status: 'accepted' });
   const [, init] = globalThis.fetch.mock.calls[0].arguments;
-  assert.equal(new Headers(init.headers).get('Idempotency-Key'), 'market-briefing/workflow-id/success');
+  assert.equal(new Headers(init.headers).get('Idempotency-Key'), 'market-briefing/workflow-id/result');
   assert.deepEqual(JSON.parse(init.body).to, ['test@example.test']);
   globalThis.fetch.mock.mockImplementation(async () => Response.json({ name: 'validation_error', message: 'bad' }, { status: 422 }));
   await assert.rejects(sendMarketBriefingResult(env, result), /邮件发送失败/);
@@ -207,3 +210,18 @@ test('工作日行情滞后不能被误判休市跳过', async t => {
   await assert.rejects(h.run(), /行情尚未更新/);
   assert.equal(h.objects.size, 0);
 });
+
+
+for (const stage of ['generateMarketBriefingFromNews', 'saveMarketReport']) {
+  test(`${stage}失败也只执行最后一个notify-result并保留失败状态`, async t => {
+    clock(t);
+    const h = harness();
+    h.dependencies[stage] = async () => { throw new Error(`${stage} failed`); };
+    await assert.rejects(h.run(), new RegExp(`${stage} failed`));
+    assert.equal(h.objects.size, 0);
+    assert.equal(h.notifications.length, 1);
+    assert.equal(h.notifications[0].status, 'failed');
+    assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), ['notify-result']);
+    assert.equal(h.steps.at(-1).name, 'notify-result');
+  });
+}
