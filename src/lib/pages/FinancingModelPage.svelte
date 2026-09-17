@@ -524,7 +524,7 @@
         <ModuleCard class="conclusion-card" labelledBy="overall-conclusion-title">
             <PanelHeading id="overall-conclusion-title" title="整体结论" controlsInline>
               {#if !editingConclusion}
-                <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
+                <Button permission="model.conclusion:update" data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                   </svg>
@@ -689,7 +689,7 @@
       <ModuleCard class="decision-history-section" labelledBy="decision-history-title">
         <PanelHeading id="decision-history-title" title="历史择时决策记录" controlsBesideTitle>
           {#if !editingDecision}
-            <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="录入当前决策" onclick={() => openDecisionEditor()}>
+            <Button permission="model.decision:create" data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="录入当前决策" onclick={() => openDecisionEditor()}>
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
             </Button>
           {/if}
@@ -739,7 +739,7 @@
                   <td>
                     <div class="decision-result-cell">
                       <span>{record.outcome || "—"}</span>
-                      <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label={`编辑${record.decisionDate}择时决策记录`} onclick={() => openDecisionEditor(record)}>
+                      <Button permission="model.decision:create" data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label={`编辑${record.decisionDate}择时决策记录`} onclick={() => openDecisionEditor(record)}>
                         <svg viewBox="0 0 24 24" aria-hidden="true">
                           <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                         </svg>
@@ -761,13 +761,13 @@
         <PanelHeading id="sell-side-title" title="卖方观点" controlsBesideTitle>
           <div class="section-actions heading-icon-actions">
             {#if report.sellSide && !editingSellSide}
-              <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
+              <Button permission="model.sell_side:update" data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="编辑卖方逻辑汇总" onclick={openSellSideEditor}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
                 </svg>
               </Button>
             {/if}
-            <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={["ui-button  icon-button ai-generate-button", generatingResearch && "is-loading"]}  type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}
+            <Button permission="model.sell_side:generate" data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={["ui-button  icon-button ai-generate-button", generatingResearch && "is-loading"]}  type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}
               aria-label={generatingResearch ? "AI 生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
               aria-busy={generatingResearch}
             >

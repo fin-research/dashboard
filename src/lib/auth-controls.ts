@@ -63,11 +63,30 @@ export function installAuthControls(state: ClientSession, document: Document, re
       delete anchor.dataset.authPreload;
     }
   }
+  function visibility() {
+    const current=state.current();
+    for(const element of document.querySelectorAll<HTMLElement>('a[href],form,[data-permission]')) {
+      if(element.matches('a[href^="/auth/"]') || element.closest('[role="dialog"]')?.querySelector('input[autocomplete="username"]'))continue;
+      let permission=element.dataset.permission;
+      if(!permission && element.tagName === 'A' && new URL((element as HTMLAnchorElement).href).origin===document.location.origin)
+        permission=clientRequestPermission(new URL((element as HTMLAnchorElement).href),'GET');
+      if(!permission && element instanceof HTMLFormElement && new URL(element.action).origin===document.location.origin)
+        permission=clientRequestPermission(new URL(element.action),element.method);
+      if(!permission || permission==='public')continue;
+      const denied=!current || !sessionAllows(current,permission);
+      if(denied){element.setAttribute('data-auth-hidden','');element.setAttribute('inert','');}
+      else if(element.hasAttribute('data-auth-hidden')){element.removeAttribute('data-auth-hidden');element.removeAttribute('inert');}
+    }
+  }
+  const observer=new document.defaultView!.MutationObserver(visibility);
+  observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['href','action','data-permission']});
+  const unsubscribe=state.subscribe(visibility);
   // Prevent speculative hover/tap preloads from opening login before a click.
   for (const type of ['mousemove', 'mousedown', 'touchstart']) document.addEventListener(type, protectPreload, true);
   document.addEventListener('submit', submit, true);
   document.addEventListener('click', click, true);
   return () => {
+    observer.disconnect(); unsubscribe();
     document.removeEventListener('submit', submit, true); document.removeEventListener('click', click, true);
     for (const type of ['mousemove', 'mousedown', 'touchstart']) document.removeEventListener(type, protectPreload, true);
   };

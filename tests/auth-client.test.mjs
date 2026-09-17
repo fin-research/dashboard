@@ -8,7 +8,7 @@ import { createClientSession } from '../src/lib/client-session.ts';
 
 const current = 'https://eastmoney.hasbai.xyz/fund-report?upload=1#history';
 const anonymous = { user: null, account: null, roles: [], permissions: [], expiresAt: null };
-const authenticated = { ...anonymous, user: { email: 'test@18.cn' }, permissions: ['credit.institution:read', 'fund.report:upload'], expiresAt: Date.now() / 1000 + 3600 };
+const authenticated = { ...anonymous, user: { email: 'test@18.cn' }, roles:[{id:'rol_TestAdmin',name:'admin'}], permissions: ['credit.institution:read', 'fund.report:upload'], expiresAt: Date.now() / 1000 + 3600 };
 
 test('anonymous writes wait for login, recheck permission and send exactly once', async () => {
   const state = createClientSession(anonymous);
@@ -22,7 +22,7 @@ test('anonymous writes wait for login, recheck permission and send exactly once'
 });
 
 test('cancelled login and denied permissions never send the protected operation', async () => {
-  for (const session of [anonymous, { ...authenticated, permissions: [] }]) {
+  for (const session of [anonymous, { ...authenticated, roles:[], permissions: [] }]) {
     const errors = [];
     const cleanup = installAuthInteraction({ session: createClientSession(session), login: async () => false, error: message => errors.push(message) });
     try {

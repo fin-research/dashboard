@@ -34,7 +34,7 @@ const incrementalContracts = [
 	{
 		name: 'profile settings',
 		server: 'src/routes/api/profile/+server.ts',
-		client: 'src/routes/profile/+page.svelte',
+		client: 'src/routes/management/me/+page.svelte',
 		response: /identityRequest/,
 		apply: /result.name/
 	}
@@ -103,7 +103,7 @@ test('only global identity or reminder data is invalidated after relevant deltas
 		readFile(new URL('../../src/routes/financing/projects/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/projects/[id]/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/management/people/+page.svelte', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/routes/profile/+page.svelte', import.meta.url), 'utf8')
+		readFile(new URL('../../src/routes/management/me/+page.svelte', import.meta.url), 'utf8')
 	]);
 	assert.match(layout, /depends\('financing:identity', 'financing:permissions', 'financing:reminders'\)/);
 	assert.match(projects, /invalidate\('financing:reminders'\)/);

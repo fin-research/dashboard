@@ -3,6 +3,7 @@ import svelteKitWorker from "../.svelte-kit/cloudflare/_worker.js";
 import { creditAssistantHttp } from "./credit-assistant-http.ts";
 import { dashboardAccessFailure } from '../src/lib/server/dashboard-access.ts';
 import { readBindingContext, CONTEXT_HEADER } from '../src/lib/server/gateway-context.ts';
+import { notificationSource } from '../src/lib/server/notification-source';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 /** Only the provisioned Gateway binding can select this entrypoint. */
@@ -20,6 +21,10 @@ export class GatewayDashboard extends WorkerEntrypoint<Cloudflare.Env> {
   }
 }
 
+export class NotificationSource extends WorkerEntrypoint<Cloudflare.Env> {
+ override fetch(request:Request) { return notificationSource(request,this.env); }
+}
+
 export { MarketBriefingWorkflow } from "./market-briefing-workflow.ts";
 export { BondLedgerImportWorkflow } from "./bond-ledger-workflow.ts";
 export { CreditAgent } from "./credit-agent.ts";
@@ -32,12 +37,7 @@ const worker: ExportedHandler<Cloudflare.Env> = {
       context.waitUntil(startMarketBriefing(env, controller.scheduledTime));
       return;
     }
-    if (controller.cron === '0 * * * *') {
-      context.waitUntil(import('../src/lib/server/financing/reminder-scheduler.js')
-        .then(({ runScheduledReminderCheck }) => runScheduledReminderCheck({ scheduledTime: controller.scheduledTime, env }))
-        .then(summary => { console.log(JSON.stringify(summary)); }));
-      return;
-    }
+
   },
 };
 

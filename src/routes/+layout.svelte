@@ -33,6 +33,7 @@
     const uninstall = installAuthInteraction({ session, login: () => loginDialog.open(), error: message => globalMessages.error(message) });
     const uninstallControls = installAuthControls(session, document, message => globalMessages.error(message));
     applyPreferences(readPreferences());
+    if ('serviceWorker' in navigator) void navigator.serviceWorker.register('/service-worker.js', {scope:'/'}).catch(() => {});
     // Authenticated SSR already seeded this store. Public pages bootstrap once in
     // the background without making report rendering depend on Auth0.
     void session.load().then(() => {

@@ -238,7 +238,7 @@
         <Popover.Trigger>
           {#snippet child({ props })}
         <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline"
-          class={"ui-button scope-button"} {...props}
+          permission="research.hotspot:generate" class={"ui-button scope-button"} {...props}
           aria-label={`证据范围：${scopeLabel}`}
           type="button"
         >
@@ -295,13 +295,13 @@
               </div>
               </Tabs.Content>
             </Tabs.Root>
-            <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline" class={"ui-button apply-scope-button"} type="button" onclick={applyConfiguration}>
+            <Button permission="research.hotspot:generate" data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline" class={"ui-button apply-scope-button"} type="button" onclick={applyConfiguration}>
               应用并生成热点
             </Button>
           </div>
         </Popover.Content>
       </Popover.Root>
-      <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="default"
+      <Button permission="research.hotspot:generate" data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="default"
         class={"ui-button  regenerate-button"}
         type="button"
         disabled={loading || regenerating}

@@ -105,14 +105,10 @@
     } catch { if (mounted) globalMessages.warning('SHIBOR 暂不可用，保留 BP 报价', { key: 'inquiry-shibor' }); }
     finally { fetchingRates = false; }
   }
-  let permission = $state<NotificationPermission | 'unsupported'>('unsupported');
-  let notificationsEnabled = $state(false);
   let mounted = false;
   let localAvailable = true;
-  let checking = false;
   let abort: AbortController;
   const clock = $derived(shanghaiClock(now));
-  function prefsKey() { return `eastmoney:trading-workflow:notifications:${encodeURIComponent(actorKey)}`; }
   function storageFailure() {
     localAvailable = false;
     globalMessages.warning('本地存储不可用或记录损坏，当前进度仅在本页保留', { key: 'workflow-storage', duration: 10000 });
@@ -130,9 +126,34 @@
     }
     const copy = structuredClone($state.snapshot(day)); changeDay(copy); day = copy;
   }
+  let progressWrite: Promise<void> = Promise.resolve();
+  function syncProgress(patch: Record<string, unknown>) {
+    progressWrite = progressWrite.then(async () => {
+      const response = await fetch('/api/trading-workflow/day', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch) });
+      if (!response.ok) throw new Error(await responseError(response));
+    }).catch(error => { globalMessages.error(`进度同步失败：${error.message}`, {key:'workflow-sync'}); });
+    return progressWrite;
+  }
+  async function loadProgress() {
+    const response = await fetch('/api/trading-workflow/day');
+    if (!response.ok) throw new Error(await responseError(response));
+    const result = await response.json();
+    if (!mounted || result.state.date !== shanghaiClock().date) return;
+    if (!result.revision) await syncProgress({date:day.date,enabled:day.enabled,completed:day.completed,branches:day.branches});
+    else persist(state => { state.enabled=result.state.enabled;state.completed=result.state.completed;state.branches=result.state.branches; });
+  }
   async function change(changeDay: (value: WorkflowDay) => void) {
-    if (navigator.locks) await navigator.locks.request(`trading-workflow:${actorKey}`, () => { if (mounted) persist(changeDay); });
-    else persist(changeDay);
+    const apply = async () => {
+      if (!mounted) return;
+      const before=structuredClone($state.snapshot(day));persist(changeDay);
+      const patch:Record<string,unknown>={date:day.date};
+      for(const key of ['enabled','completed','branches'] as const){
+        const flags=Object.fromEntries(Object.entries(day[key]).filter(([id,value])=> (before[key] as Record<string,boolean>)[id]!==value));
+        if(Object.keys(flags).length)patch[key]=flags;
+      }
+      if(Object.keys(patch).length>1)await syncProgress(patch);
+    };
+    if (navigator.locks) await navigator.locks.request(`trading-workflow:${actorKey}`,apply);else await apply();
   }
   async function loadConfig() {
     loading = true; loadError = '';
@@ -143,8 +164,7 @@
       if (!mounted) return;
       config = { version: data.version, flows: data.flows, nodes: data.nodes }; actorKey = data.actorKey; canEdit = data.canEdit;
       restore(shanghaiClock().date); restoreDirectory(); void refreshRates();
-      try { notificationsEnabled = localStorage.getItem(prefsKey()) === 'true'; } catch { storageFailure(); }
-      void remind();
+      await loadProgress().catch(error=>globalMessages.error(`进度同步失败：${error.message}`,{key:'workflow-sync'}));
     } catch (error) { if (mounted) loadError = error instanceof Error ? error.message : '交易流程加载失败'; }
     finally { if (mounted) loading = false; }
   }
@@ -159,70 +179,24 @@
     if (!response.ok) { globalMessages.error(await responseError(response)); return false; }
     config = configSchema.parse(await response.json());
     globalMessages.success('交易流程节点已保存');
-    void remind(); return true;
+    return true;
   }
   function complete(ids: string[], value: boolean) { void change(state => { for (const id of ids) state.completed[id] = value; }); }
-  function branch(ids: string[], value: boolean) { void change(state => { for (const id of ids) state.branches[id] = value; }).then(remind); }
-  function enable(product: Product, value: boolean) { void change(state => { state.enabled[product] = value; }).then(remind); }
-  async function toggleNotifications() {
-    if (permission === 'unsupported') return;
-    try {
-      if (!notificationsEnabled) permission = await Notification.requestPermission();
-      if (permission !== 'granted') { globalMessages.warning('请在浏览器网站设置中允许通知'); return; }
-      notificationsEnabled = !notificationsEnabled;
-      try { localStorage.setItem(prefsKey(), String(notificationsEnabled)); } catch { storageFailure(); }
-      if (notificationsEnabled) void remind();
-    } catch { globalMessages.error('浏览器通知开启失败，请检查网站通知权限'); }
-  }
-  async function remind() {
-    if (!mounted || !config || checking) return;
-    checking = true;
-    const run = () => {
-      if (!mounted || !config) return;
-      const date = shanghaiClock().date;
-      if (day.date !== date) restore(date);
-      // Re-read inside the browser lock so another tab's delivered alerts are not replayed.
-      if (localAvailable) { try { day = readDay(localStorage, dayKey(actorKey, date), date); } catch { storageFailure(); } }
-      if ('Notification' in window) permission = Notification.permission;
-      const browser = notificationsEnabled && permission === 'granted';
-      const due = dueReminders(config.nodes, day, new Date(), browser ? 'browser' : 'page');
-      if (!due.length) return;
-      let sent = false;
-      if (browser) {
-        try {
-          for (const item of due) {
-            const label = flowLabel(item.node, config.nodes, config.flows);
-            const notification = new Notification(`${item.time} · ${label}`, { body: item.node.title, tag: `${actorKey}:${date}:${item.key}` });
-            notification.onclick = () => { window.focus(); window.dispatchEvent(new CustomEvent('workflow-locate', { detail: item.node.id })); notification.close(); };
-            notification.onerror = () => globalMessages.warning('浏览器通知未送达，请查看到点待办', { key: 'workflow-notification-error' });
-          }
-          sent = true;
-        } catch { globalMessages.warning('浏览器无法发送通知，请查看到点待办', { key: 'workflow-notification-error' }); notificationsEnabled = false; }
-      }
-      if (!sent) globalMessages.info(due.map(item => `${item.time} ${item.node.title}`).join('；'), { key: 'workflow-reminder', title: '交易待办提醒', duration: 10000 });
-      persist(state => { for (const item of due) state.notified[sent ? item.key : item.key.replace(/^browser:/, 'page:')] = true; });
-    };
-    try {
-      if (navigator.locks) await navigator.locks.request(`trading-workflow:${actorKey}`, run);
-      else run();
-    } catch { globalMessages.warning('提醒检查失败，请刷新交易流程', { key: 'workflow-notification-error' }); }
-    finally { checking = false; }
-  }
+  function branch(ids: string[], value: boolean) { void change(state => { for (const id of ids) state.branches[id] = value; }); }
+  function enable(product: Product, value: boolean) { void change(state => { state.enabled[product] = value; }); }
   onMount(() => {
     mounted = true; abort = new AbortController();
-    permission = 'Notification' in window && window.isSecureContext ? Notification.permission : 'unsupported';
     void loadConfig();
     const timer = setInterval(() => {
       now = new Date();
-      if (config && day.date !== clock.date) restore(clock.date);
-      void remind(); void refreshRates();
+      if (config && day.date !== clock.date) { restore(clock.date);void loadProgress().catch(()=>globalMessages.error('进度同步失败')); }
+      void refreshRates();
     }, 1000);
     function sync(event: StorageEvent) {
       if (event.key === directoryKey(actorKey) || event.key === null) restoreDirectory();
       if (event.key === dayKey(actorKey, shanghaiClock().date) || event.key === null) restore(shanghaiClock().date);
-      if (event.key === prefsKey() || event.key === null) { try { notificationsEnabled = localStorage.getItem(prefsKey()) === 'true'; } catch { storageFailure(); } }
     }
-    function wake() { now = new Date(); void remind(); void refreshRates(); }
+    function wake() { now = new Date();if(config)void loadProgress().catch(()=>globalMessages.error('进度同步失败'));void refreshRates(); }
     window.addEventListener('storage', sync); window.addEventListener('focus', wake); document.addEventListener('visibilitychange', wake);
     return () => { mounted = false; abort.abort(); clearInterval(timer); window.removeEventListener('storage', sync); window.removeEventListener('focus', wake); document.removeEventListener('visibilitychange', wake); };
   });
@@ -245,7 +219,7 @@
         {#key selectedId}<WorkflowEditor flows={config.flows} bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
           onClose={() => selectedId = ''} onBranch={(id, value) => setBranch([id], value)} expanded={!!preview.branches[selectedId]}
           onSave={saveDraft} onDelete={deleteNode} onAdd={addNode} onReset={() => draft = draft.map(({ offset, ...node }) => node)}
-          notificationsEnabled={notificationsEnabled} notificationsSupported={permission !== 'unsupported'} onNotifications={toggleNotifications} />{/key}
+          />{/key}
       {/if}
     </div>
   {/if}

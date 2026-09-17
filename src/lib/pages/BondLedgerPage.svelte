@@ -666,7 +666,7 @@
           {/if}
         </div>
 
-        <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button ledger-management-button"} type="button" onclick={openManagement}>
+        <Button permission="bond.ledger:import|bond.ledger:delete" data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button ledger-management-button"} type="button" onclick={openManagement}>
           <svg viewBox="0 0 20 20" aria-hidden="true">
             <path d="M3.5 5.5h13v11h-13zM6 3.5h8v2M6.5 9h7M6.5 12.5h7" />
           </svg>
@@ -703,7 +703,7 @@
           </svg>
         </div>
         <h2>数据库暂无二级池数据</h2>
-        <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={openManagement}>打开台账管理</Button>
+        <Button permission="bond.ledger:import|bond.ledger:delete" data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={openManagement}>打开台账管理</Button>
       </section>
     {:else}
       <section class="ledger-main">
@@ -873,7 +873,7 @@
       </Button>
     </header>
     <div class="ledger-management-toolbar">
-      <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="default" class={"ui-button  ledger-upload-primary"} type="button" disabled={uploading} onclick={openBatchUpload}>
+      <Button permission="bond.ledger:import" data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="default" class={"ui-button  ledger-upload-primary"} type="button" disabled={uploading} onclick={openBatchUpload}>
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5M4 12.5V17h12v-4.5" /></svg>
         <span>{uploading ? "正在上传" : "批量上传 Excel"}</span>
       </Button>
@@ -913,8 +913,8 @@
         </div>
         <div class="ledger-management-actions">
           <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" onclick={() => downloadManagedFile(managedFile)}>下载</Button>
-          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" disabled={uploading} onclick={() => openReupload(managedFile.date)}>重新上传</Button>
-          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="destructive" class={"ui-button  danger"} type="button" disabled={deleting} onclick={() => removeRemoteLedger(managedFile)}>删除</Button>
+          <Button permission="bond.ledger:import" data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={"ui-button"} type="button" disabled={uploading} onclick={() => openReupload(managedFile.date)}>重新上传</Button>
+          <Button permission="bond.ledger:delete" data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="destructive" class={"ui-button  danger"} type="button" disabled={deleting} onclick={() => removeRemoteLedger(managedFile)}>删除</Button>
         </div>
       {:else if selectedManagedDate && selectedManagedDateHasLedger}
         <div>

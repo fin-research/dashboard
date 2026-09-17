@@ -9,12 +9,14 @@
   import "../trading-research/workbench.css";
   import "./workspace.css";
 
+  import { permissionVisibility } from "$lib/permission-visibility";
+  const allowed=permissionVisibility();
   let { title, homeHref, views, activeViewId, activeLabel = "", children, chat = false, canvas = false,
     class: className = '', actions, account, status,
     integrated = false, layoutReport = false, reportKind = null, visualVariant = 'workspace', tone = 'blue' }: {
     title: string; homeHref: string;
     class?: string; actions?: Snippet; account?: Snippet; status?: Snippet;
-    views: ReadonlyArray<{ id: string; label: string; icon: WorkbenchIconName; href: string }>;
+    views: ReadonlyArray<{ id: string; label: string; icon: WorkbenchIconName; href: string; permission?: string; separatorBefore?: boolean }>;
     activeViewId: string; activeLabel?: string; children: Snippet; chat?: boolean; canvas?: boolean;
     integrated?: boolean; layoutReport?: boolean; reportKind?: "secondary" | "financing" | "liability" | null;
     visualVariant?: 'workspace' | 'report'; tone?: 'blue' | 'teal' | 'orange' | 'purple';
@@ -116,7 +118,8 @@
   <aside id="tr-workbench-drawer" class="tr-drawer" aria-label={`${title}导航`}>
     <nav class="tr-drawer__nav" aria-label="业务模块" data-sveltekit-preload-data="hover">
       <ul class="ui-menu tr-navigation-list">
-      {#each views as view}
+      {#each views.filter(view => $allowed(view.permission, view.href)) as view}
+        {#if view.separatorBefore}<li class="nav-divider" role="separator"></li>{/if}
         <li><a
           class:active={activeViewId === view.id}
           href={view.href}
@@ -160,3 +163,5 @@
     </main>
   </section>
 </div>
+
+<style>.nav-divider { margin: 12px 8px; border-top: 1px solid var(--border-color); }</style>

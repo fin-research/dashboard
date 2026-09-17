@@ -3,6 +3,10 @@ import { installDom, loadComponent } from "./svelte-dom.mjs";
 
 const window = installDom();
 const { mount, unmount, flushSync, tick } = await import("svelte");
+const {PERMISSION_CODES}=await import('../../src/lib/permissions.ts');
+const {createClientSession}=await import('../../src/lib/client-session.ts');
+const session=createClientSession({user:{id:'auth0|test',email:'test@18.cn'},account:{name:'测试人员',department:'资金管理部'},roles:[{id:'rol_TestAdmin',name:'admin'}],permissions:[...PERMISSION_CODES],expiresAt:Date.now()/1000+3600});
+const context=new Map([['site-session',session]]);
 let reportRequests = 0;
 globalThis.domAfterNavigations = [];
 globalThis.fetch = async url => {
@@ -22,7 +26,7 @@ const Host = await loadComponent("tests/helpers/CreditWorkspaceHost.svelte", `<s
 {#if workspace === "credit"}<CreditWorkbenchPage viewId={view} />
 {:else}<WorkbenchShell title="交易研究工作台" homeHref="/trading-research" activeViewId="overview"
   views={[{id:"overview",label:"总览",icon:"overview",href:"/trading-research"}]}><p>交易研究内容</p></WorkbenchShell>{/if}`);
-const app = mount(Host, { target: document.body });
+const app = mount(Host, { context, target: document.body });
 flushSync();
 const afterNavigation = globalThis.domAfterNavigations[0];
 assert.equal(typeof afterNavigation, 'function');

@@ -64,6 +64,7 @@ export const marketSnapshot = {
 
 export async function mockResources(page, { creditError = false, ledgerEmpty = false } = {}) {
   const unexpected = [];
+  let progress = null;
   await page.route('**/*', async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -73,6 +74,11 @@ export async function mockResources(page, { creditError = false, ledgerEmpty = f
     }
     if (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/data/')) return route.continue();
     let body;
+    if (url.pathname === '/api/trading-workflow/day') {
+      const empty={date:today,enabled:{loan:true,reverse:true,exchange:false},completed:{},branches:{}};
+      if(request.method()==='PUT') { const patch=request.postDataJSON(),old=progress??empty;progress={...old,enabled:{...old.enabled,...patch.enabled},completed:{...old.completed,...patch.completed},branches:{...old.branches,...patch.branches}}; }
+      return route.fulfill({json:{state:progress??empty,revision:progress?1:0}});
+    }
     if (url.pathname === '/api/credit') {
       if (creditError) return route.fulfill({ status: 503, json: { error: '授信报表暂不可用' } });
       body = credit;

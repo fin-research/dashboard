@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { randomUUID } from 'node:crypto';
-import { submitMessage } from '../messenger.ts';
+import { messengerJson } from '../messenger.ts';
 import { createDirectory } from '../auth0-directory.ts';
 import { reminderPeriodLabel } from '../../financing/reminder-periods.js';
 
@@ -53,7 +53,7 @@ export async function collectDueReminders({ asOf, asOfDate, db, directory } = {}
 				rule.recipient_mode AS recipientMode, rule.recipients,
 				period.id AS periodId, period.lead_hours AS leadHours,
 				task.id AS targetId, task.name AS taskName, project.name AS projectName,
-				project.debt_type AS debtType, template.name AS sopName, node.name AS nodeName,
+				project.id AS projectId, project.debt_type AS debtType, template.name AS sopName, node.name AS nodeName,
 				task.due_date AS triggerDate,
 				(task.due_date::timestamp AT TIME ZONE 'Asia/Shanghai') AS triggerAt,
 				CASE
@@ -94,6 +94,9 @@ export async function collectDueReminders({ asOf, asOfDate, db, directory } = {}
 			periodLabel: reminderPeriodLabel(leadHours),
 			targetType: 'project_task',
 			targetId: row.targetId,
+			projectId: row.projectId,
+			unresolvedRecipients: row.recipientMode === 'custom' ? recipients.filter(email => !people.some(person => person.active && person.email.toLowerCase() === email.toLowerCase())) : [],
+			userIds: row.recipientMode === 'owner' ? [row.ownerId] : row.recipientMode === 'assignee' ? [row.assigneeId] : people.filter(person => person.active && recipients.some(email => email.toLowerCase() === person.email.toLowerCase())).map(person => person.id),
 			projectName: row.projectName,
 			taskName: row.taskName,
 			debtType: row.debtType,
@@ -148,19 +151,15 @@ export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, con
 		}
 
 		try {
-			const response = await submitMessage(messenger, {
-				source: 'financing', channel: 'email', profile: 'default',
-				idempotencyKey: `reminder/${reminder.ruleId}/${reminder.targetId}/${reminder.periodId}`,
-				to: reminder.recipients,
-				subject: `【融资工作台】${reminder.projectName} · ${reminder.taskName}`,
-				html: `<h2>${escapeHtml(reminder.ruleName)}</h2>
-					<p>项目：${escapeHtml(reminder.projectName)}</p>
-					<p>任务：${escapeHtml(reminder.taskName)}</p>
-					<p>SOP 节点：${escapeHtml(reminder.sopName)} / ${escapeHtml(reminder.nodeName)}</p>
-					<p>提醒周期：${escapeHtml(reminder.periodLabel)}</p>
-					<p>节点日期：${escapeHtml(reminder.triggerDate)}</p>
-					<p>负债品种：${escapeHtml(reminder.debtType)}</p>`
-			});
+			if (!reminder.userIds?.length || reminder.unresolvedRecipients?.length) throw new Error('提醒收件人未关联有效本站账号');
+			const response = await messengerJson(messenger, '/notifications', {
+                source: 'financing', category: 'financing',
+                idempotencyKey: `reminder/${reminder.ruleId}/${reminder.targetId}/${reminder.periodId}`,
+                userIds: reminder.userIds.filter(Boolean),
+                title: `【融资工作台】${reminder.projectName} · ${reminder.taskName}`,
+                text: `${reminder.ruleName}\n项目：${reminder.projectName}\n任务：${reminder.taskName}\n节点日期：${reminder.triggerDate}\n提醒周期：${reminder.periodLabel}`,
+                url: `/financing/projects/${reminder.projectId}`
+            });
 			deliveries.push({
 				...reminder, id: deliveryId, status: 'queued', providerMessageId: response.id,
 				errorMessage: null, sentAt: null

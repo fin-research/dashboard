@@ -37,11 +37,14 @@
 	export type ButtonProps = WithElementRef<HTMLButtonAttributes> &
 		WithElementRef<HTMLAnchorAttributes> & {
 			variant?: ButtonVariant;
+			permission?: string;
 			size?: ButtonSize;
 		};
 </script>
 
 <script lang="ts">
+	import { permissionVisibility } from "$lib/permission-visibility";
+	const allowed = permissionVisibility();
 	let {
 		class: className,
 		variant = "default",
@@ -50,11 +53,13 @@
 		href = undefined,
 		type = "button",
 		disabled,
+		permission,
 		children,
 		...restProps
 	}: ButtonProps = $props();
 </script>
 
+{#if $allowed(permission, href ?? undefined)}
 {#if href}
 	<a
 		bind:this={ref}
@@ -81,4 +86,6 @@
 	>
 		{@render children?.()}
 	</button>
+{/if}
+
 {/if}

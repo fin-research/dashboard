@@ -19,7 +19,7 @@ test('every application route and named mutation is registered in the one permis
     const actions = source.split(/export const actions[^=]*=/)[1];
     if (actions) for (const [,name] of actions.matchAll(/(?:^|\n)\s*([A-Za-z][A-Za-z0-9]*): async \(/g)) assert.ok(ROUTE_PERMISSIONS[id][`POST:${name}`], `${id}:${name}`);
   }
-  for (const methods of Object.values(ROUTE_PERMISSIONS)) for (const code of Object.values(methods)) assert.ok(['public','login'].includes(code) || PERMISSION_CODES.includes(code), code);
+  for (const methods of Object.values(ROUTE_PERMISSIONS)) for (const code of Object.values(methods)) assert.ok(['public','login','admin'].includes(code) || PERMISSION_CODES.includes(code), code);
   assert.equal(new Set(PERMISSION_CODES).size, PERMISSION_CODES.length);
   assert.ok(PERMISSION_CODES.every(code => /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/.test(code)));
 });

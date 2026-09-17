@@ -43,3 +43,13 @@
 - 弹窗被拦截、取消、失败或超时时保留原页和输入，可重新打开；同一时刻的登录请求共用一个提示框。`postMessage` 校验本站 origin、窗口来源及事务 ID；同源 BroadcastChannel 兼容登录方隔离 opener，所有信号都必须经服务器会话核实。
 - 操作预检复用 Gateway 生成的路径、方法和 named action 权限契约，不替代服务端实时授权。未发送的请求可在登录后继续；后台返回 401 时读取最多重试一次，写入不自动重发。后台 403 就地提示并更新权限快照。
 - 浏览器会话和本站 Auth0 API 令牌设为 24 小时，Cookie 仍不晚于令牌到期。既有已签发会话不会被追溯延长，重新登录后生效。
+
+## 我的、权限与通知
+
+`/management` 和旧 `/profile` 重定向至 `/management/me`，不再提供管理总览或独立个人页面。管理导航上方为“我的、权限、通知”，面向登录用户；分割线下“消息投递、角色权限、资金日报”仅 admin 可见。后台服务与资金日报上传同时在 Gateway 校验 admin，普通业务 scope 不能替代角色。
+
+`/management/permissions` 读取当前账号角色和有效权限；资料与显示偏好保留在“我的”。`/management/notifications` 通过 `/api/notifications/settings` 管理独立联系邮箱、Telegram Chat ID 和三类通知的渠道选择；`/api/notifications/push` 注册或移除本人设备。Workflow 通知只向管理员开放；交易/融资订阅需相应业务读取权限。服务端使用 locals.user 的 Auth0 ID，不接收客户端指定用户。
+
+前端复用 permissionVisibility、Button permission 和路由契约控制入口可见性；WorkbenchShell 自动过滤无权页面。原生链接、表单及 data-permission 控件由 auth-controls 同步隐藏，移除焦点并保留请求前置检查。新写控件必须声明权限；服务端准入仍由 Gateway 负责。
+
+PWA manifest 与 service-worker 为公开静态资产；Service Worker 只缓存离线页和图标，不缓存登录态页面/API。Push 在后台展示，并将点击限定为本站地址。当前设备启用必须由用户点击授权；不在页面加载时请求通知权限。

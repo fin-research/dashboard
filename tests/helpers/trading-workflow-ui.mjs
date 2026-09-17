@@ -37,8 +37,16 @@ const { migrateLegacyNodes } = await import('../../src/lib/trading-workflow/lega
 let config = { version: 1, flows: defaultFlows, nodes: migrateLegacyNodes(JSON.parse(db.prepare('SELECT nodes FROM trading_workflow_config').get().nodes)) };
 const requests = [];
 let conflict = false;
+let serverDay = null;
 globalThis.fetch = async (url, options = {}) => {
   requests.push({ url, ...options });
+  if(url === '/api/trading-workflow/day') {
+    if(options.method === 'PUT') {
+      const patch=JSON.parse(options.body),old=serverDay ?? emptyDay(patch.date);
+      serverDay={...old,enabled:{...old.enabled,...patch.enabled},completed:{...old.completed,...patch.completed},branches:{...old.branches,...patch.branches}};
+    }
+    return Response.json({state:serverDay ?? emptyDay('2026-09-15'),revision:serverDay?1:0});
+  }
   if (url === '/data/chinamoney/shibor') return Response.json([{publishDate:'2026-09-15',publishedAt:'2026-09-15T11:00:00+08:00',tenor:'1W',rate:1.5}]);
   if (options.method === 'PUT') {
     if (conflict) return Response.json({error:'节点配置已被更新，请重新载入后修改'},{status:409});
@@ -135,15 +143,13 @@ flushSync(() => document.querySelector('[aria-label="展开交易所回购"]').c
 assert.ok(document.querySelector('[data-workflow-node="exchange-o32"]'));
 flushSync(() => document.querySelector('[aria-label="折叠交易所回购"]').click()); await settle();
 assert.equal(document.querySelector('[data-workflow-node="exchange-o32"]'), null);
-assert.equal(requests.filter(request => request.options?.method === 'PUT' || request.method === 'PUT').length,0,'local interactions must never write to backend');
+assert.ok(requests.some(request=>request.url==='/api/trading-workflow/day'&&request.method==='PUT'),'scheduling flags are synced for background reminders');
+assert.ok(requests.filter(request=>request.url==='/api/trading-workflow/day'&&request.method==='PUT').every(request=>!('quotes' in JSON.parse(request.body))),'inquiry rows remain local');
 flushSync(()=>document.querySelector('.edit-mode [role=checkbox]').click()); await settle();
 assert.equal(document.querySelector('.workflow-editor'), null, 'editing starts on the graph; panel opens on node click');
 await clickNode('shared-elements');
 assert.ok(document.querySelector('.workflow-editor'));
-flushSync(()=>[...document.querySelectorAll('.editor-checkbox')].find(label=>label.textContent.includes('浏览器提醒')).querySelector('[role=checkbox]').click()); await settle();
-assert.ok(notices.length>0);
-assert.ok(notices.every(item=>item.tag.startsWith('test-actor:2026-09-15:')));
-const noticeCount=notices.length; window.dispatchEvent(new window.Event('focus')); await settle(); assert.equal(notices.length,noticeCount);
+assert.equal(notices.length,0,'notifications are delivered by the service worker, not the foreground page');
 assert.equal(JSON.parse(localStorage.getItem(dayKey('test-actor','2026-09-15'))).completed['shared-elements'], undefined, 'editing does not complete nodes');
 const name=document.querySelector('.editor-fields input');
 flushSync(()=>{name.value='修改后的协同节点';name.dispatchEvent(new window.Event('input',{bubbles:true}));}); await settle();
