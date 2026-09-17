@@ -60,6 +60,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 	const statusLabel: Record<string, string> = {
 		sent: '已发送',
 		pending: '待发送',
+		queued: '已入队',
 		failed: '失败'
 	};
 
@@ -103,6 +104,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 			<option value="">全部状态</option>
 			<option value="sent">已发送</option>
 			<option value="pending">待发送</option>
+			<option value="queued">已入队</option>
 			<option value="failed">失败</option>
 		</NativeSelect>
 	</label>

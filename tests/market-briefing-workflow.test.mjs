@@ -201,16 +201,15 @@ test('重复Cron使用上海日确定性ID且只确认真实存在的实例', as
   await assert.rejects(startMarketBriefing(env, Date.parse('2026-08-25T09:00:00Z')), /exists/);
 });
 
-test('Resend带幂等键、固定结果收件人；provider错误可交给step重试', async t => {
-  t.mock.method(globalThis, 'fetch', async () => Response.json({ id: 'mail-id' }));
-  const env = { MARKET_BRIEFING_RESEND_API_KEY: 'test', FROM_EMAIL: 'no-reply@example.test', MARKET_BRIEFING_RECIPIENTS: 'test@example.test' };
+test('消息中台收到固定幂等键和业务内容；提交失败由step重试', async () => {
+  let payload;
+  const env = { MESSENGER: { fetch: async request => { payload = await request.json(); return Response.json({ id: 'message-id', status: 'queued' }); } }, FROM_EMAIL: 'no-reply@example.test', MARKET_BRIEFING_RECIPIENTS: 'test@example.test' };
   const result = { reportDate: date, instanceId: 'workflow-id', status: 'success', detail: '已归档' };
-  assert.deepEqual(await sendMarketBriefingResult(env, result), { messageId: 'mail-id', status: 'accepted' });
-  const [, init] = globalThis.fetch.mock.calls[0].arguments;
-  assert.equal(new Headers(init.headers).get('Idempotency-Key'), 'market-briefing/workflow-id/result');
-  assert.deepEqual(JSON.parse(init.body).to, ['test@example.test']);
-  globalThis.fetch.mock.mockImplementation(async () => Response.json({ name: 'validation_error', message: 'bad' }, { status: 422 }));
-  await assert.rejects(sendMarketBriefingResult(env, result), /邮件发送失败/);
+  assert.deepEqual(await sendMarketBriefingResult(env, result), { messageId: 'message-id', status: 'queued' });
+  assert.equal(payload.idempotencyKey, 'market-briefing/workflow-id/result');
+  assert.deepEqual(payload.to, ['test@example.test']);
+  env.MESSENGER.fetch = async () => Response.json({ error: 'unavailable' }, { status: 503 });
+  await assert.rejects(sendMarketBriefingResult(env, result), /消息中台请求失败/);
 });
 
 test('工作日行情滞后不能被误判休市跳过', async t => {

@@ -12,7 +12,7 @@
 - 等所有并行步骤完成或耗尽重试，在唯一 `aggregate-and-save-r2` step 内使用共享 `buildReportData` 与报告 Schema 汇总并保存原 `market-briefing/YYYY-MM-DD.json`。任何必需请求失败不归档残缺报告，也不把失败伪装成零行情。
 - 当日成交、期货及报价不支持历史重放；每个未完成的采集 step 校验上海当天，跨日恢复未完成采集会失败，不能以当前行情冒充历史报告。已完成数据步骤与归档步骤可由平台恢复。
 - 最后统一执行唯一 `notify-result` step：等待前面的并发请求、AI 和归档结果完成，在此 step 内判断结果、组装通知并通过 Resend 发给 `MARKET_BRIEFING_RECIPIENTS`（当前 `shiyue@18.cn`）。不设成功/失败通知分支或独立 step。通知完成后生成错误继续使 Workflow 失败；邮件自身重试不重新生成报告，也不删除已归档报告。
-- 邮件使用 `FROM_EMAIL=no-reply@hasbai.xyz` 和专用 Secret `MARKET_BRIEFING_RESEND_API_KEY`；不启用融资提醒的独立 `RESEND_API_KEY`。统一使用 `market-briefing/<instanceId>/result` 幂等键。`accepted` 仅代表 Resend 接受，不代表收件箱送达。
+- 邮件使用 `FROM_EMAIL=no-reply@hasbai.xyz` 和专用 Secret messenger 的 `RESEND_API_KEY`；不启用融资提醒的独立 `RESEND_API_KEY`。统一使用 `market-briefing/<instanceId>/result` 幂等键。`accepted` 仅代表 Resend 接受，不代表收件箱送达。
 
 ## 读取与页面
 
@@ -44,3 +44,5 @@ Cloudflare 流程图由静态语法分析生成，并不回放实际执行。`co
 2026-09-16 本地验证：类型检查、Worker 类型检查、生产构建、544 项 Node 测试、53 项浏览器用例通过；1 项手机矩形拖拽按原规则跳过。CI 候选运行 `35077845510` 通过 5 项 Python、544 项 Node、构建与 53 项浏览器用例。市场点评桌面/手机的 darwin 与 macos-ci 基线已人工对照；本轮不更新其他模块基线。
 
 手动触发使用 `pnpm exec wrangler workflows trigger market-briefing '{"reportDate":"YYYY-MM-DD"}' --id market-briefing-YYYY-MM-DD`。运行失败时先检查失败步骤，同日可执行 `pnpm exec wrangler workflows instances restart market-briefing <id>`；仅邮件步骤失败时从 `--from-step-name notify-result` 恢复，避免重新采集或覆盖报告。跨日不能补跑实时行情。休市日期应在新年度交易所公告发布后更新 `src/lib/server/market-calendar.ts`。
+
+消息发送统一通过 MESSENGER binding，notify-result 记录 messenger 入队结果；渠道尝试和人工重试见 [消息投递](messenger.md)。

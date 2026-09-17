@@ -9,6 +9,7 @@ const dateArgument = process.argv.find((argument) => argument.startsWith('--date
 const asOf = asOfArgument?.slice('--at='.length)
 	?? (dateArgument ? `${dateArgument.slice('--date='.length)}T23:59:59+08:00` : undefined);
 const dryRun = process.argv.includes('--dry-run');
+if (!dryRun) throw new Error('实际投递由 Worker Cron 经 messenger 执行；本地命令仅支持 --dry-run');
 const db = createPostgresDatabase(connectionString, 'eastmoney-financing-reminders');
 
 try {
