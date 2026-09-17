@@ -63,7 +63,6 @@
     "jose": "^6.2.12",
     "pg": "^8.23.0",
     "pinyin-pro": "^3.29.4",
-    "resend": "^6.18.0",
     "svelte": "5.56.8",
     "svelte-sonner": "1.2.1",
     "sveltekit-superforms": "^2.30.2",
