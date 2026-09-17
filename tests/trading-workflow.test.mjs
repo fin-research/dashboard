@@ -44,10 +44,11 @@ test('migration seeds every product and shared instruction without progress tabl
 test('config rejects progress, duplicate IDs, foreign/missing parents, cycles and invalid times', () => {
   assert.equal(saveSchema.safeParse({ expectedVersion: 1, flows: defaultFlows, nodes: defaults, completed: {} }).success, false);
   assert.equal(nodesSchema.safeParse([...defaults, defaults[0]]).success, false);
-  for (const patch of [{ parentId: 'absent' }, { parentId: 'shared-done' }, { parentId: 'loan-send' }, { startTime: '25:00' }, { startTime: '11:00', endTime: '10:00' }, { startTime: null, endTime: '12:00' }]) {
+  for (const patch of [{ parentId: 'absent' }, { parentId: 'loan-send' }, { startTime: '25:00' }, { startTime: '11:00', endTime: '10:00' }, { startTime: null, endTime: '12:00' }]) {
     const nodes = defaults.map(n => n.id === 'loan-send' ? { ...n, ...patch } : n);
     assert.equal(nodesSchema.safeParse(nodes).success, false, JSON.stringify(patch));
   }
+  assert.equal(nodesSchema.safeParse(defaults.map(n => n.id === 'loan-send' ? { ...n, parentId: 'shared-done' } : n)).success, true, 'a multi-flow branch may contain a task from one of its flows');
   const cycle = defaults.map(n => n.id === 'reverse-counterparty' ? { ...n, parentId: 'reverse-missing' } : n);
   assert.equal(nodesSchema.safeParse(cycle).success, false);
   assert.equal(nodesSchema.safeParse(defaults.map(n => n.id === 'loan-send' ? { ...n, completed: true } : n)).success, false);
