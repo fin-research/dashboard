@@ -10,8 +10,8 @@ import { buildReportData, dayOffset, previousTradingDate, referencedBondCodes } 
 import { reportDataSchema } from "../src/market-report.ts";
 import { currentReportDate } from "../src/report-date.ts";
 import {
-  briefingNewsResponseSchema, briefingNewsDetailSchema, buildBriefingNews, completeAll,
-  fetchDataJson, generateMarketBriefingFromNews, mapWithConcurrency,
+  briefingNewsResponseSchema, briefingNewsDetailSchema, buildBriefingNews,
+  fetchDataJson, generateMarketBriefingFromNews,
 } from "../src/lib/server/market-briefing.ts";
 import { saveMarketReport } from "../src/lib/server/market-report.ts";
 import { sendMarketBriefingResult } from "../src/lib/server/market-briefing-email.ts";
@@ -49,72 +49,90 @@ export async function runMarketBriefing(
 ) {
   const { reportDate } = params;
 
-  // Independent requests start immediately, before awaiting any results.
-  const industry = step.do("fetch-industry", DATA_STEP_OPTIONS, async () => {
-    const snapshot = await fetchReportData(env, reportDate,
-      `industry?date=${reportDate}&fields=dataDate,equities,industries,turnoverYi,turnoverChangeYi,tradingDates`, industrySnapshotSchema);
-    if (!snapshot.tradingDates.includes(reportDate)) throw new Error("当日行情尚未更新或交易日历未确认，请重试");
-    return snapshot;
-  });
-  const stock = step.do("fetch-stock", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    `stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema));
-  const omo = step.do("fetch-omo", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    `omo?startDate=${dayOffset(reportDate, -35)}&endDate=${reportDate}&fields=operationDate,operationName,duration,interestRate,operationAmount`, omoOperationsSchema));
-  const dr = step.do("fetch-funding-dr", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    `cfets?date=${reportDate}&source=DR&fields=bondCode,weightedYield,weightedYieldUpDownValueBp`, cfetsRatesSchema));
-  const dibo = step.do("fetch-funding-dibo", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    `cfets?date=${reportDate}&source=DIBO&fields=bondCode,weightedYield,weightedYieldUpDownValueBp`, cfetsRatesSchema));
-  const governmentBonds = step.do("fetch-government-bonds", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    `bond-top-case?date=${reportDate}&fields=ordinateName,abscissaName,bondCode,tradeNum,yield,yieldSubYtdCloseBp`, governmentBondsSchema));
-  const futures = step.do("fetch-futures", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    "futures-latest?fields=contractCode,lastPrice,upDownValuePct", futuresQuotesSchema));
-  const margin = step.do("fetch-margin", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    `margin?date=${reportDate}&fields=DIM_DATE,TOTAL_RZRQYE,TOTAL_RZYE,TOTAL_RQYE`, marginBalancesSchema));
-  const todayTrades = step.do("fetch-today-trades", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    "today-trades?limit=300&fields=bondUniCode,remainingTenor,cbYte,tradeYield,tradeYieldSubCb", todayTradesSchema));
-  const favoriteQuotes = step.do("fetch-favorite-quotes", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    "favorite-quotes?limit=100&fields=bondUniCode,bondShortName,remainingTenor,remainingTenorDay,cbYield,bidYield,bidEntryPrice,ofrYield,ofrEntryPrice,tradeEntryPrice,tradeYieldSubCb", favoriteQuotesSchema));
-  const news = step.do("fetch-news", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
-    `news?date=${reportDate}&important=true&pageSize=40&fields=sentimentId,title,time,tags,important`, briefingNewsResponseSchema));
+  let outcome: PromiseSettledResult<{ finalizedAt: string | null; focus: string }>;
+  try {
+    // Native awaited batches are also the dependency boundaries used by Cloudflare's diagram parser.
+    const sources = await Promise.allSettled([
+      step.do("fetch-industry", DATA_STEP_OPTIONS, async () => {
+        const snapshot = await fetchReportData(env, reportDate,
+          `industry?date=${reportDate}&fields=dataDate,equities,industries,turnoverYi,turnoverChangeYi,tradingDates`, industrySnapshotSchema);
+        if (!snapshot.tradingDates.includes(reportDate)) throw new Error("当日行情尚未更新或交易日历未确认，请重试");
+        return snapshot;
+      }),
+      step.do("fetch-stock", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        `stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema)),
+      step.do("fetch-omo", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        `omo?startDate=${dayOffset(reportDate, -35)}&endDate=${reportDate}&fields=operationDate,operationName,duration,interestRate,operationAmount`, omoOperationsSchema)),
+      step.do("fetch-funding-dr", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        `cfets?date=${reportDate}&source=DR&fields=bondCode,weightedYield,weightedYieldUpDownValueBp`, cfetsRatesSchema)),
+      step.do("fetch-funding-dibo", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        `cfets?date=${reportDate}&source=DIBO&fields=bondCode,weightedYield,weightedYieldUpDownValueBp`, cfetsRatesSchema)),
+      step.do("fetch-government-bonds", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        `bond-top-case?date=${reportDate}&fields=ordinateName,abscissaName,bondCode,tradeNum,yield,yieldSubYtdCloseBp`, governmentBondsSchema)),
+      step.do("fetch-futures", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        "futures-latest?fields=contractCode,lastPrice,upDownValuePct", futuresQuotesSchema)),
+      step.do("fetch-margin", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        `margin?date=${reportDate}&fields=DIM_DATE,TOTAL_RZRQYE,TOTAL_RZYE,TOTAL_RQYE`, marginBalancesSchema)),
+      step.do("fetch-today-trades", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        "today-trades?limit=300&fields=bondUniCode,remainingTenor,cbYte,tradeYield,tradeYieldSubCb", todayTradesSchema)),
+      step.do("fetch-favorite-quotes", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        "favorite-quotes?limit=100&fields=bondUniCode,bondShortName,remainingTenor,remainingTenorDay,cbYield,bidYield,bidEntryPrice,ofrYield,ofrEntryPrice,tradeEntryPrice,tradeYieldSubCb", favoriteQuotesSchema)),
+      step.do("fetch-news", DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+        `news?date=${reportDate}&important=true&pageSize=40&fields=sentimentId,title,time,tags,important`, briefingNewsResponseSchema)),
+    ]);
+    const industry = stepValue(sources[0]);
+    const stock = stepValue(sources[1]);
+    const omo = stepValue(sources[2]);
+    const dr = stepValue(sources[3]);
+    const dibo = stepValue(sources[4]);
+    const governmentBonds = stepValue(sources[5]);
+    const futures = stepValue(sources[6]);
+    const margin = stepValue(sources[7]);
+    const todayTrades = stepValue(sources[8]);
+    const favoriteQuotes = stepValue(sources[9]);
+    const news = stepValue(sources[10]);
 
-  // Each dependent branch starts as soon as its own inputs are ready.
-  const primary = industry.then(snapshot => step.do("fetch-primary", DATA_STEP_OPTIONS, async () => {
-    const previousDate = previousTradingDate(snapshot, reportDate);
-    if (!previousDate) throw new Error("上一交易日数据缺失");
-    const query = new URLSearchParams({
-      date: reportDate, startDate: previousDate,
-      fields: ["bidStartDate", "issueStartDate", "biddingTime", "comShortName", "issuerShortName", "issuerShortNameCn",
-        "comFullName", "issuerName", "publicOffering", "publicOfferingText", "offeringType", "issueWay", "raisingMode",
-        "bondTypeText", "bondShortName", "issueTenor", "planIssueAmount", "issueCouponRate"].join(","),
-    });
-    const issues = await fetchReportData(env, reportDate, `primary-issues?${query}`, primaryIssuesSchema);
-    return { previousDate, issues };
-  }));
-  const bondInfos = completeAll([todayTrades, favoriteQuotes]).then(([trades, quotes]) =>
-    step.do("fetch-bond-infos", DATA_STEP_OPTIONS, async () => {
-      const codes = referencedBondCodes(trades, quotes);
-      if (!codes.length) return [];
-      const query = new URLSearchParams({ codes: codes.join(","), fields: "bondUniCode,bondShortName,comShortName,bondType,bondOfferingType,sciTechInnoBondStatus" });
-      return fetchReportData(env, reportDate, `bond-infos?${query}`, bondInfosSchema);
-    }));
-  const newsDetails = news.then(items => mapWithConcurrency(items, 5, summary =>
-    step.do(`fetch-news-${summary.sentimentId}`, DATA_STEP_OPTIONS, async () => {
-      const detail = await fetchReportData(env, reportDate,
-        `news/${encodeURIComponent(summary.sentimentId)}?fields=sentimentId,title,time,tags,important,content,link`, briefingNewsDetailSchema);
-      return { ...summary, ...detail };
-    })));
-  const focus = completeAll([stock, newsDetails]).then(([summary, details]) =>
-    step.do("generate-focus", {
+    // Primary issues, bond metadata and the first five news details are independent at this point.
+    const [primaryResult, bondInfosResult, ...firstDetails] = await Promise.allSettled([
+      step.do("fetch-primary", DATA_STEP_OPTIONS, async () => {
+        const previousDate = previousTradingDate(industry, reportDate);
+        if (!previousDate) throw new Error("上一交易日数据缺失");
+        const query = new URLSearchParams({
+          date: reportDate, startDate: previousDate,
+          fields: ["bidStartDate", "issueStartDate", "biddingTime", "comShortName", "issuerShortName", "issuerShortNameCn",
+            "comFullName", "issuerName", "publicOffering", "publicOfferingText", "offeringType", "issueWay", "raisingMode",
+            "bondTypeText", "bondShortName", "issueTenor", "planIssueAmount", "issueCouponRate"].join(","),
+        });
+        const issues = await fetchReportData(env, reportDate, `primary-issues?${query}`, primaryIssuesSchema);
+        return { previousDate, issues };
+      }),
+      step.do("fetch-bond-infos", DATA_STEP_OPTIONS, async () => {
+        const codes = referencedBondCodes(todayTrades, favoriteQuotes);
+        if (!codes.length) return [];
+        const query = new URLSearchParams({ codes: codes.join(","), fields: "bondUniCode,bondShortName,comShortName,bondType,bondOfferingType,sciTechInnoBondStatus" });
+        return fetchReportData(env, reportDate, `bond-infos?${query}`, bondInfosSchema);
+      }),
+      ...news.slice(0, 5).map(summary => step.do(`fetch-news-${summary.sentimentId}`, DATA_STEP_OPTIONS,
+        () => fetchReportData(env, reportDate,
+          `news/${encodeURIComponent(summary.sentimentId)}?fields=sentimentId,title,time,tags,important,content,link`, briefingNewsDetailSchema))),
+    ]);
+    const primary = stepValue(primaryResult);
+    const bondInfos = stepValue(bondInfosResult);
+    const details = firstDetails.map(stepValue);
+    for (let offset = 5; offset < news.length; offset += 5) {
+      const batch = await Promise.allSettled(news.slice(offset, offset + 5).map(summary =>
+        step.do(`fetch-news-${summary.sentimentId}`, DATA_STEP_OPTIONS, () => fetchReportData(env, reportDate,
+          `news/${encodeURIComponent(summary.sentimentId)}?fields=sentimentId,title,time,tags,important,content,link`, briefingNewsDetailSchema))));
+      details.push(...batch.map(stepValue));
+    }
+    const newsDetails = details.map((detail, index) => ({ ...news[index], ...detail }));
+
+    const focus = await step.do("generate-focus", {
       retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "15 minutes",
     }, () => dependencies.generateMarketBriefingFromNews(env, reportDate,
-      buildBriefingNews(summary, details), { retry: false })));
+      buildBriefingNews(stock, newsDetails), { retry: false }));
 
-  const saved = completeAll([
-    industry, stock, omo, dr, dibo, governmentBonds, futures, margin,
-    todayTrades, favoriteQuotes, primary, bondInfos, focus,
-  ]).then(([industry, stock, omo, dr, dibo, governmentBonds, futures, margin,
-    todayTrades, favoriteQuotes, primary, bondInfos, focus]) =>
-    step.do("aggregate-and-save-r2", DATA_STEP_OPTIONS, async () => {
+    const saved = await step.do("aggregate-and-save-r2", DATA_STEP_OPTIONS, async () => {
       const report = reportDataSchema.parse(buildReportData({
         reportDate, generatedAt: new Date().toISOString(), previousPrimaryDate: primary.previousDate,
         industry, stock, omo, dr, dibo, governmentBonds, futures, margin,
@@ -123,9 +141,12 @@ export async function runMarketBriefing(
       const snapshot = await dependencies.saveMarketReport(env.EASTMONEY, reportDate,
         report, `1、${focus.stock}\n2、${focus.bond}`);
       return { finalizedAt: snapshot.finalized_at, focus: snapshot.focus_text };
-    }));
+    });
+    outcome = { status: "fulfilled", value: saved };
+  } catch (reason) {
+    outcome = { status: "rejected", reason };
+  }
 
-  const [outcome] = await Promise.allSettled([saved]);
   const notification = await step.do("notify-result", DATA_STEP_OPTIONS, () =>
     dependencies.sendMarketBriefingResult(env, {
       reportDate, instanceId,
@@ -134,9 +155,14 @@ export async function runMarketBriefing(
         ? `报告已归档。\n\n${outcome.value.focus}`
         : "数据获取、AI生成或归档未完成。请检查 Workflow 失败步骤后重试。",
     }));
-  // Preserve the generation failure after the single notification step has completed.
-  const result = await saved;
+  // Re-throw the original generation error only after the one terminal notification has finished.
+  const result = stepValue(outcome);
   return { reportDate, status: "complete", finalizedAt: result.finalizedAt, notification };
+}
+
+function stepValue<T>(result: PromiseSettledResult<T>): T {
+  if (result.status === "rejected") throw result.reason;
+  return result.value;
 }
 
 /** Data validation only: this function never creates, combines or retries Workflow steps. */

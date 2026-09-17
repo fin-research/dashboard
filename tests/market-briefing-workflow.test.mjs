@@ -39,25 +39,35 @@ function harness(override) {
   return { env, step, calls, steps, objects, checkpoints, notifications, dependencies, run };
 }
 
-test('独立行情和新闻step并发，AI不等待行业行情；共用收评并只汇总保存一次', async t => {
+test('独立行情和新闻并发，分批完成后顺序执行AI、保存和通知', async t => {
   clock(t);
-  const industryGate = deferred();
-  const h = harness(url => url.includes('/industry?') ? industryGate.promise.then(() => directResponse(url)) : undefined);
+  const industryGate = deferred(), newsStarted = deferred();
+  const h = harness(url => {
+    if (url.includes('/industry?')) return industryGate.promise.then(() => directResponse(url));
+    if (new URL(url).pathname === '/data/news') newsStarted.resolve();
+  });
   const events = [];
   h.dependencies.generateMarketBriefingFromNews = async (_env, _date, news, options) => {
-    assert.equal(h.checkpoints.has('fetch-industry'), false);
+    assert.equal(h.checkpoints.has('fetch-industry'), true);
+    assert.equal(h.checkpoints.has('fetch-bond-infos'), true);
+    assert.equal(h.checkpoints.has('fetch-news-news-1'), true);
     assert.ok(h.calls.some(url => url.includes('/omo?')));
     assert.equal(h.calls.filter(url => url.includes('/stock-summary?')).length, 1);
     assert.match(news.news_text, /A股主要指数收涨/);
     assert.match(news.news_text, /新闻正文/);
     assert.equal(options.retry, false);
     events.push('ai');
-    industryGate.resolve();
     return { stock: '股市判断', bond: '债市判断' };
   };
   h.dependencies.saveMarketReport = async (...args) => { events.push('r2'); return saveMarketReport(...args); };
   h.dependencies.sendMarketBriefingResult = async () => { events.push('mail'); return { messageId: '1', status: 'accepted' }; };
-  const result = await h.run();
+  const pending = h.run();
+  await newsStarted.promise;
+  assert.equal(h.calls.length, 11);
+  assert.equal(h.checkpoints.has('fetch-industry'), false);
+  assert.deepEqual(events, []);
+  industryGate.resolve();
+  const result = await pending;
   assert.equal(result.status, 'complete');
   assert.deepEqual(events, ['ai', 'r2', 'mail']);
   assert.equal(h.calls.length, 14);
@@ -225,3 +235,30 @@ for (const stage of ['generateMarketBriefingFromNews', 'saveMarketReport']) {
     assert.equal(h.steps.at(-1).name, 'notify-result');
   });
 }
+
+
+test('AI和归档有明确await边界，后续step不能提前启动', async t => {
+  clock(t);
+  const h = harness();
+  const aiStarted = deferred(), aiDone = deferred(), saveStarted = deferred(), saveDone = deferred();
+  h.dependencies.generateMarketBriefingFromNews = async () => {
+    aiStarted.resolve();
+    await aiDone.promise;
+    return { stock: '股', bond: '债' };
+  };
+  h.dependencies.saveMarketReport = async (...args) => {
+    saveStarted.resolve();
+    await saveDone.promise;
+    return saveMarketReport(...args);
+  };
+  const pending = h.run();
+  await aiStarted.promise;
+  assert.equal(h.steps.some(row => row.name === 'aggregate-and-save-r2'), false);
+  assert.equal(h.steps.some(row => row.name === 'notify-result'), false);
+  aiDone.resolve();
+  await saveStarted.promise;
+  assert.equal(h.steps.some(row => row.name === 'notify-result'), false);
+  saveDone.resolve();
+  await pending;
+  assert.deepEqual(h.steps.slice(-3).map(row => row.name), ['generate-focus', 'aggregate-and-save-r2', 'notify-result']);
+});
