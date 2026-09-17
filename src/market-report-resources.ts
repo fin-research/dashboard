@@ -551,7 +551,7 @@ export function referencedBondCodes(
 }
 
 export function previousTradingDate(
-  industryPayload: IndustrySnapshot,
+  industryPayload: Pick<IndustrySnapshot, "tradingDates">,
   reportDate: string,
 ): string | null {
   const previousDate = industryPayload.tradingDates
@@ -561,26 +561,26 @@ export function previousTradingDate(
   return previousDate ?? null;
 }
 
-export function buildReportData(resources: RawMarketReportResources): ReportData {
-  const industry = resources.industry;
-  const stock = resources.stock;
-  const trades = resources.todayTrades;
-  const quotes = resources.favoriteQuotes;
-  const infos = resources.bondInfos;
-  const primary = primaryReport(
-    resources.primary,
-    resources.reportDate,
-    resources.previousPrimaryDate,
-  );
-  const secondary = attachBondInfos(trades, infos, false);
-  const inventory = attachBondInfos(quotes, infos, true);
+export function buildOpenMarketModule(rows: OmoOperation[]): Pick<ReportData, "omo_operations"> {
+  return { omo_operations: omoOperations(rows) };
+}
+
+export function buildFixedIncomeModule(
+  resources: Pick<RawMarketReportResources, "dr" | "dibo" | "governmentBonds" | "futures">,
+): Pick<ReportData, "funding_rates" | "government_bonds" | "futures"> {
   return {
-    report_date: resources.reportDate,
-    generated_at: resources.generatedAt,
-    omo_operations: omoOperations(resources.omo),
     funding_rates: fundingRates(resources.dr, resources.dibo),
     government_bonds: governmentBonds(resources.governmentBonds),
     futures: futures(resources.futures),
+  };
+}
+
+export function buildEquityModule(
+  resources: Pick<RawMarketReportResources, "stock" | "margin" | "industry">,
+): Pick<ReportData, "stock_paragraphs" | "margin" | "equities" | "equity_data_time" |
+  "turnover_yi" | "turnover_change_yi" | "industries" | "industry_data_date"> {
+  const { stock, industry } = resources;
+  return {
     stock_paragraphs: stock.paragraphs.slice(0, 2),
     margin: margin(resources.margin),
     equities: industry.equities,
@@ -589,8 +589,33 @@ export function buildReportData(resources: RawMarketReportResources): ReportData
     turnover_change_yi: toFloat(industry.turnoverChangeYi),
     industries: industry.industries,
     industry_data_date: industry.dataDate,
-    ...primary,
-    secondary_bonds: normalizeSecondary(secondary),
-    inventory_bonds: normalizeInventory(inventory, secondary),
+  };
+}
+
+export function buildPrimaryModule(rows: PrimaryIssue[], reportDate: string, previousDate: string) {
+  return primaryReport(rows, reportDate, previousDate);
+}
+
+export function buildSecondaryModule(trades: TodayTrade[], infos: BondInfo[]): Pick<ReportData, "secondary_bonds"> {
+  return { secondary_bonds: normalizeSecondary(attachBondInfos(trades, infos, false)) };
+}
+
+export function buildInventoryModule(
+  quotes: FavoriteQuote[], trades: TodayTrade[], infos: BondInfo[],
+): Pick<ReportData, "inventory_bonds"> {
+  return { inventory_bonds: normalizeInventory(attachBondInfos(quotes, infos, true), trades) };
+}
+
+/** Legacy callers use the same module transformations as the Workflow. */
+export function buildReportData(resources: RawMarketReportResources): ReportData {
+  return {
+    report_date: resources.reportDate,
+    generated_at: resources.generatedAt,
+    ...buildOpenMarketModule(resources.omo),
+    ...buildFixedIncomeModule(resources),
+    ...buildEquityModule(resources),
+    ...buildPrimaryModule(resources.primary, resources.reportDate, resources.previousPrimaryDate),
+    ...buildSecondaryModule(resources.todayTrades, resources.bondInfos),
+    ...buildInventoryModule(resources.favoriteQuotes, resources.todayTrades, resources.bondInfos),
   };
 }

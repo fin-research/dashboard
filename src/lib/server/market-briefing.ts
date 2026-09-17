@@ -169,9 +169,7 @@ export async function generateMarketBriefingFromNews(
       { role: "system", content: MARKET_BRIEFING_SYSTEM },
       {
         role: "user",
-        content: buildMarketBriefingPrompt(
-          filterMarketBriefingNews(news.news_text),
-        ),
+        content: buildMarketBriefingPrompt(news.news_text),
       },
     ],
     marketBriefingOutputSchema,
@@ -211,22 +209,26 @@ export async function fetchBriefingNews(
   signal?: AbortSignal,
 ): Promise<BriefingNews> {
   const baseUrl = env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
+  const [stockPayload, newsDetails] = await completeAll([
+    fetchDataJson(env, `${baseUrl}/stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema, signal),
+    fetchBriefingNewsDetails(env, reportDate, signal),
+  ]);
+  return buildBriefingNews(stockPayload, newsDetails);
+}
+
+export async function fetchBriefingNewsDetails(env: Env, reportDate: string, signal?: AbortSignal) {
+  const baseUrl = env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
   const newsQuery = new URLSearchParams({
     date: reportDate, important: "true", pageSize: "40",
     fields: "sentimentId,title,time,tags,important",
   });
-  const details = fetchDataJson(env, `${baseUrl}/news?${newsQuery}`, briefingNewsResponseSchema, signal).then(news =>
-    mapWithConcurrency(news, 5, async summary => {
-      const query = new URLSearchParams({ fields: "sentimentId,title,time,tags,important,content,link" });
-      const detail = await fetchDataJson(env,
-        `${baseUrl}/news/${encodeURIComponent(summary.sentimentId)}?${query}`, briefingNewsDetailSchema, signal);
-      return { ...summary, ...detail };
-    }));
-  const [stockPayload, newsDetails] = await completeAll([
-    fetchDataJson(env, `${baseUrl}/stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema, signal),
-    details,
-  ]);
-  return buildBriefingNews(stockPayload, newsDetails);
+  const news = await fetchDataJson(env, `${baseUrl}/news?${newsQuery}`, briefingNewsResponseSchema, signal);
+  return mapWithConcurrency(news, 5, async summary => {
+    const query = new URLSearchParams({ fields: "sentimentId,title,time,tags,important,content,link" });
+    const detail = await fetchDataJson(env,
+      `${baseUrl}/news/${encodeURIComponent(summary.sentimentId)}?${query}`, briefingNewsDetailSchema, signal);
+    return { ...summary, ...detail };
+  });
 }
 
 export function buildBriefingNews(
@@ -239,10 +241,13 @@ export function buildBriefingNews(
     { title: stockPayload.title, time: stockPayload.time, tags: ["股市", "行情"], content: paragraphs.join("\n") },
     ...newsDetails,
   ];
-  return {
-    news_count: items.length,
-    news_text: items.map((item, index) => formatBriefingItem(index + 1, item)).join("\n\n"),
-  };
+  return prepareBriefingNews(items);
+}
+
+export function prepareBriefingNews(items: Array<Record<string, unknown>>): BriefingNews {
+  const newsText = filterMarketBriefingNews(items.map((item, index) => formatBriefingItem(index + 1, item)).join("\n\n"));
+  if (!newsText.trim()) throw new MarketBriefingError(503, "新闻数据为空，请稍后重试");
+  return { news_count: items.length, news_text: newsText };
 }
 
 /** Drain every branch (including durable retries) before propagating a failure. */

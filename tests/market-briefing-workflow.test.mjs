@@ -6,6 +6,7 @@ import { sendMarketBriefingResult } from '../src/lib/server/market-briefing-emai
 import { directResponse } from './fixtures/market-resources.mjs';
 
 const date = '2026-08-25';
+const moduleSteps = ['collect-focus-news', 'collect-open-market', 'collect-fixed-income', 'collect-equity', 'collect-primary', 'collect-secondary', 'collect-inventory'];
 function clock(t) { t.mock.timers.enable({ apis: ['Date'], now: new Date(`${date}T17:00:00+08:00`) }); }
 function deferred() { return Promise.withResolvers(); }
 function newsItem(index) {
@@ -13,6 +14,7 @@ function newsItem(index) {
 }
 function harness(override) {
   const calls = [], steps = [], objects = new Map(), checkpoints = new Map(), notifications = [];
+  const completed = Object.fromEntries(moduleSteps.map(name => [name, deferred()]));
   const env = { DATA: { fetch: async req => {
     calls.push(req.url);
     const response = await override?.(req.url);
@@ -28,6 +30,7 @@ function harness(override) {
     steps.push({ name, config });
     const value = await fn();
     checkpoints.set(name, structuredClone(value));
+    completed[name]?.resolve();
     return value;
   } };
   const dependencies = {
@@ -36,56 +39,56 @@ function harness(override) {
     sendMarketBriefingResult: async (_env, result) => { notifications.push(result); return { messageId: '1', status: 'accepted' }; },
   };
   const run = () => runMarketBriefing(env, step, { reportDate: date }, 'test', dependencies);
-  return { env, step, calls, steps, objects, checkpoints, notifications, dependencies, run };
+  return { env, step, calls, steps, objects, checkpoints, completed, notifications, dependencies, run };
 }
 
-test('独立行情和新闻并发，分批完成后顺序执行AI、保存和通知', async t => {
+test('七模块并发且互不等待，step内完成解析，之后仅AI、归档和通知', async t => {
   clock(t);
-  const industryGate = deferred(), newsStarted = deferred();
+  const equityGate = deferred();
   const h = harness(url => {
-    if (url.includes('/industry?')) return industryGate.promise.then(() => directResponse(url));
-    if (new URL(url).pathname === '/data/news') newsStarted.resolve();
+    const target = new URL(url);
+    if (target.pathname === '/data/industry' && target.searchParams.get('fields') !== 'tradingDates') {
+      return equityGate.promise.then(() => directResponse(url));
+    }
   });
   const events = [];
   h.dependencies.generateMarketBriefingFromNews = async (_env, _date, news, options) => {
-    assert.equal(h.checkpoints.has('fetch-industry'), true);
-    assert.equal(h.checkpoints.has('fetch-bond-infos'), true);
-    assert.equal(h.checkpoints.has('fetch-news-news-1'), true);
-    assert.ok(h.calls.some(url => url.includes('/omo?')));
-    assert.equal(h.calls.filter(url => url.includes('/stock-summary?')).length, 1);
-    assert.match(news.news_text, /A股主要指数收涨/);
-    assert.match(news.news_text, /新闻正文/);
+    assert.ok(moduleSteps.every(name => h.checkpoints.has(name)));
     assert.equal(options.retry, false);
+    assert.match(news.news_text, /新闻正文/);
+    assert.doesNotMatch(news.news_text, /A股主要指数收涨/);
+    assert.equal(news.news_count, 1);
     events.push('ai');
     return { stock: '股市判断', bond: '债市判断' };
   };
   h.dependencies.saveMarketReport = async (...args) => { events.push('r2'); return saveMarketReport(...args); };
-  h.dependencies.sendMarketBriefingResult = async () => { events.push('mail'); return { messageId: '1', status: 'accepted' }; };
+  h.dependencies.sendMarketBriefingResult = async () => { events.push('mail'); return { messageId: '1', status: 'queued' }; };
   const pending = h.run();
-  await newsStarted.promise;
-  assert.equal(h.calls.length, 11);
-  assert.equal(h.checkpoints.has('fetch-industry'), false);
+  await Promise.all(moduleSteps.filter(name => name !== 'collect-equity').map(name => h.completed[name].promise));
+  assert.deepEqual(h.steps.map(row => row.name), moduleSteps);
+  assert.equal(h.checkpoints.has('collect-equity'), false);
   assert.deepEqual(events, []);
-  industryGate.resolve();
-  const result = await pending;
-  assert.equal(result.status, 'complete');
+  // Parsed checkpoint values already use report units and business classifications.
+  assert.equal(h.checkpoints.get('collect-open-market').omo_operations[0].amount_yi, 1000);
+  assert.equal(h.checkpoints.get('collect-fixed-income').futures[0].last_price, null);
+  assert.equal(h.checkpoints.get('collect-primary').primary_summary.current_amount, 0);
+  assert.equal(h.checkpoints.get('collect-secondary').secondary_bonds[0].issuer, '测试公司');
+  assert.equal(h.checkpoints.get('collect-inventory').inventory_bonds[0].bid_yield, 2.01);
+  equityGate.resolve();
+  assert.equal((await pending).status, 'complete');
   assert.deepEqual(events, ['ai', 'r2', 'mail']);
-  assert.equal(h.calls.length, 14);
-  assert.equal(h.calls.filter(url => url.includes('/bond-infos?')).length, 1);
+  assert.deepEqual(h.steps.map(row => row.name), [...moduleSteps, 'generate-focus', 'archive-report', 'notify-result']);
+  assert.equal(h.calls.filter(url => url.includes('/stock-summary?')).length, 1);
+  assert.equal(h.calls.filter(url => url.includes('/industry?')).length, 2);
+  assert.equal(h.calls.filter(url => url.includes('/bond-infos?')).length, 2);
   assert.ok(h.calls.every(url => url.includes('fields=')));
-  assert.ok(h.steps.filter(row => row.name.startsWith('fetch-')).every(({ config }) => config.retries.limit === 3));
+  assert.ok(h.steps.slice(0, 7).every(({ config }) => config.retries.limit === 3));
   assert.equal(h.steps.find(row => row.name === 'generate-focus').config.retries.limit, 2);
-  assert.equal(h.steps.some(row => ['trading-day', 'assemble-report'].includes(row.name)), false);
-  assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), ['notify-result']);
-  assert.equal(h.steps.at(-1).name, 'notify-result');
   const report = h.objects.get(`market-briefing/${date}.json`);
   assert.equal(report.focus_text, '1、股市判断\n2、债市判断');
-  assert.equal(report.omo_operations[0].amount_yi, 1000);
-  assert.equal(report.omo_operations[0].interest_rate, null);
-  assert.equal(report.futures[0].last_price, null);
-  assert.equal(report.primary_summary.current_amount, 0);
-  assert.equal(report.secondary_bonds[0].issuer, '测试公司');
-  assert.equal(report.inventory_bonds[0].bid_yield, 2.01);
+  for (const name of moduleSteps.slice(1)) {
+    for (const [field, value] of Object.entries(h.checkpoints.get(name))) assert.deepEqual(report[field], value);
+  }
 });
 
 test('个别国债收益率缺失保留其他行情且不归零', async t => {
@@ -107,7 +110,7 @@ for (const source of ['stock-summary', 'industry', 'bond-infos', 'news/news-1'])
     assert.deepEqual(h.steps.filter(row => row.name.startsWith('notify-')).map(row => row.name), ['notify-result']);
     assert.equal(h.steps.at(-1).name, 'notify-result');
     assert.equal(h.objects.size, 0);
-    assert.equal(h.steps.some(row => row.name === 'aggregate-and-save-r2'), false);
+    assert.equal(h.steps.some(row => row.name === 'archive-report'), false);
   });
 }
 
@@ -126,7 +129,7 @@ test('失败通知等待所有并发step结束', async t => {
   assert.equal(h.notifications[0].status, 'failed');
 });
 
-test('新闻详情各自持久化，并发上限五；AI失败重放不重新采集', async t => {
+test('今日聚焦模块内新闻详情并发上限五；AI失败重放不重新采集', async t => {
   clock(t);
   const gate = deferred(), full = deferred();
   let active = 0, peak = 0, attempts = 0;
@@ -151,7 +154,8 @@ test('新闻详情各自持久化，并发上限五；AI失败重放不重新采
   gate.resolve();
   await failed;
   assert.equal(peak, 5);
-  assert.equal(h.steps.filter(row => row.name.startsWith('fetch-news-news-')).length, 7);
+  assert.equal(h.steps.filter(row => row.name === 'collect-focus-news').length, 1);
+  assert.equal(h.checkpoints.get('collect-focus-news').news_count, 7);
   const calls = h.calls.length;
   assert.equal((await h.run()).status, 'complete');
   assert.equal(h.calls.length, calls);
@@ -252,12 +256,35 @@ test('AI和归档有明确await边界，后续step不能提前启动', async t =
   };
   const pending = h.run();
   await aiStarted.promise;
-  assert.equal(h.steps.some(row => row.name === 'aggregate-and-save-r2'), false);
+  assert.equal(h.steps.some(row => row.name === 'archive-report'), false);
   assert.equal(h.steps.some(row => row.name === 'notify-result'), false);
   aiDone.resolve();
   await saveStarted.promise;
   assert.equal(h.steps.some(row => row.name === 'notify-result'), false);
   saveDone.resolve();
   await pending;
-  assert.deepEqual(h.steps.slice(-3).map(row => row.name), ['generate-focus', 'aggregate-and-save-r2', 'notify-result']);
+  assert.deepEqual(h.steps.slice(-3).map(row => row.name), ['generate-focus', 'archive-report', 'notify-result']);
+});
+
+
+test('模块失败不影响其它模块完成，恢复时只重新采集失败模块', async t => {
+  clock(t);
+  let fail = true;
+  const h = harness(url => url.includes('/omo?') && fail ? Response.json({}, { status: 503 }) : undefined);
+  await assert.rejects(h.run());
+  assert.ok(moduleSteps.filter(name => name !== 'collect-open-market').every(name => h.checkpoints.has(name)));
+  const previousCalls = h.calls.length;
+  fail = false;
+  await h.run();
+  assert.equal(h.calls.length - previousCalls, 1);
+  assert.ok(h.calls.at(-1).includes('/omo?'));
+});
+
+test('DM新闻为空时今日聚焦模块失败，其余六模块仍独立完成', async t => {
+  clock(t);
+  const h = harness(url => new URL(url).pathname === '/data/news' ? Response.json([]) : undefined);
+  await assert.rejects(h.run(), /新闻数据为空/);
+  assert.ok(moduleSteps.slice(1).every(name => h.checkpoints.has(name)));
+  assert.equal(h.objects.size, 0);
+  assert.equal(h.steps.some(row => row.name === 'generate-focus'), false);
 });
