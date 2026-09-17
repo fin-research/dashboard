@@ -2,6 +2,7 @@ export type WorkbenchViewId =
   | "overview"
   | "trading"
   | "market-hotspots"
+  | "tracking-commentary"
   | "policy-tracking"
   | "research"
   | "workflow"
@@ -62,6 +63,13 @@ export const workbenchRoutes: Array<{
     title: "政策跟踪",
     context: "政策资讯与研究点评",
     icon: "policy-tracking",
+  },
+  {
+    id: "tracking-commentary",
+    label: "跟踪点评",
+    title: "跟踪点评",
+    context: "点评撰写与历史档案",
+    icon: "tracking-commentary",
   },
   {
     id: "research",

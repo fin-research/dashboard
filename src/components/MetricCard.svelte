@@ -130,7 +130,7 @@
     box-shadow: none;
   }
 
-  :global(.research-metric-card--report).research-metric-card--cyan {
+  :global(.research-metric-card--report.research-metric-card--cyan) {
     --metric-accent: #0284c7;
     --metric-report-background: #eff6ff;
   }

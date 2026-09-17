@@ -119,7 +119,7 @@ export interface ResearchReportDetail extends ArticleSearchResult {
 
 export interface ResearchCommentaryDetail {
   commentary: ResearchCommentary;
-  policy: RelatedPolicySummary;
+  policy: RelatedPolicySummary | null;
 }
 
 export const policyCategoryLabels: Record<PolicyCategory, string> = {

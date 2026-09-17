@@ -323,19 +323,19 @@ export async function loadResearchCommentaryDetail(
            pe.title AS policy_title, pe.summary AS policy_summary,
            pe.category AS policy_category, pe.policy_date
     FROM research_commentary rc
-    JOIN policy_event pe ON pe.id = rc.policy_id
+    LEFT JOIN policy_event pe ON pe.id = rc.policy_id
     WHERE rc.id = ?
   `).bind(commentaryId).first<CommentaryDetailRow>();
   if (!row) throw new PolicyRepositoryError(404, "研究点评不存在");
   return {
     commentary: commentaryFromRow(row),
-    policy: {
+    policy: row.policy_id ? {
       id: row.policy_id,
       title: row.policy_title,
       summary: row.policy_summary,
       category: row.policy_category,
       policyDate: row.policy_date,
-    },
+    } : null,
   };
 }
 

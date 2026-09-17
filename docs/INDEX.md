@@ -11,6 +11,7 @@
 | 市场点评内今日聚焦、`/api/market-briefing` | [今日聚焦](modules/market-focus.md) |
 | `/trading-research/market-hotspots`、旧 `/market-hotspots`、`/api/rag/hotspots` | [市场热点](modules/market-hotspots.md) |
 | `/trading-research/policy-tracking`、旧 `/policy-tracking`、`/api/policies/*` | [政策跟踪](modules/policy-tracking.md) |
+| `/trading-research/tracking-commentary`、`/api/tracking-commentaries/*`、历史手写稿导入 | [跟踪点评](modules/tracking-commentary.md) |
 | `/news/[id]`、`/articles/[id]`、`/commentaries/[id]` 及同名 `/api/*` | [资讯、研报与点评详情](modules/research-details.md) |
 | `/trading-research`、`/trading-research/trading`、`/trading-research/workflow`、`/api/trading-workflow/config`、工作台框架与兼容跳转 | [交易研究工作台](TRADING_RESEARCH_WORKBENCH.md) |
 | `/trading-research/research`、`/api/economic-indicators`（同步由 Data 维护） | [研究辅助与 EDB](modules/research-assistance.md) |

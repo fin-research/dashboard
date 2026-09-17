@@ -5,3 +5,8 @@ export function afterNavigate(callback) {
 }
 /** @param {string | URL} url */
 export function goto(url) { window.location.assign(String(url)); return Promise.resolve(); }
+
+/** Component harness has no SvelteKit router. Browser unload remains native.
+ * @param {(event: {cancel: () => void}) => void} _callback
+ */
+export function beforeNavigate(_callback) {}

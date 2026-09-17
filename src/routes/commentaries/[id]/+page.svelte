@@ -2,6 +2,7 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { onMount } from "svelte";
 
+  import DocumentBody from "$lib/policy-tracking/DocumentBody.svelte";
   import ModuleCard from "../../../components/ModuleCard.svelte";
   import DetailPageShell from "$lib/policy-tracking/DetailPageShell.svelte";
   import {
@@ -41,6 +42,7 @@
   }
 
   function formatDate(value: string): string {
+    if (!value) return "未注明";
     return new Intl.DateTimeFormat("zh-CN", {
       timeZone: "Asia/Shanghai",
       year: "numeric",
@@ -55,7 +57,7 @@
   <meta name="description" content="政策跟踪标准化研究点评" />
 </svelte:head>
 
-<DetailPageShell eyebrow="RESEARCH COMMENTARY" title="研究点评" backHref="/trading-research/policy-tracking" backLabel="返回政策跟踪">
+<DetailPageShell eyebrow="RESEARCH COMMENTARY" title="研究点评" backHref="/trading-research/tracking-commentary" backLabel="返回跟踪点评">
   {#if loading}
     <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取研究点评</strong></section>
   {:else if errorMessage}
@@ -63,7 +65,7 @@
   {:else if detail}
     <div class="commentary-layout">
       <ModuleCard class="commentary-card" labelledBy="commentary-title">
-        <header class="commentary-brand"><strong>【东财证券】资金管理部 · 政策跟踪</strong><span>{detail.commentary.edited ? "人工修订" : "AI 初版"}</span></header>
+        <header class="commentary-brand"><strong>【东财证券】资金管理部 · 跟踪点评</strong><span>{detail.commentary.edited ? "人工修订" : "AI 初版"}</span></header>
         <h2 class="commentary-event-title" id="commentary-title">{detail.commentary.eventName}</h2>
         <dl>
           <div><dt>消息来源</dt><dd>{detail.commentary.sources}</dd></div>
@@ -72,18 +74,18 @@
         </dl>
         <div class="divider"></div>
         <section class="commentary-section" aria-labelledby="summary-title"><h3 id="summary-title">事件摘要</h3><p>{detail.commentary.eventSummary}</p></section>
-        <section class="commentary-section" aria-labelledby="commentary-body-title"><h3 id="commentary-body-title">政策点评</h3><p>{detail.commentary.commentary}</p></section>
-        <section class="commentary-section" aria-labelledby="recommendation-title"><h3 id="recommendation-title">应对建议</h3><p>{detail.commentary.recommendation}</p></section>
+        <section class="commentary-section" aria-labelledby="commentary-body-title"><h3 id="commentary-body-title">跟踪点评</h3><DocumentBody content={detail.commentary.commentary} /></section>
+        <section class="commentary-section" aria-labelledby="recommendation-title"><h3 id="recommendation-title">应对建议</h3><DocumentBody content={detail.commentary.recommendation} /></section>
       </ModuleCard>
 
-      <aside aria-labelledby="source-policy-title">
+      {#if detail.policy}<aside aria-labelledby="source-policy-title">
         <ModuleCard>
           <div class="policy-meta"><span>{policyCategoryLabels[detail.policy.category]}</span><time datetime={detail.policy.policyDate}>{detail.policy.policyDate}</time></div>
           <h2 id="source-policy-title">{detail.policy.title}</h2>
           <p>{detail.policy.summary}</p>
           <a href={`/trading-research/policy-tracking#policy-${encodeURIComponent(detail.policy.id)}`}>查看对应政策</a>
         </ModuleCard>
-      </aside>
+      </aside>{/if}
     </div>
   {/if}
 </DetailPageShell>

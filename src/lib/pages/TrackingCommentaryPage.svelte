@@ -1,0 +1,270 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { beforeNavigate } from "$app/navigation";
+  import DocumentBody from "$lib/policy-tracking/DocumentBody.svelte";
+  import ModuleCard from "../../components/ModuleCard.svelte";
+  import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
+  import Badge from "$lib/trading-research/Badge.svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
+  import { globalMessages } from "$lib/global-messages";
+  import { commentaryTypeLabels, shanghaiDate, trackingText, type TrackingCommentary, type TrackingDraft, type TrackingRevision } from "$lib/tracking-commentary";
+
+  type Item = Pick<TrackingCommentary, "id" | "eventName" | "type" | "commentaryDate" | "origin" | "edited" | "generatedAt">;
+  let items = $state<Item[]>([]), query = $state(""), typeFilter = $state("");
+  let loading = $state(true), listError = $state(""), hasMore = $state(false), loadingMore = $state(false);
+  let selected = $state<TrackingCommentary | null>(null), draft = $state<TrackingDraft>(blank());
+  let savedDraft = $state(JSON.stringify(blank())), policyId = $state<string | null>(null);
+  let busy = $state(false), progress = $state(""), opening = $state(false), preview = $state(false);
+  let startDate = $state(shanghaiDate(-6)), endDate = $state(shanghaiDate());
+  let revisions = $state<TrackingRevision[]>([]), shownRevision = $state<TrackingRevision | null>(null);
+  let generation = 0, listRequest = 0, mounted = false;
+  const dirty = $derived(JSON.stringify(draft) !== savedDraft);
+  const evidence = $derived(selected?.evidence ?? []);
+
+  function blank(): TrackingDraft {
+    return { eventName: "", type: "current_affairs", sources: "", eventPublishedAt: shanghaiDate(), commentaryDate: shanghaiDate(), eventSummary: "", commentary: "", recommendation: "" };
+  }
+  function accept(value: TrackingCommentary) {
+    selected = value; policyId = value.policyId;
+    draft = { eventName: value.eventName, type: value.type, sources: value.sources, eventPublishedAt: value.eventPublishedAt,
+      commentaryDate: value.commentaryDate, eventSummary: value.eventSummary, commentary: value.commentary, recommendation: value.recommendation };
+    savedDraft = JSON.stringify(draft); revisions = []; shownRevision = null;
+    if (value.search) { startDate = value.search.startDate; endDate = value.search.endDate; }
+    const url = new URL(window.location.href); url.search = new URLSearchParams({ id: value.id }).toString();
+    window.history.replaceState(window.history.state, "", url);
+  }
+  function canLeave() { return !dirty || window.confirm("有未保存的修改，是否离开？"); }
+  beforeNavigate(({ cancel }) => { if ((busy && !window.confirm("点评正在生成或保存，是否离开？")) || !canLeave()) cancel(); });
+  function beforeUnload(event: BeforeUnloadEvent) { if (dirty || busy) { event.preventDefault(); event.returnValue = ""; } }
+  onMount(() => {
+    mounted = true;
+    void initialize();
+    return () => { mounted = false; generation++; listRequest++; };
+  });
+  async function json<T>(url: string, options?: RequestInit): Promise<T> {
+    const response = await fetch(url, options); const value = await response.json();
+    if (!response.ok) throw new Error(value.error || "请求失败");
+    return value as T;
+  }
+  async function initialize() {
+    await loadList(); if (!mounted) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("id")) { await open(params.get("id")!); return; }
+    const policy = params.get("policy");
+    if (policy) {
+      opening = true;
+      try {
+        const found = await json<{ items: Item[]; policy: { id: string; title: string; summary: string; departments: string[]; policyDate: string } | null }>(`/api/tracking-commentaries?policyId=${encodeURIComponent(policy)}`);
+        if (!mounted) return;
+        if (found.items[0]) { await open(found.items[0].id); return; }
+        const value = found.policy;
+        if (!value) throw new Error("未找到政策，请从政策跟踪重新进入");
+        policyId = value.id; draft = { ...blank(), eventName: value.title, type: "policy_tracking", sources: value.departments.join("、"), eventPublishedAt: value.policyDate, eventSummary: value.summary };
+        endDate = value.policyDate; startDate = new Date(Date.parse(`${value.policyDate}T00:00:00+08:00`) - 6 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" });
+      } catch (error) { fail(error); } finally { opening = false; }
+    }
+  }
+  async function loadList(more = false) {
+    const requestId = ++listRequest;
+    if (more) loadingMore = true; else loading = true;
+    listError = "";
+    try {
+      const params = new URLSearchParams({ q: query, offset: String(more ? items.length : 0) });
+      if (typeFilter) params.set("type", typeFilter);
+      const result = await json<{ items: Item[]; hasMore: boolean }>(`/api/tracking-commentaries?${params}`);
+      if (!mounted || requestId !== listRequest) return;
+      items = more ? [...items, ...result.items] : result.items; hasMore = result.hasMore;
+    } catch (error) { if (requestId === listRequest) listError = error instanceof Error ? error.message : "点评列表读取失败"; }
+    finally { if (requestId === listRequest) { loading = false; loadingMore = false; } }
+  }
+  async function open(id: string) {
+    if (busy || !canLeave()) return;
+    const requestId = ++generation; opening = true;
+    try { const value = await json<TrackingCommentary>(`/api/tracking-commentaries/${encodeURIComponent(id)}`); if (mounted && requestId === generation) accept(value); }
+    catch (error) { if (requestId === generation) fail(error); }
+    finally { if (requestId === generation) opening = false; }
+  }
+  function newDraft() {
+    if (busy || !canLeave()) return;
+    generation++; opening = false; selected = null; policyId = null; draft = blank(); savedDraft = JSON.stringify(draft);
+    startDate = shanghaiDate(-6); endDate = shanghaiDate(); revisions = []; shownRevision = null; preview = false;
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+  }
+  async function persist(): Promise<TrackingCommentary> {
+    const value = await json<TrackingCommentary>(selected ? `/api/tracking-commentaries/${encodeURIComponent(selected.id)}` : "/api/tracking-commentaries", {
+      method: selected ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(selected ? { ...draft, updatedAt: selected.updatedAt } : { ...draft, policyId }),
+    });
+    if (mounted) accept(value);
+    return value;
+  }
+  async function save() {
+    if (busy) return; busy = true;
+    try { await persist(); globalMessages.success("点评已保存"); await loadList(); }
+    catch (error) { fail(error); } finally { busy = false; }
+  }
+  async function generateDraft() {
+    if (busy) return;
+    if ((draft.commentary || draft.recommendation) && !window.confirm("重新生成将替换当前正文，已保存版本会保留。是否继续？")) return;
+    const range = { startDate, endDate };
+    busy = true; progress = "保存主题";
+    try {
+      const current = dirty || !selected ? await persist() : selected;
+      progress = "检索研报";
+      const response = await fetch(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/generate`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...range, updatedAt: current.updatedAt }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || "生成失败");
+      if (!response.body) throw new Error("生成连接中断，请重新打开点评查看");
+      const reader = response.body.getReader(), decoder = new TextDecoder(); let pending = "", completed = false;
+      try {
+        while (true) {
+          const { value, done } = await reader.read(); pending += decoder.decode(value, { stream: !done });
+          const lines = pending.split("\n"); pending = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const event = JSON.parse(line);
+            if (event.type === "error") throw new Error(event.error);
+            if (event.type === "progress" && mounted) progress = event.message;
+            if (event.type === "complete") { completed = true; if (mounted) accept(event.commentary); }
+          }
+          if (done) break;
+        }
+      } finally { reader.releaseLock(); }
+      if (!completed) throw new Error("连接中断，请重新打开点评查看保存结果");
+      if (mounted) { globalMessages.success("点评草稿已生成"); await loadList(); }
+    } catch (error) { if (mounted) fail(error); }
+    finally { if (mounted) { busy = false; progress = ""; } }
+  }
+  async function loadRevisions() {
+    if (!selected) return; const id = selected.id;
+    try { const result = await json<{ revisions: TrackingRevision[] }>(`/api/tracking-commentaries/${encodeURIComponent(id)}/revisions`); if (mounted && selected?.id === id) revisions = result.revisions; }
+    catch (error) { fail(error); }
+  }
+  async function copy() { try { await navigator.clipboard.writeText(trackingText(draft)); globalMessages.success("点评已复制"); } catch { globalMessages.error("复制失败"); } }
+  function fail(error: unknown) { globalMessages.error(error instanceof Error ? error.message : "操作失败"); }
+</script>
+
+<svelte:window onbeforeunload={beforeUnload} />
+<div class="tracking-workspace">
+  <div class="writing">
+    <div class="writing-toolbar">
+      <Button variant="outline" disabled={busy} onclick={newDraft}>新建点评</Button>
+      <Button variant="outline" disabled={busy || opening || !draft.eventName.trim()} onclick={save}>保存</Button>
+      <Button variant="outline" disabled={opening} aria-pressed={preview} onclick={() => preview = !preview}>{preview ? "继续编辑" : "预览"}</Button>
+      <Button variant="outline" disabled={!draft.commentary} onclick={copy}>复制正文</Button>
+      {#if selected}<Button variant="outline" onclick={loadRevisions}>版本记录</Button>{/if}
+      <Badge tone={dirty ? "warning" : "neutral"}>{dirty ? "未保存" : selected ? "已保存" : "新稿"}</Badge>
+    </div>
+    {#if opening}<ModuleCard><p aria-live="polite">正在读取点评</p></ModuleCard>
+    {:else}
+      <ModuleCard>
+        <PanelHeading id="tracking-write" title="撰写点评" />
+        <fieldset disabled={busy}>
+          <label><span>主题</span><Input bind:value={draft.eventName} maxlength={240} /></label>
+          <div class="metadata-fields">
+            <label><span>类型</span><NativeSelect bind:value={draft.type} disabled={!!policyId}>{#each Object.entries(commentaryTypeLabels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
+            <label><span>发布时间</span><Input type="date" bind:value={draft.eventPublishedAt} /></label>
+            <label><span>点评时间</span><Input type="date" bind:value={draft.commentaryDate} /></label>
+          </div>
+          <div class="generation-toolbar">
+            <label><span>研报起始日期</span><Input type="date" bind:value={startDate} /></label>
+            <label><span>研报截止日期</span><Input type="date" bind:value={endDate} /></label>
+            <Button disabled={busy || draft.eventName.trim().length < 2 || !startDate || !endDate || startDate > endDate} onclick={generateDraft}>{busy && progress ? progress : "检索并生成"}</Button>
+          </div>
+        </fieldset>
+      </ModuleCard>
+      <div class="editor-grid">
+        <ModuleCard>
+          <PanelHeading id="tracking-body" title={preview ? "点评预览" : "点评正文"} />
+          {#if preview}
+            <article class="preview"><h3>{draft.eventName}</h3><p>{draft.sources} · {draft.commentaryDate}</p>
+              <h4>事件摘要</h4><p>{draft.eventSummary || "尚未撰写"}</p><h4>跟踪点评</h4><DocumentBody content={draft.commentary || "尚未撰写"} /><h4>应对建议</h4><DocumentBody content={draft.recommendation || "尚未撰写"} />
+            </article>
+          {:else}
+            <fieldset disabled={busy}>
+              <label><span>消息来源</span><Input bind:value={draft.sources} /></label>
+              <label><span>事件摘要</span><Textarea rows={5} bind:value={draft.eventSummary} /></label>
+              <label><span>跟踪点评</span><Textarea rows={18} bind:value={draft.commentary} /></label>
+              <label><span>应对建议</span><Textarea rows={7} bind:value={draft.recommendation} /></label>
+            </fieldset>
+          {/if}
+        </ModuleCard>
+        <div class="evidence-column">
+          <ModuleCard><PanelHeading id="tracking-evidence" title="取材原句" />
+            {#if selected?.search}<p class="item-date">{selected.search.startDate} — {selected.search.endDate}</p>{/if}
+            {#if !evidence.length}<p>暂无摘录</p>{/if}
+            {#each evidence as quote, i}<details open={i === 0}>
+              <summary>{quote.section}</summary>
+              <p class="source-title">{quote.institution} · {quote.publishedAt}</p><p>{quote.title}</p>
+              <blockquote>{quote.text}</blockquote>
+            </details>{/each}
+            {#if policyId}<a href={`/trading-research/policy-tracking#policy-${encodeURIComponent(policyId)}`}>关联政策</a>{/if}
+          </ModuleCard>
+          {#if selected?.originalText}<ModuleCard><PanelHeading id="tracking-original" title="手写原稿" />
+            <ul>{#each selected.sourceFiles as file}<li>{file.name}</li>{/each}</ul>
+            <details><summary>查看原文</summary><DocumentBody content={selected.originalText} /></details>
+          </ModuleCard>{/if}
+          {#if revisions.length}<ModuleCard><PanelHeading id="tracking-revisions" title="版本记录" />
+            {#each revisions as revision}<Button variant="ghost" onclick={() => shownRevision = revision}>{revision.savedAt.slice(0,19).replace("T"," ")} · {revision.content.edited ? "人工稿" : "AI 草稿"}</Button>{/each}
+            {#if shownRevision}<p class="original">{trackingText(shownRevision.content)}</p>{/if}
+          </ModuleCard>{/if}
+        </div>
+      </div>
+    {/if}
+  </div>
+  <aside class="archive" aria-label="点评档案">
+    <ModuleCard>
+      <PanelHeading id="tracking-archive" title="点评档案" />
+      <form class="archive-filter" onsubmit={(event) => { event.preventDefault(); void loadList(); }}>
+        <label><span>检索主题</span><Input bind:value={query} /></label>
+        <label><span>类型</span><NativeSelect bind:value={typeFilter}><option value="">全部</option>{#each Object.entries(commentaryTypeLabels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
+        <Button variant="outline" type="submit" disabled={loading}>查询</Button>
+      </form>
+      {#if loading}<p aria-live="polite">读取中</p>
+      {:else if listError}<p role="alert">{listError}</p><Button variant="outline" onclick={() => loadList()}>重试</Button>
+      {:else if !items.length}<p>暂无点评</p>
+      {:else}<ol class="archive-list">{#each items as item (item.id)}<li>
+        <button class:active={selected?.id === item.id} aria-current={selected?.id === item.id ? "true" : undefined} disabled={busy} onclick={() => open(item.id)}>
+          <span class="item-date">{item.commentaryDate || "日期未注明"} · {commentaryTypeLabels[item.type]}</span>
+          <strong>{item.eventName}</strong><span>{item.origin === "import" ? "手写稿" : item.edited ? "人工稿" : "AI 草稿"}</span>
+        </button>
+      </li>{/each}</ol>{/if}
+      {#if hasMore}<Button variant="outline" disabled={loadingMore} onclick={() => loadList(true)}>{loadingMore ? "读取中" : "加载更多"}</Button>{/if}
+    </ModuleCard>
+  </aside>
+
+</div>
+
+<style>
+  .tracking-workspace { display:grid; grid-template-columns: minmax(220px, 280px) minmax(0,1fr); gap:24px; align-items:start; }
+  .archive { grid-column:1; grid-row:1; min-width:0; }
+  .writing { grid-column:2; grid-row:1; }
+  .writing, .evidence-column { display:grid; gap:20px; min-width:0; }
+  .writing-toolbar, .generation-toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+  .writing-toolbar { align-items:center; }
+  .archive-filter, fieldset { display:grid; gap:16px; min-width:0; padding:0; border:0; margin:0; }
+  label { display:grid; gap:8px; min-width:0; }
+  label > span { font-weight:bold; }
+  .metadata-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+  .archive-list { list-style:none; margin:20px 0; padding:0; display:grid; gap:4px; }
+  .archive-list button { display:grid; gap:8px; width:100%; text-align:left; border:0; border-bottom:1px solid var(--border-color); padding:16px 8px; color:var(--text-1); background:transparent; font:inherit; cursor:pointer; }
+  .archive-list button.active { background:var(--muted); border-inline-start:3px solid var(--primary); }
+  .archive-list button:focus-visible, summary:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  .archive-list button:disabled { cursor:wait; }
+  .archive-list strong { overflow-wrap:anywhere; line-height:1.5; }
+  .archive-list span, .item-date, .source-title { color:var(--text-muted); font-size:.875rem; }
+  .editor-grid { display:grid; grid-template-columns:minmax(0, 1fr) minmax(240px, 32%); gap:20px; align-items:start; }
+  .preview, .original, blockquote { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.85; }
+  .preview h3 { font-size:1.25rem; margin:0 0 16px; }
+  .preview h4 { font-size:1rem; margin:24px 0 8px; }
+  details { border-top:1px solid var(--border-color); padding:16px 0; }
+  summary { cursor:pointer; font-weight:bold; min-height:44px; line-height:1.6; }
+  blockquote { margin:12px 0; padding-inline-start:12px; border-inline-start:3px solid var(--primary); }
+  .evidence-column p, .evidence-column li { overflow-wrap:anywhere; line-height:1.7; }
+  @media(max-width:1300px) { .editor-grid { grid-template-columns:minmax(0,1fr); } }
+  @media(max-width:760px) { .tracking-workspace { grid-template-columns:minmax(0,1fr); } .writing { grid-column:1; grid-row:1; } .archive { grid-column:1; grid-row:2; } .metadata-fields { grid-template-columns:minmax(0,1fr); } .generation-toolbar { display:grid; } }
+</style>

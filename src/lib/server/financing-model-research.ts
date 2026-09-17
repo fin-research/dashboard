@@ -38,7 +38,7 @@ const researchOutputSchema = z
 
 type ResearchOutput = z.infer<typeof researchOutputSchema>;
 
-interface ResearchDocument {
+export interface ResearchDocument {
   sourceId: string;
   institution: string;
   title: string;
@@ -185,7 +185,7 @@ export function buildAiSearchToolCall(
   };
 }
 
-export function parseAiSearchResponse(text: string): ResearchDocument[] {
+export function parseAiSearchResponse(text: string, maxDocumentText = MAX_DOCUMENT_TEXT): ResearchDocument[] {
   const envelope = parseMcpEnvelope(text);
   const content = envelope.result?.content;
   if (!Array.isArray(content)) {
@@ -205,7 +205,7 @@ export function parseAiSearchResponse(text: string): ResearchDocument[] {
       continue;
     }
   }
-  return compactResearchDocuments(chunks);
+  return compactResearchDocuments(chunks, maxDocumentText);
 }
 
 function parseMcpEnvelope(text: string): {
@@ -242,7 +242,7 @@ function parseMcpEnvelope(text: string): {
   throw new FinancingModelResearchError(502, "AI Search MCP 响应不是有效 JSON-RPC");
 }
 
-function compactResearchDocuments(chunks: AiSearchChunk[]): ResearchDocument[] {
+function compactResearchDocuments(chunks: AiSearchChunk[], maxDocumentText: number): ResearchDocument[] {
   const grouped = new Map<
     string,
     Omit<ResearchDocument, "sourceId"> & { textParts: string[] }
@@ -255,7 +255,7 @@ function compactResearchDocuments(chunks: AiSearchChunk[]): ResearchDocument[] {
     if (!key || !institution || !publishedAt || !body) continue;
     const existing = grouped.get(key);
     if (existing) {
-      if (existing.textParts.join("\n").length < MAX_DOCUMENT_TEXT) {
+      if (existing.textParts.join("\n").length < maxDocumentText) {
         existing.textParts.push(body);
       }
       continue;
@@ -275,7 +275,7 @@ function compactResearchDocuments(chunks: AiSearchChunk[]): ResearchDocument[] {
     title: document.title,
     publishedAt: document.publishedAt,
     sourceKey: document.sourceKey,
-    text: document.textParts.join("\n").slice(0, MAX_DOCUMENT_TEXT),
+    text: [...new Set(document.textParts)].join("\n").slice(0, maxDocumentText),
   }));
 }
 
@@ -389,7 +389,7 @@ function textValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-async function readTextBounded(response: Response, maxBytes: number): Promise<string> {
+export async function readTextBounded(response: Response, maxBytes: number): Promise<string> {
   const contentLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     throw new FinancingModelResearchError(502, "AI Search MCP 响应过大");

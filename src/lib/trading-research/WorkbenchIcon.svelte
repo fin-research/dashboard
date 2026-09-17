@@ -25,6 +25,8 @@
     <path d="m8.3 10.8 6.4-3.6M8.4 13.1l7.2 2.8" />
   {:else if name === "policy-tracking"}
     <path d="M6 3v18M6 5h12l-3 4 3 4H6" />
+  {:else if name === "tracking-commentary"}
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6M8 13h8M8 17h5" />
   {:else if name === "research"}
     <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" />
   {:else if name === "workflow"}
