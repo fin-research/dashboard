@@ -10,11 +10,11 @@
 - Workflow 只保留一组七个并行模块 step，直接写在 `worker/market-briefing-runner.ts` 的原生 `await Promise.allSettled([...])` 中：今日聚焦 `collect-focus-news`、公开市场操作 `collect-open-market`、固收市场 `collect-fixed-income`、权益市场 `collect-equity`、一级发行 `collect-primary`、二级行情 `collect-secondary`、东财债券 `collect-inventory`。
 - 每个模块自己完成抓取、DTO 校验、解析、业务换算和结果组装，返回已校验的报告字段；不依赖其他模块 step 的输出。一级发行独立读取交易日期；二级与东财各自补全所需债券信息，东财另自取今日成交作收益率回退。共享接口可由不同模块独立请求，不设跨模块缓存或前置步骤。
 - 今日聚焦只抓取 DM 新闻列表和详情，在模块内完成正文合并、筛选及提示材料组装，详情最多五个并发。股票收评由权益模块负责，不作为今日聚焦的依赖。模块内部不创建子 step，不做业务重试。
-- 七个模块全部结束后，显式依次 `await generate-focus → archive-report → notify-result`。AI 只消费今日聚焦模块的新闻材料，关闭 adapter 内部重试；归档只合并已经解析完成的模块字段、校验完整报告并保存原 `market-briefing/YYYY-MM-DD.json`，不再解析上游数据。任一必需模块失败不影响其他模块完成，但不生成或归档残缺报告。
+- 七个模块全部结束后，显式依次 `await generate-focus → archive-report`。AI 只消费今日聚焦模块的新闻材料，关闭 adapter 内部重试；归档只合并已经解析完成的模块字段、校验完整报告并保存原 `market-briefing/YYYY-MM-DD.json`，不再解析上游数据。任一必需模块失败不影响其他模块完成，但不生成或归档残缺报告。
 - 模块 step 最多重试 3 次，30 秒起指数退避；行情模块单步超时 3 分钟，今日聚焦采集超时 10 分钟。AI step 最多重试 2 次，1 分钟起指数退避、超时 15 分钟。所有采集、AI、归档和通知重试由 Workflow step 配置负责。
 - 当日成交、期货及报价不支持历史重放；每个未完成的采集 step 校验上海当天，跨日恢复未完成采集会失败，不能以当前行情冒充历史报告。已完成数据步骤与归档步骤可由平台恢复。
-- 最后统一执行唯一 `notify-result` step：等待前面的并发请求、AI 和归档结果完成，在此 step 内判断结果、组装通知并通过 Messenger 提交给 `MARKET_BRIEFING_RECIPIENTS`（当前 `shiyue@18.cn`）。不设成功/失败通知分支或独立 step。通知完成后生成错误继续使 Workflow 失败；邮件自身重试不重新生成报告，也不删除已归档报告。
-- 邮件渠道与凭据由 Messenger 管理。统一使用 `market-briefing/<instanceId>/result` 幂等键；`queued` 仅代表消息中台接受入队，不代表收件箱送达。
+
+- Workflow 只生成并归档报告，成功返回 reportDate、finalizedAt、focus；失败直接保留原错误。终态由 Cloudflare Event Subscriptions → Messenger 统一发送 email＋Telegram，接收人、幂等和渠道重试在 Messenger 管理。
 
 ## 读取与页面
 
@@ -47,6 +47,6 @@ Cloudflare 流程图由静态语法分析生成，并不回放实际执行。`co
 
 2026-09-16 本地验证：类型检查、Worker 类型检查、生产构建、544 项 Node 测试、53 项浏览器用例通过；1 项手机矩形拖拽按原规则跳过。CI 候选运行 `35077845510` 通过 5 项 Python、544 项 Node、构建与 53 项浏览器用例。市场点评桌面/手机的 darwin 与 macos-ci 基线已人工对照；本轮不更新其他模块基线。
 
-手动触发使用 `pnpm exec wrangler workflows trigger market-briefing '{"reportDate":"YYYY-MM-DD"}' --id market-briefing-YYYY-MM-DD`。运行失败时先检查失败步骤，同日可执行 `pnpm exec wrangler workflows instances restart market-briefing <id>`；仅邮件步骤失败时从 `--from-step-name notify-result` 恢复，避免重新采集或覆盖报告。跨日不能补跑实时行情。休市日期应在新年度交易所公告发布后更新 `src/lib/server/market-calendar.ts`。
+手动触发使用 `pnpm exec wrangler workflows trigger market-briefing '{"reportDate":"YYYY-MM-DD"}' --id market-briefing-YYYY-MM-DD`。运行失败时先检查失败步骤，同日可执行 `pnpm exec wrangler workflows instances restart market-briefing <id>`；通知投递失败在 Messenger 管理页重试，不重启业务 Workflow。跨日不能补跑实时行情。休市日期应在新年度交易所公告发布后更新 `src/lib/server/market-calendar.ts`。
 
-消息发送统一通过 MESSENGER binding，notify-result 记录 messenger 入队结果；渠道尝试和人工重试见 [消息投递](messenger.md)。
+Workflow 结果通知由 Messenger 订阅平台事件；渠道尝试和人工重试见 [消息投递](messenger.md)。

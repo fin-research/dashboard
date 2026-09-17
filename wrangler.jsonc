@@ -11,8 +11,7 @@
     "AI_GATEWAY_ID": "default",
     "DATA_API_BASE_URL": "https://eastmoney.hasbai.xyz/data",
     "CHOICE_DATA_API_URL": "https://eastmoney.hasbai.xyz/data",
-    "FROM_EMAIL": "no-reply@hasbai.xyz",
-    "MARKET_BRIEFING_RECIPIENTS": "shiyue@18.cn"
+    "FROM_EMAIL": "no-reply@hasbai.xyz"
   },
   "secrets": {
     "required": [
