@@ -35,8 +35,7 @@ export async function captureCommentaryPdf(report: HTMLElement): Promise<Uint8Ar
     const range=document.createRange();range.selectNodeContents(node);
     for(const line of range.getClientRects())if(line.height>0)lines.push({top:line.top-rect.top,bottom:line.bottom-rect.top});
   }
-  const canvas=await toCanvas(report,{pixelRatio:3,backgroundColor:'#ffffff',width:rect.width,height:Math.ceil(rect.height),skipFonts:true});
-  const scale=canvas.width/rect.width, pageHeight=(769.89/523.28)*rect.width;
+  const pageHeight=(769.89/523.28)*rect.width;
   const pages:Array<{bytes:Uint8Array;width:number;height:number}>=[];
   let start=0;
   while(start<rect.height) {
@@ -46,11 +45,9 @@ export async function captureCommentaryPdf(report: HTMLElement): Promise<Uint8Ar
       while(prior!==end) { prior=end;for(const line of lines)if(line.top<end && line.bottom>end)end=Math.max(start,line.top-1); }
     }
     if(end<=start+1)throw new Error('报告段落超出 A4 可用高度');
-    const top=Math.round(start*scale),bottom=Math.round(end*scale);
-    const page=document.createElement('canvas');page.width=canvas.width;page.height=bottom-top;
-    const context=page.getContext('2d');if(!context)throw new Error('浏览器无法生成 PDF');
-    context.fillStyle='#ffffff';context.fillRect(0,0,page.width,page.height);
-    context.drawImage(canvas,0,top,canvas.width,page.height,0,0,page.width,page.height);
+    const height=Math.ceil(end-start);
+    const page=await toCanvas(report,{pixelRatio:3,backgroundColor:'#ffffff',width:rect.width,height,
+      skipFonts:true, style:{width:`${rect.width}px`,height:`${rect.height}px`,transform:`translateY(-${start}px)`,transformOrigin:'top left'}});
     const base64=page.toDataURL('image/jpeg',0.96).split(',')[1]!;
     pages.push({bytes:Uint8Array.from(atob(base64),char=>char.charCodeAt(0)),width:page.width,height:page.height});
     start=end;

@@ -134,3 +134,18 @@ test('frontend PDF upload is bounded and archives the exact bytes for download',
   await archiveCommentaryPdf(env,current.id,current.updatedAt,bytes);
   assert.deepEqual(stored,bytes);assert.deepEqual(new Uint8Array(await (await downloadCommentaryPdf(env,current.id)).arrayBuffer()),bytes);sqlite.close();
 });
+
+
+test('concurrent PDF uploads cannot overwrite the first R2 object or desynchronize its hash',async()=>{
+  const {db,sqlite}=database();const current=await createTrackingCommentary(db,{...draft,policyId:null});
+  let object=null;const env={DB:db,EASTMONEY:{
+    async put(key,bytes,options){assert.deepEqual(options.onlyIf,{etagDoesNotMatch:'*'});if(object)return null;object={key,bytes,size:bytes.length,customMetadata:options.customMetadata};return object;},
+    async head(){return object;},async get(){return {body:object.bytes,httpEtag:'"pdf"'};}
+  }};
+  const a=new TextEncoder().encode('%PDF-1.7 first %%EOF'),b=new TextEncoder().encode('%PDF-1.7 second %%EOF');
+  const [one,two]=await Promise.all([archiveCommentaryPdf(env,current.id,current.updatedAt,a),archiveCommentaryPdf(env,current.id,current.updatedAt,b)]);
+  assert.equal(one.sha256,two.sha256);assert.equal(one.sha256,object.customMetadata.sha256);
+  const updated=await updateTrackingCommentary(db,current.id,{...draft,commentary:'下一版本'},current.updatedAt);
+  assert.notEqual(updated.updatedAt,current.updatedAt);
+  assert.deepEqual(new Uint8Array(await (await downloadCommentaryPdf(env,current.id,current.updatedAt)).arrayBuffer()),a);sqlite.close();
+});

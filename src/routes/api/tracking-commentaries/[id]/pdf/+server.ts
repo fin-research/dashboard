@@ -3,8 +3,8 @@ import { validateSameOrigin } from "$lib/server/bond-ledger";
 import { requireTrackingEnv, trackingError, trackingHeaders } from "$lib/server/tracking-commentary-http";
 import { archiveCommentaryPdf, downloadCommentaryPdf, readUploadedCommentaryPdf } from "$lib/server/tracking-commentary-pdf";
 import type { RequestHandler } from "./$types";
-export const GET: RequestHandler = async ({ platform, params }) => {
-  try { return await downloadCommentaryPdf(requireTrackingEnv(platform),params.id); }
+export const GET: RequestHandler = async ({ platform, params, url }) => {
+  try { return await downloadCommentaryPdf(requireTrackingEnv(platform),params.id,z.string().min(1).max(80).optional().parse(url.searchParams.get("revisionAt") ?? undefined)); }
   catch(error) { return trackingError(error); }
 };
 export const POST: RequestHandler = async ({ platform, params, request, url }) => {

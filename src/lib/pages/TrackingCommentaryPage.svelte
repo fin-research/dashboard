@@ -25,14 +25,14 @@
   let revisions = $state<TrackingRevision[]>([]), shownRevision = $state<TrackingRevision | null>(null);
   let generation = 0, listRequest = 0, mounted = false;
   let pdfElement = $state<HTMLElement>();
-  let savingDraft = $state(false), failedSaveDraft = $state("");
+  let savingDraft = $state(false), failedSaveDraft = $state(""), saveConflict = $state(false);
   let autosavePromise: Promise<void> = Promise.resolve();
   const dirty = $derived(JSON.stringify(draft) !== savedDraft);
   const evidence = $derived(selected?.evidence ?? []);
 
   $effect(() => {
     const value=JSON.stringify(draft);
-    if (!mounted || !selected || busy || savingDraft || value===savedDraft || value===failedSaveDraft) return;
+    if (!mounted || !selected || busy || savingDraft || saveConflict || value===savedDraft || value===failedSaveDraft) return;
     const timer=setTimeout(() => { autosavePromise=syncDraft(); },800);
     return () => clearTimeout(timer);
   });
@@ -45,16 +45,24 @@
         method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...snapshot,updatedAt:selected.updatedAt}),
       });
       if(mounted && requestId===generation && selected?.id===id){selected=value;savedDraft=JSON.stringify(snapshot);failedSaveDraft="";}
-    } catch(error) { if(mounted && requestId===generation){failedSaveDraft=JSON.stringify(snapshot);fail(error);} }
+    } catch(error) { if(mounted && requestId===generation){failedSaveDraft=JSON.stringify(snapshot);saveConflict=error instanceof Error && /已更新/.test(error.message);fail(error);} }
     finally { savingDraft=false; }
+  }
+  async function reloadDraft() {
+    if(!selected || !window.confirm("重新读取将放弃当前未保存的修改，是否继续？"))return;
+    const id=selected.id, requestId=++generation;
+    opening=true;
+    try { const value=await json<TrackingCommentary>(`/api/tracking-commentaries/${encodeURIComponent(id)}`);if(mounted && requestId===generation)accept(value); }
+    catch(error){fail(error);}finally{if(requestId===generation)opening=false;}
   }
   function clearPrintMode() {
     document.documentElement.classList.remove("tracking-commentary-print");document.body.classList.remove("tracking-commentary-print");
   }
-  async function printDraft() {
-    await document.fonts.ready;
+  function enablePrintMode() {
     document.documentElement.classList.add("tracking-commentary-print");document.body.classList.add("tracking-commentary-print");
-    window.print();
+  }
+  async function printDraft() {
+    await document.fonts.ready; enablePrintMode(); window.print();
   }
   function blank(): TrackingDraft {
     return { eventName: "", type: "current_affairs", sources: "", eventPublishedAt: shanghaiDate(), commentaryDate: shanghaiDate(), eventSummary: "", commentary: "", recommendation: "" };
@@ -63,7 +71,7 @@
     selected = value; policyId = value.policyId;
     draft = { eventName: value.eventName, type: value.type, sources: value.sources, eventPublishedAt: value.eventPublishedAt,
       commentaryDate: value.commentaryDate, eventSummary: value.eventSummary, commentary: value.commentary, recommendation: value.recommendation };
-    savedDraft = JSON.stringify(draft); revisions = []; shownRevision = null;
+    savedDraft = JSON.stringify(draft); saveConflict=false; revisions = []; shownRevision = null;
     if (value.search) { startDate = value.search.startDate; endDate = value.search.endDate; }
     const url = new URL(window.location.href); url.search = new URLSearchParams({ id: value.id }).toString();
     window.history.replaceState(window.history.state, "", url);
@@ -136,9 +144,9 @@
     return value;
   }
   async function save() {
-    if (busy) return; busy = true;
+    if (busy || saveConflict) return; busy = true;
     try { await persist(); globalMessages.success("点评已保存"); await loadList(); }
-    catch (error) { fail(error); } finally { busy = false; }
+    catch (error) { saveConflict=error instanceof Error && /已更新/.test(error.message);fail(error); } finally { busy = false; }
   }
   async function generateDraft() {
     if (busy) return;
@@ -193,7 +201,7 @@
         if (mounted && selected?.id === current.id) selected = { ...selected, pdf };
       }
       // Download the archived bytes, including when another tab already saved this version.
-      const response=await fetch(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/pdf`);
+      const response=await fetch(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/pdf?revisionAt=${encodeURIComponent(current.updatedAt)}`);
       if(!response.ok)throw new Error("PDF 已归档，但下载失败，请点击下载 PDF重试");
       downloadPdfBlob(await response.blob(),selected?.pdf?.fileName || `${current.eventName}.pdf`);
       globalMessages.success("PDF 已下载并归档");
@@ -203,17 +211,18 @@
   function fail(error: unknown) { globalMessages.error(error instanceof Error ? error.message : "操作失败"); }
 </script>
 
-<svelte:window onbeforeunload={beforeUnload} onafterprint={clearPrintMode} />
+<svelte:window onbeforeunload={beforeUnload} onbeforeprint={enablePrintMode} onafterprint={clearPrintMode} />
 <div class="tracking-workspace">
   <div class="writing">
     <div class="writing-toolbar">
       <Button variant="outline" disabled={busy} onclick={newDraft}>新建点评</Button>
-      <Button variant="outline" disabled={busy || opening || !draft.eventName.trim()} onclick={save}>保存草稿</Button>
+      <Button variant="outline" disabled={busy || opening || saveConflict || !draft.eventName.trim()} onclick={save}>保存草稿</Button>
+      {#if saveConflict}<Button variant="outline" disabled={busy} onclick={reloadDraft}>重新读取</Button>{/if}
       <Button variant="outline" disabled={opening} aria-pressed={preview} onclick={() => preview = !preview}>{preview ? "继续编辑" : "预览"}</Button>
       <Button variant="outline" disabled={!draft.commentary} onclick={copy}>复制正文</Button>
-      <Button variant="outline" disabled={busy || !draft.commentary.trim()} onclick={archivePdf}>保存 PDF</Button>
+      <Button variant="outline" disabled={busy || saveConflict || !draft.commentary.trim()} onclick={archivePdf}>保存 PDF</Button>
       <Button variant="outline" disabled={busy || !draft.commentary.trim()} onclick={printDraft}>打印</Button>
-      {#if selected?.pdf && !dirty}<Button variant="outline" href={`/api/tracking-commentaries/${encodeURIComponent(selected.id)}/pdf`}>下载 PDF</Button>{/if}
+      {#if selected?.pdf && !dirty}<Button variant="outline" href={`/api/tracking-commentaries/${encodeURIComponent(selected.id)}/pdf?revisionAt=${encodeURIComponent(selected.pdf.revisionAt)}`}>下载 PDF</Button>{/if}
       {#if selected}<Button variant="outline" onclick={loadRevisions}>版本记录</Button>{/if}
       <Badge tone={dirty ? "warning" : "neutral"}>{savingDraft ? "保存中" : dirty ? "未保存" : selected ? "已保存" : "新稿"}</Badge>
     </div>
@@ -231,7 +240,7 @@
           <div class="generation-toolbar">
             <label><span>研报起始日期</span><Input type="date" bind:value={startDate} /></label>
             <label><span>研报截止日期</span><Input type="date" bind:value={endDate} /></label>
-            <Button disabled={busy || draft.eventName.trim().length < 2 || !startDate || !endDate || startDate > endDate} onclick={generateDraft}>{busy && progress ? progress : "检索并生成"}</Button>
+            <Button disabled={busy || saveConflict || draft.eventName.trim().length < 2 || !startDate || !endDate || startDate > endDate} onclick={generateDraft}>{busy && progress ? progress : "检索并生成"}</Button>
           </div>
         </fieldset>
       </ModuleCard>

@@ -20,16 +20,21 @@ export async function archiveCommentaryPdf(env: Env, id: string, expectedVersion
   const fileName = `${commentary.commentaryDate || "日期未注明"}-${commentary.eventName.replace(/[\\/\x00-\x1f]/g," ")}.pdf`;
   const now = new Date().toISOString();
   const object = await env.EASTMONEY.put(key, bytes, { httpMetadata:{contentType:"application/pdf",cacheControl:"private, no-store"},
-    customMetadata:{commentaryId:id,revisionAt:expectedVersion,sha256} });
-  if (!object) throw new PolicyRepositoryError(503,"PDF 归档失败");
+    customMetadata:{commentaryId:id,revisionAt:expectedVersion,sha256}, onlyIf: { etagDoesNotMatch: "*" } });
+  let archivedHash=sha256, archivedSize=bytes.length;
+  if (!object) {
+    const winner=await env.EASTMONEY.head(key);
+    if (!winner?.customMetadata?.sha256) throw new PolicyRepositoryError(409,"该版本归档正在处理中，请重试");
+    archivedHash=winner.customMetadata.sha256; archivedSize=winner.size;
+  }
   await env.DB.prepare(`INSERT INTO research_commentary_pdf(commentary_id,revision_at,r2_key,file_name,sha256,byte_size,archived_at)
-    VALUES(?,?,?,?,?,?,?) ON CONFLICT(commentary_id,revision_at) DO NOTHING`).bind(id,expectedVersion,key,fileName,sha256,bytes.length,now).run();
+    VALUES(?,?,?,?,?,?,?) ON CONFLICT(commentary_id,revision_at) DO NOTHING`).bind(id,expectedVersion,key,fileName,archivedHash,archivedSize,now).run();
   return (await getCommentaryPdfArchive(env.DB,id,expectedVersion))!;
 }
-export async function downloadCommentaryPdf(env: Env, id: string): Promise<Response> {
+export async function downloadCommentaryPdf(env: Env, id: string, revisionAt?: string): Promise<Response> {
   if (!env.EASTMONEY) throw new PolicyRepositoryError(503,"PDF 归档存储尚未配置");
   const commentary = await getTrackingCommentary(env.DB,id);
-  const archive = await getCommentaryPdfArchive(env.DB,id,commentary.updatedAt);
+  const archive = await getCommentaryPdfArchive(env.DB,id,revisionAt ?? commentary.updatedAt);
   if (!archive) throw new PolicyRepositoryError(404,"当前点评版本尚未归档 PDF");
   // Object keys come only from the archive table, never a user-supplied bucket path.
   if (!archive.key.startsWith("research-commentary/")) throw new PolicyRepositoryError(500,"PDF 归档路径无效");

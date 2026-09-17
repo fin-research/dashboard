@@ -51,7 +51,7 @@ test('tracking archive opens, edits, generates and retains source evidence',asyn
   const downloaded=page.waitForEvent('download');
   await page.getByRole('button',{name:'保存 PDF',exact:true}).click();
   await (await downloaded).saveAs(testInfo.outputPath('tracking-commentary-saved.pdf'));
-  await expect(page.getByRole('link',{name:'下载 PDF',exact:true})).toHaveAttribute('href','/api/tracking-commentaries/archive-1/pdf');
+  await expect(page.getByRole('link',{name:'下载 PDF',exact:true})).toHaveAttribute('href',`/api/tracking-commentaries/archive-1/pdf?revisionAt=${encodeURIComponent(stored.updatedAt)}`);
   await page.getByRole('button',{name:'版本记录',exact:true}).click();
   await expect(page.getByRole('button',{name:/2026-09-15 03:00:00/})).toBeVisible();
 });
@@ -64,10 +64,11 @@ test('failed saves retain the edited draft',async({page})=>{
   await page.getByRole('button',{name:'保存草稿',exact:true}).click();
   await expect(page.getByText('点评已更新，请重新打开后编辑',{exact:true})).toBeVisible();
   await expect(page.getByLabel('事件摘要',{exact:true})).toHaveValue('保留这段尚未保存的内容');
+  await expect(page.getByRole('button',{name:'重新读取',exact:true})).toBeVisible();
 });
 
 
-test('manual edits autosave and print isolates the A4 report',async({page})=>{
+test('manual edits autosave and print isolates the A4 report',async({page},testInfo)=>{
   await page.goto('/trading-research/tracking-commentary?id=archive-1');
   await expect(page.getByLabel('主题',{exact:true})).toHaveValue(original.eventName);
   await page.getByLabel('事件摘要',{exact:true}).fill('自动同步到数据库的人工修订摘要');
@@ -80,7 +81,19 @@ test('manual edits autosave and print isolates the A4 report',async({page})=>{
   await expect(page.locator('.tracking-print-host')).toBeVisible();
   await expect(page.locator('.tracking-workspace')).not.toBeVisible();
   await expect(page).toHaveScreenshot('tracking-commentary-print.png',{fullPage:true});
+  await page.pdf({format:'A4',preferCSSPageSize:true,printBackground:true,path:testInfo.outputPath('tracking-commentary-native-print.pdf')});
   await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
   await page.emulateMedia({media:'screen'});
   await expect(page.getByLabel('主题',{exact:true})).toBeVisible();
+});
+
+
+test('long commentary produces multiple A4 PDF pages',async({page},testInfo)=>{
+  await page.goto('/trading-research/tracking-commentary?id=archive-1');
+  await expect(page.getByLabel('主题',{exact:true})).toHaveValue(original.eventName);
+  await page.getByLabel('跟踪点评',{exact:true}).fill(Array.from({length:12},(_,i)=>`${i+1}. 第${i+1}段判断\n资金需求回落，融资成本下移，发行窗口具备有利条件。`.repeat(4)).join('\n\n'));
+  const downloaded=page.waitForEvent('download');
+  await page.getByRole('button',{name:'保存 PDF',exact:true}).click();
+  await (await downloaded).saveAs(testInfo.outputPath('tracking-commentary-long.pdf'));
+  expect(pdfBytes.toString('latin1')).toMatch(/\/Count [2-9]/);
 });
