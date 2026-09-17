@@ -4,10 +4,10 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
 import { compileExtractiveCommentary, extractiveCommentarySchema, retrieveTrackingResearch } from '../src/lib/server/tracking-commentary-generation.ts';
-import { createTrackingCommentary, updateTrackingCommentary, getTrackingCommentary, trackingRevisions, listTrackingCommentaries } from '../src/lib/server/tracking-commentary-repository.ts';
+import { createTrackingCommentary, updateTrackingCommentary, getTrackingCommentary, trackingRevisions, listTrackingCommentaries, loadTrackingStyleReferences } from '../src/lib/server/tracking-commentary-repository.ts';
 import { generateTrackingSchema, trackingDraftSchema } from '../src/lib/tracking-commentary.ts';
 import { renderCommentaryPdf, commentaryPdfKey } from '../src/lib/research-commentary-pdf.ts';
-import { archiveCommentaryPdf, downloadCommentaryPdf } from '../src/lib/server/tracking-commentary-pdf.ts';
+import { archiveCommentaryPdf, downloadCommentaryPdf, readUploadedCommentaryPdf } from '../src/lib/server/tracking-commentary-pdf.ts';
 import { parseResearchContent } from '../src/lib/report-content.ts';
 
 const sentence = '融资需求下降，资金价格中枢下移，发行窗口已经打开。';
@@ -108,4 +108,44 @@ test('PDF renderer preserves Chinese text, escapes PDF syntax and paginates with
   const count=Number(text.match(/\/Type \/Pages \/Kids \[[^\]]+\] \/Count (\d+)/)[1]);assert.ok(count>1);
   const streams=[...text.matchAll(/<([0-9a-f]+)> Tj/g)].map(match=>match[1].match(/.{4}/g).map(hex=>String.fromCharCode(parseInt(hex,16))).join('')).join('');
   assert.ok(streams.includes('融资 (研究) \\ 测试'));assert.equal((streams.match(/资金价格下移/g)||[]).length,400);
+});
+
+
+test('style references use the latest three same-type human drafts, excluding current and future records',async()=>{
+  const {db,sqlite}=database();
+  const current=await createTrackingCommentary(db,{...draft,policyId:null});
+  for(let i=1;i<=5;i++)await createTrackingCommentary(db,{...draft,eventName:'参考稿'+i,commentaryDate:'2026-09-'+String(i).padStart(2,'0'),policyId:null});
+  await createTrackingCommentary(db,{...draft,eventName:'未来稿',commentaryDate:'2026-10-01',policyId:null});
+  await createTrackingCommentary(db,{...draft,eventName:'海外稿',type:'overseas_event',policyId:null});
+  const references=await loadTrackingStyleReferences(db,current.id,'current_affairs','2026-09-17');
+  assert.deepEqual(references.map(item=>item.eventName),['参考稿5','参考稿4','参考稿3']);
+  assert.ok(references.every(item=>item.id!==current.id));sqlite.close();
+});
+
+test('frontend PDF upload is bounded and archives the exact bytes for download',async()=>{
+  const {db,sqlite}=database();const current=await createTrackingCommentary(db,{...draft,policyId:null});
+  const bytes=new TextEncoder().encode('%PDF-1.7\nfrontend-layout\n%%EOF\n');
+  const request=new Request('https://example.test/pdf',{method:'POST',body:bytes});
+  assert.deepEqual(await readUploadedCommentaryPdf(request),bytes);
+  await assert.rejects(readUploadedCommentaryPdf(new Request('https://example.test/pdf',{method:'POST',body:'not PDF'})),/格式/);
+  await assert.rejects(readUploadedCommentaryPdf(new Request('https://example.test/pdf',{method:'POST',headers:{'content-length':String(17*1024*1024)},body:bytes})),/16MB/);
+  let stored;
+  const env={DB:db,EASTMONEY:{async put(_key,value){stored=value;return {size:value.length};},async get(){return {body:stored,httpEtag:'"pdf"'};}}};
+  await archiveCommentaryPdf(env,current.id,current.updatedAt,bytes);
+  assert.deepEqual(stored,bytes);assert.deepEqual(new Uint8Array(await (await downloadCommentaryPdf(env,current.id)).arrayBuffer()),bytes);sqlite.close();
+});
+
+
+test('concurrent PDF uploads cannot overwrite the first R2 object or desynchronize its hash',async()=>{
+  const {db,sqlite}=database();const current=await createTrackingCommentary(db,{...draft,policyId:null});
+  let object=null;const env={DB:db,EASTMONEY:{
+    async put(key,bytes,options){assert.deepEqual(options.onlyIf,{etagDoesNotMatch:'*'});if(object)return null;object={key,bytes,size:bytes.length,customMetadata:options.customMetadata};return object;},
+    async head(){return object;},async get(){return {body:object.bytes,httpEtag:'"pdf"'};}
+  }};
+  const a=new TextEncoder().encode('%PDF-1.7 first %%EOF'),b=new TextEncoder().encode('%PDF-1.7 second %%EOF');
+  const [one,two]=await Promise.all([archiveCommentaryPdf(env,current.id,current.updatedAt,a),archiveCommentaryPdf(env,current.id,current.updatedAt,b)]);
+  assert.equal(one.sha256,two.sha256);assert.equal(one.sha256,object.customMetadata.sha256);
+  const updated=await updateTrackingCommentary(db,current.id,{...draft,commentary:'下一版本'},current.updatedAt);
+  assert.notEqual(updated.updatedAt,current.updatedAt);
+  assert.deepEqual(new Uint8Array(await (await downloadCommentaryPdf(env,current.id,current.updatedAt)).arrayBuffer()),a);sqlite.close();
 });

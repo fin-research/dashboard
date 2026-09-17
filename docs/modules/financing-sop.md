@@ -35,3 +35,5 @@
 ## 每小时调度与交付边界
 
 `worker/entry.ts` 的 `0 * * * *` 仅运行融资提醒。经济观测同步的午夜 Cron 已迁至 Data。提醒沿用原查询、周期、去重键和状态含义；无 Resend 配置时仍为 pending。真实发送测试需明确收件人与发件人，Provider accepted 不等于 delivered。
+
+邮件投递通过 MESSENGER。新增 queued 为中台已入队，最终状态在 `/management/messenger` 查询；既有 sent 历史不变。

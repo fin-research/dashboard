@@ -95,3 +95,14 @@ export async function trackingRevisions(db: Env["DB"], id: string): Promise<Trac
     WHERE commentary_id=? ORDER BY saved_at DESC LIMIT 50`).bind(id).all<{ saved_at: string; content_json: string }>();
   return [{ savedAt: current.updatedAt, content: current }, ...previous.results.map((row: { saved_at: string; content_json: string }) => ({ savedAt: row.saved_at, content: JSON.parse(row.content_json) as TrackingCommentary }))];
 }
+
+export async function loadTrackingStyleReferences(db: Env["DB"], id: string, type: TrackingDraft["type"], asOfDate: string) {
+  const result = await db.prepare(`SELECT rc.id, rc.event_name AS eventName, rc.commentary_date AS commentaryDate,
+    rc.event_summary AS eventSummary, rc.commentary, rc.recommendation
+    FROM research_commentary rc LEFT JOIN tracking_commentary_workspace w ON w.commentary_id=rc.id
+    WHERE rc.id<>? AND rc.commentary_type=? AND rc.commentary_date<>'' AND rc.commentary_date<=?
+      AND (w.origin='import' OR rc.edited=1) AND rc.commentary<>''
+    ORDER BY rc.commentary_date DESC, rc.updated_at DESC LIMIT 3`).bind(id,type,asOfDate)
+    .all<{id:string;eventName:string;commentaryDate:string;eventSummary:string;commentary:string;recommendation:string}>();
+  return result.results;
+}
