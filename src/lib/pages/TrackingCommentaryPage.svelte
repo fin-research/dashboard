@@ -1,6 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { beforeNavigate } from "$app/navigation";
+  import CommentaryReport from "$lib/tracking-commentary/CommentaryReport.svelte";
+  import { captureCommentaryPdf, downloadPdfBlob } from "$lib/tracking-commentary/browser-pdf";
+  import { portal } from "$lib/portal";
   import DocumentBody from "$lib/policy-tracking/DocumentBody.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
   import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
@@ -21,9 +24,38 @@
   let startDate = $state(shanghaiDate(-6)), endDate = $state(shanghaiDate());
   let revisions = $state<TrackingRevision[]>([]), shownRevision = $state<TrackingRevision | null>(null);
   let generation = 0, listRequest = 0, mounted = false;
+  let pdfElement = $state<HTMLElement>();
+  let savingDraft = $state(false), failedSaveDraft = $state("");
+  let autosavePromise: Promise<void> = Promise.resolve();
   const dirty = $derived(JSON.stringify(draft) !== savedDraft);
   const evidence = $derived(selected?.evidence ?? []);
 
+  $effect(() => {
+    const value=JSON.stringify(draft);
+    if (!mounted || !selected || busy || savingDraft || value===savedDraft || value===failedSaveDraft) return;
+    const timer=setTimeout(() => { autosavePromise=syncDraft(); },800);
+    return () => clearTimeout(timer);
+  });
+  async function syncDraft() {
+    if (!selected || savingDraft || busy) return;
+    const requestId=generation, id=selected.id, snapshot=JSON.parse(JSON.stringify(draft)) as TrackingDraft;
+    savingDraft=true;
+    try {
+      const value=await json<TrackingCommentary>(`/api/tracking-commentaries/${encodeURIComponent(id)}`,{
+        method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...snapshot,updatedAt:selected.updatedAt}),
+      });
+      if(mounted && requestId===generation && selected?.id===id){selected=value;savedDraft=JSON.stringify(snapshot);failedSaveDraft="";}
+    } catch(error) { if(mounted && requestId===generation){failedSaveDraft=JSON.stringify(snapshot);fail(error);} }
+    finally { savingDraft=false; }
+  }
+  function clearPrintMode() {
+    document.documentElement.classList.remove("tracking-commentary-print");document.body.classList.remove("tracking-commentary-print");
+  }
+  async function printDraft() {
+    await document.fonts.ready;
+    document.documentElement.classList.add("tracking-commentary-print");document.body.classList.add("tracking-commentary-print");
+    window.print();
+  }
   function blank(): TrackingDraft {
     return { eventName: "", type: "current_affairs", sources: "", eventPublishedAt: shanghaiDate(), commentaryDate: shanghaiDate(), eventSummary: "", commentary: "", recommendation: "" };
   }
@@ -42,7 +74,7 @@
   onMount(() => {
     mounted = true;
     void initialize();
-    return () => { mounted = false; generation++; listRequest++; };
+    return () => { mounted = false; generation++; listRequest++; clearPrintMode(); };
   });
   async function json<T>(url: string, options?: RequestInit): Promise<T> {
     const response = await fetch(url, options); const value = await response.json();
@@ -94,11 +126,13 @@
     window.history.replaceState(window.history.state, "", window.location.pathname);
   }
   async function persist(): Promise<TrackingCommentary> {
+    await autosavePromise;
+    if (selected && !dirty) return selected;
     const value = await json<TrackingCommentary>(selected ? `/api/tracking-commentaries/${encodeURIComponent(selected.id)}` : "/api/tracking-commentaries", {
       method: selected ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(selected ? { ...draft, updatedAt: selected.updatedAt } : { ...draft, policyId }),
     });
-    if (mounted) accept(value);
+    if (mounted) { accept(value); failedSaveDraft=""; }
     return value;
   }
   async function save() {
@@ -147,30 +181,41 @@
   async function archivePdf() {
     if (busy) return; busy = true;
     try {
+      await autosavePromise;
       const current = dirty || !selected ? await persist() : selected;
-      const pdf = await json<CommentaryPdfArchive>(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/pdf`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updatedAt: current.updatedAt }),
-      });
-      if (mounted && selected?.id === current.id) selected = { ...selected, pdf };
-      globalMessages.success("PDF 已归档");
+      if(!current.pdf) {
+        await tick();
+        if(!pdfElement)throw new Error("报告尚未完成排版");
+        const bytes=await captureCommentaryPdf(pdfElement);
+        const pdf = await json<CommentaryPdfArchive>(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/pdf?updatedAt=${encodeURIComponent(current.updatedAt)}`, {
+          method: "POST", headers: { "Content-Type": "application/pdf" }, body: bytes,
+        });
+        if (mounted && selected?.id === current.id) selected = { ...selected, pdf };
+      }
+      // Download the archived bytes, including when another tab already saved this version.
+      const response=await fetch(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/pdf`);
+      if(!response.ok)throw new Error("PDF 已归档，但下载失败，请点击下载 PDF重试");
+      downloadPdfBlob(await response.blob(),selected?.pdf?.fileName || `${current.eventName}.pdf`);
+      globalMessages.success("PDF 已下载并归档");
     } catch(error) { fail(error); } finally { busy = false; }
   }
   async function copy() { try { await navigator.clipboard.writeText(trackingText(draft)); globalMessages.success("点评已复制"); } catch { globalMessages.error("复制失败"); } }
   function fail(error: unknown) { globalMessages.error(error instanceof Error ? error.message : "操作失败"); }
 </script>
 
-<svelte:window onbeforeunload={beforeUnload} />
+<svelte:window onbeforeunload={beforeUnload} onafterprint={clearPrintMode} />
 <div class="tracking-workspace">
   <div class="writing">
     <div class="writing-toolbar">
       <Button variant="outline" disabled={busy} onclick={newDraft}>新建点评</Button>
-      <Button variant="outline" disabled={busy || opening || !draft.eventName.trim()} onclick={save}>保存</Button>
+      <Button variant="outline" disabled={busy || opening || !draft.eventName.trim()} onclick={save}>保存草稿</Button>
       <Button variant="outline" disabled={opening} aria-pressed={preview} onclick={() => preview = !preview}>{preview ? "继续编辑" : "预览"}</Button>
       <Button variant="outline" disabled={!draft.commentary} onclick={copy}>复制正文</Button>
-      <Button variant="outline" disabled={busy || !draft.commentary.trim()} onclick={archivePdf}>归档 PDF</Button>
+      <Button variant="outline" disabled={busy || !draft.commentary.trim()} onclick={archivePdf}>保存 PDF</Button>
+      <Button variant="outline" disabled={busy || !draft.commentary.trim()} onclick={printDraft}>打印</Button>
       {#if selected?.pdf && !dirty}<Button variant="outline" href={`/api/tracking-commentaries/${encodeURIComponent(selected.id)}/pdf`}>下载 PDF</Button>{/if}
       {#if selected}<Button variant="outline" onclick={loadRevisions}>版本记录</Button>{/if}
-      <Badge tone={dirty ? "warning" : "neutral"}>{dirty ? "未保存" : selected ? "已保存" : "新稿"}</Badge>
+      <Badge tone={dirty ? "warning" : "neutral"}>{savingDraft ? "保存中" : dirty ? "未保存" : selected ? "已保存" : "新稿"}</Badge>
     </div>
     {#if opening}<ModuleCard><p aria-live="polite">正在读取点评</p></ModuleCard>
     {:else}
@@ -194,9 +239,7 @@
         <ModuleCard>
           <PanelHeading id="tracking-body" title={preview ? "点评预览" : "点评正文"} />
           {#if preview}
-            <article class="preview"><h3>{draft.eventName}</h3><p>{draft.sources} · {draft.commentaryDate}</p>
-              <h4>事件摘要</h4><p>{draft.eventSummary || "尚未撰写"}</p><h4>跟踪点评</h4><DocumentBody content={draft.commentary || "尚未撰写"} /><h4>应对建议</h4><DocumentBody content={draft.recommendation || "尚未撰写"} />
-            </article>
+            <CommentaryReport {draft} />
           {:else}
             <fieldset disabled={busy}>
               <label><span>消息来源</span><Input bind:value={draft.sources} /></label>
@@ -215,6 +258,10 @@
               <p class="source-title">{quote.institution} · {quote.publishedAt}</p><p>{quote.title}</p>
               <blockquote>{quote.text}</blockquote>
             </details>{/each}
+            {#if selected?.search?.references?.length}
+              <h3>参考点评</h3>
+              {#each selected.search.references as reference}<p><a href={`/trading-research/tracking-commentary?id=${encodeURIComponent(reference.id)}`}>{reference.date} · {reference.title}</a></p>{/each}
+            {/if}
             {#if policyId}<a href={`/trading-research/policy-tracking#policy-${encodeURIComponent(policyId)}`}>关联政策</a>{/if}
           </ModuleCard>
           {#if selected?.originalText}<ModuleCard><PanelHeading id="tracking-original" title="手写原稿" />
@@ -252,6 +299,10 @@
 
 </div>
 
+<div class="tracking-print-anchor">
+  <div class="tracking-print-host" use:portal={"body"} aria-hidden="true"><CommentaryReport {draft} bind:element={pdfElement} /></div>
+</div>
+
 <style>
   .tracking-workspace { display:grid; grid-template-columns: minmax(220px, 280px) minmax(0,1fr); gap:24px; align-items:start; }
   .archive { grid-column:1; grid-row:1; min-width:0; }
@@ -271,13 +322,18 @@
   .archive-list strong { overflow-wrap:anywhere; line-height:1.5; }
   .archive-list span, .item-date, .source-title { color:var(--text-muted); font-size:.875rem; }
   .editor-grid { display:grid; grid-template-columns:minmax(0, 1fr) minmax(240px, 32%); gap:20px; align-items:start; }
-  .preview, .original, blockquote { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.85; }
-  .preview h3 { font-size:1.25rem; margin:0 0 16px; }
-  .preview h4 { font-size:1rem; margin:24px 0 8px; }
+  .original, blockquote { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.85; }
   details { border-top:1px solid var(--border-color); padding:16px 0; }
   summary { cursor:pointer; font-weight:bold; min-height:44px; line-height:1.6; }
   blockquote { margin:12px 0; padding-inline-start:12px; border-inline-start:3px solid var(--primary); }
   .evidence-column p, .evidence-column li { overflow-wrap:anywhere; line-height:1.7; }
   @media(max-width:1300px) { .editor-grid { grid-template-columns:minmax(0,1fr); } }
   @media(max-width:760px) { .tracking-workspace { grid-template-columns:minmax(0,1fr); } .writing { grid-column:1; grid-row:1; } .archive { grid-column:1; grid-row:2; } .metadata-fields { grid-template-columns:minmax(0,1fr); } .generation-toolbar { display:grid; } }
+  .tracking-print-host { position:fixed; left:-10000px; top:0; width:720px; background:white; pointer-events:none; }
+  @media print {
+    @page { size:A4 portrait; margin:12mm; }
+    :global(html.tracking-commentary-print), :global(body.tracking-commentary-print) { height:auto !important; overflow:visible !important; background:white !important; }
+    :global(body.tracking-commentary-print > :not(.tracking-print-host)) { display:none !important; }
+    .tracking-print-host { position:static; width:auto; margin:0; padding:0; }
+  }
 </style>

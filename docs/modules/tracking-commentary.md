@@ -45,3 +45,13 @@ R2 `eastmoney` 桶前缀为 `research-commentary/`，按中文类型分类：`�
 38份历史PDF按原字节上传，分类按结构化点评类型；已有无PDF的D1点评由结构化字段生成A4 PDF。页面“归档 PDF”先保存当前修改再从数据库渲染、存R2；“下载 PDF”通过已授权API按D1 key读取，不开放存储桶或接受任意路径。新稿PDF使用标准中文CID字体和Unicode映射，长稿自动分页，不截断正文。历史原件不重新排版。
 
 `POST /api/tracking-commentaries/[id]/pdf` 使用 `research.policy_commentary:update`，`GET` 使用 `research.policy:read`。重复归档同版本幂等返回，版本冲突409。初次迁移脚本 `scripts/archive-tracking-commentary-pdfs.mjs --manifest=... --source=... --output=/tmp/...` 默认预览；`--apply` 执行R2上传及D1索引，逐份下载核验SHA256后落库；发现同key内容不同直接失败，不覆盖。
+
+## 人工编辑、A4打印与前端PDF（v3）
+
+AI生成后，已存在点评的人工输入使用800ms防抖串行同步D1；保存期间继续编辑不会被迟到响应覆盖。失败保留输入并停止对同一份失败内容自动重试，用户可修改后重试或“保存草稿”。未保存的新主题在生成或保存时建稿。
+
+“打印”直接调用浏览器原生打印，专用报告使用A4 portrait、12mm页边距，只打印标题、元数据及正文；App壳、工具栏、证据区不打印。关闭打印后恢复原工作台。原生打印对话框不会向网页返回PDF字节。
+
+“保存 PDF”先完成D1同步，再在前端捕获同一报告（系统字体、3倍像素密度），按A4页宽分页；分页位置避开文字行。前端将PDF二进制上传R2，随后下载已归档的同一份字节；同版本已有PDF直接下载原件。`POST /[id]/pdf?updatedAt=...`接受限16MB的application/pdf，仍以数据库点评版本解析唯一key。旧JSON生成请求仅兼容早先打开的客户端及本地历史迁移。历史原件不改写。
+
+每次生成动态读取最近三期同类型人工稿（截至点评日期，排除当前稿与未来稿），作为独立styleReferences传入Prompt；sourceId原文校验仍只接受本次研报/政策，不接受参考稿。检索快照保存参考稿ID/标题/日期，页面显示“参考点评”。

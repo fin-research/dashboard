@@ -8,14 +8,14 @@ export async function getCommentaryPdfArchive(db: Env["DB"], id: string, version
     sha256, byte_size AS size, archived_at AS archivedAt FROM research_commentary_pdf WHERE commentary_id=? AND revision_at=?`)
     .bind(id,version).first<CommentaryPdfArchive>();
 }
-export async function archiveCommentaryPdf(env: Env, id: string, expectedVersion: string): Promise<CommentaryPdfArchive> {
+export async function archiveCommentaryPdf(env: Env, id: string, expectedVersion: string, uploadedBytes?: Uint8Array<ArrayBuffer>): Promise<CommentaryPdfArchive> {
   if (!env.EASTMONEY) throw new PolicyRepositoryError(503,"PDF 归档存储尚未配置");
   const commentary = await getTrackingCommentary(env.DB,id);
   if (commentary.updatedAt !== expectedVersion) throw new PolicyRepositoryError(409,"点评已更新，请重新打开后归档");
   const existing = await getCommentaryPdfArchive(env.DB,id,expectedVersion);
   if (existing) return existing;
   if (!commentary.commentary.trim()) throw new PolicyRepositoryError(422,"请先完成点评正文");
-  const bytes = renderCommentaryPdf(commentary), key = commentaryPdfKey(commentary);
+  const bytes = uploadedBytes ?? renderCommentaryPdf(commentary), key = commentaryPdfKey(commentary);
   const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),b=>b.toString(16).padStart(2,"0")).join("");
   const fileName = `${commentary.commentaryDate || "日期未注明"}-${commentary.eventName.replace(/[\\/\x00-\x1f]/g," ")}.pdf`;
   const now = new Date().toISOString();
@@ -38,4 +38,21 @@ export async function downloadCommentaryPdf(env: Env, id: string): Promise<Respo
   return new Response(object.body,{headers:{"Content-Type":"application/pdf","Cache-Control":"private, no-store",
     "Content-Disposition":`attachment; filename="commentary.pdf"; filename*=UTF-8''${encodeURIComponent(archive.fileName)}`,
     "X-Content-Type-Options":"nosniff","Content-Security-Policy":"sandbox",ETag:object.httpEtag}});
+}
+
+
+export async function readUploadedCommentaryPdf(request: Request): Promise<Uint8Array<ArrayBuffer>> {
+  const limit = 16 * 1024 * 1024;
+  const declared = Number(request.headers.get("content-length"));
+  if (declared > limit) throw new PolicyRepositoryError(413,"PDF 超过16MB，请减少篇幅后重试");
+  if (!request.body) throw new PolicyRepositoryError(400,"PDF 文件为空");
+  const reader=request.body.getReader(), chunks:Uint8Array[]=[]; let size=0;
+  while(true) {
+    const {value,done}=await reader.read();if(done)break;
+    size+=value.length;if(size>limit){await reader.cancel();throw new PolicyRepositoryError(413,"PDF 超过16MB");}chunks.push(value);
+  }
+  const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+  const decoder=new TextDecoder();
+  if(decoder.decode(bytes.slice(0,5))!=="%PDF-" || !decoder.decode(bytes.slice(-64)).includes("%%EOF"))throw new PolicyRepositoryError(400,"PDF 文件格式无效");
+  return bytes;
 }
