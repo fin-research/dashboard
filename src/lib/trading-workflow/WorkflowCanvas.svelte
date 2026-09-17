@@ -8,10 +8,10 @@
   import WorkflowNodeView from './WorkflowNode.svelte';
   import WorkflowEdgeView from './WorkflowEdge.svelte';
   import { buildGraph, timelineCursor, workflowBranchFrames, type FlowGraph, type FlowNode } from './graph';
-  import { isInquiry, products, type WorkflowNode, type WorkflowDay, type Product } from './model';
-  let { nodes, day, clockMinutes, editing = false, selectedId = '', onSelect, onMove, onComplete, onBranch, onEnable, onNote, onRows, onRemember, directory, rates, now }: {
+  import { isInquiry, products, defaultFlows, type WorkflowConfig, type WorkflowNode, type WorkflowDay, type Product } from './model';
+  let { flows = defaultFlows, nodes, day, clockMinutes, editing = false, selectedId = '', onSelect, onMove, onComplete, onBranch, onEnable, onNote, onRows, onRemember, directory, rates, now }: {
     onRows: (id: string, rows: InquiryRow[]) => void; onRemember: (row: InquiryRow) => void; directory: InquiryDirectory; rates: ShiborRate[]; now: Date;
-    nodes: WorkflowNode[]; day: WorkflowDay; clockMinutes: number; editing?: boolean; selectedId?: string;
+    flows?: WorkflowConfig['flows']; nodes: WorkflowNode[]; day: WorkflowDay; clockMinutes: number; editing?: boolean; selectedId?: string;
     onSelect: (id: string) => void; onMove: (id: string, offset: { x: number; y: number }) => void;
     onComplete: (ids: string[], value: boolean) => void; onBranch: (ids: string[], value: boolean) => void;
     onEnable: (product: Product, value: boolean) => void; onNote: (id: string, value: string) => void;
@@ -19,7 +19,8 @@
   const nodeTypes = { workflow: WorkflowNodeView };
   const edgeTypes = { workflow: WorkflowEdgeView };
   let reducedMotion = $state(false);
-  const enabledProducts = $derived(products.filter(product => day.enabled[product.id]));
+  const flowProducts = $derived(products.map(product => ({ ...product, label: flows.find(flow => flow.id === product.id)?.label ?? product.label })));
+  const enabledProducts = $derived(flowProducts.filter(product => day.enabled[product.id]));
   let lastStructure = '';
   let animation = 0;
   let animating = false;

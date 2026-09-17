@@ -30,10 +30,11 @@ globalThis.Notification = window.Notification = Notification;
 if (!window.HTMLDialogElement.prototype.showModal) window.HTMLDialogElement.prototype.showModal = function() { this.open = true; };
 const { mount, unmount, flushSync } = await import('svelte');
 const { globalMessages } = await import('../../src/lib/global-messages.ts');
-const { dayKey, emptyDay } = await import('../../src/lib/trading-workflow/model.ts');
+const { dayKey, emptyDay, defaultFlows } = await import('../../src/lib/trading-workflow/model.ts');
 const db = new DatabaseSync(':memory:');
 db.exec(await readFile(new URL('../../migrations/1015_trading_workflow_config.sql',import.meta.url),'utf8'));
-let config = { version: 1, nodes: JSON.parse(db.prepare('SELECT nodes FROM trading_workflow_config').get().nodes) };
+const { migrateLegacyNodes } = await import('../../src/lib/trading-workflow/legacy.ts');
+let config = { version: 1, flows: defaultFlows, nodes: migrateLegacyNodes(JSON.parse(db.prepare('SELECT nodes FROM trading_workflow_config').get().nodes)) };
 const requests = [];
 let conflict = false;
 globalThis.fetch = async (url, options = {}) => {
@@ -42,8 +43,8 @@ globalThis.fetch = async (url, options = {}) => {
   if (options.method === 'PUT') {
     if (conflict) return Response.json({error:'节点配置已被更新，请重新载入后修改'},{status:409});
     const body = JSON.parse(options.body);
-    assert.deepEqual(Object.keys(body).sort(), ['expectedVersion','nodes']);
-    config = {version: config.version+1, nodes:body.nodes};
+    assert.deepEqual(Object.keys(body).sort(), ['expectedVersion','flows','nodes']);
+    config = {version: config.version+1, flows:body.flows, nodes:body.nodes};
     return Response.json(config);
   }
   return Response.json({...config, actorKey:'test-actor',canEdit:true});
@@ -160,6 +161,18 @@ conflict=false;
 flushSync(()=>button('保存').click()); await settle();
 assert.equal(document.querySelector('.workflow-editor'),null); assert.equal(config.nodes[0].title,'修改后的协同节点');
 assert.deepEqual(config.nodes[0].offset, {x:120,y:0});
+// Editing rewires saved successors, rejects cycles, and preserves the shared node ID.
+flushSync(()=>document.querySelector('.edit-mode [role=checkbox]').click()); await settle();
+await clickNode('loan-deal');
+assert.ok([...document.querySelectorAll('legend')].some(node => node.textContent === '所属流程'));
+assert.equal(document.querySelector('.workflow-editor').textContent.includes('节点归属'), false);
+flushSync(()=>button('上移').click()); await settle();
+const addNext = document.querySelector('[aria-label="添加后续节点"]');
+flushSync(()=>{ addNext.value='shared-elements'; addNext.dispatchEvent(new window.Event('change',{bubbles:true})); }); await settle();
+flushSync(()=>button('保存').click()); await settle();
+assert.ok(config.nodes.find(node => node.id === 'shared-elements').nextIds.includes('loan-deal'));
+assert.deepEqual(config.nodes.find(node => node.id === 'loan-deal').nextIds, ['loan-send']);
+assert.ok(config.nodes.every(node => !('scope' in node)));
 // Deletion saves immediately, retains children, and failed writes remain retryable.
 window.confirm = () => true;
 flushSync(()=>document.querySelector('.edit-mode [role=checkbox]').click()); await settle();
@@ -211,7 +224,7 @@ const event=(permissions,body,origin='https://eastmoney.hasbai.xyz')=>({locals:{
 assert.equal((await GET(event(null))).status,401);
 assert.equal((await GET(event([]))).status,403);
 assert.equal((await GET(event(['research.workspace:read']))).status,200);
-const valid={expectedVersion:1,nodes:config.nodes};
+const valid={expectedVersion:1,flows:config.flows,nodes:config.nodes};
 assert.equal((await PUT(event(['research.workspace:read'],valid))).status,403);
 assert.equal((await PUT(event(['research.workflow:update'],valid,'https://evil.invalid'))).status,403);
 assert.equal((await PUT(event(['research.workflow:update'],{...valid,progress:emptyDay('2026-09-15')}))).status,400);

@@ -1,9 +1,10 @@
+import { migrateLegacyNodes } from '../src/lib/trading-workflow/legacy.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { buildGraph, timelineCursor, workflowGroups, workflowBranchFrames, nodeComplete } from '../src/lib/trading-workflow/graph.ts';
-import { activeTasks, childrenOf, dayKey, descendants, dueReminders, emptyDay, removeNode, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
+import { activeTasks, defaultFlows, nodeScope, nodeFlowIds, insertNode, childrenOf, dayKey, descendants, dueReminders, emptyDay, removeNode, moveNode, nodesSchema, readDay, saveSchema, shanghaiClock, updateDay } from '../src/lib/trading-workflow/model.ts';
 import { readWorkflowConfig, saveWorkflowConfig } from '../src/lib/server/trading-workflow.ts';
 
 function database() {
@@ -14,7 +15,8 @@ function database() {
   return { sqlite, adapter, migration };
 }
 const fixture = database();
-const defaults = JSON.parse(fixture.sqlite.prepare('SELECT nodes FROM trading_workflow_config').get().nodes);
+const legacyDefaults = JSON.parse(fixture.sqlite.prepare('SELECT nodes FROM trading_workflow_config').get().nodes);
+const defaults = migrateLegacyNodes(legacyDefaults);
 fixture.sqlite.close();
 function storage() { const values = new Map(); return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) }; }
 
@@ -24,23 +26,23 @@ test('migration seeds every product and shared instruction without progress tabl
     const initial = await readWorkflowConfig(adapter);
     assert.equal(initial.nodes.length, 26);
     assert.equal(nodesSchema.safeParse(initial.nodes).success, true);
-    assert.deepEqual(initial.nodes.filter(n => n.scope === 'loan').map(n => n.title), ['询价', '本币发交易', '等待成交', '导出发咚咚群', '衡泰补单审批', '资金系统导入数据 & 还款申请', '银企流水查询是否到账']);
+    assert.deepEqual(initial.nodes.filter(n => nodeScope(n, initial.nodes) === 'loan').map(n => n.title), ['询价', '本币发交易', '等待成交', '导出发咚咚群', '衡泰补单审批', '资金系统导入数据 & 还款申请', '银企流水查询是否到账']);
     assert.match(initial.nodes.find(n => n.id === 'reverse-check').detail, /AAA.*− 5.*≤ 95\n.*永续.*次级.*− 10.*≤ 90/);
     assert.match(initial.nodes.find(n => n.id === 'reverse-transfer').detail, /0386 → 0432/);
     assert.match(initial.nodes.find(n => n.id === 'reverse-ccdc').detail, /0432 → 2001/);
     const edited = initial.nodes.map(n => n.id === 'loan-send' ? { ...n, title: '修改后的节点' } : n);
-    const result = await saveWorkflowConfig(adapter, { expectedVersion: 1, nodes: edited });
+    const result = await saveWorkflowConfig(adapter, { expectedVersion: 1, flows: defaultFlows, nodes: edited });
     assert.equal(result.version, 2);
     sqlite.exec(migration);
     assert.deepEqual(await readWorkflowConfig(adapter), result);
     assert.deepEqual(sqlite.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name), ['trading_workflow_config']);
-    await assert.rejects(saveWorkflowConfig(adapter, { expectedVersion: 1, nodes: defaults }), e => e.status === 409);
+    await assert.rejects(saveWorkflowConfig(adapter, { expectedVersion: 1, flows: defaultFlows, nodes: defaults }), e => e.status === 409);
     assert.deepEqual(await readWorkflowConfig(adapter), result);
   } finally { sqlite.close(); }
 });
 
 test('config rejects progress, duplicate IDs, foreign/missing parents, cycles and invalid times', () => {
-  assert.equal(saveSchema.safeParse({ expectedVersion: 1, nodes: defaults, completed: {} }).success, false);
+  assert.equal(saveSchema.safeParse({ expectedVersion: 1, flows: defaultFlows, nodes: defaults, completed: {} }).success, false);
   assert.equal(nodesSchema.safeParse([...defaults, defaults[0]]).success, false);
   for (const patch of [{ parentId: 'absent' }, { parentId: 'shared-done' }, { parentId: 'loan-send' }, { startTime: '25:00' }, { startTime: '11:00', endTime: '10:00' }, { startTime: null, endTime: '12:00' }]) {
     const nodes = defaults.map(n => n.id === 'loan-send' ? { ...n, ...patch } : n);
@@ -53,7 +55,7 @@ test('config rejects progress, duplicate IDs, foreign/missing parents, cycles an
 
 test('reserved node IDs and more than four nested branches are rejected', () => {
   for (const id of ['__proto__', 'constructor', 'toString']) assert.equal(nodesSchema.safeParse([{ ...defaults[0], id }]).success, false);
-  const nested = Array.from({ length: 5 }, (_, i) => ({ ...defaults[0], id: `branch-${i}`, kind: 'branch', startTime: null, parentId: i ? `branch-${i - 1}` : null }));
+  const nested = Array.from({ length: 5 }, (_, i) => ({ ...defaults[0], id: `branch-${i}`, kind: 'branch', nextIds: [], startTime: null, parentId: i ? `branch-${i - 1}` : null }));
   assert.equal(nodesSchema.safeParse(nested.slice(0, 4)).success, true);
   assert.equal(nodesSchema.safeParse(nested).success, false);
 });
@@ -107,7 +109,7 @@ test('reminders cover exact boundaries, intervals, late wakeup, inactive branche
   assert.equal(due('10:00:00').length, 1);
   day.completed['loan-quote'] = true;
   const late = due('16:30:00');
-  assert.equal(late.some(item => item.node.scope === 'exchange'), false);
+  assert.equal(late.some(item => nodeScope(item.node, defaults) === 'exchange'), false);
   assert.equal(late.some(item => item.node.id === 'loan-quote'), false);
   assert.equal(late.some(item => item.node.id === 'reverse-quote'), false, 'inquiries never require completion or reminders');
   assert.equal(late.some(item => item.node.id === 'loan-arrival'), true);
@@ -225,14 +227,14 @@ test('product-owned approvals stay separate, fold with their own flow, and never
   graph = buildGraph(defaults, day, options);
   assert.deepEqual(graph.nodes.map(node => node.id), ['shared-elements', 'shared-done']);
   day.enabled.loan = true; day.enabled.exchange = true;
-  const emptyExchange = defaults.filter(node => node.scope !== 'exchange');
+  const emptyExchange = defaults.filter(node => nodeScope(node, defaults) !== 'exchange');
   graph = buildGraph(emptyExchange, day, options);
   assert.equal(graph.edges.some(edge => edge.source === 'shared-elements' && edge.target === 'shared-done'), false, 'empty flow adds no shared shortcut');
 });
 
 test('shared branches have a separate right rail even with all products folded', () => {
-  const branch = { id: 'common-branch', scope: 'shared', parentId: null, kind: 'branch', title: '共通条件', detail: '', startTime: null, endTime: null };
-  const child = { ...branch, id: 'common-child', parentId: branch.id, kind: 'task' };
+  const branch = { id: 'common-branch', flowIds: ['loan', 'reverse', 'exchange'], nextIds: ['common-child'], parentId: null, kind: 'branch', title: '共通条件', detail: '', startTime: null, endTime: null };
+  const child = { ...branch, id: 'common-child', nextIds: [], parentId: branch.id, kind: 'task' };
   const day = emptyDay('2026-09-15');
   day.enabled = { loan: false, reverse: false, exchange: false };
   day.branches[branch.id] = true;
@@ -253,7 +255,7 @@ test('deleting one branch promotes its children in order and persists both delet
     assert.deepEqual(childrenOf(nodes, 'reverse').map(node => node.id), ['reverse-quote', 'reverse-change', 'reverse-check', 'reverse-missing', 'reverse-hengtai', 'reverse-confirm']);
     nodes = removeNode(nodes, 'reverse-missing');
     nodes = nodes.map(node => node.id === 'reverse-approval' ? { ...node, icon: 'clipboard-check' } : node);
-    const saved = await saveWorkflowConfig(adapter, saveSchema.parse({ expectedVersion: 1, nodes }));
+    const saved = await saveWorkflowConfig(adapter, saveSchema.parse({ expectedVersion: 1, flows: defaultFlows, nodes }));
     assert.deepEqual(await readWorkflowConfig(adapter), saved);
     assert.equal(saved.nodes.find(node => node.id === 'reverse-approval').parentId, null);
     assert.equal(saved.nodes.find(node => node.id === 'reverse-approval').icon, 'clipboard-check');
@@ -274,4 +276,54 @@ test('branch completion requires every descendant, including collapsed nested br
   assert.equal(nodeComplete(parent, defaults, day), true);
   const differentParents = defaults.map(node => node.id === 'reverse-hengtai' ? {...node, parentId:'reverse-counterparty'} : node);
   assert.equal(workflowGroups(differentParents).find(group => group[0].id === 'reverse-hengtai').length, 1);
+});
+
+
+test('explicit successors determine order independently of array order and time; merge is automatic', () => {
+  const make = (id, nextIds, flowIds = ['loan']) => ({ ...defaults[0], id, title: id, startTime: null, flowIds, nextIds });
+  const nodes = [make('a', ['c']), make('b', ['c'], ['reverse']), make('c', ['d']), make('d', [])];
+  assert.equal(nodesSchema.safeParse(nodes).success, true);
+  assert.equal(nodeScope(nodes[2], nodes), 'shared');
+  assert.deepEqual(nodeFlowIds(nodes[2], nodes), ['loan', 'reverse']);
+  const options = { editing: true, selectedId: '', clockMinutes: 0, activate() {}, toggleProduct() {}, note() {} };
+  for (const input of [nodes, [...nodes].reverse()]) {
+    const graph = buildGraph(input, emptyDay('2026-09-15'), options);
+    assert.deepEqual(graph.edges.map(edge => `${edge.source}:${edge.target}`).sort(), ['a:c', 'b:c', 'c:d']);
+    assert.ok(graph.bases.d.y > graph.bases.c.y);
+    assert.equal(graph.nodes.filter(node => node.id === 'c').length, 1);
+  }
+  for (const nextIds of [['missing'], ['c', 'c'], ['a']]) assert.equal(nodesSchema.safeParse(nodes.map(node => node.id === 'a' ? { ...node, nextIds } : node)).success, false);
+  assert.equal(nodesSchema.safeParse(nodes.map(node => node.id === 'd' ? { ...node, nextIds: ['a'] } : node)).success, false);
+  const swapped = moveNode(defaults, 'loan-deal', -1);
+  assert.ok(swapped.find(node => node.id === 'shared-elements').nextIds.includes('loan-deal'));
+  assert.deepEqual(swapped.find(node => node.id === 'loan-deal').nextIds, ['loan-send']);
+  assert.deepEqual(swapped.find(node => node.id === 'loan-send').nextIds, ['loan-export']);
+  assert.equal(nodesSchema.safeParse(swapped).success, true);
+  const inserted = insertNode(nodes, nodes[2], make('new', []));
+  assert.deepEqual(inserted.find(node => node.id === 'c').nextIds, ['new']);
+  assert.deepEqual(inserted.find(node => node.id === 'new').nextIds, ['d']);
+  const removed = removeNode(nodes, 'c');
+  assert.deepEqual(removed.map(node => node.nextIds), [['d'], ['d'], []]);
+  assert.equal(nodesSchema.safeParse(removed).success, true);
+});
+
+test('graph migration preserves edited legacy data and is idempotent; flow and node JSON are separate', async () => {
+  const { sqlite, adapter } = database();
+  try {
+    const legacy = legacyDefaults.map(node => node.id === 'loan-send' ? { ...node, title: '保留人工编辑', offset: { x: 42, y: 0 }, icon: 'send' } : node);
+    sqlite.prepare('UPDATE trading_workflow_config SET nodes = ?').run(JSON.stringify(legacy));
+    const sql = readFileSync(new URL('../migrations/1016_trading_workflow_graph.sql', import.meta.url), 'utf8');
+    sqlite.exec(sql);
+    const saved = await readWorkflowConfig(adapter);
+    assert.equal(saved.version, 2);
+    assert.deepEqual(saved.flows, defaultFlows);
+    const normalize = nodes => nodes.map(node => ({ ...node, nextIds: [...node.nextIds].sort() }));
+    assert.deepEqual(normalize(saved.nodes), normalize(migrateLegacyNodes(legacy)));
+    assert.ok(saved.nodes.every(node => !('scope' in node)));
+    sqlite.exec(sql);
+    assert.deepEqual(await readWorkflowConfig(adapter), saved);
+    const persisted = await saveWorkflowConfig(adapter, { expectedVersion: saved.version, flows: saved.flows, nodes: moveNode(saved.nodes, 'loan-deal', -1) });
+    assert.deepEqual(await readWorkflowConfig(adapter), persisted);
+    assert.equal(Array.isArray(JSON.parse(sqlite.prepare('SELECT nodes FROM trading_workflow_config').get().nodes)), false);
+  } finally { sqlite.close(); }
 });

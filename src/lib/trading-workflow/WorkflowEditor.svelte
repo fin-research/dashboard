@@ -7,9 +7,10 @@
   import { workflowGroups } from './graph';
   import { nodeIcon, workflowIcons } from './icons';
   import { onMount } from 'svelte';
-  import { descendants, isInquiry, products, type Scope, type WorkflowNode } from './model';
-  let { nodes = $bindable(), selectedId, disabled, onSelect, onClose, onBranch, expanded, onSave, onDelete, onAdd, onReset, notificationsEnabled, notificationsSupported, onNotifications }: {
-    nodes: WorkflowNode[]; selectedId: string; disabled: boolean; onSelect: (id: string) => void;
+  import { descendants, isInquiry, nodeFlowIds, flowLabel, insertNode, moveNode, nodesSchema, type Product, type WorkflowConfig, type WorkflowNode } from './model';
+  import { globalMessages } from '../global-messages';
+  let { flows, nodes = $bindable(), selectedId, disabled, onSelect, onClose, onBranch, expanded, onSave, onDelete, onAdd, onReset, notificationsEnabled, notificationsSupported, onNotifications }: {
+    flows: WorkflowConfig['flows']; nodes: WorkflowNode[]; selectedId: string; disabled: boolean; onSelect: (id: string) => void;
     onDelete: (id: string) => void; onSave: () => void; onAdd: () => void; onReset: () => void; notificationsEnabled: boolean; notificationsSupported: boolean; onNotifications: () => void;
     onClose: () => void; onBranch: (id: string, value: boolean) => void; expanded: boolean;
   } = $props();
@@ -21,7 +22,32 @@
     const next = { ...offset, [axis]: value };
     nodes = nodes.map(node => ids.has(node.id) ? { ...node, offset: next } : node);
   }
-  const scopes = [{ id: 'shared', label: '共通节点' }, ...products];
+  const previous = $derived(nodes.filter(node => node.nextIds.includes(selectedId)));
+  function apply(next: WorkflowNode[]) {
+    const parsed = nodesSchema.safeParse(next);
+    if (!parsed.success) { globalMessages.error(parsed.error.issues[0]?.message ?? '节点配置无效'); return; }
+    nodes = parsed.data;
+  }
+  function setNext(index: number, id: string) {
+    if (!selected) return;
+    const nextIds = [...selected.nextIds];
+    if (id) nextIds[index] = id; else nextIds.splice(index, 1);
+    apply(nodes.map(node => node.id === selectedId ? { ...node, nextIds } : node));
+  }
+  function setFlow(id: Product, checked: boolean) {
+    if (!selected) return;
+    const flowIds = checked ? [...new Set([...selected.flowIds, id])] : selected.flowIds.filter(flow => flow !== id);
+    const ids = descendants(nodes, selected.id);
+    apply(nodes.map(node => ids.has(node.id) ? { ...node, flowIds } : node));
+  }
+  function setParent(parentId: string | null) {
+    if (!selected || selected.parentId === parentId) return;
+    const next = nodes.map(node => ({ ...node, parentId: node.id === selectedId ? parentId : node.parentId,
+      nextIds: node.nextIds.filter(id => id !== selectedId) }));
+    const parent = next.find(node => node.id === parentId);
+    if (parent) parent.nextIds.push(selectedId);
+    apply(next);
+  }
   let panel: HTMLElement;
   onMount(() => panel.querySelector<HTMLInputElement>('input')?.focus());
   function remove(node: WorkflowNode) {
@@ -29,9 +55,8 @@
     onDelete(node.id);
   }
   function addChild(node: WorkflowNode) {
-    const child: WorkflowNode = { id: crypto.randomUUID(), scope: node.scope, kind: 'task', parentId: node.kind === 'branch' ? node.id : node.parentId, title: '新节点', detail: '', startTime: null, endTime: null };
-    const index = nodes.findIndex(item => item.id === node.id);
-    nodes = [...nodes.slice(0, index + 1), child, ...nodes.slice(index + 1)];
+    const child: WorkflowNode = { id: crypto.randomUUID(), flowIds: [...node.flowIds], nextIds: [], kind: 'task', parentId: node.kind === 'branch' ? node.id : node.parentId, title: '新节点', detail: '', startTime: null, endTime: null };
+    apply(insertNode(nodes, node, child));
     if (node.kind === 'branch') onBranch(node.id, true);
     onSelect(child.id);
   }
@@ -42,7 +67,7 @@
   <fieldset disabled={disabled} class="editor-fields">
     {#if selected}
       <label>编辑节点<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} value={selectedId} onchange={event => onSelect(event.currentTarget.value)}>
-        {#each nodes as node}<option value={node.id}>{scopes.find(scope => scope.id === node.scope)?.label} · {isInquiry(node) ? '询价' : node.title}</option>{/each}
+        {#each nodes as node}<option value={node.id}>{flowLabel(node, nodes, flows)} · {isInquiry(node) ? '询价' : node.title}</option>{/each}
       </NativeSelect></label>
       <label>节点名称<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} required maxlength={160} bind:value={selected.title} /></label>
       <fieldset class="icon-options"><legend>节点图标</legend>
@@ -56,10 +81,24 @@
           <label>结束<Input data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-input"} type="time" value={selected.endTime ?? ''} oninput={event => { if (selected) selected.endTime = event.currentTarget.value || null; }} /></label>
         </div>
       {/if}
-      <label>节点归属<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} value={selected.scope} onchange={(event) => {
-        if (!selected) return; const scope = event.currentTarget.value as Scope;
-        const ids = descendants(nodes, selected.id); nodes = nodes.map(node => ids.has(node.id) ? { ...node, scope, parentId: node.id === selectedId ? null : node.parentId } : node);
-      }}>{#each scopes as scope}<option value={scope.id}>{scope.label}</option>{/each}</NativeSelect></label>
+      <fieldset class="connection-fields"><legend>所属流程</legend>
+        {#each flows as flow}<label class="editor-checkbox"><Checkbox checked={nodeFlowIds(selected, nodes).includes(flow.id)} disabled={!selected.flowIds.includes(flow.id) && nodeFlowIds(selected, nodes).includes(flow.id)} onCheckedChange={checked => setFlow(flow.id, checked)} />{flow.label}</label>{/each}
+      </fieldset>
+      <fieldset class="connection-fields"><legend>前序节点</legend>
+        {#each previous as node}<Button variant="ghost" type="button" onclick={() => onSelect(node.id)}>{flowLabel(node, nodes, flows)} · {node.title}</Button>{:else}<span>起点</span>{/each}
+      </fieldset>
+      <fieldset class="connection-fields"><legend>后续节点</legend>
+        {#each selected.nextIds as id, index}
+          <div class="connection-row"><NativeSelect aria-label={`后续节点 ${index + 1}`} value={id} onchange={event => setNext(index, event.currentTarget.value)}>
+            {#each nodes.filter(node => node.id !== selectedId) as target}<option value={target.id}>{flowLabel(target, nodes, flows)} · {target.title}</option>{/each}
+          </NativeSelect><Button variant="ghost" type="button" aria-label={`移除后续节点 ${index + 1}`} onclick={() => setNext(index, '')}>×</Button></div>
+        {/each}
+        <NativeSelect aria-label="添加后续节点" value="" onchange={event => { const id = event.currentTarget.value; event.currentTarget.value = ''; if (selected && id) setNext(selected.nextIds.length, id); }}>
+          <option value="">添加后续节点</option>
+          {#each nodes.filter(node => node.id !== selectedId && !selected.nextIds.includes(node.id)) as target}<option value={target.id}>{flowLabel(target, nodes, flows)} · {target.title}</option>{/each}
+        </NativeSelect>
+        <div class="editor-pair"><Button variant="outline" type="button" disabled={moveNode(nodes, selectedId, -1) === nodes} onclick={() => apply(moveNode(nodes, selectedId, -1))}>上移</Button><Button variant="outline" type="button" disabled={moveNode(nodes, selectedId, 1) === nodes} onclick={() => apply(moveNode(nodes, selectedId, 1))}>下移</Button></div>
+      </fieldset>
       <label class="editor-checkbox"><Checkbox data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"  bind:checked={() => notificationsEnabled, () => onNotifications()} disabled={!notificationsSupported} />浏览器提醒</label>
       <label>备注<Textarea data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-textarea"} maxlength={1200} rows={4} bind:value={selected.detail}></Textarea></label>
       <Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="default" class={"ui-button  editor-save"} type="button" onclick={onSave}>{disabled ? '保存中…' : '保存'}</Button>
@@ -71,9 +110,9 @@
           selected.kind = event.currentTarget.value as 'task' | 'branch';
           if (selected.kind === 'branch') { selected.startTime = null; selected.endTime = null; }
         }}><option value="task" disabled={nodes.some(node => node.parentId === selectedId)}>任务</option><option value="branch">条件分支</option></NativeSelect></label>
-        <label>上级分支<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} bind:value={selected.parentId}>
-          <option value={null}>主流程</option>
-          {#each nodes.filter(node => node.scope === selected.scope && node.kind === 'branch' && !descendants(nodes, selected.id).has(node.id)) as parent}<option value={parent.id}>{parent.title}</option>{/each}
+        <label>上级分支<NativeSelect data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-select"} value={selected.parentId ?? ''} onchange={event => setParent(event.currentTarget.value || null)}>
+          <option value="">主流程</option>
+          {#each nodes.filter(node => node.flowIds.some(id => selected.flowIds.includes(id)) && node.kind === 'branch' && !descendants(nodes, selected.id).has(node.id)) as parent}<option value={parent.id}>{parent.title}</option>{/each}
         </NativeSelect></label>
         {#if selected.kind === 'task'}
           <label class="editor-checkbox"><Checkbox data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"  checked={isInquiry(selected)} onCheckedChange={checked => { if (selected) selected.inquiry = checked; }} />询价输入框</label>
@@ -96,6 +135,10 @@
   .editor-fields label { display: grid; gap: 8px; font-weight: bold; font-size: 1rem; min-width: 0; }
   :global(.editor-fields :is(input[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"]:not([type="checkbox"]), select[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"], textarea[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"])) { width: 100%; font-weight: normal; }
   .editor-fields .editor-checkbox { display: flex; align-items: center; gap: 10px; }
+  .connection-fields { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; min-width: 0; }
+  .connection-fields legend { font-weight: bold; margin-bottom: 8px; }
+  .connection-row { display: flex; gap: 8px; min-width: 0; }
+  .connection-row :global(select) { min-width: 0; flex: 1; }
   .editor-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   :global(.editor-save[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"]) { width: 100%; }
   .editor-advanced { border: 1px solid var(--tr-border); border-radius: 8px; }

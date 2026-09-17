@@ -11,7 +11,7 @@
   import { workflowGroups } from '../trading-workflow/graph';
   import WorkflowEditor from '../trading-workflow/WorkflowEditor.svelte';
   import { globalMessages } from '../global-messages';
-  import { configResponseSchema, configSchema, dayKey, dueReminders, emptyDay, products, nodesSchema,
+  import { configResponseSchema, configSchema, dayKey, dueReminders, emptyDay, products, nodesSchema, flowLabel,
     removeNode, readDay, shanghaiClock, updateDay, type Product, type WorkflowConfig, type WorkflowDay, type WorkflowNode } from '../trading-workflow/model';
 
   let config = $state<WorkflowConfig | null>(null);
@@ -64,7 +64,7 @@
     }
   }
   function addNode() {
-    const node: WorkflowNode = { id: crypto.randomUUID(), scope: 'shared', parentId: null, kind: 'task', title: '新节点', detail: '', startTime: null, endTime: null };
+    const node: WorkflowNode = { id: crypto.randomUUID(), flowIds: ['loan'], nextIds: [], parentId: null, kind: 'task', title: '新节点', detail: '', startTime: null, endTime: null };
     draft = [...draft, node]; selectedId = node.id;
   }
   function setBranch(ids: string[], value: boolean) {
@@ -141,7 +141,7 @@
       if (!response.ok) throw new Error(await responseError(response));
       const data = configResponseSchema.parse(await response.json());
       if (!mounted) return;
-      config = { version: data.version, nodes: data.nodes }; actorKey = data.actorKey; canEdit = data.canEdit;
+      config = { version: data.version, flows: data.flows, nodes: data.nodes }; actorKey = data.actorKey; canEdit = data.canEdit;
       restore(shanghaiClock().date); restoreDirectory(); void refreshRates();
       try { notificationsEnabled = localStorage.getItem(prefsKey()) === 'true'; } catch { storageFailure(); }
       void remind();
@@ -155,7 +155,7 @@
   async function saveConfig(nodes: WorkflowNode[]) {
     if (!config) return false;
     const response = await fetch('/api/trading-workflow/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expectedVersion: config.version, nodes }) });
+      body: JSON.stringify({ expectedVersion: config.version, flows: config.flows, nodes }) });
     if (!response.ok) { globalMessages.error(await responseError(response)); return false; }
     config = configSchema.parse(await response.json());
     globalMessages.success('交易流程节点已保存');
@@ -191,7 +191,7 @@
       if (browser) {
         try {
           for (const item of due) {
-            const label = products.find(product => product.id === item.node.scope)?.label ?? '共通节点';
+            const label = flowLabel(item.node, config.nodes, config.flows);
             const notification = new Notification(`${item.time} · ${label}`, { body: item.node.title, tag: `${actorKey}:${date}:${item.key}` });
             notification.onclick = () => { window.focus(); window.dispatchEvent(new CustomEvent('workflow-locate', { detail: item.node.id })); notification.close(); };
             notification.onerror = () => globalMessages.warning('浏览器通知未送达，请查看到点待办', { key: 'workflow-notification-error' });
@@ -239,10 +239,10 @@
   {:else if loadError}<ModuleCard><p role="alert">{loadError}</p><Button data-ui-owner="lib-trading-research-WorkflowView-svelte" variant="outline" class={"ui-button"} onclick={loadConfig}>重新加载</Button></ModuleCard>
   {:else if config}
     <div class="flow-workspace" class:saving>
-      <WorkflowCanvas nodes={editing ? draft : config.nodes} day={displayDay} clockMinutes={clock.minutes} {editing} {selectedId}
+      <WorkflowCanvas flows={config.flows} nodes={editing ? draft : config.nodes} day={displayDay} clockMinutes={clock.minutes} {editing} {selectedId}
         onSelect={id => selectedId = id} onMove={move} onComplete={complete} onBranch={setBranch} onEnable={setEnabled} onNote={note} onRows={quoteRows} onRemember={rememberRow} {directory} {rates} {now} />
       {#if editing && (selectedId || !draft.length)}
-        {#key selectedId}<WorkflowEditor bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
+        {#key selectedId}<WorkflowEditor flows={config.flows} bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
           onClose={() => selectedId = ''} onBranch={(id, value) => setBranch([id], value)} expanded={!!preview.branches[selectedId]}
           onSave={saveDraft} onDelete={deleteNode} onAdd={addNode} onReset={() => draft = draft.map(({ offset, ...node }) => node)}
           notificationsEnabled={notificationsEnabled} notificationsSupported={permission !== 'unsupported'} onNotifications={toggleNotifications} />{/key}

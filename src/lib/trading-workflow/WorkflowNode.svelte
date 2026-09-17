@@ -36,7 +36,7 @@
   </button>
   {#if data.node && !isInquiry(data.node)}<span id={`workflow-state-${data.node.id}`} class="sr-only">{data.done ? '已完成' : '未完成'}</span>{/if}
   {#if data.node && isInquiry(data.node) && data.expanded && !data.editing}
-    {#key data.date}<InquiryTable rows={data.rows} loan={data.node.scope === 'loan'} directory={data.directory} rates={data.rates}
+    {#key data.date}<InquiryTable rows={data.rows} loan={data.node.flowIds.includes('loan')} directory={data.directory} rates={data.rates}
       date={data.date} now={data.now} onRows={data.writeRows} onRemember={data.remember} />{/key}
     {#if data.note}<Textarea data-ui-owner="lib-trading-workflow-WorkflowNode-svelte" class={"ui-textarea legacy-note nodrag nopan nowheel"} aria-label="原询价记录" value={data.note} oninput={event => data.writeNote(event.currentTarget.value)}></Textarea>{/if}
   {/if}
