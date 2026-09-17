@@ -6,6 +6,7 @@
   const component: Promise<{ default: Component<any> }> = path === '/' ? import('../../../src/routes/+page.svelte')
     : path.startsWith('/trading-research') ? import('../../../src/lib/trading-research/WorkbenchPage.svelte')
     : path.startsWith('/credit-workbench') ? import('../../../src/lib/credit-workbench/CreditWorkbenchPage.svelte')
+    : path === '/management/messenger' ? import('./Messenger.svelte')
     : path === '/ui-contracts' ? import('./Primitives.svelte')
     : path === '/financing/schedule' ? import('./Schedule.svelte')
     : path === '/market-briefing' ? import('../../../src/App.svelte')

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { randomUUID } from 'node:crypto';
-import { Resend } from 'resend';
+import { submitMessage } from '../messenger.ts';
 import { createDirectory } from '../auth0-directory.ts';
 import { reminderPeriodLabel } from '../../financing/reminder-periods.js';
 
@@ -112,11 +112,7 @@ export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, con
 	db = requireDatabase(db);
 	const instant = normaliseAsOf(asOf, asOfDate);
 	const reminders = await collectDueReminders({ asOf: instant, db, directory: directory ?? (() => createDirectory(config).people()) });
-	const apiKey = config.RESEND_API_KEY;
-	const from = config.FROM_EMAIL
-		?? config.REMINDER_FROM_EMAIL
-		?? '融资工作台 <onboarding@resend.dev>';
-	const resend = apiKey ? new Resend(apiKey) : null;
+	const messenger = config.MESSENGER;
 	const results = [];
 	const existingRows = reminders.length ? await db.prepare(`
 		WITH keys AS (
@@ -139,21 +135,22 @@ export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, con
 
 	for (const reminder of reminders) {
 		const existing = existingByTarget.get(`${reminder.ruleId}:${reminder.targetId}:${reminder.periodId}`);
-		if (existing?.status === 'sent') {
+		if (['sent', 'queued'].includes(existing?.status)) {
 			results.push({ ...reminder, status: 'skipped' });
 			continue;
 		}
 
 		const deliveryId = existing?.id ?? randomUUID();
-		if (dryRun || !resend) {
+		if (dryRun || !messenger) {
 			deliveries.push({ ...reminder, id: deliveryId, status: 'pending', providerMessageId: null, errorMessage: null, sentAt: null });
 			results.push({ ...reminder, status: 'pending' });
 			continue;
 		}
 
 		try {
-			const response = await resend.emails.send({
-				from,
+			const response = await submitMessage(messenger, {
+				source: 'financing', channel: 'email', profile: 'default',
+				idempotencyKey: `reminder/${reminder.ruleId}/${reminder.targetId}/${reminder.periodId}`,
 				to: reminder.recipients,
 				subject: `【融资工作台】${reminder.projectName} · ${reminder.taskName}`,
 				html: `<h2>${escapeHtml(reminder.ruleName)}</h2>
@@ -164,12 +161,11 @@ export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, con
 					<p>节点日期：${escapeHtml(reminder.triggerDate)}</p>
 					<p>负债品种：${escapeHtml(reminder.debtType)}</p>`
 			});
-			if (response.error) throw new Error(response.error.message);
 			deliveries.push({
-				...reminder, id: deliveryId, status: 'sent', providerMessageId: response.data?.id ?? null,
-				errorMessage: null, sentAt: new Date().toISOString()
+				...reminder, id: deliveryId, status: 'queued', providerMessageId: response.id,
+				errorMessage: null, sentAt: null
 			});
-			results.push({ ...reminder, status: 'sent', messageId: response.data?.id ?? null });
+			results.push({ ...reminder, status: 'queued', messageId: response.id });
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			deliveries.push({
@@ -212,5 +208,5 @@ export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, con
 			sent_at: delivery.sentAt
 		}))));
 	}
-	return { asOf: instant.toISOString(), asOfDate: isoDate(instant), dryRun: dryRun || !apiKey, count: reminders.length, results };
+	return { asOf: instant.toISOString(), asOfDate: isoDate(instant), dryRun: dryRun || !messenger, count: reminders.length, results };
 }

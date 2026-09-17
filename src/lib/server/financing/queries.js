@@ -661,13 +661,13 @@ function encodeReminderCursor(row) {
 /** @param {{ status?: string | null, query?: string | null, cursor?: string | null, limit?: number, includeSummary?: boolean, database?: ReturnType<typeof getDatabase> }} [options] */
 export async function getReminderHistory({ status, query, cursor, limit = 50, includeSummary = true, database = getDatabase() } = {}) {
 	const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
-	const validStatus = status && ['pending', 'sent', 'failed'].includes(status) ? status : null;
+	const validStatus = status && ['pending', 'queued', 'sent', 'failed'].includes(status) ? status : null;
 	const safeQuery = String(query ?? '').trim().slice(0, 160);
 	const decodedCursor = decodeReminderCursor(cursor);
 	const summaryCte = includeSummary ? `,
 		summary AS (
 			SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'sent') AS sent,
-				COUNT(*) FILTER (WHERE status = 'pending') AS pending,
+				COUNT(*) FILTER (WHERE status IN ('pending','queued')) AS pending,
 				COUNT(*) FILTER (WHERE status = 'failed') AS failed
 			FROM reminder_deliveries
 		)` : '';

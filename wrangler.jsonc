@@ -16,8 +16,7 @@
   },
   "secrets": {
     "required": [
-      "CF_AIG_TOKEN",
-      "MARKET_BRIEFING_RESEND_API_KEY"
+      "CF_AIG_TOKEN"
     ]
   },
   "assets": {
@@ -47,6 +46,16 @@
       "service": "eastmoney-gateway",
       "entrypoint": "IdentityService",
       "remote": true
+    },
+    {
+      "binding": "MESSENGER",
+      "service": "messenger",
+      "entrypoint": "Messaging"
+    },
+    {
+      "binding": "MESSENGER_ADMIN",
+      "service": "messenger",
+      "entrypoint": "MessengerAdmin"
     }
   ],
   "d1_databases": [
