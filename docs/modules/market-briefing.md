@@ -7,7 +7,7 @@
 - Dashboard 共两项 Cron：`0 * * * *` 为每小时整点融资提醒（支持任意提前小时，不能缩成每日一次）；`0 9 * * MON-FRI` 为北京时间工作日 17:00 市场点评。Cron 使用 UTC。Data 午夜同步、Ingest 采集分别由各自 Worker 持有。
 - `MARKET_BRIEFING` 绑定 `MarketBriefingWorkflow`，平台名称固定 `market-briefing`。实例 ID 为 `market-briefing-YYYY-MM-DD`，同日重复 Cron 不重复创建。
 - Cron 在创建 Workflow 实例前判断 workday；`knownMarketClosure(reportDate) === true` 时立即返回，完全不进入 Workflow。Workflow 内不再判断或返回非交易日 skipped 状态，当前内置2026年公告。`fetch-industry` 要求 DATA `/data/industry` 的 `tradingDates` 包含当天，否则视为行情滞后，由 step 重试并失败，不能误判假期。未知年度只允许有当日行情证据时生成；每年须按交易所公告更新休市日。
-- 所有 `step.do` 及其并行、依赖关系直接写在 `worker/market-briefing-runner.ts`，不使用创建 step 的 loader 或 collector 封装。无依赖的行情和新闻列表各为独立 `fetch-*` step 并发执行。股票收评只请求一次，供报告与 AI 共用；一级发行等待行业数据中的上一交易日；债券基础信息等待今日成交和收藏报价后去重批量查询一次；新闻详情等待列表，每条独立 step、最多五条并发。新闻和收评齐备后启动 `generate-focus`，不等待其他行情。各 step 返回最小 DTO 或 AI 结果，通过 Workflow 检查点向下游传递，不在中途写报告。
+- 所有 `step.do` 及其并行、依赖关系直接写在 `worker/market-briefing-runner.ts`，不使用创建 step 的 loader 或 collector 封装。无依赖的行情和新闻列表各为独立 `fetch-*` step 并发执行。股票收评只请求一次，供报告与 AI 共用；一级发行等待行业数据中的上一交易日；债券基础信息等待今日成交和收藏报价后去重批量查询一次；新闻详情等待列表，每条独立 step、最多五条并发。按依赖使用原生 `await Promise.allSettled([...])` 划分并行批次：第一批独立行情与新闻列表，第二批一级发行、债券基础信息及前五条新闻详情，其余详情每五条一批；全部数据完成后，显式依次 `await generate-focus → aggregate-and-save-r2 → notify-result`。批次之间等待该批全部请求结束，不使用 `.then()` 或自定义 Promise 汇总函数串联 step。各 step 返回最小 DTO 或 AI 结果，通过 Workflow 检查点向下游传递，不在中途写报告。
 - 数据步骤最多重试 3 次，30 秒起指数退避，单步超时 3 分钟；AI 步骤最多重试 2 次，1 分钟起指数退避，单步超时 15 分钟，AI adapter 显式关闭内部重试（本工作流的共享 AI 默认规则例外）。采集、AI、保存和通知的重试均只由 Workflow step 配置负责，业务代码不执行重试循环。
 - 等所有并行步骤完成或耗尽重试，在唯一 `aggregate-and-save-r2` step 内使用共享 `buildReportData` 与报告 Schema 汇总并保存原 `market-briefing/YYYY-MM-DD.json`。任何必需请求失败不归档残缺报告，也不把失败伪装成零行情。
 - 当日成交、期货及报价不支持历史重放；每个未完成的采集 step 校验上海当天，跨日恢复未完成采集会失败，不能以当前行情冒充历史报告。已完成数据步骤与归档步骤可由平台恢复。
@@ -38,6 +38,8 @@
 交易日历来源：[上交所2026年休市安排](https://www.sse.com.cn/disclosure/dealinstruc/closed/c/c_20251222_10802510.shtml)。
 
 ## 验证与恢复
+
+Cloudflare 流程图由静态语法分析生成，并不回放实际执行。`completeAll(...).then(...)` 曾使解析器把依赖步骤全部标为 `starts=1`，因此 Workflow 编排使用原生 Promise 批次与直接 await。发布后通过 `GET /accounts/{account}/workflows/market-briefing/versions/{version}/graph` 核对并行节点及 AI、保存、通知的顺序；测试通过不能替代平台图核验。见 [Cloudflare 流程图文档](https://developers.cloudflare.com/workflows/build/visualizer/)。
 
 2026-09-16 本地验证：类型检查、Worker 类型检查、生产构建、544 项 Node 测试、53 项浏览器用例通过；1 项手机矩形拖拽按原规则跳过。CI 候选运行 `35077845510` 通过 5 项 Python、544 项 Node、构建与 53 项浏览器用例。市场点评桌面/手机的 darwin 与 macos-ci 基线已人工对照；本轮不更新其他模块基线。
 
