@@ -667,7 +667,7 @@ export async function getReminderHistory({ status, query, cursor, limit = 50, in
 	const summaryCte = includeSummary ? `,
 		summary AS (
 			SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'sent') AS sent,
-				COUNT(*) FILTER (WHERE status = 'pending') AS pending,
+				COUNT(*) FILTER (WHERE status IN ('pending','queued')) AS pending,
 				COUNT(*) FILTER (WHERE status = 'failed') AS failed
 			FROM reminder_deliveries
 		)` : '';

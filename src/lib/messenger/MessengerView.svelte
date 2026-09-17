@@ -2,6 +2,7 @@
   import ModuleCard from '../../components/ModuleCard.svelte';
   import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { NativeSelect } from '$lib/components/ui/native-select/index.js';
   import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
   import type {Delivery,DeliveryList,DeliveryDetail} from './types';
   let {list,detail=null,filters={},canRetry=false,message}:{list:DeliveryList;detail?:DeliveryDetail|null;filters?:Record<string,string>;canRetry?:boolean;message?:string}=$props();
@@ -14,9 +15,9 @@
   <PanelHeading id="messenger-heading" title="消息投递" />
   <ModuleCard>
     <form method="GET" class="filters">
-      <label>渠道<select name="channel" value={filters.channel??''}><option value="">全部</option><option value="email">邮件</option><option value="telegram">Telegram</option></select></label>
-      <label>状态<select name="status" value={filters.status??''}><option value="">全部</option>{#each Object.entries(labels) as [value,label]}<option {value}>{label}</option>{/each}</select></label>
-      <label>来源<select name="source" value={filters.source??''}><option value="">全部</option><option value="market-briefing">市场点评</option><option value="financing">融资提醒</option><option value="ingest">央行资讯</option></select></label>
+      <label>渠道<NativeSelect class="min-h-11" name="channel" value={filters.channel??''}><option value="">全部</option><option value="email">邮件</option><option value="telegram">Telegram</option></NativeSelect></label>
+      <label>状态<NativeSelect class="min-h-11" name="status" value={filters.status??''}><option value="">全部</option>{#each Object.entries(labels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
+      <label>来源<NativeSelect class="min-h-11" name="source" value={filters.source??''}><option value="">全部</option><option value="market-briefing">市场点评</option><option value="financing">融资提醒</option><option value="ingest">央行资讯</option></NativeSelect></label>
       <Button type="submit">筛选</Button><Button variant="outline" href="/management/messenger">刷新</Button>
     </form>
     <div class="counts" aria-label="消息统计">{#each list.counts as item}<span>{labels[item.status]??item.status} <strong>{item.count}</strong></span>{/each}</div>
@@ -44,10 +45,10 @@
 <AlertDialog.Root open={!!retryTarget} onOpenChange={(open)=>{if(!open)retryTarget=null;}}>
   <AlertDialog.Content><AlertDialog.Header><AlertDialog.Title>重试消息</AlertDialog.Title><AlertDialog.Description>{retryTarget?.status==='uncertain'?'上次发送结果不确定，重试可能重复发送。':'确认重新发送此消息？'}</AlertDialog.Description></AlertDialog.Header>
     <form method="POST" action="?/retry"><input type="hidden" name="id" value={retryTarget?.id??''}/><input type="hidden" name="confirmUncertain" value="yes"/>
-      <AlertDialog.Footer><AlertDialog.Cancel>取消</AlertDialog.Cancel><Button type="submit">确认重试</Button></AlertDialog.Footer>
+      <AlertDialog.Footer><AlertDialog.Cancel type="button">取消</AlertDialog.Cancel><Button type="submit">确认重试</Button></AlertDialog.Footer>
     </form>
   </AlertDialog.Content>
 </AlertDialog.Root>
 <style>
-  .messenger-view{display:grid;gap:1rem;min-width:0}.filters{display:flex;flex-wrap:wrap;align-items:end;gap:1rem}label{display:grid;gap:.5rem;font-weight:bold}select{min-height:44px;border:1px solid var(--border-color);border-radius:var(--radius-control,24px);background:var(--surface);padding:.5rem 1rem;color:var(--text-1);font:inherit;font-weight:normal}.counts{display:flex;gap:1.25rem;flex-wrap:wrap;margin:1.25rem 0}.table-scroll{overflow:auto;max-width:100%}table{width:100%;border-collapse:collapse;font-size:.875rem}th,td{text-align:left;padding:.75rem;border-bottom:1px solid var(--border-color);white-space:nowrap}th{font-weight:bold}.subject{min-width:220px;max-width:420px;white-space:normal}.recipient{max-width:250px;white-space:normal;overflow-wrap:anywhere}.failure{color:var(--color-danger,#b42318)}.success{color:var(--business-accent,#067647)}.pagination{display:flex;gap:1rem;justify-content:end;margin-top:1rem}dl{display:grid;grid-template-columns:auto 1fr;gap:.5rem 1rem}dd{margin:0;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;max-height:24rem;overflow:auto}a{color:var(--color-primary)}
+  .messenger-view{display:grid;gap:1rem;min-width:0}.filters{display:flex;flex-wrap:wrap;align-items:end;gap:1rem}label{display:grid;gap:.5rem;font-weight:bold}.counts{display:flex;gap:1.25rem;flex-wrap:wrap;margin:1.25rem 0}.table-scroll{overflow:auto;max-width:100%}table{width:100%;border-collapse:collapse;font-size:.875rem}th,td{text-align:left;padding:.75rem;border-bottom:1px solid var(--border-color);white-space:nowrap}th{font-weight:bold}.subject{min-width:220px;max-width:420px;white-space:normal}.recipient{max-width:250px;white-space:normal;overflow-wrap:anywhere}.failure{color:var(--color-danger,#b42318)}.success{color:var(--business-accent,#067647)}.pagination{display:flex;gap:1rem;justify-content:end;margin-top:1rem}dl{display:grid;grid-template-columns:auto 1fr;gap:.5rem 1rem}dd{margin:0;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;max-height:24rem;overflow:auto}a{color:var(--color-primary)}
 </style>

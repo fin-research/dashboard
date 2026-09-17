@@ -151,6 +151,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 					<div class:error-copy={row.status === 'failed'}>
 						{#if row.status === 'failed'}
 							<strong>{row.errorMessage ?? '未记录失败原因'}</strong>
+						{:else if row.status === 'queued'}
+							<a href={`/management/messenger?id=${encodeURIComponent(row.providerMessageId)}`}>查看投递</a>
 						{:else if row.status === 'sent'}
 							<strong>Resend 已接受</strong>
 							<span>{row.providerMessageId ?? '未返回消息编号'}</span>
