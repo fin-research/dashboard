@@ -224,8 +224,14 @@ export function transformWorkbook(parsed) {
 			&& !debt.issueDate && !debt.maturityDate && !debt.activatedAt
 			&& /^(?:[123]、东财转[123][（(]|截至目前集团共发行3次可转债)/u.test(debt.counterparty ?? '')
 			&& !parsed.cashflows.some((flow) => flow[1] === debt.sourceKey)));
+	const rawDebts=new Map(parsed.debts.map(row=>[row[1],row]));
+  for (const debt of debts) {
+    const raw=rawDebts.get(debt.sourceKey);
+    if(raw[9]==null && raw[10]==null)throw new Error(`负债 ${debt.name} 缺少金额，整个导入已拒绝`);
+  }
 	const debtKeys = new Set(debts.map((debt) => debt.sourceKey));
-	const cashflows = parsed.cashflows.filter((flow) => debtKeys.has(flow[1])).map(([_eventKey, sourceKey, eventType, eventDate, amount, sourceSequence]) => ({
+	if(parsed.cashflows.some(flow=>!debtKeys.has(flow[1])))throw new Error('现金流没有对应负债，整个导入已拒绝');
+	const cashflows = parsed.cashflows.map(([_eventKey, sourceKey, eventType, eventDate, amount, sourceSequence]) => ({
 		sourceKey,
 		cashflowType: eventType,
 		dueDate: eventDate,

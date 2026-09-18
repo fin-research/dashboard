@@ -8,7 +8,7 @@ import { cacheSessionUser, invalidateCachedSession, readCachedSessionUser } from
 import { createNeonAuthClient, jwtFromResponseHeaders, NEON_SESSION_COOKIE, sessionMaxAgeFromSetCookie, sessionTokenFromSetCookie } from './fixtures/legacy-auth/neon-auth-client.js';
 import { dataApiUrlFromAuthUrl } from '../../src/lib/financing/neon-urls.js';
 import { deleteProjectWithReminders } from '../../src/lib/server/financing/project-deletion.js';
-import { decodeDebtImportPayload, encodeDebtImportPayload } from '../../src/lib/financing/debt-import-codec.js';
+import { validateWorkbook } from '../../src/lib/financing/debt-import-json.ts';
 import { importDebtWorkbook, refreshDebtImportDerivatives } from '../../src/lib/server/financing/debt-importer.js';
 import { actionNameFromUrl, isAuthorizedRequest, isSafeRequestMethod } from './fixtures/legacy-auth/request-authorization.js';
 import { PERMISSION_CODES } from './fixtures/legacy-auth/permissions.js';
@@ -328,6 +328,7 @@ test('shared debt importer is idempotent and preserves mutable historical fields
 	const db = new PGlite();
 	t.after(() => db.close());
 	await installSchema(db);
+	await db.exec("INSERT INTO public.client(name,type) VALUES ('集团公司','其它')");
 	const transformed = {
 		snapshot: { asOfDate: '2026-09-03', totalYi: 1 },
 		debts: [{
@@ -348,10 +349,10 @@ test('shared debt importer is idempotent and preserves mutable historical fields
 	assert.equal(updated.insertedDebtCount, 0);
 	assert.equal(updated.updatedDebtCount, 0);
 	assert.equal(updated.skippedDebtCount, 1);
-	const decoded = decodeDebtImportPayload(encodeDebtImportPayload(transformed));
-	const protobufUpdated = await importDebtWorkbook(db, decoded);
-	assert.equal(protobufUpdated.insertedDebtCount, 0);
-	assert.equal(protobufUpdated.updatedDebtCount, 0);
+	const decoded = validateWorkbook(JSON.parse(JSON.stringify(transformed)));
+	const jsonUpdated = await importDebtWorkbook(db, decoded);
+	assert.equal(jsonUpdated.insertedDebtCount, 0);
+	assert.equal(jsonUpdated.updatedDebtCount, 0);
 	const rows = (await db.query("SELECT amount, annual_rate FROM financing.debt WHERE name = '集团借款·集团公司·2026-09-01'")).rows;
 	assert.equal(rows.length, 1);
 	assert.equal(Number(rows[0].amount), 100000000);

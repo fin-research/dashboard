@@ -1,19 +1,9 @@
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
-import fs from 'node:fs';
 import test from 'node:test';
 import * as XLSX from 'xlsx/xlsx.mjs';
 import { parseDebtWorkbookData } from '../../scripts/financing/lib/excel-import.mjs';
 import { transformWorkbook } from '../../scripts/financing/lib/debt-transform.mjs';
-import {
-	decodeDebtImportPayload,
-	encodeDebtImportPayload,
-	MAX_WORKFLOW_EVENT_BYTES,
-	workflowEventSize,
-	workflowPayloadBase64
-} from '../../src/lib/financing/debt-import-codec.js';
-
-const brotli = createRequire(import.meta.url)('brotli-wasm');
+import { validateWorkbook, validateIncrement, incrementForPlan, balanceKey } from '../../src/lib/financing/debt-import-json.ts';
 
 function workbookFixture() {
 	const workbook = XLSX.utils.book_new();
@@ -55,58 +45,44 @@ test('uploaded workbook is parsed and transformed directly without persisting th
 	assert.equal(transformed.balances.length, 10);
 });
 
-test('generated Protobuf payload survives Brotli round-trip within the Workflow event contract', () => {
-	const transformed = transformWorkbook(parseDebtWorkbookData(
-		workbookFixture(),
-		'东方财富证券借入资金汇总表20260903.xlsx'
-	));
-	const protobuf = encodeDebtImportPayload(transformed);
-	const compressed = brotli.compress(protobuf, { quality: 10 });
-	const decoded = decodeDebtImportPayload(brotli.decompress(compressed));
-	assert.equal(decoded.asOfDate, '2026-09-03');
-	assert.equal(decoded.totalYi, 55);
-	const debts = [...decoded.debtBatches()].flat();
-	const cashflows = [...decoded.cashflowBatches()].flat();
-	const balances = [...decoded.balanceBatches()].flat();
-	assert.equal(debts.length, 1);
-	assert.equal(debts[0].debtType, '集团借款');
-	assert.equal(cashflows.length, 0);
-	assert.equal(balances.length, 10);
-	assert.ok(workflowEventSize(
-		workflowPayloadBase64(compressed),
-		'东方财富证券借入资金汇总表20260903.xlsx',
-		1_397_495
-	) < MAX_WORKFLOW_EVENT_BYTES);
+test('JSON workbook validation preserves rows and rejects invalid dates, money, or orphan cashflows', () => {
+ const transformed=transformWorkbook(parseDebtWorkbookData(workbookFixture(),'借入资金汇总表20260903.xlsx'));
+ const parsed=validateWorkbook(JSON.parse(JSON.stringify(transformed)));
+ assert.equal(parsed.debts.length,1);assert.equal(parsed.balances.length,10);
+ assert.throws(()=>validateWorkbook({...transformed,debts:[{...transformed.debts[0],issueDate:'2026-02-30'}]}));
+ assert.throws(()=>validateWorkbook({...transformed,debts:[{...transformed.debts[0],amount:-1}]}));
+ assert.throws(()=>validateWorkbook({...transformed,cashflows:[{sourceKey:'missing',cashflowType:'principal',dueDate:'2026-09-03',amount:1}]}),/没有对应新增负债/);
+ assert.throws(()=>validateIncrement({...parsed,snapshot:{...parsed.snapshot,totalYi:99}}),/余额分项/);
 });
 
-test('online import uses client Protobuf plus idempotent Workflow and no database staging', () => {
-	const [route, workflow, config, panel, browserWorker, migration] = [
-		fs.readFileSync(new URL('../../src/routes/financing/data/import/+server.ts', import.meta.url), 'utf8'),
-		fs.readFileSync(new URL('../../worker/financing-debt-import.ts', import.meta.url), 'utf8'),
-		fs.readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8'),
-		fs.readFileSync(new URL('../../src/lib/financing/DebtImportPanel.svelte', import.meta.url), 'utf8'),
-		fs.readFileSync(new URL('../../src/lib/financing/debt-import.worker.js', import.meta.url), 'utf8'),
-		fs.readFileSync(new URL('../../financing-migrations/0022_remove_debt_import_state.sql', import.meta.url), 'utf8')
-	];
-	assert.match(route, /request\.arrayBuffer\(\)/);
-	assert.doesNotMatch(route, /parseDebtWorkbookData|stageDebtImportPayload|getDatabase/);
-	assert.match(route, /DEBT_IMPORT_WORKFLOW\.createBatch/);
-	assert.match(route, /sha256Hex\(payloadBytes\)/);
-	assert.match(route, /instance\.restart\(\)/);
-	assert.doesNotMatch(route, /R2|LIABILITY_REPORT_SNAPSHOTS|\.put\(/);
-	assert.match(workflow, /brotliDecompressSync/);
-	assert.match(workflow, /decodeDebtImportPayload/);
-	assert.match(workflow, /importDebtWorkbook/);
-	assert.match(workflow, /refreshDerivatives: true/);
-	assert.doesNotMatch(workflow, /DebtImportRun|debt-import-runs|debt_import_/);
-	assert.match(config, /"name": "financing-debt-import"/);
-	assert.match(config, /"class_name": "DebtImportWorkflow"/);
-	assert.match(panel, /function schedulePoll\(runId: string, delay = 1500\)/);
-	assert.match(panel, /new Worker\(new URL\('\.\/debt-import\.worker\.js'/);
-	assert.match(browserWorker, /parseDebtWorkbookData\(event\.data\.workbookData/);
-	assert.match(browserWorker, /encodeDebtImportPayload\(transformed\)/);
-	assert.match(browserWorker, /brotli\.compress\(protobuf, \{ quality: 10 \}\)/);
-	assert.doesNotMatch(panel, /原始 Excel 不上传/);
-	assert.match(migration, /DROP TABLE IF EXISTS financing\.debt_import_payloads/);
-	assert.match(migration, /DROP TABLE IF EXISTS financing\.debt_import_runs/);
+test('Excel import refuses a malformed sheet or cashflow instead of silently dropping it',()=>{
+ const workbook=XLSX.read(workbookFixture(),{type:'array'});
+ XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['无效表头'],['不能丢弃的数据']]),'同业拆借');
+ assert.throws(()=>parseDebtWorkbookData(XLSX.write(workbook,{type:'array',bookType:'xlsx'}),'借入资金汇总表20260903.xlsx'),/无法识别表头/);
+ delete workbook.Sheets['同业拆借'];workbook.SheetNames.pop();
+ workbook.Sheets['集团借款']=XLSX.utils.aoa_to_sheet([['名称','借款对象','借入金额','起息日','到期日','应付利息'],['测试','集团公司',100,'2026-09-01',null,1]]);
+ assert.throws(()=>parseDebtWorkbookData(XLSX.write(workbook,{type:'array',bookType:'xlsx'}),'借入资金汇总表20260903.xlsx'),/缺少有效日期/);
+});
+
+
+test('derived movement summary is allowed but a business row without money is refused',()=>{
+ const workbook=XLSX.read(workbookFixture(),{type:'array'});
+ XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([['起息','到期','变化']]),'变动');
+ const read=()=>parseDebtWorkbookData(XLSX.write(workbook,{type:'array',bookType:'xlsx'}),'借入资金汇总表20260903.xlsx');
+ assert.equal(transformWorkbook(read()).debts.length,1);
+ workbook.Sheets['集团借款']=XLSX.utils.aoa_to_sheet([['名称','借款对象','借入金额','起息日','到期日'],['测试','集团公司',null,'2026-09-01','2027-09-01']]);
+ assert.throws(()=>transformWorkbook(read()),/缺少金额/);
+});
+
+
+test('browser increment excludes stored business records while retaining the complete identity manifest',()=>{
+ const workbook=validateWorkbook(transformWorkbook(parseDebtWorkbookData(workbookFixture(),'借入资金汇总表20260903.xlsx')));
+ const old=workbook.debts[0];
+ const newDebt={...old,sourceKey:'new-debt',name:'新增借款',amount:20};
+ const parsed=validateWorkbook({...workbook,debts:[old,newDebt],cashflows:[{sourceKey:old.sourceKey,cashflowType:'principal',dueDate:'2026-09-03',amount:100},{sourceKey:newDebt.sourceKey,cashflowType:'principal',dueDate:'2026-09-03',amount:20}]});
+ const increment=incrementForPlan(parsed,{version:'verified',newKeys:['new-debt'],balanceKeys:parsed.balances.map(balanceKey)});
+ assert.equal(increment.identities.length,2);assert.deepEqual(increment.debts,[newDebt]);
+ assert.deepEqual(increment.cashflows.map(c=>c.sourceKey),['new-debt']);assert.equal(increment.balances.length,0);
+ assert.equal(increment.snapshotBalances.length,10);
+ assert.throws(()=>incrementForPlan(parsed,{version:'verified',newKeys:['unknown'],balanceKeys:[]}),/无效负债/);
 });

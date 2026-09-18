@@ -112,8 +112,7 @@ test('data administration gets its endpoint with the private token request', asy
 	assert.match(table, /new NeonDataApi\(\)/);
 	assert.doesNotMatch(page, /dataApiUrl/);
 	assert.match(importer, /fetch\(withBase\('\/data\/import'\)/);
-	assert.match(importer, /function schedulePoll\(runId: string, delay = 1500\)/);
-	assert.match(importer, /if \(\['parsing', 'queued', 'running'\]\.includes\(payload\.run\.status\)\)/);
+	// Increment selection and JSON request failures are covered by debt-import tests.
 });
 
 test('liability report page reads one snapshot and generation splits business and raw market Data API reads', async () => {

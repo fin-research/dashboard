@@ -28,13 +28,14 @@ const row = (overrides = {}) => ({ bondName: '债甲', investorName: '甲基金'
 
 test('investor imports preserve split allocations, unknowns, rollback and repeat-run idempotence', async t => {
   const db = await database(t); await bond(db);
+  const existingClients=(await db.query('SELECT * FROM public.client ORDER BY id')).rows;
   const parsed = { rows: [row({ amount: 40 }), row({ amount: 60 }), row({ investorName: '未知', category: '其他', amount: 200 })] };
   await db.exec('BEGIN');
   const preview = await importBondInvestors(db, parsed);
   assert.equal(preview.storedRows, 2); assert.equal(preview.sourceRows, 3);
   await db.exec('ROLLBACK');
   assert.equal((await db.query('SELECT * FROM financing.bond_investors')).rows.length, 0);
-  assert.equal((await db.query('SELECT * FROM public.client')).rows.length, 0);
+  assert.deepEqual((await db.query('SELECT * FROM public.client ORDER BY id')).rows, existingClients);
   await db.exec('BEGIN'); const first = await importBondInvestors(db, parsed); await db.exec('COMMIT');
   assert.equal(first.insertedRows, 2); assert.equal(first.unknownAmount, 200);
   assert.equal((await db.query('SELECT * FROM public.client WHERE name=\'未知\'')).rows.length, 0);

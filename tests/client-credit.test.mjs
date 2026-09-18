@@ -7,6 +7,7 @@ import { loadCreditReport, persistCreditWorkbook, saveCreditInstitution } from '
 import { creditInstitutionUpdateSchema } from '../src/lib/credit/update.ts';
 import { creditItemTypes } from '../src/lib/credit/types.ts';
 import { importDebtWorkbook } from '../src/lib/server/financing/debt-importer.js';
+import { listClients, saveClient } from '../src/lib/server/financing/clients.ts';
 import { transformWorkbook } from '../scripts/financing/lib/debt-transform.mjs';
 
 async function database(t, legacy = false) {
@@ -219,9 +220,9 @@ test('nonempty migration converts all NDA states, consolidates dates and applies
 
 test('explicit bank asset suffixes resolve to separate wealth clients, while unmarked banks and verified investors stay proprietary', async t => {
   const db=await database(t);
-  await db.query("INSERT INTO public.client(name,type,subtype) VALUES ('招商银行资管','理财子','银行资管')");
+  const assetId=(await db.query("INSERT INTO public.client(name,type,subtype) VALUES ('招商银行资管','理财子','银行资管') RETURNING id")).rows[0].id;
   for (const raw of ['招商银行（资管）','招商银行资管','招商银行资产管理部','银行-招商银行股份有限公司(资产管理)']) {
-    assert.equal((await db.query('SELECT public.resolve_client($1) id',[raw])).rows[0].id,4);
+    assert.equal((await db.query('SELECT public.resolve_client($1) id',[raw])).rows[0].id,assetId);
   }
   for (const raw of ['招商银行','银行-招商银行股份有限公司','招商银行（金市）','招商银行自营','银行-申万宏源证券资产管理有限公司（代“申万宏源招行凭证一号单一资产管理计划”）']) {
     assert.equal((await db.query('SELECT public.resolve_client($1) id',[raw])).rows[0].id,1);
@@ -310,4 +311,50 @@ test('alias migration removes redundant exact and regex rules, keeps ownership e
   assert.deepEqual((await db.query("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='client_alias' ORDER BY column_name")).rows.map(r=>r.column_name),['alias','client_id']);
   assert.equal((await db.query("SELECT public.resolve_client('银行-招商银行股份有限公司') id")).rows[0].id,1);
   assert.equal((await db.query("SELECT public.resolve_client('银行-特殊主体') id")).rows[0].id,3);
+});
+
+
+test('unknown client rejects all new debts, cashflows, balances and derivatives',async t=>{
+ const db=await database(t);
+ const payload={snapshot:{asOfDate:'2026-09-04',totalYi:1},debts:[
+ {sourceKey:'a',table:'debt',debtType:'同业拆借',name:'有效',counterparty:'招商银行',amount:100000000,interestPayable:0,extension:{}},
+ {sourceKey:'b',table:'debt',debtType:'同业拆借',name:'无效',counterparty:'未登记银行',amount:1,interestPayable:0,extension:{}}],
+ cashflows:[{sourceKey:'a',cashflowType:'principal',dueDate:'2026-09-10',amount:100000000}],
+ balances:[{asOfDate:'2026-09-04',debtType:'同业拆借',subtype:'',amount:100000000}]};
+ await assert.rejects(importDebtWorkbook(db,payload),/整个导入已拒绝.*未登记银行/);
+ for(const table of ['debt','cashflow','balance_snapshot'])assert.equal((await db.query(`SELECT count(*) n FROM financing.${table}`)).rows[0].n,0);
+});
+
+test('increment plan is read only, commit rejects missing additions and stale versions, exact retry is idempotent',async t=>{
+ const db=await database(t);
+ const payload={snapshot:{asOfDate:'2026-09-04',totalYi:1},debts:[{sourceKey:'a',table:'debt',debtType:'同业拆借',name:'测试',counterparty:'招商银行',amount:100000000,interestPayable:0,extension:{}}],cashflows:[],balances:[{asOfDate:'2026-09-04',debtType:'同业拆借',subtype:'',amount:100000000}]};
+ const plan=await importDebtWorkbook(db,payload,{planOnly:true});assert.deepEqual(plan.newKeys,['a']);
+ assert.equal((await db.query('SELECT count(*) n FROM financing.debt')).rows[0].n,0);
+ await assert.rejects(importDebtWorkbook(db,payload,{expectedVersion:plan.version,expectedNewKeys:[]}),/核对结果不一致/);
+ const result=await importDebtWorkbook(db,payload,{expectedVersion:plan.version,expectedNewKeys:['a']});assert.equal(result.insertedDebtCount,1);
+ await assert.rejects(importDebtWorkbook(db,payload,{expectedVersion:plan.version,expectedNewKeys:['a']}),/台账已发生变化/);
+ const again=await importDebtWorkbook(db,payload,{planOnly:true});assert.deepEqual(again.newKeys,[]);
+ const repeat=await importDebtWorkbook(db,{...payload,balances:[],snapshotBalances:payload.balances},{expectedVersion:again.version,expectedNewKeys:[]});assert.equal(repeat.insertedDebtCount,0);
+});
+
+test('Tianjin Binhai alias resolves both new imports and previously unlinked records',async t=>{
+ const db=await database(t);
+ const client=(await db.query("SELECT id FROM public.client WHERE name='天津滨海农商行'")).rows[0];
+ assert.equal((await db.query("SELECT public.resolve_client('天津滨海农村商行') AS id")).rows[0].id,client.id);
+ await db.exec("DELETE FROM public.client_alias WHERE alias=public.client_match_key('天津滨海农村商行'); INSERT INTO financing.debt(debt_type,name,counterparty,amount) VALUES('同业拆借','旧记录','天津滨海农村商行',1)");
+ await db.exec(fs.readFileSync(new URL('../credit-migrations/0012_tianjin_binhai_client_alias.sql',import.meta.url),'utf8'));
+ assert.equal((await db.query('SELECT client_id FROM financing.debt')).rows[0].client_id,client.id);
+});
+
+test('client maintenance supports search, aliases, conflicts, optimistic concurrency and preservation of existing identity',async t=>{
+ const db=await database(t);
+ const facade={transaction:fn=>db.transaction(tx=>fn(tx))};
+ const created=await saveClient(facade,null,{name:'测试客户',fullname:null,type:'其它',subtype:null,aliases:['测试客户别称']});
+ const listed=await listClients(db,'测试客户别称');assert.equal(listed.total,1);assert.equal(listed.rows[0].id,created.id);
+ assert.equal(String((await db.query("SELECT public.resolve_client('测试客户别称') id")).rows[0].id),created.id);
+ await assert.rejects(saveClient(facade,created.id,{name:'新简称',fullname:null,type:'其它',subtype:null,aliases:[],version:'stale'}),/客户已被修改/);
+ await assert.rejects(saveClient(facade,created.id,{name:'新简称',fullname:null,type:'其它',subtype:null,aliases:['招商银行'],version:created.version}),/别名已关联其他客户/);
+ const saved=await saveClient(facade,created.id,{name:'新简称',fullname:null,type:'其它',subtype:null,aliases:['测试客户别称'],version:created.version});
+ assert.ok(saved.aliases.includes('测试客户'));assert.equal(saved.name,'新简称');
+ assert.equal(String((await db.query("SELECT public.resolve_client('测试客户') id")).rows[0].id),created.id);
 });
