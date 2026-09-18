@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as XLSX from 'xlsx/xlsx.mjs';
 import { parseDebtWorkbookData } from '../../scripts/financing/lib/excel-import.mjs';
 import { transformWorkbook } from '../../scripts/financing/lib/debt-transform.mjs';
-import { validateWorkbook, validateIncrement } from '../../src/lib/financing/debt-import-json.ts';
+import { validateWorkbook, validateIncrement, incrementForPlan, balanceKey } from '../../src/lib/financing/debt-import-json.ts';
 
 function workbookFixture() {
 	const workbook = XLSX.utils.book_new();
@@ -72,4 +72,17 @@ test('derived movement summary is allowed but a business row without money is re
  assert.equal(transformWorkbook(read()).debts.length,1);
  workbook.Sheets['集团借款']=XLSX.utils.aoa_to_sheet([['名称','借款对象','借入金额','起息日','到期日'],['测试','集团公司',null,'2026-09-01','2027-09-01']]);
  assert.throws(()=>transformWorkbook(read()),/缺少金额/);
+});
+
+
+test('browser increment excludes stored business records while retaining the complete identity manifest',()=>{
+ const workbook=validateWorkbook(transformWorkbook(parseDebtWorkbookData(workbookFixture(),'借入资金汇总表20260903.xlsx')));
+ const old=workbook.debts[0];
+ const newDebt={...old,sourceKey:'new-debt',name:'新增借款',amount:20};
+ const parsed=validateWorkbook({...workbook,debts:[old,newDebt],cashflows:[{sourceKey:old.sourceKey,cashflowType:'principal',dueDate:'2026-09-03',amount:100},{sourceKey:newDebt.sourceKey,cashflowType:'principal',dueDate:'2026-09-03',amount:20}]});
+ const increment=incrementForPlan(parsed,{version:'verified',newKeys:['new-debt'],balanceKeys:parsed.balances.map(balanceKey)});
+ assert.equal(increment.identities.length,2);assert.deepEqual(increment.debts,[newDebt]);
+ assert.deepEqual(increment.cashflows.map(c=>c.sourceKey),['new-debt']);assert.equal(increment.balances.length,0);
+ assert.equal(increment.snapshotBalances.length,10);
+ assert.throws(()=>incrementForPlan(parsed,{version:'verified',newKeys:['unknown'],balanceKeys:[]}),/无效负债/);
 });

@@ -5,7 +5,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { globalMessages } from '$lib/global-messages';
-  import { balanceKey, type ImportCommit } from './debt-import-json';
+  import { incrementForPlan, type ImportCommit } from './debt-import-json';
   import { withBase } from './app-paths';
   let file = $state<File | null>(null);
   let busy = $state(false);
@@ -33,11 +33,7 @@
       });
       phase='核对中';
       const plan=await post({action:'plan',snapshot:parsed.snapshot,identities:parsed.identities});
-      const keys=new Set<string>(plan.newKeys);
-      const balances=new Set<string>(plan.balanceKeys);
-      const increment={...parsed,action:'commit',version:plan.version,
-        debts:parsed.debts.filter(d=>keys.has(d.sourceKey)),cashflows:parsed.cashflows.filter(c=>keys.has(c.sourceKey)),
-        balances:parsed.balances.filter(b=>!balances.has(balanceKey(b)))};
+      const increment=incrementForPlan(parsed,plan);
       phase='提交中';
       const result=await post(increment);
       globalMessages.success(`新增 ${result.insertedDebtCount} 笔负债、${result.insertedCashflowCount} 笔现金流；保留 ${result.skippedDebtCount} 笔历史负债`,{title:'导入完成',duration:0});

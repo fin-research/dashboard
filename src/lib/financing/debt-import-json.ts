@@ -68,3 +68,18 @@ export function validateIncrement(input: ImportCommit) {
   if(Math.abs(total-input.snapshot.totalYi)>0.0001) throw new DebtImportError('余额分项与汇总不一致');
 }
 export function balanceKey(b: {asOfDate:string;debtType:string;subtype?:string|null}) {return JSON.stringify([b.asOfDate,b.debtType,b.subtype??'']);}
+
+
+/** Keep historical business values in the browser and send only selected additions. */
+export function incrementForPlan(workbook: ImportCommit, rawPlan: unknown): ImportCommit {
+  const plan=z.object({version:z.string().min(1).max(200),newKeys:z.array(text).max(100000),balanceKeys:z.array(z.string()).max(100000)}).parse(rawPlan);
+  const keys=new Set(plan.newKeys);
+  const sourceKeys=new Set(workbook.identities.map(d=>d.sourceKey));
+  if(keys.size!==plan.newKeys.length || plan.newKeys.some(key=>!sourceKeys.has(key)))throw new DebtImportError('核对结果包含无效负债，请重新导入');
+  const balances=new Set(plan.balanceKeys);
+  const increment:ImportCommit={...workbook,version:plan.version,
+    debts:workbook.debts.filter(d=>keys.has(d.sourceKey)),cashflows:workbook.cashflows.filter(c=>keys.has(c.sourceKey)),
+    balances:workbook.balances.filter(b=>!balances.has(balanceKey(b)))};
+  validateIncrement(increment);
+  return increment;
+}
