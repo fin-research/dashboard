@@ -40,7 +40,7 @@ const activeLabel = $derived(path.startsWith('/projects/') ? '项目详情' : pa
 
 
 {#if data.user}
-<WorkbenchShell title="融资工作台" homeHref="/financing/" {views} {activeViewId} {activeLabel}
+<WorkbenchShell title="融资工作台" homeHref="/financing/" {views} {activeViewId} {activeLabel} activeHref={page.url.pathname}
   class="financing-scope" tone="orange" layoutReport={isLiabilityReport} reportKind={isLiabilityReport ? 'liability' : null}>
   {#snippet actions()}
     <Popover.Root bind:open={remindersOpen}>

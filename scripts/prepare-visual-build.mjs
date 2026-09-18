@@ -34,6 +34,7 @@ const map = {
   '/': stylesFor(layout, 'src/routes/+page.svelte'),
   '/trading-research': stylesFor(layout, 'src/routes/trading-research/+page.svelte', 'src/routes/trading-research/[view]/+page.svelte'),
   '/credit-workbench': stylesFor(layout, 'src/routes/credit-workbench/[[view]]/+page.svelte'),
+  '/fund-report': stylesFor(layout, 'src/routes/fund-report/+page.svelte'),
   '/market-briefing': stylesFor(layout, 'src/routes/market-briefing/+page.svelte'),
   '/management/messenger': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/messenger/+page.svelte'),
   '/financing/schedule': [...new Set([...stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte'), ...moduleCardStyles])],

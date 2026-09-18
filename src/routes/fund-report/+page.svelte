@@ -4,7 +4,7 @@
   import { getContext, onMount } from 'svelte';
   import { invalidate } from '$app/navigation';
   import { page } from '$app/state';
-  import AuthMenu from '$lib/AuthMenu.svelte';
+  import PageHeader from '$lib/workbench/PageHeader.svelte';
   import FundReportUploadDialog from '$lib/FundReportUploadDialog.svelte';
   import { requireClientPermission, isLoginRedirecting } from '$lib/auth-client';
   import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
@@ -61,25 +61,14 @@
 </svelte:head>
 
 <div class="fund-report-page">
-  <header class="fund-report-header">
-    <div class="fund-report-title-block">
-      <a class="fund-report-back" href="/" aria-label="返回市场研究门户">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 4-6 6 6 6" /></svg>
-      </a>
-      <h1>
-        <span>资金管理部</span>
-        <span class="title-dot" aria-hidden="true">•</span>
-        <span class="title-subject">历史资金日报</span>
-      </h1>
-    </div>
-    <div class="header-actions">
+  <PageHeader section={{label: '资金日报', href: '/fund-report'}}>
+    {#snippet actions()}
       <Button permission="admin" data-ui-owner="routes-fund-report--page-svelte" variant="outline" class={"ui-button upload-entry"} type="button" disabled={checkingLogin} onclick={openUpload}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6" /></svg>
         {checkingLogin ? '正在检查登录' : '上传资金日报'}
       </Button>
-      <AuthMenu />
-    </div>
-  </header>
+    {/snippet}
+  </PageHeader>
 
   <main>
     <section class="report-panel" aria-labelledby="fund-report-list-title">
@@ -137,10 +126,8 @@
 <FundReportUploadDialog bind:this={uploadDialog} onuploaded={refreshReports} />
 
 <style>
-  .header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
   :global(.upload-entry[data-ui-owner="routes-fund-report--page-svelte"]) { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; }
   :global(.upload-entry[data-ui-owner="routes-fund-report--page-svelte"] svg) { width: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  @media (max-width: 720px) { .fund-report-header { flex-wrap: wrap; gap: 12px; } }
 
   .fund-report-page {
     width: min(100%, 2100px);
@@ -151,15 +138,6 @@
     background: var(--bg-page);
   }
 
-  .fund-report-header {
-    display: flex;
-    min-height: 64px;
-    align-items: center;
-    padding: 4px 2px 12px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .fund-report-title-block,
   .panel-heading,
   .panel-heading > div,
   .report-date,
@@ -169,54 +147,6 @@
     align-items: center;
   }
 
-  .fund-report-title-block {
-    min-width: 0;
-    gap: 10px;
-  }
-
-  .fund-report-title-block h1 {
-    display: flex;
-    min-width: 0;
-    align-items: baseline;
-    gap: 9px;
-    margin: 0;
-    color: var(--text-2);
-    font-size: 1.5rem;
-    font-weight: bolder;
-    letter-spacing: -0.025em;
-  }
-
-  .title-dot {
-    color: color-mix(in srgb, var(--brand) 72%, var(--text-muted));
-  }
-
-  .title-subject {
-    color: var(--brand-deep);
-  }
-
-  .fund-report-back {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    flex: 0 0 auto;
-    place-items: center;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-control);
-    color: var(--brand-deep);
-    background: var(--surface);
-    box-shadow: var(--shadow-card);
-    text-decoration: none;
-    transition:
-      border-color 160ms ease,
-      background 160ms ease;
-  }
-
-  .fund-report-back:hover {
-    border-color: var(--brand);
-    background: var(--brand-soft);
-  }
-
-  .fund-report-back svg,
   .panel-icon svg,
   .report-state svg,
   .report-open svg {
@@ -225,10 +155,6 @@
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-width: 1.9;
-  }
-
-  .fund-report-back svg {
-    width: 20px;
   }
 
   main {
@@ -398,7 +324,6 @@
     color: var(--red);
   }
 
-  .fund-report-back:focus-visible,
   .report-list a:focus-visible,
   .report-state a:focus-visible {
     position: relative;
@@ -410,12 +335,6 @@
   @media (max-width: 720px) {
     .fund-report-page {
       padding-inline: 12px;
-    }
-
-    .fund-report-title-block h1 {
-      flex-wrap: wrap;
-      gap: 3px 7px;
-      font-size: 1.25rem;
     }
 
     main {
@@ -444,10 +363,6 @@
   }
 
   @media (max-width: 460px) {
-    .title-dot,
-    .fund-report-title-block h1 > span:first-child {
-      display: none;
-    }
 
     .panel-heading {
       align-items: flex-start;
@@ -471,7 +386,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .fund-report-back,
     .report-list a {
       transition: none;
     }

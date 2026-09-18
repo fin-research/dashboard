@@ -10,3 +10,5 @@ export function goto(url) { window.location.assign(String(url)); return Promise.
  * @param {(event: {cancel: () => void}) => void} _callback
  */
 export function beforeNavigate(_callback) {}
+
+export function invalidate() { return Promise.resolve(); }

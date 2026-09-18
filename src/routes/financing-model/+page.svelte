@@ -1,5 +1,5 @@
 <script lang="ts">
-  import FinancingModelPage from "$lib/pages/FinancingModelPage.svelte";
+  import WorkbenchPage from "$lib/trading-research/WorkbenchPage.svelte";
 </script>
 
-<FinancingModelPage />
+<WorkbenchPage viewId="financing-model" />

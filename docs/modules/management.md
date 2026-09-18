@@ -53,3 +53,7 @@
 前端复用 permissionVisibility、Button permission 和路由契约控制入口可见性；WorkbenchShell 自动过滤无权页面。原生链接、表单及 data-permission 控件由 auth-controls 同步隐藏，移除焦点并保留请求前置检查。新写控件必须声明权限；服务端准入仍由 Gateway 负责。
 
 PWA manifest 与 service-worker 为公开静态资产；Service Worker 只缓存离线页和图标，不缓存登录态页面/API。Push 在后台展示，设置 `requireInteraction: true` 请求保留至用户点击或关闭，并将点击限定为本站地址。系统通知样式仍由浏览器与操作系统决定；macOS 需将 Chrome 通知设为持续提醒才能让屏幕横幅持续显示。当前设备启用必须由用户点击授权；不在页面加载时请求通知权限。
+
+## 通知管理标签页
+
+`/management/messenger` 的消息投递和测试消息复用共享 header 标签栏，以 `?tab=delivery` / `?tab=test` 深链选择；缺省与未知值回到消息投递。复制链接、刷新及浏览器历史恢复同一标签页。`NotificationManagement` 只负责当前页内容，标签导航由管理 layout 维护。管理员权限和发送动作校验保持原有边界。

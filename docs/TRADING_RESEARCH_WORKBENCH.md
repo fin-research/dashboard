@@ -170,3 +170,7 @@
 交易提醒改由 Messenger 统一定时触发 NotificationSource；浏览器前台不再调用 new Notification。每日启用品种、完成状态和分支状态通过 `/api/trading-workflow/day` 存入 D1 `trading_workflow_progress`，按 Auth0 subject/上海日期隔离，字段增量以 revision 条件更新避免多设备覆盖。首次打开当日已有本地状态时同步调度字段；询价行、备注和名单继续本地保存。共享节点配置接口保持原有乐观锁。
 
 提醒扫描仅工作日，按上海时区节点开始/结束时间、启用品种、分支及完成状态选择最近五分钟到点任务；事件幂等键包含用户、日期、节点和时点。通知类型与 email/Telegram/Web Push 在管理“通知”页配置，浏览器关闭后仍由服务端扫描。
+
+## 页面层级
+
+交易研究工作台为一级入口，左侧导航为二级页面；页面内存在多个独立视图时才使用共享 header 三级标签页。页面标题和深链由 `WorkbenchShell` / `PageHeader` 统一维护，普通页与版式报告共用 header 样式；二级池周报保持原有单面正文，不按参考图增设标签或改动业务模块。三个独立报告兼容入口也复用 `WorkbenchPage`。

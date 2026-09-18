@@ -6,10 +6,10 @@ test('报告只读取归档，控件的选择悬浮按下及焦点状态可辨�
   const requests=[];
   page.on('request',request=>{if(/\/(api|data)\//.test(request.url()))requests.push(request);});
   await page.goto('/market-briefing');
-  const visual=page.getByRole('button',{name:'可视化',exact:true});
-  const text=page.getByRole('button',{name:'文字版',exact:true});
+  const visual=page.getByRole('link',{name:'可视化',exact:true});
+  const text=page.getByRole('link',{name:'文字版',exact:true});
   await expect(page.getByRole('heading',{name:'今日聚焦'})).toBeVisible();
-  await expect(visual).toHaveAttribute('aria-pressed','true');
+  await expect(visual).toHaveAttribute('aria-current','page');
   await expect(page.getByRole('button',{name:/生成聚焦|保存市场点评/})).toHaveCount(0);
   expect(requests.map(request=>new URL(request.url()).pathname)).toEqual(['/api/market-report']);
   expect(requests.every(request=>request.method()==='GET')).toBe(true);
@@ -23,7 +23,7 @@ test('报告只读取归档，控件的选择悬浮按下及焦点状态可辨�
     expect(await text.evaluate(el=>getComputedStyle(el).filter)).not.toBe('none');
     await page.mouse.up();
   } else await text.click();
-  await expect(text).toHaveAttribute('aria-pressed','true');
+  await expect(text).toHaveAttribute('aria-current','page');
   await expect(page.locator('.text-report__editor')).toHaveAttribute('contenteditable','false');
   await visual.focus();
   await page.keyboard.press("Tab");
@@ -42,4 +42,19 @@ test('未归档报告明确报错，重新尝试仍只读取归档', async ({ pa
   await page.getByRole('button',{name:'重新尝试'}).click();
   await expect.poll(()=>calls.length).toBe(2);
   expect(unexpected).toEqual([]);
+});
+
+
+test('市场点评标签链接可直达并保留日期和浏览器历史', async ({ page }) => {
+  await mockResources(page);
+  await page.goto('/market-briefing/text?date=2026-09-15');
+  const tabs = page.getByRole('navigation', { name: '标签页' });
+  await expect(tabs.getByRole('link', { name: '文字版', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.text-report__editor')).toBeVisible();
+  await tabs.getByRole('link', { name: '可视化', exact: true }).click();
+  await expect(page).toHaveURL(/market-briefing\?date=2026-09-15$/);
+  await page.goBack();
+  await expect(page.locator('.text-report__editor')).toBeVisible();
+  await page.reload();
+  await expect(tabs.getByRole('link', { name: '文字版', exact: true })).toHaveAttribute('aria-current', 'page');
 });

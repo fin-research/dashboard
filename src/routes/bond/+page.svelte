@@ -1,5 +1,5 @@
 <script lang="ts">
-  import BondLedgerPage from "$lib/pages/BondLedgerPage.svelte";
+  import WorkbenchPage from "$lib/trading-research/WorkbenchPage.svelte";
 </script>
 
-<BondLedgerPage />
+<WorkbenchPage viewId="bond" />
