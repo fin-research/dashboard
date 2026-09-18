@@ -19,13 +19,13 @@ export default defineConfig({
     reducedMotion: 'reduce', serviceWorkers: 'block',
     trace: 'retain-on-failure', screenshot: 'only-on-failure',
   },
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: [['list'], ['html', { open: 'never' }], ['./scripts/visual-coverage-reporter.mjs']],
   projects: [
     { name: 'desktop', use: { viewport: { width: 1440, height: 900 } } },
     { name: 'mobile', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
   ],
   webServer: {
-    command: 'pnpm exec vite --config vite.visual.config.mjs',
+    command: 'pnpm exec vite preview --config vite.visual.config.mjs',
     url: 'http://127.0.0.1:8877', reuseExistingServer: false, timeout: 120_000,
   },
 });

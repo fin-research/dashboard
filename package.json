@@ -39,9 +39,13 @@
     "auth0:apply": "node --use-env-proxy scripts/auth0-deploy.mjs apply",
     "test:coverage": "mkdir -p coverage && node --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-include='src/**/*.js' --test-coverage-exclude='src/**/generated/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.mjs tests/financing/*.test.mjs",
     "test:visual": "playwright test",
-    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:update": "playwright test --update-snapshots=all",
     "test:visual:report": "playwright show-report",
-    "test:python": "uv run tests/test_credit_materials.py"
+    "test:python": "uv run tests/test_credit_materials.py",
+    "check:visual-coverage": "node scripts/check-visual-coverage.mjs",
+    "visual:baseline:import": "node scripts/visual-baselines.mjs import",
+    "test:ci-tools": "node --test scripts/tests/visual-ci.test.mjs",
+    "build:visual": "vite build --config vite.visual.config.mjs && node scripts/prepare-visual-build.mjs"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.1",

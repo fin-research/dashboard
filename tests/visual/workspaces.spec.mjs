@@ -146,8 +146,10 @@ test('credit failure is visible instead of an empty success', async ({ page }) =
   await screenshot(page, 'credit-error');
 });
 
-test('schedule switches modes and resets without stale fields', async ({ page }) => {
+test('schedule switches modes and resets without stale fields', async ({ page }, testInfo) => {
   await page.goto('/financing/schedule');
+  // The synthetic route must also load its wrapper's shipping component CSS.
+  await expect(page.locator('.module-card')).toHaveCSS('padding-left', testInfo.project.name === 'mobile' ? '15px' : '18px');
   await page.getByRole('combobox', { name: '节点时间配置' }).selectOption('point');
   await expect(page.getByRole('spinbutton', { name: '节点启动偏移天数' })).toHaveCount(0);
   await page.getByRole('spinbutton', { name: '节点计划偏移天数' }).fill('2');

@@ -87,4 +87,4 @@ Auth0 租户配置与用户资料服务由 Gateway 维护。Dashboard 只经 `ID
 
 ## 测试规范
 
-测试新增、合并、覆盖率与视觉回归按 [TESTING](docs/TESTING.md) 执行；不要通过源码样式或控件数量锁定代替行为验证。
+页面或视觉变更先更新 `visual-coverage.json` 的证据/明确豁免；有意视觉变化在创建 PR 前主动生成、核对并导入当前 SHA 的 CI baseline 候选，不等待普通 CI 报截图差异。测试新增、合并、覆盖率与视觉回归按 [TESTING](docs/TESTING.md) 执行；不要通过源码样式或控件数量锁定代替行为验证。
