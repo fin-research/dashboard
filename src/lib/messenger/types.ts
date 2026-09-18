@@ -8,3 +8,6 @@ export interface DeliveryDetail extends Delivery {
   history: { number: number; started_at: number; finished_at: number | null; status: string; provider_id: string | null; error: string | null }[];
   retries: {actor: string; created_at: number; previous_status: string}[];
 }
+
+export interface TestRecipient {id:string;name:string;email:string}
+export interface TestSendResult {id:string;status:string;deliveries:number;skipped:{userId:string;channel:string;reason:string}[]}

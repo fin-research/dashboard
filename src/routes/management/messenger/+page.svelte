@@ -1,5 +1,5 @@
 <script lang="ts">
-  import MessengerView from '$lib/messenger/MessengerView.svelte';
+  import NotificationManagement from '$lib/messenger/NotificationManagement.svelte';
   let {data,form}=$props();
 </script>
-<MessengerView {...data} message={form?.message} />
+<NotificationManagement {...data} message={form?.message} />
