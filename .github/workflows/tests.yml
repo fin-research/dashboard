@@ -1,8 +1,10 @@
 name: Tests and visual regression
 on:
   pull_request:
-  push:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,32 +12,44 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  test:
-    name: Dashboard CI
-    # Match the committed native macOS baselines. No containers or login secrets.
+  unit:
+    name: Unit tests and coverage
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - run: npm install --global pnpm@10.33.2
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-ci
+      - uses: astral-sh/setup-uv@v6
         with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          cache-dependency-glob: tests/test_credit_materials.py
+      - run: pnpm test:python
+      - run: pnpm test:coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-evidence
+          path: coverage/
+          retention-days: 14
+  build-visual:
+    name: Build and visual regression
+    if: github.event_name != 'pull_request'
+    # Preserve the OS, browser, production CSS and screenshot tolerance.
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-ci
+        with:
+          browser: 'true'
       - run: pnpm test:ci-tools
       - run: pnpm check:visual-coverage
       - name: Check types and diff
         run: pnpm check:quick
-      - uses: astral-sh/setup-uv@v6
-      - run: pnpm test:python
-      - run: pnpm test:coverage
-      # Types already passed above; the normal pnpm build retains both checks.
       - name: Build production bundle
         run: pnpm exec vite build
       - name: Prepare browser bundle with shipping CSS
         run: pnpm build:visual
-      - run: pnpm exec playwright install chromium
       - name: Compare visual baselines
         run: pnpm test:visual
         env:
@@ -43,11 +57,28 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-evidence
+          name: visual-evidence
           path: |
-            coverage/
             playwright-report/
             test-results/
             visual-dist/production-css.json
             tests/visual/__screenshots__/macos-ci/
           retention-days: 14
+  gate:
+    name: Dashboard CI
+    needs: [unit, build-visual]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read enforced merge rules for PR admission
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/$GITHUB_REPOSITORY/rules/branches/main" > "$RUNNER_TEMP/dashboard-rules.json"
+      - name: Require queue protection or every full check
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/ci-gate.mjs

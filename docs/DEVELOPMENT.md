@@ -20,11 +20,14 @@ pnpm dev
 
 本地默认不重复全量覆盖率、浏览器截图或生产构建；排障需要时可以运行，无需额外申请。`pnpm build` 仍包含两类类型检查，已经对同一份改动成功构建时无需另跑类型检查。`check:quick` 不连接业务数据库、不调用线上服务；SvelteKit 类型同步会写入本地生成目录 `.svelte-kit`。本地检查通过后才进入以下流程，不能用本地结果替代 CI。
 
-1. 主代理修改代码并划定本任务文件，每次派一个新的子代理负责提交、推送任务分支和创建/更新 PR；禁止直接推送 `main`。
-2. PR 创建/更新和 `main` push 触发 `.github/workflows/tests.yml` 的 `Dashboard CI`；普通任务分支 push 不单独触发，推送后须创建 PR（草稿 PR 也运行），避免同一更新 push/PR 双跑。依次执行 `pnpm check:quick`、Python 测试、Node 单元/契约测试与覆盖率、`pnpm exec vite build`、`pnpm build:visual`（复用生产 CSS）、Playwright 截图比较与浏览器交互。CI 构建复用前序类型检查结果，不在同一次运行重复检查；所有改动均运行完整检查，不按路径跳过。依赖下载使用 pnpm 缓存，安装仍采用 frozen lockfile。
-3. 子代理等待当前提交的 PR 运行结束，核对 PR 最新 head SHA、check 名称、结论与运行链接。同一 PR 新提交自动取消旧 CI，只以最新提交的检查为准；`main` 正在运行的检查不自动取消。失败、取消、跳过或尚未完成均不能作为通过；返回失败日志，由主代理修复并重新委派推送和核验。
-4. `main` ruleset 要求 PR 和 GitHub Actions 来源的 `Dashboard CI`，分支必须基于最新 `main` 通过检查；不要求额外人工批准，不设置管理员或应用 bypass，禁止删除/强推。配置源为 `.github/main-ruleset.json`；修改此文件不会自动修改 GitHub 规则，须使用仓库 rulesets API 应用并读回核验。
-5. CI 通过且交付范围允许合并时，子代理通过普通 PR 合并（禁止 `--admin`），核对合并提交、`main` CI 和 Cloudflare 构建状态。报告记录 SHA 与实际运行结果；CI 成功不代表生产鉴权或全部路由 E2E 已验收。
+1. 主代理修改代码并划定本任务文件，每次派一个新的子代理负责提交、推送任务分支和创建/更新 PR；禁止直接推送 `main`。有意视觉变化先生成、审阅并提交候选截图，再入队。
+2. 普通分支 push 不运行 CI；PR 创建/更新仅执行轻量入队门禁，核对线上已强制启用 merge queue 和 GitHub Actions 来源的 `Dashboard CI`。PR 上的绿色门禁只表示可以入队，不能报告为测试通过。草稿 PR 也不跑全量验收。
+3. 准备合并时使用 `gh pr merge <number> --auto` 加入 GitHub 合并队列（禁止 `--admin`）；完整 `.github/workflows/tests.yml` 只在 `merge_group` 上自动执行，手动 `workflow_dispatch` 留作排障。队列用最新 main 加上待合并改动生成独立提交；无需为其它 PR 先合并反复更新任务分支。真实 Git/视觉冲突仍须修复，禁止直接覆盖其它任务截图。
+4. 全量检查分为并行的两项：Python 与 Node 完整覆盖率；CI 工具/视觉覆盖门禁、类型检查、生产构建、复用生产 CSS 的浏览器构建及严格截图/交互比较。最后统一 `Dashboard CI` 要求两项均成功，失败、取消、跳过和缺失结果都拒绝合并。保留完整测试范围与截图容差，不按文件路径跳过。
+5. `main` ruleset 同时要求 PR、merge queue 和 GitHub Actions 来源的 `Dashboard CI`；无人工审批要求、无管理员或应用 bypass，禁止删除/强推。队列一次构建/合并一个 PR，避免前序失败引发多个推测合并组重建；不要求作者分支追平 main，最新 main 的兼容性由队列检查保证。配置源 `.github/main-ruleset.json` 必须通过 rulesets API 应用并读回核验；不能只改文件，不能在未启用队列时使用轻量 PR 门禁。
+6. 子代理等待对应 `merge_group` 的完整检查并确认队列完成合并，记录 PR head、合并组 SHA、运行链接、合并提交和 Cloudflare 构建状态。被移出队列、取消、失败或仍在运行均不是交付成功；主代理根据证据修复，再派新的子代理处理。合并后的 main 不重复跑测试、覆盖率或截图；Cloudflare Git 仍负责生产部署。CI 成功不代表生产鉴权或全部路由 E2E 已验收。
+
+pnpm 下载缓存和按 OS/架构/Playwright 版本固定的 Chromium 缓存由 `.github/actions/setup-ci` 共用，依赖安装仍为 frozen lockfile，浏览器安装命令仍核对缺失文件。PR/合并组缓存受 GitHub ref 作用域限制，不能作为其它任务的公共缓存；因此 `dependency-cache.yml` 仅在 main 的依赖/缓存配置变化时预热可共享的默认分支缓存，不执行测试或构建。Python uv 缓存依赖键使用实际声明 PEP 723 依赖的 `tests/test_credit_materials.py`。不缓存构建产物、截图基线、实际截图或测试通过结论。
 
 截图基线、覆盖范围与候选生成规则见 [TESTING](TESTING.md)。`Visual baseline candidates` 只生成待审候选，不能替代 `Dashboard CI`。
 
@@ -51,7 +54,7 @@ pnpm dev
 ## 发布
 
 - `pnpm worker:dev` 用于构建后本地 Worker 检查。
-- 默认将通过必需 CI 的 PR 合并到 GitHub `main`，由 Cloudflare Git 自动构建部署 `eastmoney-dashboard`；核对对应提交的构建状态和线上受影响路由。
+- 默认将 PR 加入合并队列，队列完整 CI 成功后自动合并到 GitHub `main`，由 Cloudflare Git 自动构建部署 `eastmoney-dashboard`；核对对应提交的构建状态和线上受影响路由。
 - 自动部署不可用、失败或有其他必要时，可执行 `pnpm worker:deploy` 手动部署同一份已验证代码。自动构建与手动部署全程无需再次向用户申请授权；不得覆盖其他任务尚未集成的改动。
 - JWT、Auth0、会话、角色配置及其 Secret 由 Gateway 维护；Dashboard 只需要 `IDENTITY` Service Binding。新建或变更绑定须先部署提供对应 entrypoint 的 Gateway。
 - Gateway 变更的发布顺序见 [Gateway DEVELOPMENT](../../gateway/docs/DEVELOPMENT.md)。不能恢复本 Worker 的公网 route、workers.dev、preview 或旧 Access 开关。
