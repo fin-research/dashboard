@@ -22,11 +22,11 @@ test('通知管理测试消息支持编辑、单发群发和渠道选择',async(
   await page.getByRole('tab',{name:'测试消息',exact:true}).click();
   await expect(page.getByLabel('消息内容',{exact:true})).toHaveValue('这是一条测试消息，用于确认通知渠道可以正常接收。');
   await expect(page.getByRole('button',{name:'发送测试消息',exact:true})).toBeDisabled();
-  await page.getByLabel('接收用户',{exact:true}).selectOption('auth0|one');
+  await page.getByRole('combobox',{name:'接收用户',exact:true}).selectOption('auth0|one');
   await page.getByLabel('消息内容',{exact:true}).fill('这是编辑后的测试消息。');
   await expect(page.getByRole('button',{name:'发送测试消息',exact:true})).toBeEnabled();
   await expect(page).toHaveScreenshot('messenger-test-single.png',{fullPage:true});
-  await page.getByLabel('发送方式',{exact:true}).selectOption('multiple');
+  await page.getByRole('combobox',{name:'发送方式',exact:true}).selectOption('multiple');
   await page.getByRole('button',{name:'选择当前结果',exact:true}).click();
   await page.getByRole('checkbox',{name:'Telegram',exact:true}).check();
   await page.getByRole('checkbox',{name:'Web Push',exact:true}).check();
