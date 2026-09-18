@@ -91,3 +91,11 @@ PR #1 的首次检查 `35086092645` 捕获交易流程展开截图的测量竞�
 ## 通知中台与PWA验收
 
 候选运行 35251986142 对应 902b84d；主代理核对桌面/手机交易流程的actual/expected与候选，旧页面即时提醒浮层和编辑器浏览器提醒开关已迁入统一通知设置，流程顺序/节点布局不变。仅更新 workflow、workflow-expanded、workflow-editor、workflow-branch 共8张 macos-ci基线，其余逐字节一致。候选通过不替代PR与main完整CI。
+
+## 生产 CSS 与覆盖门禁迁移（2026-09-18）
+
+候选运行 [35300448142](https://github.com/fin-research/dashboard/actions/runs/35300448142) 对应 `afb3044f08a62c9fcd8c66c541f0cf81779e3a64`：6 项 CI 工具回归通过；生成和不更新复跑均为 67 通过、1 项既有手机鼠标框选跳过。原样生产 CSS 的 SHA-256 与路由映射保存在候选证据 `visual-dist/production-css.json`。
+
+目视对比发现 Schedule fixture 的 ModuleCard 原先未出现在 SOP 路由 CSS 内；已补入该组件的生产 chunk 并增加 padding 行为断言，未接受丢失内边距的候选。最终 44 张 CI 图新增 desktop/mobile 消息投递；生产 CSS 下门户/手机总览的 ghost 按钮背景与开发环境不同，布局和业务数据未改，其余差异为局部图标或细微栅格化。主代理核对后按当前 SHA 导入，历史 darwin 图不改。消息管理截图覆盖首屏，滚动区下方详情仍依赖交互断言，不表述为全部内容截图覆盖。候选成功仍须随后普通 PR/main 比较通过。
+
+清单登记 34 个页面模块；正常态与已有异常/展开状态分列。28 个路由模块明确保留尚无页面场景的豁免，3 个动态视图待补；这些均不是已覆盖。融资 schedule 是独立控件场景，不充当完整融资路由验收。
