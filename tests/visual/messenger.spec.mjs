@@ -19,7 +19,10 @@ test('消息记录、尝试明细和不确定结果重试确认',async({page})=>
 test('通知管理测试消息支持编辑、单发群发和渠道选择',async({page})=>{
   await mockResources(page);
   await page.goto('/management/messenger');
-  await page.getByRole('tab',{name:'测试消息',exact:true}).click();
+  await page.getByRole('link',{name:'测试消息',exact:true}).click();
+  await expect(page).toHaveURL(/tab=test/);
+  await page.reload();
+  await expect(page.getByRole('navigation',{name:'标签页'}).getByRole('link',{name:'测试消息'})).toHaveAttribute('aria-current','page');
   await expect(page.getByLabel('消息内容',{exact:true})).toHaveValue('这是一条测试消息，用于确认通知渠道可以正常接收。');
   await expect(page.getByRole('button',{name:'发送测试消息',exact:true})).toBeDisabled();
   await page.getByRole('combobox',{name:'接收用户',exact:true}).selectOption('auth0|one');
@@ -34,4 +37,18 @@ test('通知管理测试消息支持编辑、单发群发和渠道选择',async(
   await expect(page).toHaveScreenshot('messenger-test-bulk.png',{fullPage:true});
   await page.getByRole('button',{name:'清空',exact:true}).click();
   await expect(page.getByRole('button',{name:'发送测试消息',exact:true})).toBeDisabled();
+});
+
+
+test('通知标签保留真实链接并支持历史和未知值回退', async ({ page }) => {
+  await mockResources(page);
+  await page.goto('/management/messenger?tab=test');
+  const tabs = page.getByRole('navigation', { name: '标签页' });
+  await expect(tabs.getByRole('link', { name: '消息投递', exact: true })).toHaveAttribute('href', '/management/messenger?tab=delivery');
+  await tabs.getByRole('link', { name: '消息投递', exact: true }).click();
+  await expect(page.getByRole('region', { name: '消息记录' })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByLabel('消息内容', { exact: true })).toBeVisible();
+  await page.goto('/management/messenger?tab=unknown');
+  await expect(tabs.getByRole('link', { name: '消息投递', exact: true })).toHaveAttribute('aria-current', 'page');
 });

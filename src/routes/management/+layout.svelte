@@ -1,6 +1,7 @@
 <script lang="ts">
 import { page } from '$app/state';
 import WorkbenchShell from '$lib/workbench/WorkbenchShell.svelte';
+import { notificationTabs, notificationTab } from '$lib/workbench/navigation';
 import type { WorkbenchIconName } from '$lib/trading-research/demo-data';
 let { children } = $props();
 const views: {id:string;label:string;href:string;icon:WorkbenchIconName;permission?:string;separatorBefore?:boolean}[] = [
@@ -13,4 +14,4 @@ const views: {id:string;label:string;href:string;icon:WorkbenchIconName;permissi
 ];
 const activeViewId = $derived(page.url.pathname.split('/')[2] ?? 'me');
 </script>
-<WorkbenchShell title="管理" homeHref="/management/me" {views} {activeViewId} class="management-scope" tone="purple">{@render children()}</WorkbenchShell>
+<WorkbenchShell title="管理" homeHref="/management" {views} {activeViewId} tabs={activeViewId === 'messenger' ? notificationTabs : []} activeTabId={notificationTab(page.url.searchParams.get('tab'))} class="management-scope" tone="purple">{@render children()}</WorkbenchShell>

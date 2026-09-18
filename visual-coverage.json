@@ -18,7 +18,7 @@
     },
     {
       "source": "src/routes/articles/[id]/+page.svelte",
-      "exemption": "服务端数据详情，未建浏览器夹具"
+      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
     },
     {
       "source": "src/routes/auth/verify-email/+page.svelte",
@@ -26,11 +26,11 @@
     },
     {
       "source": "src/routes/bond/+page.svelte",
-      "exemption": "BondLedgerPage 未建浏览器夹具"
+      "exemption": "兼容URL复用WorkbenchPage；共享header由工作台桌面/手机场景覆盖，兼容URL装配仍未单独进行浏览器验收"
     },
     {
       "source": "src/routes/commentaries/[id]/+page.svelte",
-      "exemption": "服务端数据详情，未建浏览器夹具"
+      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
     },
     {
       "source": "src/routes/credit-workbench/[[view]]/+page.svelte",
@@ -43,7 +43,7 @@
     },
     {
       "source": "src/routes/financing-model/+page.svelte",
-      "exemption": "独立 legacy report 页面，未建浏览器夹具；dynamic financing-model evidence 不覆盖此 URL"
+      "exemption": "兼容URL复用WorkbenchPage；共享header由工作台桌面/手机场景覆盖，兼容URL装配仍未单独进行浏览器验收"
     },
     {
       "source": "src/routes/financing/+page.svelte",
@@ -91,7 +91,9 @@
     },
     {
       "source": "src/routes/fund-report/+page.svelte",
-      "exemption": "归档报告服务端列表，未建 visual harness；portal 仅验证链接"
+      "scenarios": [
+        "fund-report-header"
+      ]
     },
     {
       "source": "src/routes/management/+page.svelte",
@@ -127,7 +129,9 @@
     },
     {
       "source": "src/routes/market-briefing/text/+page.svelte",
-      "exemption": "同 App 的文本入口未单独建场景"
+      "scenarios": [
+        "market-text-link"
+      ]
     },
     {
       "source": "src/routes/market-hotspots/+page.svelte",
@@ -135,7 +139,7 @@
     },
     {
       "source": "src/routes/news/[id]/+page.svelte",
-      "exemption": "服务端新闻详情，未建浏览器夹具"
+      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
     },
     {
       "source": "src/routes/policy-tracking/+page.svelte",
@@ -147,7 +151,7 @@
     },
     {
       "source": "src/routes/secondary-bond-pool/+page.svelte",
-      "exemption": "legacy weekly page；已有截图针对 /trading-research/secondary-bond-pool，不是此 URL"
+      "exemption": "兼容URL复用WorkbenchPage；共享header由工作台桌面/手机场景覆盖，兼容URL装配仍未单独进行浏览器验收"
     },
     {
       "source": "src/routes/trading-research/+page.svelte",
@@ -450,7 +454,7 @@
       "id": "messenger",
       "url": "/management/messenger",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "共享header、消息投递、测试单发/群发及tab深链刷新",
       "evidence": [
         {
           "spec": "tests/visual/messenger.spec.mjs",
@@ -603,6 +607,41 @@
           ],
           "snapshots": [
             "schedule-point.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fund-report-header",
+      "url": "/fund-report",
+      "kind": "screenshot",
+      "state": "单面页面无标签，跨板块标题字体一致",
+      "evidence": [
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "单面页面共用标题且不显示标签栏",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "fund-report-header.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "market-text-link",
+      "url": "/market-briefing/text?date=2026-09-15",
+      "kind": "interaction",
+      "state": "文字标签直达、日期及前进后退刷新",
+      "evidence": [
+        {
+          "spec": "tests/visual/market-report.spec.mjs",
+          "test": "市场点评标签链接可直达并保留日期和浏览器历史",
+          "projects": [
+            "desktop",
+            "mobile"
           ]
         }
       ]

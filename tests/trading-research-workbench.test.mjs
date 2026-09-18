@@ -131,7 +131,7 @@ test("二级债券池运营周报复用共享组件并提供独立与工作台�
   assert.match(page, /title="核心重仓券速览"/);
   assert.match(page, /title="后续跟踪重点"/);
   assert.match(page, /use:portal=\{embedded \? "#tr-topbar-actions" : null\}/);
-  assert.match(standaloneRoute, /<SecondaryBondPoolWeeklyPage \/>/);
+  assert.match(standaloneRoute, /<WorkbenchPage viewId="secondary-bond-pool" \/>/);
   assert.match(workbench, /<SecondaryBondPoolWeeklyPage embedded \/>/);
   assert.match(routeLoader, /workbenchRoutes/);
   assert.match(styles, /\.secondary-weekly-columns\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);

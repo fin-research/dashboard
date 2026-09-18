@@ -1,5 +1,5 @@
 <script lang="ts">
-  import SecondaryBondPoolWeeklyPage from "$lib/pages/SecondaryBondPoolWeeklyPage.svelte";
+  import WorkbenchPage from "$lib/trading-research/WorkbenchPage.svelte";
 </script>
 
-<SecondaryBondPoolWeeklyPage />
+<WorkbenchPage viewId="secondary-bond-pool" />

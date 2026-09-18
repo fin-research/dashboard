@@ -2,7 +2,7 @@
 
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
-  import AuthMenu from '$lib/AuthMenu.svelte';
+  import PageHeader from '$lib/workbench/PageHeader.svelte';
   import { onDestroy, onMount, tick } from "svelte";
 
   import { fetchReport } from "./api";
@@ -170,7 +170,7 @@
     activeView = view;
     const pathname = pathnameForReportView(view);
     if (window.location.pathname !== pathname) {
-      window.history.pushState(null, "", `${pathname}${window.location.search}`);
+      window.history.pushState(null, "", `${pathname}${selectedDate ? `?date=${selectedDate}` : ""}`);
     }
   }
 
@@ -187,38 +187,14 @@
 
 <div class="page-shell">
   <main bind:this={reportSurface} id="report-surface">
-    <header class="report-masthead">
-      <div class="report-title">
-        <h1>
-          <span class="report-title__department">资金管理部</span>
-          <span class="report-title__dot" aria-hidden="true">•</span>
-          <span class="report-title__subject">市场点评</span>
-        </h1>
-      </div>
-      <div class="masthead-controls" aria-label="报告控制">
-        <div class="titlebar-actions">
-          <div class="report-view-switch view-toggle" role="group" aria-label="报告展示方式">
-            <Button data-ui-owner="App-svelte" variant={activeView === "visual" ? 'default' : 'outline'} class={"ui-button report-view-switch-item"}
-              id="visual-report-tab"
-
-              type="button"
-              aria-pressed={activeView === "visual"}
-              disabled={exporting}
-              onclick={() => selectView("visual")}
-            >
-              可视化
-            </Button>
-            <Button data-ui-owner="App-svelte" variant={activeView === "text" ? 'default' : 'outline'} class={"ui-button report-view-switch-item"}
-              id="text-report-tab"
-
-              type="button"
-              aria-pressed={activeView === "text"}
-              disabled={exporting}
-              onclick={() => selectView("text")}
-            >
-              文字版
-            </Button>
-          </div>
+    <PageHeader section={{ label: '市场点评', href: '/market-briefing' }}
+      tabs={[
+        { id: 'visual', label: '可视化', href: `/market-briefing${selectedDate ? `?date=${selectedDate}` : ''}` },
+        { id: 'text', label: '文字版', href: `/market-briefing/text${selectedDate ? `?date=${selectedDate}` : ''}` },
+      ]} activeTabId={activeView} tabsDisabled={exporting} onTabNavigate={(tab) => selectView(tab.id as ReportView)}>
+      {#snippet actions()}
+        <div class="masthead-controls" aria-label="报告控制">
+          <div class="titlebar-actions">
           <Button data-ui-owner="App-svelte" variant="outline"
 
             class={["ui-button refresh-button", loading && "is-loading"]}
@@ -269,8 +245,9 @@
           </time>
         </label>
       </div>
-      <div class="report-account"><AuthMenu /></div>
-    </header>
+      {/snippet}
+    </PageHeader>
+    <div class="report-export-heading"><strong>资金管理部 · 市场点评</strong><time datetime={data?.report_date}>{dateParts.date} {dateParts.weekday}</time></div>
 
     {#if loading}
       <div class="loading-state" role="status" aria-live="polite">
@@ -297,8 +274,8 @@
         <div
           id="visual-report-panel"
           class="visual-report-view"
-          role="tabpanel"
-          aria-labelledby="visual-report-tab"
+          role="region"
+          aria-label="可视化"
         >
           <div class="core-metrics" aria-label="核心市场指标">
             <CoreMetrics {data} {reportDerived} {missingResources} />
@@ -489,8 +466,8 @@
         <div
           id="text-report-panel"
           class="text-report-view"
-          role="tabpanel"
-          aria-labelledby="text-report-tab"
+          role="region"
+          aria-label="文字版"
         >
           <TextReport data={data} {focusText} {missingResources} readonly />
         </div>
@@ -498,3 +475,13 @@
     {/if}
   </main>
 </div>
+
+<style>
+  #report-surface { grid-template-rows: auto minmax(0, 1fr); }
+  .report-export-heading { display: none; }
+  :global(.is-export-capture) .report-export-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; font-size: 1.5rem; }
+  .page-shell :global(.page-header__meta .titlebar-actions) { display: flex; width: auto; }
+  .page-shell :global(.page-header) { padding-inline: 2px; flex: 0 0 auto; }
+  .page-shell :global(.page-header__meta .masthead-controls) { flex-wrap: wrap; justify-content: flex-end; margin: 0; }
+  :global(.is-export-capture .page-header) { display: none; }
+</style>

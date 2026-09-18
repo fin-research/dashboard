@@ -2,21 +2,22 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { setContext, type Snippet } from "svelte";
   import { afterNavigate } from "$app/navigation";
-  import AuthMenu from "$lib/AuthMenu.svelte";
+  import PageHeader from "./PageHeader.svelte";
+  import type { PageTab, WorkbenchPageLink } from "./navigation";
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
-  import type { WorkbenchIconName } from "../trading-research/demo-data";
   import "../../layout-report.css";
   import "../trading-research/workbench.css";
   import "./workspace.css";
 
   import { permissionVisibility } from "$lib/permission-visibility";
   const allowed=permissionVisibility();
-  let { title, homeHref, views, activeViewId, activeLabel = "", children, chat = false, canvas = false,
+  let { title, homeHref, views, activeViewId, activeLabel = "", activeHref, tabs = [], activeTabId = "", children, chat = false, canvas = false,
     class: className = '', actions, account, status,
     integrated = false, layoutReport = false, reportKind = null, visualVariant = 'workspace', tone = 'blue' }: {
     title: string; homeHref: string;
     class?: string; actions?: Snippet; account?: Snippet; status?: Snippet;
-    views: ReadonlyArray<{ id: string; label: string; icon: WorkbenchIconName; href: string; permission?: string; separatorBefore?: boolean }>;
+    views: readonly WorkbenchPageLink[];
+    activeHref?: string; tabs?: readonly PageTab[]; activeTabId?: string;
     activeViewId: string; activeLabel?: string; children: Snippet; chat?: boolean; canvas?: boolean;
     integrated?: boolean; layoutReport?: boolean; reportKind?: "secondary" | "financing" | "liability" | null;
     visualVariant?: 'workspace' | 'report'; tone?: 'blue' | 'teal' | 'orange' | 'purple';
@@ -28,19 +29,12 @@
   let workspaceRegion: HTMLElement;
   let keyboardNavigation = false;
   let topbarHeight = $state(72);
-  function measureTopbar(element: HTMLElement) {
-    const resize = () => (topbarHeight = Math.ceil(element.getBoundingClientRect().height));
-    const observer = new ResizeObserver(resize);
-    observer.observe(element);
-    resize();
-    return { destroy: () => observer.disconnect() };
-  }
-  const activeView = $derived(views.find(view => view.id === activeViewId) ?? { label: activeLabel });
+  const activeView = $derived(views.find(view => view.id === activeViewId) ?? { label: activeLabel, href: homeHref });
   const currentLabel = $derived(activeLabel || activeView.label);
 
   afterNavigate(({ from, to, type }) => {
     mobileDrawerOpen = false;
-    if (type !== "popstate" && from?.url?.pathname !== to?.url?.pathname) {
+    if (type !== "popstate" && (from?.url?.pathname !== to?.url?.pathname || from?.url?.searchParams.get("tab") !== to?.url?.searchParams.get("tab"))) {
       workspaceRegion?.scrollTo({ top: 0, left: 0 });
     }
     if (keyboardNavigation) requestAnimationFrame(() => mainRegion?.focus({ preventScroll: true }));
@@ -74,8 +68,10 @@
 >
   <a class="tr-skip-link" href="#tr-workbench-main">跳至工作台内容</a>
 
-  <header class="ui-topbar tr-topbar" use:measureTopbar>
-    <div class="tr-topbar__title">
+  <PageHeader class="tr-topbar" section={{ label: title, href: homeHref }}
+    current={{ label: currentLabel, href: activeHref ?? activeView.href }} {tabs} {activeTabId}
+    {actions} {account} actionsId="tr-topbar-actions" onheight={(height) => (topbarHeight = height)}>
+    {#snippet leading()}
       <Button data-ui-owner="lib-workbench-WorkbenchShell-svelte" variant="ghost" size="icon"
         class={"ui-button   tr-sidebar-toggle"}
         type="button"
@@ -96,24 +92,8 @@
       >
         <WorkbenchIcon name="menu" />
       </Button>
-      <div class="tr-topbar__heading">
-        <a class="tr-portal-link" href="/" aria-label="返回市场研究门户">
-          东方财富证券 · 资金管理部
-        </a>
-        <nav class="tr-breadcrumb" aria-label="当前位置">
-          <ol>
-            <li><a href={homeHref}>{title}</a></li>
-            <li class="tr-breadcrumb__separator" aria-hidden="true">/</li>
-            <li aria-current="page"><h1>{currentLabel}</h1></li>
-          </ol>
-        </nav>
-      </div>
-    </div>
-    <div class="tr-topbar__meta">
-      <div id="tr-topbar-actions" class="tr-topbar__actions">{#if actions}{@render actions()}{/if}</div>
-      {#if account}{@render account()}{:else}<AuthMenu />{/if}
-    </div>
-  </header>
+    {/snippet}
+  </PageHeader>
 
   <aside id="tr-workbench-drawer" class="tr-drawer" aria-label={`${title}导航`}>
     <nav class="tr-drawer__nav" aria-label="业务模块" data-sveltekit-preload-data="hover">
