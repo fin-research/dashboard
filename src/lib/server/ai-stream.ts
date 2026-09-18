@@ -7,6 +7,7 @@ const object = (value: unknown): value is Record<string, unknown> => !!value && 
 export async function readResponsesStream(
   body: ReadableStream<Uint8Array>, onText: (delta: string) => void, maxBytes: number,
   onSummary?: (summary: { id: string; text: string }) => void,
+  signal?: AbortSignal,
 ): Promise<unknown> {
   let completed: unknown;
   const summaries = new Map<string, string>();
@@ -44,9 +45,12 @@ export async function readResponsesStream(
       value.response.output.forEach((item, i) => { if (object(item)) itemSummaries(item, i); });
     if (value.type === "response.output_text.delta" && typeof value.delta === "string"
       && phases.get(index) !== "commentary") onText(value.delta);
-    if (["response.completed", "response.failed", "response.incomplete"].includes(String(value.type))) completed = value.response;
+    if (["response.completed", "response.failed", "response.incomplete"].includes(String(value.type))) {
+      if (!object(value.response)) throw new Error("AI stream terminal event has no response");
+      completed = value.response;
+    }
     if (value.type === "error") throw new Error("AI stream reported an error");
-  }, maxBytes);
+  }, maxBytes, { signal, shouldStop: () => completed !== undefined });
   if (!completed) throw new Error("AI stream ended before response completion");
   return completed;
 }

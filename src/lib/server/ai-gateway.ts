@@ -306,6 +306,7 @@ async function runProvider<OUTPUT>(
   };
 
   let response: Response;
+  const requestSignal = AbortSignal.any([AbortSignal.timeout(options.requestTimeoutMs + 5_000), ...(options.signal ? [options.signal] : [])]);
   try {
     response = await fetcher(url, {
       method: "POST",
@@ -338,7 +339,7 @@ async function runProvider<OUTPUT>(
         input: prompt.input,
         ...(streaming ? { stream: true } : {}),
       }),
-      signal: AbortSignal.any([AbortSignal.timeout(options.requestTimeoutMs + 5_000), ...(options.signal ? [options.signal] : [])]),
+      signal: requestSignal,
     });
   } catch (error) {
     throw new AiGatewayResponseError({
@@ -356,8 +357,8 @@ async function runProvider<OUTPUT>(
   try {
     const maxBytes = options.taskType === "credit_answer" ? MAX_CREDIT_GATEWAY_RESPONSE_BYTES : MAX_AI_GATEWAY_RESPONSE_BYTES;
     responseText = response.ok && streaming && response.body && response.headers.get("content-type")?.includes("text/event-stream")
-      ? JSON.stringify(await readResponsesStream(response.body, options.onTextDelta ?? (() => {}), maxBytes, options.onReasoningSummary))
-      : await readTextBounded(response, maxBytes);
+      ? JSON.stringify(await readResponsesStream(response.body, options.onTextDelta ?? (() => {}), maxBytes, options.onReasoningSummary, requestSignal))
+      : await readTextBounded(response, maxBytes, requestSignal);
   } catch (error) {
     throw new AiGatewayResponseError({
       provider,
@@ -593,7 +594,8 @@ function validateRequestTimeout(value: number): void {
   }
 }
 
-async function readTextBounded(response: Response, maxBytes: number): Promise<string> {
+async function readTextBounded(response: Response, maxBytes: number, signal: AbortSignal): Promise<string> {
+  signal.throwIfAborted();
   const contentLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     throw new Error(`AI Gateway response exceeds ${maxBytes} bytes`);
@@ -603,15 +605,23 @@ async function readTextBounded(response: Response, maxBytes: number): Promise<st
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel("AI Gateway response too large");
-      throw new Error(`AI Gateway response exceeds ${maxBytes} bytes`);
+  const abort = () => { void reader.cancel(signal.reason).catch(() => {}); };
+  signal.addEventListener("abort", abort, { once: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      signal.throwIfAborted();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        throw new Error(`AI Gateway response exceeds ${maxBytes} bytes`);
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } finally {
+    signal.removeEventListener("abort", abort);
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
 
   const body = new Uint8Array(total);
