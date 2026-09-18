@@ -21,6 +21,7 @@
   "assets": {
     "binding": "ASSETS",
     "directory": ".svelte-kit/cloudflare",
+    "html_handling": "none",
     "run_worker_first": true
   },
   "placement": {

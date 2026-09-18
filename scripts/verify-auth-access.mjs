@@ -4,6 +4,11 @@ import { AuthTestError, SITE_ORIGIN, createHttpSession, loginTestAccount, readAu
 // GET only. Missing-record probes verify the authorization/validation boundary
 // without querying paid Choice data, generating AI, or mutating business state.
 export const ACCESS_PROBES = [
+  ['public', '/offline.html', [200]],
+  ['public', '/service-worker.js', [200]],
+  ['public', '/manifest.webmanifest', [200]],
+  ['public', '/pwa-192.png', [200]],
+  ['public', '/pwa-512.png', [200]],
   ['public', '/market-briefing', [200]],
   ['public', '/market-briefing/text', [200]],
   ['public', '/api/market-report?date=invalid', [400]],
@@ -28,7 +33,12 @@ export const ACCESS_PROBES = [
   ['financing.data:read', '/financing/data', [200]],
   ['financing.report:read', '/financing/liability-report', [200]],
   ['account.profile:read', '/api/profile', [200]],
-  ['auth.permission:read', '/management/people', [200]],
+  ['login', '/management/me', [200]],
+  ['login', '/management/permissions', [200]],
+  ['login', '/management/notifications', [200]],
+  ['login', '/api/notifications/settings', [200]],
+  ['admin', '/management/people', [200]],
+  ['admin', '/management/messenger', [200]],
   ['public', '/data/health', [200]],
   ['public', '/data/graphql', [200]],
   ['login', '/data/choice/css', [422]],
@@ -60,10 +70,11 @@ async function main() {
   }
   const session = await loginTestAccount(config);
   const permissions = new Set((session.profile.permissions ?? []).map(item => item.name));
+  const isAdmin = session.profile.roles?.some(role => role.name === 'admin') === true;
   for (const [scope, path, expected] of ACCESS_PROBES) {
     await pause(1500);
     const response = await session.request(SITE_ORIGIN + path, { headers: { Accept: path.startsWith('/api/') || path.startsWith('/data/') ? 'application/json' : 'text/html' }, followRedirects: false });
-    const permitted = ['public', 'login'].includes(scope) || permissions.has(scope);
+    const permitted = scope === 'admin' ? isAdmin : ['public', 'login'].includes(scope) || permissions.has(scope);
     const passed = permitted ? expected.includes(response.status) : response.status === 403;
     let failureDetail;
     if (!passed && response.headers.get('content-type')?.includes('json')) {
