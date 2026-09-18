@@ -87,3 +87,27 @@
 @media (prefers-reduced-motion: reduce) {
   .page-shell [data-slot="button"] { transition: none; }
 }
+
+/* A single compact rhythm for the market report header, including account/date. */
+.page-shell .page-header__meta { gap: 8px; }
+.page-shell .page-header__meta [data-slot="button"],
+.page-shell .page-header__meta .hero-date {
+  box-sizing: border-box;
+  height: var(--report-control-size);
+  min-height: var(--report-control-size);
+  border-radius: var(--radius-control);
+  padding: 0 10px;
+  font-size: 1rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.page-shell .page-header__meta [data-slot="button"] svg { width: 16px; height: 16px; }
+.page-shell .page-header__meta .export-button { min-width: 110px; }
+.page-shell .page-header__meta .hero-date { border-color: var(--border-color); background: var(--card); }
+.page-shell .hero-date [data-slot="input"] { width: 100%; height: 100%; min-height: 0; }
+.page-shell .hero-date:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+.page-shell .focus-generate-button { width: var(--report-control-size); height: var(--report-control-size); padding: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .page-shell .focus-generate-button.is-loading svg { animation: none; }
+}

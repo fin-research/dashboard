@@ -2,9 +2,9 @@
 
 入口：`/market-briefing`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
 
-日常生成由 `market-briefing` Workflow 的 `generate-focus` 步骤执行，直接消费七个并行模块之一 `collect-focus-news` 整理完成的 DM 新闻材料；AI 步骤不重新取材，adapter 关闭内部重试，由 step 配置统一管理。页面只显示已归档聚焦。以下 POST 为旧客户端兼容接口，新版页面不再调用。
+日常生成由 `market-briefing` Workflow 的 `generate-focus` 步骤执行，直接消费七个并行模块之一 `collect-focus-news` 整理完成的 DM 新闻材料；AI 步骤不重新取材，adapter 关闭内部重试，由 step 配置统一管理。页面初次只读取已归档聚焦，有写权限时可直接编辑；点击星标 AI 生成按钮才调用以下 POST，失败保留当前内容，成功替换后仍可编辑。修改后的内容由 header 导出并发下载图片和归档报告。
 
-日常 Workflow 今日聚焦不依赖权益模块，也不取股票收评；新闻列表、详情、筛选和组装都在 `collect-focus-news` 内完成。以下旧 POST 兼容接口仍保留股票收评与 DM 新闻合并取材。
+日常 Workflow 今日聚焦不依赖权益模块，也不取股票收评；新闻列表、详情、筛选和组装都在 `collect-focus-news` 内完成。人工重新生成 POST 接口仍保留股票收评与 DM 新闻合并取材。
 
 ## 接口
 

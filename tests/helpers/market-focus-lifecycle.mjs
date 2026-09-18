@@ -18,11 +18,11 @@ export function value() { return text; }
 const app = mount(Host, { target: document.body }); flushSync();
 assert.equal(app.value(), '原始草稿');
 flushSync(() => app.progress());
-assert.equal(app.value(), '');
+assert.equal(app.value(), '原始草稿');
 assert.equal(document.querySelector('.focus-progress-message').textContent, '<b>摘要</b>');
 assert.equal(document.querySelector('.focus-progress-message b'), null);
 assert.equal(document.querySelector('[contenteditable]').hidden, false);
-assert.equal(document.querySelector('[contenteditable]').textContent, '');
+assert.equal(document.querySelector('[contenteditable]').textContent, '原始草稿');
 assert.equal(document.querySelector('[contenteditable]').dataset.placeholder, '');
 assert.equal(document.querySelector('.focus-progress.focus-editor'), null);
 assert.equal(document.querySelector('.focus-progress .loading-spinner'), null);
@@ -34,10 +34,10 @@ assert.equal(document.querySelector('.focus-progress-message').textContent, '债
 flushSync(() => app.reset());
 await new Promise(resolve => setTimeout(resolve, 350));
 assert.equal(document.querySelector('.focus-progress-message').textContent, '正在分析股债市场');
-assert.equal(window.localStorage.getItem(`${FOCUS_STORAGE_PREFIX}2026-09-11`), null);
+assert.equal(window.localStorage.getItem(`${FOCUS_STORAGE_PREFIX}2026-09-11`), '原始草稿');
 flushSync(() => app.cancel());
 assert.equal(document.querySelector('[contenteditable]').hidden, false);
-assert.equal(app.value(), '');
+assert.equal(app.value(), '原始草稿');
 flushSync(() => app.complete());
 assert.equal(app.value(), '1、股市结论\n2、债市结论');
 assert.equal(document.querySelector('.focus-progress'), null);

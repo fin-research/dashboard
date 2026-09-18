@@ -44,22 +44,9 @@
   let html = $state("");
   let empty = $state(true);
   let appliedBriefing = $state<MarketBriefing | null>(null);
-  let wasGenerating = $state(false);
 
 
 
-
-  function clearForGeneration(): void {
-    html = "";
-    empty = true;
-    onTextChange("");
-    try {
-      window.localStorage.removeItem(`${FOCUS_STORAGE_PREFIX}${reportDate}`);
-      window.localStorage.removeItem(`${LEGACY_FOCUS_STORAGE_PREFIX}${reportDate}`);
-    } catch {
-      // Clearing the editor does not depend on browser storage availability.
-    }
-  }
 
 
   function save(): void {
@@ -158,16 +145,10 @@
         empty = !visibleText(html);
         onTextChange(focusHtmlToPlainText(html));
       } catch {
-        html = "";
-        empty = true;
-        onTextChange("");
+        html = plainTextToFocusHtml(initialText);
+        empty = !visibleText(html);
+        onTextChange(focusHtmlToPlainText(html));
       }
-    }
-  });
-  $effect(() => {
-    if (generating !== wasGenerating) {
-      wasGenerating = generating;
-      if (generating) clearForGeneration();
     }
   });
   $effect(() => {
