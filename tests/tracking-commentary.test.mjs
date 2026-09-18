@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { compileExtractiveCommentary, extractiveCommentarySchema, retrieveTrackingResearch, trackingGenerationOptions } from '../src/lib/server/tracking-commentary-generation.ts';
 import { createTrackingCommentary, updateTrackingCommentary, getTrackingCommentary, trackingRevisions, listTrackingCommentaries, loadTrackingStyleReferences } from '../src/lib/server/tracking-commentary-repository.ts';
 import { generateTrackingSchema, trackingDraftSchema } from '../src/lib/tracking-commentary.ts';
@@ -150,16 +151,40 @@ test('frontend PDF upload is bounded and archives the exact bytes for download',
 });
 
 
-test('concurrent PDF uploads cannot overwrite the first R2 object or desynchronize its hash',async()=>{
-  const {db,sqlite}=database();const current=await createTrackingCommentary(db,{...draft,policyId:null});
-  let object=null;const env={DB:db,EASTMONEY:{
-    async put(key,bytes,options){assert.deepEqual(options.onlyIf,{etagDoesNotMatch:'*'});if(object)return null;object={key,bytes,size:bytes.length,customMetadata:options.customMetadata};return object;},
-    async head(){return object;},async get(){return {body:object.bytes,httpEtag:'"pdf"'};}
-  }};
-  const a=new TextEncoder().encode('%PDF-1.7 first %%EOF'),b=new TextEncoder().encode('%PDF-1.7 second %%EOF');
-  const [one,two]=await Promise.all([archiveCommentaryPdf(env,current.id,current.updatedAt,a),archiveCommentaryPdf(env,current.id,current.updatedAt,b)]);
-  assert.equal(one.sha256,two.sha256);assert.equal(one.sha256,object.customMetadata.sha256);
-  const updated=await updateTrackingCommentary(db,current.id,{...draft,commentary:'下一版本'},current.updatedAt);
-  assert.notEqual(updated.updatedAt,current.updatedAt);
-  assert.deepEqual(new Uint8Array(await (await downloadCommentaryPdf(env,current.id,current.updatedAt)).arrayBuffer()),a);sqlite.close();
-});
+for (const winnerIndex of [0, 1]) {
+  test(`concurrent PDF uploads preserve R2 winner ${winnerIndex + 1} and its hash`, { timeout: 5000 }, async () => {
+    const { db, sqlite } = database();
+    try {
+      const current = await createTrackingCommentary(db, { ...draft, policyId: null });
+      const uploads = ['%PDF-1.7 first %%EOF', '%PDF-1.7 second %%EOF'].map(text => new TextEncoder().encode(text));
+      const pending = [], entered = Promise.withResolvers();
+      let object = null;
+      const env = { DB: db, EASTMONEY: {
+        async put(key, bytes, options) {
+          assert.deepEqual(options.onlyIf, { etagDoesNotMatch: '*' });
+          return new Promise(resolve => {
+            pending.push({ key, bytes, options, resolve });
+            if (pending.length === 2) entered.resolve();
+          });
+        },
+        async head() { return object; },
+        async get() { return { body: object.bytes, httpEtag: '"pdf"' }; },
+      } };
+      const results = Promise.all(uploads.map(bytes => archiveCommentaryPdf(env, current.id, current.updatedAt, bytes)));
+      await entered.promise;
+      // Hashing is asynchronous: invocation order does not determine the first
+      // conditional R2 write. Exercise both winners without timing assumptions.
+      const winner = pending.find(request => request.bytes === uploads[winnerIndex]);
+      object = { key: winner.key, bytes: winner.bytes, size: winner.bytes.length, customMetadata: winner.options.customMetadata };
+      for (const request of pending) request.resolve(request === winner ? object : null);
+      const [one, two] = await results;
+      assert.equal(one.sha256, two.sha256);
+      assert.equal(one.sha256, createHash('sha256').update(uploads[winnerIndex]).digest('hex'));
+      assert.equal(one.size, uploads[winnerIndex].length);
+      assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM research_commentary_pdf').get().n, 1);
+      const updated = await updateTrackingCommentary(db, current.id, { ...draft, commentary: '下一版本' }, current.updatedAt);
+      assert.notEqual(updated.updatedAt, current.updatedAt);
+      assert.deepEqual(new Uint8Array(await (await downloadCommentaryPdf(env, current.id, current.updatedAt)).arrayBuffer()), uploads[winnerIndex]);
+    } finally { sqlite.close(); }
+  });
+}
