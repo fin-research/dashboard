@@ -7,10 +7,10 @@ import { fetchDataNewsDetail } from "./data-news.ts";
 import { getTrackingCommentary, updateTrackingCommentary, loadTrackingStyleReferences } from "./tracking-commentary-repository.ts";
 
 export const TRACKING_COMMENTARY_PROMPT_VERSION = "tracking-commentary-extract-v3";
-export function trackingGenerationOptions(id: string, documentCount: number, progress: (message: string) => void): AiGatewayOptions {
+export function trackingGenerationOptions(id: string, documentCount: number, progress: (message: string) => void, signal?: AbortSignal): AiGatewayOptions {
   let reportedReasoning = false, reportedWriting = false;
   return {
-    taskType: "policy_commentary", requestTimeoutMs: 120_000,
+    taskType: "policy_commentary", requestTimeoutMs: 300_000, signal,
     promptCacheKey: TRACKING_COMMENTARY_PROMPT_VERSION,
     metadata: { commentary_id: id, prompt_version: TRACKING_COMMENTARY_PROMPT_VERSION, document_count: documentCount, tags: "tracking-commentary,verbatim" },
     onAttempt(attempt) {
@@ -84,13 +84,13 @@ export function compileExtractiveCommentary(output: z.infer<typeof extractiveCom
   return { eventSummary, commentary, recommendation: output.recommendation, evidence };
 }
 
-export async function retrieveTrackingResearch(topic: string, startDate: string, endDate: string, fetcher: typeof fetch = fetch) {
+export async function retrieveTrackingResearch(topic: string, startDate: string, endDate: string, fetcher: typeof fetch = fetch, signal?: AbortSignal) {
   const period = { startDate, endDate, startMs: Date.parse(`${startDate}T00:00:00+08:00`), endMs: Date.parse(`${endDate}T23:59:59.999+08:00`) };
   const queries = [topic, `${topic} 核心观点 边际变化 债券利率 融资窗口`];
   const results = await Promise.all(queries.map(async query => {
     const response = await fetcher("https://research.hasbai.xyz/mcp", {
       method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-      body: JSON.stringify(buildAiSearchToolCall(query, period)), signal: AbortSignal.timeout(120_000),
+      body: JSON.stringify(buildAiSearchToolCall(query, period)), signal: AbortSignal.any([AbortSignal.timeout(120_000), ...(signal ? [signal] : [])]),
     });
     if (!response.ok) throw new PolicyRepositoryError(502, `研报检索失败（HTTP ${response.status}）`);
     return parseAiSearchResponse(await readTextBounded(response, 6 * 1024 * 1024), Number.POSITIVE_INFINITY);
@@ -105,13 +105,14 @@ export async function retrieveTrackingResearch(topic: string, startDate: string,
   return [...docs.values()].map((doc, i) => ({ ...doc, sourceId: `S${i + 1}` }));
 }
 
-export async function generateTrackingCommentary(env: Env, id: string, input: z.infer<typeof generateTrackingSchema>, progress: (message: string) => void = () => {}) {
+export async function generateTrackingCommentary(env: Env, id: string, input: z.infer<typeof generateTrackingSchema>, progress: (message: string) => void = () => {}, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   const current = await getTrackingCommentary(env.DB, id);
   if (current.updatedAt !== input.updatedAt) throw new PolicyRepositoryError(409, "点评已更新，请重新打开");
   if (!env.CF_AIG_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) throw new PolicyRepositoryError(503, "AI Gateway 尚未配置");
   const styleReferences = await loadTrackingStyleReferences(env.DB, id, current.type, current.commentaryDate || shanghaiDate());
   progress("检索研报");
-  const documents = await retrieveTrackingResearch(current.eventName, input.startDate, input.endDate);
+  const documents = await retrieveTrackingResearch(current.eventName, input.startDate, input.endDate, fetch, signal);
   if (current.policyId) {
     const context = await loadCommentaryGenerationContext(env.DB, current.policyId);
     // Existing manually linked reports remain part of the policy evidence contract.
@@ -138,7 +139,7 @@ export async function generateTrackingCommentary(env: Env, id: string, input: z.
     { accountId: env.CLOUDFLARE_ACCOUNT_ID, gatewayId: env.AI_GATEWAY_ID || "default", token: env.CF_AIG_TOKEN },
     [{ role: "system", content: TRACKING_COMMENTARY_INSTRUCTIONS }, { role: "user", content: JSON.stringify({ topic: current.eventName,
       eventDate: current.eventPublishedAt, period: { startDate: input.startDate, endDate: input.endDate }, evidence: documents, styleReferences }) }],
-    schema, "tracking_commentary", trackingGenerationOptions(id, documents.length, progress),
+    schema, "tracking_commentary", trackingGenerationOptions(id, documents.length, progress, signal),
   );
   progress("校验原文并保存");
   const compiled = compileExtractiveCommentary(output, documents);
@@ -150,6 +151,7 @@ export async function generateTrackingCommentary(env: Env, id: string, input: z.
   const draft: TrackingDraft = { type: current.type, eventName: current.eventName, eventPublishedAt: current.eventPublishedAt,
     commentaryDate: current.commentaryDate, sources: [...new Set(compiled.evidence.map(item => item.institution))].join("、"),
     eventSummary: compiled.eventSummary, commentary: compiled.commentary, recommendation: compiled.recommendation };
+  signal?.throwIfAborted();
   return await updateTrackingCommentary(env.DB, id, draft, input.updatedAt, { model: AI_GATEWAY_MODEL,
     promptVersion: TRACKING_COMMENTARY_PROMPT_VERSION, evidence: compiled.evidence,
     search: { startDate: input.startDate, endDate: input.endDate, query: current.eventName, references: styleReferences.map((item: {id:string;eventName:string;commentaryDate:string}) => ({id:item.id,title:item.eventName,date:item.commentaryDate})) } });
