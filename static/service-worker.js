@@ -7,7 +7,7 @@ self.addEventListener('fetch',event=>{
 self.addEventListener('push',event=>{
  let data;try{data=event.data?.json();}catch{data={};}
  data ??={};
- event.waitUntil(self.registration.showNotification(data.title||'资金管理部',{body:data.body||'您有一条新通知',tag:data.tag||'eastmoney',icon:'/pwa-192.png',badge:'/pwa-192.png',data:{url:data.url||'/management/notifications'}}));
+ event.waitUntil(self.registration.showNotification(data.title||'资金管理部',{body:data.body||'您有一条新通知',tag:data.tag||'eastmoney',icon:'/pwa-192.png',badge:'/pwa-192.png',requireInteraction:true,data:{url:data.url||'/management/notifications'}}));
 });
 self.addEventListener('notificationclick',event=>{
  event.notification.close();
