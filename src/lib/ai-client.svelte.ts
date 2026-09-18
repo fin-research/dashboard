@@ -52,6 +52,7 @@ export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
   function complete(id: string, status: Exclude<AiTaskStatus, "running">, error?: string) {
     controllers.delete(id);
     update(id, (task) => ({ ...task, status, finishedAt: Date.now(), ...(error ? { error } : {}) }));
+    if (!tasks.some((task) => task.status === "running")) open = false;
   }
 
   const client: AiClient = {
