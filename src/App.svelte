@@ -5,7 +5,9 @@
   import PageHeader from '$lib/workbench/PageHeader.svelte';
   import { onDestroy, onMount, tick } from "svelte";
 
-  import { fetchReport } from "./api";
+  import { fetchReport, generateMarketBriefing, saveMarketReport } from "./api";
+  import { permissionVisibility } from "$lib/permission-visibility";
+  import FocusEditor from "./components/FocusEditor.svelte";
   import ChartHost from "./components/ChartHost.svelte";
   import CoreMetrics from "./components/CoreMetrics.svelte";
   import EquityStats from "./components/EquityStats.svelte";
@@ -26,9 +28,10 @@
     type ReportView,
   } from "./report-route";
   import type {
+    MarketBriefing,
     MarketReportResource,
     MarketReportResourceIssue,
-    ReportData,
+    MarketReportSnapshot,
   } from "./types";
   import {
     comparableSummaryItems,
@@ -59,7 +62,7 @@
   let reportSurface = $state<HTMLElement>(null!);
   let dateInput = $state<HTMLInputElement>(null!);
   let selectedDate = $state("");
-  let data = $state<ReportData | null>(null);
+  let data = $state<MarketReportSnapshot | null>(null);
   let charts = $state<ChartRenderers | null>(null);
   let loading = $state(true);
   let errorMessage = $state("");
@@ -67,7 +70,13 @@
   let exportLabel = $state("导出图片");
   let activeRequest: AbortController | null = null;
   let activeView: ReportView = $state("visual");
+  const allowed = permissionVisibility();
   let focusText = $state("");
+  let generating = $state(false);
+  let generatedBriefing = $state<MarketBriefing | null>(null);
+  let progressText = $state("正在分析股债市场");
+  let summaries = $state<Array<{ id: string; text: string }>>([]);
+  let briefingRequest: AbortController | null = null;
   let resourceIssues = $state<MarketReportResourceIssue[]>([]);
 
   let reportDerived = $derived(data ? deriveReport(data) : EMPTY_DERIVED);
@@ -93,10 +102,12 @@
 
   onDestroy(() => {
     activeRequest?.abort();
-
+    briefingRequest?.abort();
   });
 
   async function loadReport(refresh: boolean): Promise<void> {
+    if (exporting || generating) return;
+    generatedBriefing = null;
     activeRequest?.abort();
     const request = new AbortController();
     activeRequest = request;
@@ -145,16 +156,64 @@
     }
   }
 
+  async function generateFocus(): Promise<void> {
+    if (!data || generating || exporting) return;
+    const reportDate = data.report_date;
+    const request = new AbortController();
+    briefingRequest?.abort();
+    briefingRequest = request;
+    generatedBriefing = null;
+    generating = true;
+    progressText = "正在分析股债市场";
+    summaries = [];
+    try {
+      const result = await generateMarketBriefing(reportDate, request.signal, (event) => {
+        if (request.signal.aborted) return;
+        if (event.type === "summary") {
+          summaries = [...summaries.filter((item) => item.id !== event.id), event];
+        } else {
+          progressText = event.text;
+          if (event.type === "reset") summaries = [];
+        }
+      });
+      if (request.signal.aborted || data?.report_date !== reportDate) return;
+      generatedBriefing = result;
+      focusText = `1、${result.stock}\n2、${result.bond}`;
+    } catch (error) {
+      if (!request.signal.aborted) globalMessages.error(
+        `今日聚焦生成失败：${error instanceof Error ? error.message : String(error)}`,
+        { key: "market-focus-generate" },
+      );
+    } finally {
+      if (briefingRequest === request) generating = false;
+    }
+  }
+
   async function exportImage(): Promise<void> {
-    if (!data || exporting) return;
-    await tick();
+    if (!data || exporting || generating) return;
     exporting = true;
     exportLabel = "正在导出";
+    const report = $state.snapshot(data);
+    const focus = focusText;
+    const canSave = $allowed("research.market_report:update");
     try {
-      await exportReportImage(reportSurface, data.report_date, { captureClass: true });
-      globalMessages.success(`${data.report_date} 图片已导出`, { key: "market-report-export" });
-    } catch (error) {
-      globalMessages.error(`图片导出失败：${error instanceof Error ? error.message : String(error)}`, { key: "market-report-export" });
+      await tick();
+      const [image, archive] = await Promise.allSettled([
+        exportReportImage(reportSurface, report.report_date, { captureClass: true }),
+        canSave ? saveMarketReport(report, focus) : Promise.resolve(null),
+      ]);
+      if (archive.status === "fulfilled" && archive.value && data?.report_date === report.report_date) {
+        data = archive.value;
+      }
+      if (image.status === "fulfilled" && archive.status === "fulfilled") {
+        globalMessages.success(`${report.report_date} 图片已导出${canSave ? "，报告已保存" : ""}`, { key: "market-report-export" });
+      } else {
+        const messages = [
+          image.status === "fulfilled" ? "图片已导出" : `图片导出失败：${String(image.reason)}`,
+          ...(canSave ? [archive.status === "fulfilled" ? "报告已保存" : `报告保存失败：${String(archive.reason)}`] : []),
+        ];
+        globalMessages.error(messages.join("；"), { key: "market-report-export" });
+      }
     } finally {
       exporting = false;
       exportLabel = "导出图片";
@@ -191,7 +250,7 @@
       tabs={[
         { id: 'visual', label: '可视化', href: `/market-briefing${selectedDate ? `?date=${selectedDate}` : ''}` },
         { id: 'text', label: '文字版', href: `/market-briefing/text${selectedDate ? `?date=${selectedDate}` : ''}` },
-      ]} activeTabId={activeView} tabsDisabled={exporting} onTabNavigate={(tab) => selectView(tab.id as ReportView)}>
+      ]} activeTabId={activeView} tabsDisabled={exporting || generating} onTabNavigate={(tab) => selectView(tab.id as ReportView)}>
       {#snippet actions()}
         <div class="masthead-controls" aria-label="报告控制">
           <div class="titlebar-actions">
@@ -199,7 +258,7 @@
 
             class={["ui-button refresh-button", loading && "is-loading"]}
             type="button"
-            disabled={loading || exporting}
+            disabled={loading || exporting || generating}
             onclick={() => loadReport(true)}
           >
             <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -212,7 +271,7 @@
 
             class={["ui-button  export-button", exporting && "is-exporting"]}
             type="button"
-            disabled={!data || loading || exporting}
+            disabled={!data || loading || exporting || generating}
             onclick={exportImage}
           >
             <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -230,7 +289,7 @@
             class={"ui-input hero-date__input"}
             type="date"
             aria-label="选择报告日期"
-            disabled={exporting}
+            disabled={exporting || generating}
             bind:value={selectedDate}
             onclick={openDatePicker}
             onchange={() => loadReport(false)}
@@ -285,8 +344,24 @@
           <header class="panel-heading">
             <span class="panel-index">01</span>
             <h2 id="focus-title">今日聚焦</h2>
+            <Button permission="research.market_report:generate" variant="default" size="icon"
+              class={["focus-generate-button ai-generate-button", generating && "is-loading"]}
+              aria-label={generating ? "AI 生成中" : "重新生成今日聚焦"} aria-busy={generating}
+              disabled={generating || exporting} onclick={generateFocus}>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m10 2 1.1 4.2L15 8l-3.9 1.8L10 14l-1.1-4.2L5 8l3.9-1.8L10 2Z" />
+                <path d="m16 13 .6 2.1 1.9.9-1.9.9L16 19l-.6-2.1-1.9-.9 1.9-.9L16 13Z" />
+              </svg>
+            </Button>
           </header>
-          <div class="focus-editor" aria-label="今日聚焦">{@html plainTextToFocusHtml(focusText)}</div>
+          {#if $allowed("research.market_report:update") || $allowed("research.market_report:generate")}
+            <FocusEditor reportDate={data.report_date} initialText={focusText}
+              finalizedAt={data.finalized_at ?? data.generated_at} {generating} {generatedBriefing}
+              {progressText} {summaries} disabled={exporting || !$allowed("research.market_report:update")}
+              onTextChange={(value) => focusText = value} onBriefingApplied={() => generatedBriefing = null} />
+          {:else}
+            <div class="focus-editor" aria-label="今日聚焦">{@html plainTextToFocusHtml(focusText)}</div>
+          {/if}
         </section>
 
         <section class="dashboard-panel panel--omo" aria-labelledby="omo-title">

@@ -236,7 +236,8 @@ h1 {
   min-height: var(--report-control-size);
   align-items: center;
   gap: 7px;
-  padding: 3px 4px 3px 10px;
+  height: var(--report-control-size);
+  padding: 0 10px;
   border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
   border-radius: var(--radius-control);
   color: var(--ink);
@@ -277,16 +278,15 @@ h1 {
 }
 
 .hero-date__value {
-  font-weight: 720;
+  font-weight: bold;
 }
 
 .hero-date__weekday {
-  padding: 3px 7px;
-  border-radius: var(--radius-tag);
-  color: #fff;
-  background: var(--color-primary);
-  font-weight: 720;
-  line-height: 1.15;
+  padding: 0 0 0 8px;
+  border-left: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-weight: normal;
+  line-height: 1.35;
 }
 
 .core-metrics {
@@ -1004,7 +1004,7 @@ h2 {
   top: 0;
   color: var(--text-muted);
   background: #f1f5fb;
-  font-weight: 720;
+  font-weight: bold;
 }
 
 .primary-table tbody tr:nth-child(even) td,

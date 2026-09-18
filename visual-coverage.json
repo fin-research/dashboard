@@ -124,7 +124,8 @@
     {
       "source": "src/routes/market-briefing/+page.svelte",
       "scenarios": [
-        "market-report"
+        "market-report",
+        "market-report-edit-export"
       ]
     },
     {
@@ -382,7 +383,7 @@
       "id": "market-report",
       "url": "/market-briefing",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "归档展示、统一页头、直接编辑、重新生成及并发导出归档",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -643,6 +644,38 @@
         {
           "spec": "tests/visual/market-report.spec.mjs",
           "test": "市场点评标签链接可直达并保留日期和浏览器历史",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "market-report-edit-export",
+      "url": "/market-briefing",
+      "kind": "interaction",
+      "state": "直接编辑、重生成、并发导出与归档失败恢复、页头尺寸",
+      "evidence": [
+        {
+          "spec": "tests/visual/market-report.spec.mjs",
+          "test": "聚焦直接编辑、生成失败保留原稿，重新生成后跨标签保留修改",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        },
+        {
+          "spec": "tests/visual/market-report.spec.mjs",
+          "test": "导出并发下载图片与归档，保存失败保留编辑且可重试",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        },
+        {
+          "spec": "tests/visual/market-report.spec.mjs",
+          "test": "市场点评页头操作、日期和个人入口尺寸一致",
           "projects": [
             "desktop",
             "mobile"
