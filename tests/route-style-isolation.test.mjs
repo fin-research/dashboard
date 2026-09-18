@@ -26,6 +26,6 @@ test("二级池日期重载不写入全局滚动锁且原入口复用同一页�
 
   assert.match(page, /void refreshReport\(true\)/);
   assert.doesNotMatch(page, /document\.(?:body|documentElement).*overflow|style\.overflow/);
-  assert.match(route, /<BondLedgerPage \/>/);
+  assert.match(route, /<WorkbenchPage viewId="bond" \/>/);
   assert.match(styles, /html\s*\{[\s\S]*?min-width:\s*0/);
 });

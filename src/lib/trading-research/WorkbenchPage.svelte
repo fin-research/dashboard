@@ -24,6 +24,7 @@
 </script>
 
 <WorkbenchShell title="交易研究工作台" homeHref="/trading-research" {views} {activeViewId}
+  activeHref={workbenchViewPath(activeViewId)}
   activeLabel={workbenchRoutes.find(view => view.id === activeViewId)?.label}
   integrated={isIntegratedView(activeViewId)} layoutReport={isLayoutReport(activeViewId)}
   canvas={activeViewId === "market-hotspots"}

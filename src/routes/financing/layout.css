@@ -242,8 +242,8 @@
 
 @media (max-width: 900px) {
   .financing-scope .tr-topbar { flex-wrap: wrap; }
-  .financing-scope .tr-topbar__title { width: 100%; }
-  .financing-scope .tr-topbar__meta { display: flex; flex-wrap: wrap; justify-content: space-between; width: 100%; gap: .5rem; }
+  .financing-scope .page-header__identity { width: 100%; }
+  .financing-scope .page-header__meta { display: flex; flex-wrap: wrap; justify-content: space-between; width: 100%; gap: .5rem; }
   .financing-scope .tr-topbar__actions { flex-wrap: wrap; gap: .5rem; }
   .financing-scope:has(.report-header-actions) .tr-topbar__actions { width: 100%; justify-content: space-between; }
 }
