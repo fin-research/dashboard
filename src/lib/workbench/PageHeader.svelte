@@ -61,7 +61,7 @@
 <style>
   .page-header {
     --page-title-size: 1.25rem;
-    --header-padding-block: 9px;
+    --header-padding-block: 7px;
     --tab-shoulder: 12px;
     position: relative;
     z-index: 40;
@@ -96,7 +96,7 @@
   .page-header__tabs { display: flex; align-self: stretch; align-items: end; gap: 8px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; margin-bottom: calc(-1 * var(--header-padding-block)); padding: 0 var(--tab-shoulder); }
   .page-header__tabs::-webkit-scrollbar { display: none; }
   .page-header__tabs a { position: relative; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; min-height: 44px; padding: 10px 22px; border: 0; border-radius: 12px 12px 0 0; color: var(--text-2); background: transparent; font-size: 1rem; line-height: 24px; font-weight: bold; text-decoration: none; white-space: nowrap; transition: color 160ms ease; }
-  .page-header__tabs a:hover { color: var(--brand-deep); }
+  .page-header__tabs a:hover { color: var(--brand-deep); background: var(--brand-soft); }
   .page-header__tabs a.active { z-index: 1; color: var(--brand-deep); background: var(--bg-card); }
   .page-header__tabs a.active::before, .page-header__tabs a.active::after {
     position: absolute; bottom: 0; width: var(--tab-shoulder); height: var(--tab-shoulder); content: ''; pointer-events: none;
