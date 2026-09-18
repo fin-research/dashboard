@@ -37,4 +37,12 @@ node scripts/reconcile-client-usage.mjs /absolute/path/reconciliation.json
 
 维护清单按名称更新客户和给定别名/静态归属，不删除未提及客户、旧别名或关联。给定别名若已能由通用规则识别，不重复写入；将旧例外显式改回通用规则的归属时，删除该条例外。旧清单的 `matchKind` / `notes` 别名字段会被拒绝，防止再次灌入旧规则。改变归属需显式维护 `institution_client`；同一客户重复关联多个授信主体会被数据库拒绝。全部融资品种统一按客户身份汇总，银行与资管不能互相代入。负债详情可编辑客户 ID；修改历史金额、日期、现金流后按需要显式刷新既有月度衍生指标。
 
-当前 Auth0 模式经 `/financing/data/api` 由 Worker 编译白名单 SQL、通过 Hyperdrive 访问融资 schema，并在事务内使用 `authenticated` 角色与 RLS；生产未开通 Neon 托管 Data API，因此无需刷新托管 schema cache。若将来重新启用托管 Data API，DDL 后须刷新缓存。公共客户表和授信内部视图不向数据后台开放，继续沿用融资写权限和审计。
+当前 Auth0 模式经 `/financing/data/api` 由 Worker 编译白名单 SQL、通过 Hyperdrive 访问融资 schema，并在事务内使用 `authenticated` 角色与 RLS；生产未开通 Neon 托管 Data API，因此无需刷新托管 schema cache。若将来重新启用托管 Data API，DDL 后须刷新缓存。公共客户表不向通用数据后台开放，客户名单通过上述专用服务和融资权限维护；授信内部视图仍不开放。
+
+## 融资客户名单
+
+`/financing/clients` 提供按名称/全称/类型/别名搜索、分页、新建与编辑；沿用 `financing.data:read/create/update` 权限，Gateway 登记页面及 named actions。前端只提交客户白名单字段，不直接访问数据库或通用 Data API。
+
+专用客户服务在事务内维护公共主表及精确别名，使用融资/授信维护锁、版本校验、唯一约束与归属检查。名称修改保留旧名称作为别名；与已有客户冲突或改变已知来源归属则回滚。保存后只回填尚未关联的负债，不覆盖人工指定。无删除客户入口。
+
+授信 migration `0012_tianjin_binhai_client_alias.sql` 在现有客户别名简化迁移之后增加“天津滨海农村商行 → 天津滨海农商行”，同时回填同名未关联负债；已有不同归属拒绝迁移。

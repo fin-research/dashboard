@@ -172,6 +172,10 @@
         "bond",
         "financing-model"
       ]
+    },
+    {
+      "source": "src/routes/financing/clients/+page.svelte",
+      "exemption": "新增客户维护页尚未接入浏览器组件夹具；数据校验、别名冲突、乐观锁与整批回滚通过数据库行为测试，页面视觉未验收"
     }
   ],
   "registries": [

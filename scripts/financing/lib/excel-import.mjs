@@ -5,7 +5,8 @@ import { stableDebtKey } from './debt-key.mjs';
 import { DEBT_FIELD_COLUMNS } from './debt-fields.mjs';
 import { sha256Hex } from './hash.mjs';
 
-const SUMMARY_SHEET_NAMES = new Set(['借入资金汇总表']);
+// Derived daily movement summary; no independent debt or cashflow records.
+const SUMMARY_SHEET_NAMES = new Set(['借入资金汇总表', '变动']);
 const SUMMARY_SHEET_NAME = '借入资金汇总表';
 const SNAPSHOT_DEBT_TYPES = ['收益凭证', '收益权转让', '同业拆借', '次级债', '集团借款', '转融资', '短期融资券', '私募债', '小公募', '互换便利'];
 const FIELD_ALIASES = {
@@ -279,6 +280,7 @@ function cashflowEventsForRow({
 	row,
 	headers,
 	sheetName,
+	sourceRow,
 	debtId,
 	externalKey,
 	sequenceForEvent
@@ -309,7 +311,9 @@ function cashflowEventsForRow({
 	const events = [];
 	for (const amountColumn of amountColumns) {
 		const amount = amountValue(row[amountColumn.column], headers[amountColumn.column]);
-		if (amount === null || amount === 0 || !dateColumns.length) continue;
+		if (amount === null && text(row[amountColumn.column]) !== null) throw new Error(`工作表 ${sheetName} 第 ${sourceRow} 行的现金流金额无效`);
+		if (amount === null || amount === 0) continue;
+		if (!dateColumns.length) throw new Error(`工作表 ${sheetName} 第 ${sourceRow} 行有现金流金额但缺少有效日期`);
 		const dateColumn = [...dateColumns].sort(
 			(left, right) =>
 				Math.abs(left.column - amountColumn.column) - Math.abs(right.column - amountColumn.column)
@@ -337,6 +341,12 @@ function rowToDebt(row, fields, sheetName, headers) {
 	const principalAmount = amountValue(valueAt(row, fields, 'principalAmount'), headers[fields.principalAmount]);
 	const outstandingAmount = amountValue(valueAt(row, fields, 'outstandingAmount'), headers[fields.outstandingAmount]);
 	const maturityDate = dateValue(valueAt(row, fields, 'maturityDate'));
+  for (const field of ['principalAmount','outstandingAmount','annualRate','issueDate','maturityDate']) {
+    const raw=valueAt(row,fields,field);
+    if(text(raw)===null)continue;
+    const parsed=field.endsWith('Date')?dateValue(raw):field==='annualRate'?rateValue(raw):amountValue(raw,headers[fields[field]]);
+    if(parsed===null || (field.endsWith('Date') && new Date(`${parsed}T00:00:00Z`).toISOString().slice(0,10)!==parsed))throw new Error(`工作表 ${sheetName} 的 ${headers[fields[field]]} 无效：${raw}`);
+  }
 	return {
 		id: globalThis.crypto.randomUUID(),
 		debtType: sheetName,
@@ -387,7 +397,7 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 			blankrows: true
 		});
 		const header = findHeaderRow(rows);
-		if (!header) continue;
+		if (!header) throw new Error(`工作表 ${sheetName} 无法识别表头，整个导入已拒绝`);
 		sheetCount += 1;
 		const headers = rows[header.index];
 		let parent = null;
@@ -439,8 +449,8 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 			}
 
 			if (!parent) {
-				skipped += 1;
-				continue;
+				if(row.filter(value=>text(value)!==null).every(value=>/^(合计|总计|小计|备注|说明)([：:].*)?$/u.test(String(value)))){skipped+=1;continue;}
+				throw new Error(`工作表 ${sheetName} 第 ${sourceRow} 行无法关联负债，整个导入已拒绝`);
 			}
 			const values = Array(DEBT_FIELD_COLUMNS.length).fill(null);
 			for (const field of fieldValuesForRow(sheet, sourceRow, headers, bounds.maxColumn)) {
@@ -459,6 +469,7 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 				row,
 				headers,
 				sheetName,
+				sourceRow,
 				debtId: parent.debtId,
 				externalKey: parent.externalKey,
 				sequenceForEvent: (eventType, eventDate, amount) => {

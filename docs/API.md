@@ -53,6 +53,6 @@ Data 错误保留安全诊断字段；市场点评 Workflow 对失败资源独�
 
 页面 load 仅返回所需数据，通用预取使用 tap，固定工作台导航允许 hover。普通 mutation 返回单个确认实体或删除 ID，增强表单使用 `update({ reset: false, invalidateAll: false })`；身份与提醒只按 dependencies 定向失效。负债周报的显式生成按新快照版本刷新，具体例外见模块文档。
 
-内部数据接口保持 `/financing/data/token`、`/financing/data/api/*`、`/financing/data/import`、`/financing/data/import/[id]`。Auth0 模式不向浏览器返回 Neon JWT。字段、表、主键与分页仍使用原白名单；请求身份在事务内设置并执行 RLS。
+内部数据接口保持 `/financing/data/token`、`/financing/data/api/*`、`/financing/data/import`。Auth0 模式不向浏览器返回 Neon JWT。字段、表、主键与分页仍使用原白名单；请求身份在事务内设置并执行 RLS。
 
 全站业务 GET/HEAD、API 写入及 named actions 均由 Gateway 的 `permission-policy.ts` 登记和检查，门户及身份 bootstrap 除外。权限目录由 Gateway 维护，`src/lib/permissions.ts` 为前端展示快照；请求传入的权限、角色、人员身份或来源标记不能代替服务端授权。

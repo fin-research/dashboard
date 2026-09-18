@@ -96,11 +96,6 @@
       "class_name": "BondLedgerImportWorkflow"
     },
     {
-      "binding": "DEBT_IMPORT_WORKFLOW",
-      "name": "financing-debt-import",
-      "class_name": "DebtImportWorkflow"
-    },
-    {
       "binding": "MARKET_BRIEFING",
       "name": "market-briefing",
       "class_name": "MarketBriefingWorkflow"
