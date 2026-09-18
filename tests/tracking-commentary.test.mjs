@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { compileExtractiveCommentary, extractiveCommentarySchema, retrieveTrackingResearch, trackingGenerationOptions } from '../src/lib/server/tracking-commentary-generation.ts';
+import { compileExtractiveCommentary, extractiveCommentarySchema, retrieveTrackingResearch, trackingGenerationOptions, commentaryPassages, commentarySelectionSchema, compileCommentarySelection } from '../src/lib/server/tracking-commentary-generation.ts';
+import { trackingError } from '../src/lib/server/tracking-commentary-http.ts';
+import { AiGatewayResponseError, AiGatewayRetryError } from '../src/lib/server/ai-gateway.ts';
 import { createTrackingCommentary, updateTrackingCommentary, getTrackingCommentary, trackingRevisions, listTrackingCommentaries, loadTrackingStyleReferences } from '../src/lib/server/tracking-commentary-repository.ts';
 import { generateTrackingSchema, trackingDraftSchema } from '../src/lib/tracking-commentary.ts';
 import { renderCommentaryPdf, commentaryPdfKey } from '../src/lib/research-commentary-pdf.ts';
@@ -19,6 +21,7 @@ test('interactive generation streams phase labels without exposing unvalidated m
   const phases = [];
   const options = trackingGenerationOptions('draft',20,message => phases.push(message));
   assert.equal(options.requestTimeoutMs,300000);
+  assert.equal(options.taskType,'tracking_commentary');
   options.onAttempt('primary');
   options.onReasoningSummary({id:'r',text:'private reasoning'});
   options.onReasoningSummary({id:'r',text:'more reasoning'});
@@ -27,6 +30,31 @@ test('interactive generation streams phase labels without exposing unvalidated m
   options.onAttempt('retry');
   options.onTextDelta('replacement JSON');
   assert.deepEqual(phases,['AI 选取原文','组织判断与建议','生成点评','AI 重试选材','生成点评']);
+});
+
+test('selection uses complete source sentences and preserves numbers, conditions, quoted punctuation and source offsets', () => {
+  const doc = {...source,text:'观点\n- 如果资金价格低于1.5%，发行成本将继续下降。\n机构判断：“债牛仍有支撑。”另一完整判断指出，信用需求仍然偏弱。'};
+  const passages = commentaryPassages([doc]);
+  assert.deepEqual(passages.map(p => p.text), ['如果资金价格低于1.5%，发行成本将继续下降。','机构判断：“债牛仍有支撑。”','另一完整判断指出，信用需求仍然偏弱。']);
+  assert.ok(passages.every(p => doc.text.slice(p.startOffset,p.endOffset) === p.text));
+  const selection = { eventSummaryId:'Q1',sections:[{heading:'宽松资金降低融资成本',quoteIds:['Q1']},{heading:'弱信用继续支撑债市',quoteIds:['Q2','Q3']}],recommendation:output.recommendation };
+  const compiled = compileCommentarySelection(commentarySelectionSchema(passages).parse(selection),passages,[doc]);
+  assert.equal(compiled.eventSummary,passages[0].text);
+  assert.ok(compiled.evidence.every(e => doc.text.slice(e.startOffset,e.endOffset) === e.text));
+  assert.equal(commentarySelectionSchema(passages).safeParse({...selection,eventSummaryId:'Q999'}).success,false);
+  assert.throws(() => compileExtractiveCommentary({...output,eventSummary:{sourceId:'S1',text:'发行成本将继续下降。'}},[doc]),/句中/);
+});
+
+test('AI failures expose safe actionable timeout and validation codes with trace IDs', async () => {
+  const failure = {provider:'custom-codex',status:200,gatewayLogId:'log-1',retryable:true,message:'The operation was aborted due to timeout'};
+  const response = trackingError(new AiGatewayRetryError([failure,{...failure,gatewayLogId:'log-2'}]));
+  assert.equal(response.status,504);
+  const result = await response.json();
+  assert.equal(result.code,'AI_RESPONSE_TIMEOUT');assert.equal(result.attempts,2);
+  assert.deepEqual(result.gatewayLogIds,['log-1','log-2']);
+  assert.match(result.error,/HTTP 200/);
+  const invalid = await trackingError(new AiGatewayResponseError({...failure,message:'output failed business schema: private source text'})).json();
+  assert.equal(invalid.code,'AI_OUTPUT_INVALID');assert.doesNotMatch(JSON.stringify(invalid),/private source text/);
 });
 
 test('excerpt compiler keeps source words and offsets, rejects rewritten or condition-stripped quotations', () => {
