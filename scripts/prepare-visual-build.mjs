@@ -1,0 +1,53 @@
+// Replace all harness CSS with the unmodified stylesheets emitted by SvelteKit.
+// Route-node stylesheet order is preserved; no CSS is re-minified or concatenated.
+import { cp, readFile, writeFile, readdir, mkdir, rm } from 'node:fs/promises';
+import { resolve, relative, join } from 'node:path';
+import { createHash } from 'node:crypto';
+
+const nodeDirectory = '.svelte-kit/generated/client-optimized/nodes';
+const routes = new Map();
+for (const name of await readdir(nodeDirectory)) {
+  if (!name.endsWith('.js')) continue;
+  const entry = await readFile(join(nodeDirectory, name), 'utf8');
+  const component = entry.match(/export\s*\{\s*default as component\s*\}\s*from\s*["']([^"']+)["']/)?.[1];
+  if (!component) continue;
+  const source = relative(process.cwd(), resolve(nodeDirectory, component)).replaceAll('\\', '/');
+  const serverNode = await readFile(`.svelte-kit/output/server/nodes/${name}`, 'utf8');
+  const styles = serverNode.match(/export const stylesheets = (\[[^;]*\]);/)?.[1];
+  if (!styles) throw new Error(`Missing production stylesheet metadata: ${source}`);
+  routes.set(source, JSON.parse(styles));
+}
+function stylesFor(...sources) {
+  return [...new Set(sources.flatMap(source => {
+    if (!routes.has(source)) throw new Error(`Production route not built: ${source}`);
+    return routes.get(source);
+  }))];
+}
+const layout = 'src/routes/+layout.svelte';
+const financing = 'src/routes/financing/+layout.svelte';
+const map = {
+  '/': stylesFor(layout, 'src/routes/+page.svelte'),
+  '/trading-research': stylesFor(layout, 'src/routes/trading-research/+page.svelte', 'src/routes/trading-research/[view]/+page.svelte'),
+  '/credit-workbench': stylesFor(layout, 'src/routes/credit-workbench/[[view]]/+page.svelte'),
+  '/market-briefing': stylesFor(layout, 'src/routes/market-briefing/+page.svelte'),
+  '/management/messenger': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/messenger/+page.svelte'),
+  '/financing/schedule': stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte'),
+  '/ui-contracts': stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte', 'src/routes/financing/debts/[id]/+page.svelte'),
+};
+const files = [...new Set(Object.values(map).flat())];
+if (!files.length || Object.values(map).some(styles => !styles.length)) throw new Error('Production stylesheets are empty');
+await cp('.svelte-kit/output/client/_app', 'visual-dist/_app', { recursive: true });
+const hashes = {};
+for (const file of files) {
+  const original = await readFile(`.svelte-kit/output/client/${file}`);
+  const copied = await readFile(`visual-dist/${file}`);
+  if (!original.equals(copied)) throw new Error(`Production CSS copy differs: ${file}`);
+  hashes[file] = createHash('sha256').update(original).digest('hex');
+}
+// cssCodeSplit:false ensures JS cannot load a second, harness-generated stylesheet.
+const html = await readFile('visual-dist/index.html', 'utf8');
+await writeFile('visual-dist/index.html', html.replace(/<link\b[^>]*rel="stylesheet"[^>]*>/g, ''));
+for (const file of await readdir('visual-dist/assets')) if (file.endsWith('.css')) await rm(`visual-dist/assets/${file}`);
+await writeFile('visual-dist/production-styles.json', JSON.stringify(map, null, 2) + '\n');
+await writeFile('visual-dist/production-css.json', JSON.stringify({ routes: map, sha256: hashes }, null, 2) + '\n');
+console.log(`Prepared ${files.length} unchanged production stylesheets for ${Object.keys(map).length} harness routes.`);

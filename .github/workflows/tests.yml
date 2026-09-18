@@ -23,6 +23,8 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test:ci-tools
+      - run: pnpm check:visual-coverage
       - name: Check types and diff
         run: pnpm check:quick
       - uses: astral-sh/setup-uv@v6
@@ -31,9 +33,13 @@ jobs:
       # Types already passed above; the normal pnpm build retains both checks.
       - name: Build production bundle
         run: pnpm exec vite build
+      - name: Prepare browser bundle with shipping CSS
+        run: pnpm build:visual
       - run: pnpm exec playwright install chromium
       - name: Compare visual baselines
         run: pnpm test:visual
+        env:
+          VISUAL_COVERAGE_GATE: '1'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -42,5 +48,6 @@ jobs:
             coverage/
             playwright-report/
             test-results/
+            visual-dist/production-css.json
             tests/visual/__screenshots__/macos-ci/
           retention-days: 14

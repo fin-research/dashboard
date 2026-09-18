@@ -41,7 +41,11 @@
     "test:visual": "playwright test",
     "test:visual:update": "playwright test --update-snapshots",
     "test:visual:report": "playwright show-report",
-    "test:python": "uv run tests/test_credit_materials.py"
+    "test:python": "uv run tests/test_credit_materials.py",
+    "check:visual-coverage": "node scripts/check-visual-coverage.mjs",
+    "visual:baseline:import": "node scripts/visual-baselines.mjs import",
+    "test:ci-tools": "node --test scripts/tests/visual-ci.test.mjs",
+    "build:visual": "vite build --config vite.visual.config.mjs && node scripts/prepare-visual-build.mjs"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.1",

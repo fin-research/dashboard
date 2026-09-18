@@ -12,6 +12,8 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 20
     steps:
+      - name: Require a task branch
+        run: test "$GITHUB_REF" != refs/heads/main
       - uses: actions/checkout@v4
       - run: npm install --global pnpm@10.33.2
       - uses: actions/setup-node@v4
@@ -19,14 +21,33 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm check:quick
+      - run: pnpm test:ci-tools
+      - run: pnpm check:visual-coverage --candidate
+      - run: pnpm exec vite build
+      - run: pnpm build:visual
       - run: pnpm exec playwright install chromium
       - run: pnpm test:visual:update
+        env:
+          VISUAL_COVERAGE_GATE: '1'
+      - name: Compare candidates without updating
+        run: pnpm test:visual
+        env:
+          VISUAL_COVERAGE_GATE: '1'
+      - run: node scripts/visual-baselines.mjs record
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: visual-baseline-candidates
           path: |
+            test-results/visual-baseline-candidate.json
+            tests/visual/__screenshots__/macos-ci/
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-candidate-evidence
+          path: |
             playwright-report/
             test-results/
-            tests/visual/__screenshots__/macos-ci/
+            visual-dist/production-css.json
           retention-days: 14

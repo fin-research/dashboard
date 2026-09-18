@@ -21,7 +21,7 @@ pnpm dev
 本地默认不重复全量覆盖率、浏览器截图或生产构建；排障需要时可以运行，无需额外申请。`pnpm build` 仍包含两类类型检查，已经对同一份改动成功构建时无需另跑类型检查。`check:quick` 不连接业务数据库、不调用线上服务；SvelteKit 类型同步会写入本地生成目录 `.svelte-kit`。本地检查通过后才进入以下流程，不能用本地结果替代 CI。
 
 1. 主代理修改代码并划定本任务文件，每次派一个新的子代理负责提交、推送任务分支和创建/更新 PR；禁止直接推送 `main`。
-2. PR 创建/更新和 `main` push 触发 `.github/workflows/tests.yml` 的 `Dashboard CI`；普通任务分支 push 不单独触发，推送后须创建 PR（草稿 PR 也运行），避免同一更新 push/PR 双跑。依次执行 `pnpm check:quick`、Python 测试、Node 单元/契约测试与覆盖率、`pnpm exec vite build`、Playwright 截图比较与浏览器交互。CI 构建复用前序类型检查结果，不在同一次运行重复检查；所有改动均运行完整检查，不按路径跳过。依赖下载使用 pnpm 缓存，安装仍采用 frozen lockfile。
+2. PR 创建/更新和 `main` push 触发 `.github/workflows/tests.yml` 的 `Dashboard CI`；普通任务分支 push 不单独触发，推送后须创建 PR（草稿 PR 也运行），避免同一更新 push/PR 双跑。依次执行 `pnpm check:quick`、Python 测试、Node 单元/契约测试与覆盖率、`pnpm exec vite build`、`pnpm build:visual`（复用生产 CSS）、Playwright 截图比较与浏览器交互。CI 构建复用前序类型检查结果，不在同一次运行重复检查；所有改动均运行完整检查，不按路径跳过。依赖下载使用 pnpm 缓存，安装仍采用 frozen lockfile。
 3. 子代理等待当前提交的 PR 运行结束，核对 PR 最新 head SHA、check 名称、结论与运行链接。同一 PR 新提交自动取消旧 CI，只以最新提交的检查为准；`main` 正在运行的检查不自动取消。失败、取消、跳过或尚未完成均不能作为通过；返回失败日志，由主代理修复并重新委派推送和核验。
 4. `main` ruleset 要求 PR 和 GitHub Actions 来源的 `Dashboard CI`，分支必须基于最新 `main` 通过检查；不要求额外人工批准，不设置管理员或应用 bypass，禁止删除/强推。配置源为 `.github/main-ruleset.json`；修改此文件不会自动修改 GitHub 规则，须使用仓库 rulesets API 应用并读回核验。
 5. CI 通过且交付范围允许合并时，子代理通过普通 PR 合并（禁止 `--admin`），核对合并提交、`main` CI 和 Cloudflare 构建状态。报告记录 SHA 与实际运行结果；CI 成功不代表生产鉴权或全部路由 E2E 已验收。

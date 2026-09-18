@@ -1,0 +1,599 @@
+{
+  "version": 1,
+  "scope": "组件集成与生产CSS；不代表生产路由、Gateway或真实数据E2E。豁免页不计作已覆盖。",
+  "inventory": {
+    "root": "src/routes",
+    "suffix": "+page.svelte"
+  },
+  "baselineTemplate": "tests/visual/__screenshots__/macos-ci/{project}/{snapshot}",
+  "baselineDirectories": [
+    "tests/visual/__screenshots__/macos-ci"
+  ],
+  "pages": [
+    {
+      "source": "src/routes/+page.svelte",
+      "scenarios": [
+        "home"
+      ]
+    },
+    {
+      "source": "src/routes/articles/[id]/+page.svelte",
+      "exemption": "服务端数据详情，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/auth/verify-email/+page.svelte",
+      "exemption": "认证/邮件状态页，视觉 harness 明确无 auth bypass"
+    },
+    {
+      "source": "src/routes/bond/+page.svelte",
+      "exemption": "BondLedgerPage 未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/commentaries/[id]/+page.svelte",
+      "exemption": "服务端数据详情，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/credit-workbench/[[view]]/+page.svelte",
+      "scenarios": [
+        "credit",
+        "calendar",
+        "credit-weekly",
+        "credit-assistant"
+      ]
+    },
+    {
+      "source": "src/routes/financing-model/+page.svelte",
+      "exemption": "独立 legacy report 页面，未建浏览器夹具；dynamic financing-model evidence 不覆盖此 URL"
+    },
+    {
+      "source": "src/routes/financing/+page.svelte",
+      "exemption": "融资工作台生产页未接入 visual harness"
+    },
+    {
+      "source": "src/routes/financing/bond-investors/+page.svelte",
+      "exemption": "权限 gated 数据页，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/financing/data/+page.svelte",
+      "exemption": "权限 gated 数据页，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/financing/debts/[id]/+page.svelte",
+      "exemption": "服务端负债详情，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/financing/liability-report/+page.svelte",
+      "exemption": "服务端报表数据，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/financing/login/+page.svelte",
+      "exemption": "统一登录跳转页，认证边界"
+    },
+    {
+      "source": "src/routes/financing/projects/+page.svelte",
+      "exemption": "融资项目数据与权限，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/financing/projects/[id]/+page.svelte",
+      "exemption": "服务端项目详情，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/financing/sop/+page.svelte",
+      "exemption": "SOP 数据/权限，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/financing/sop/[id]/+page.svelte",
+      "exemption": "服务端 SOP 详情，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/financing/sop/reminders/+page.svelte",
+      "exemption": "提醒历史服务端数据，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/fund-report/+page.svelte",
+      "exemption": "归档报告服务端列表，未建 visual harness；portal 仅验证链接"
+    },
+    {
+      "source": "src/routes/management/+page.svelte",
+      "exemption": "没有页面截图/交互；组件只有 head"
+    },
+    {
+      "source": "src/routes/management/me/+page.svelte",
+      "exemption": "身份资料 API 页面，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/management/messenger/+page.svelte",
+      "scenarios": [
+        "messenger"
+      ]
+    },
+    {
+      "source": "src/routes/management/notifications/+page.svelte",
+      "exemption": "Web Push/设备 API，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/management/people/+page.svelte",
+      "exemption": "Auth0 管理边界，浏览器无法伪造 Gateway 身份"
+    },
+    {
+      "source": "src/routes/management/permissions/+page.svelte",
+      "exemption": "权限刷新/Auth0 边界，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/market-briefing/+page.svelte",
+      "scenarios": [
+        "market-report"
+      ]
+    },
+    {
+      "source": "src/routes/market-briefing/text/+page.svelte",
+      "exemption": "同 App 的文本入口未单独建场景"
+    },
+    {
+      "source": "src/routes/market-hotspots/+page.svelte",
+      "exemption": "本模块是 LegacyWorkbenchRedirect；仅 canonical dynamic URL 有交互，无重定向截图"
+    },
+    {
+      "source": "src/routes/news/[id]/+page.svelte",
+      "exemption": "服务端新闻详情，未建浏览器夹具"
+    },
+    {
+      "source": "src/routes/policy-tracking/+page.svelte",
+      "exemption": "LegacyWorkbenchRedirect；canonical dynamic view 也无 visual spec"
+    },
+    {
+      "source": "src/routes/profile/+page.svelte",
+      "exemption": "认证身份页，visual harness 无 auth bypass"
+    },
+    {
+      "source": "src/routes/secondary-bond-pool/+page.svelte",
+      "exemption": "legacy weekly page；已有截图针对 /trading-research/secondary-bond-pool，不是此 URL"
+    },
+    {
+      "source": "src/routes/trading-research/+page.svelte",
+      "scenarios": [
+        "overview"
+      ]
+    },
+    {
+      "source": "src/routes/trading-research/[view]/+page.svelte",
+      "scenarios": [
+        "trading",
+        "market-hotspots",
+        "policy-tracking",
+        "tracking-commentary",
+        "research",
+        "workflow",
+        "secondary",
+        "bond",
+        "financing-model"
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "source": "src/lib/trading-research/demo-data.ts",
+      "export": "workbenchRoutes",
+      "scenarios": {
+        "overview": "overview",
+        "trading": "trading",
+        "market-hotspots": "market-hotspots",
+        "tracking-commentary": "tracking-commentary",
+        "policy-tracking": "policy-tracking",
+        "research": "research",
+        "workflow": "workflow",
+        "secondary-bond-pool": "secondary",
+        "bond": "bond",
+        "financing-model": "financing-model"
+      }
+    },
+    {
+      "source": "src/lib/credit-workbench/navigation.ts",
+      "export": "creditWorkbenchViews",
+      "scenarios": {
+        "overview": "credit",
+        "calendar": "calendar",
+        "weekly": "credit-weekly",
+        "assistant": "credit-assistant"
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "home",
+      "url": "/",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "home renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "home.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "overview",
+      "url": "/trading-research",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "overview renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "overview.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trading",
+      "url": "/trading-research/trading",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "trading renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "trading.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflow",
+      "url": "/trading-research/workflow",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "workflow renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "workflow.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "credit",
+      "url": "/credit-workbench",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "credit renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "calendar",
+      "url": "/credit-workbench/calendar",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "calendar renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "calendar.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "credit-weekly",
+      "url": "/credit-workbench/weekly",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "credit-weekly renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-weekly.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "url": "/trading-research/research",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "research renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "research.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "secondary",
+      "url": "/trading-research/secondary-bond-pool",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "secondary renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "secondary.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "market-report",
+      "url": "/market-briefing",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "market-report renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "market-report.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "schedule",
+      "url": "/financing/schedule",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "schedule renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "schedule.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-model",
+      "url": "/trading-research/financing-model",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/reports.spec.mjs",
+          "test": "financing-model preserves its approved report layout",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "financing-model.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tracking-commentary",
+      "url": "/trading-research/tracking-commentary?id=archive-1",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/tracking-commentary.spec.mjs",
+          "test": "tracking archive opens, edits, generates and retains source evidence",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "tracking-commentary.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "messenger",
+      "url": "/management/messenger",
+      "kind": "screenshot",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/messenger.spec.mjs",
+          "test": "消息记录、尝试明细和不确定结果重试确认",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "messenger.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "market-hotspots",
+      "url": "/trading-research/market-hotspots",
+      "kind": "interaction",
+      "state": "normal",
+      "evidence": [
+        {
+          "spec": "tests/visual/ui-contracts.spec.mjs",
+          "test": "hotspot scope tabs and detail dialog support keyboard dismissal and restore focus",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "policy-tracking",
+      "url": "/trading-research/policy-tracking",
+      "kind": "deferred",
+      "reason": "政策列表与详情尚未建立浏览器夹具；不计作截图覆盖。"
+    },
+    {
+      "id": "bond",
+      "url": "/trading-research/bond",
+      "kind": "deferred",
+      "reason": "逐日台账组件尚未建立浏览器夹具；周报截图不替代此页面。"
+    },
+    {
+      "id": "credit-assistant",
+      "url": "/credit-workbench/assistant",
+      "kind": "deferred",
+      "reason": "授信助手流式会话尚未建立浏览器夹具。"
+    },
+    {
+      "id": "workflow-expanded",
+      "url": "/trading-research/workflow",
+      "kind": "screenshot",
+      "state": "expanded/editor",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "workflow expands a branch and opens the real editor",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "workflow-expanded.png",
+            "workflow-editor.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workflow-branch",
+      "url": "/trading-research/workflow",
+      "kind": "screenshot",
+      "state": "expanded branch",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "workflow branches expand to the right without displacing the main path",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "workflow-branch.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "credit-error",
+      "url": "/credit-workbench",
+      "kind": "screenshot",
+      "state": "error",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "credit failure is visible instead of an empty success",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-error.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "secondary-empty",
+      "url": "/trading-research/secondary-bond-pool",
+      "kind": "screenshot",
+      "state": "empty",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "secondary pool empty state is a successful empty report",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "secondary-empty.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "schedule-point",
+      "url": "/financing/schedule",
+      "kind": "screenshot",
+      "state": "point mode",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "schedule switches modes and resets without stale fields",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "schedule-point.png"
+          ]
+        }
+      ]
+    }
+  ]
+}
