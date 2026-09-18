@@ -1,7 +1,5 @@
 <script lang="ts">
 
-  import { prefersReducedMotion } from "svelte/motion";
-  import { fly } from "svelte/transition";
   import {
     FOCUS_STORAGE_PREFIX,
     LEGACY_FOCUS_STORAGE_PREFIX,
@@ -16,8 +14,6 @@
   interface Props {
     generating?: boolean;
     disabled?: boolean;
-    progressText?: string;
-    summaries?: Array<{ id: string; text: string }>;
     reportDate: string;
     generatedBriefing?: MarketBriefing | null;
     initialText?: string;
@@ -29,8 +25,6 @@
   let {
     generating = false,
     disabled = false,
-    progressText = "正在分析股债市场",
-    summaries = [],
     reportDate,
     generatedBriefing = null,
     initialText = "",
@@ -116,8 +110,6 @@
       .getPropertyValue("--color-primary")
       .trim();
   }
-  let currentProgress = $derived(summaries.at(-1) ?? { id: `status:${progressText}`, text: progressText });
-  let progressMessage = $derived(currentProgress.text.replace(/\*\*/g, ""));
   $effect(() => {
     if (
       reportDate &&
@@ -174,20 +166,6 @@
   });
 </script>
 
-{#if generating}
-  <div class="focus-progress" role="status" aria-live="polite" aria-atomic="true" aria-label="今日聚焦生成进度">
-    <div class="focus-progress-copy">
-      {#key currentProgress.id}
-        <span
-          class="focus-progress-message"
-          title={progressMessage}
-          in:fly={{ y: prefersReducedMotion.current ? 0 : 6, duration: prefersReducedMotion.current ? 0 : 180, delay: prefersReducedMotion.current ? 0 : 120 }}
-          out:fly={{ y: prefersReducedMotion.current ? 0 : -6, duration: prefersReducedMotion.current ? 0 : 120 }}
-        >{progressMessage}</span>
-      {/key}
-    </div>
-  </div>
-{/if}
 <div
   bind:this={editor}
   class="focus-editor"
@@ -206,27 +184,3 @@
   oninput={save}
   onpaste={pastePlainText}
 ></div>
-
-<style>
-  .focus-progress {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-block: 0.5rem;
-    color: var(--color-primary);
-    font-family: var(--font);
-    font-size: 1rem;
-  }
-  .focus-progress-copy { display: grid; flex: 1; min-width: 0; overflow: hidden; }
-  .focus-progress-message {
-    grid-area: 1 / 1;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
-    line-height: 1.5;
-  }
-</style>

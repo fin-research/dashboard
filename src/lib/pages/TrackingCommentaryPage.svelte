@@ -15,6 +15,7 @@
   import { NativeSelect } from "$lib/components/ui/native-select/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { globalMessages } from "$lib/global-messages";
+  import { isAiRequestCancelled, useAiClient } from "$lib/ai-client.svelte";
   import { commentaryTypeLabels, shanghaiDate, trackingText, type TrackingCommentary, type TrackingDraft, type TrackingRevision, type CommentaryPdfArchive } from "$lib/tracking-commentary";
 
   type Item = Pick<TrackingCommentary, "id" | "eventName" | "type" | "commentaryDate" | "origin" | "edited" | "generatedAt">;
@@ -22,7 +23,8 @@
   let loading = $state(true), listError = $state(""), hasMore = $state(false), loadingMore = $state(false);
   let selected = $state<TrackingCommentary | null>(null), draft = $state<TrackingDraft>(blank());
   let savedDraft = $state(JSON.stringify(blank())), policyId = $state<string | null>(null);
-  let busy = $state(false), progress = $state(""), opening = $state(false), preview = $state(false);
+  const aiClient = useAiClient();
+  let busy = $state(false), opening = $state(false), preview = $state(false);
   let startDate = $state(shanghaiDate(-6)), endDate = $state(shanghaiDate());
   let revisions = $state<TrackingRevision[]>([]), shownRevision = $state<TrackingRevision | null>(null);
   let generation = 0, listRequest = 0, mounted = false;
@@ -154,34 +156,23 @@
     if (busy) return;
     if ((draft.commentary || draft.recommendation) && !window.confirm("重新生成将替换当前正文，已保存版本会保留。是否继续？")) return;
     const range = { startDate, endDate };
-    busy = true; progress = "保存主题";
+    busy = true;
     try {
       const current = dirty || !selected ? await persist() : selected;
-      progress = "检索研报";
-      const response = await fetch(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/generate`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...range, updatedAt: current.updatedAt }),
+      const commentary = await aiClient.run({
+        title: `跟踪点评 · ${current.eventName}`,
+        url: `/api/tracking-commentaries/${encodeURIComponent(current.id)}/generate`,
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...range, updatedAt: current.updatedAt }),
+        },
+        parse: (value) => value as TrackingCommentary,
       });
-      if (!response.ok) throw new Error((await response.json()).error || "生成失败");
-      if (!response.body) throw new Error("生成连接中断，请重新打开点评查看");
-      const reader = response.body.getReader(), decoder = new TextDecoder(); let pending = "", completed = false;
-      try {
-        while (true) {
-          const { value, done } = await reader.read(); pending += decoder.decode(value, { stream: !done });
-          const lines = pending.split("\n"); pending = lines.pop() ?? "";
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            const event = JSON.parse(line);
-            if (event.type === "error") throw new Error(event.error);
-            if (event.type === "progress" && mounted) progress = event.message;
-            if (event.type === "complete") { completed = true; if (mounted) accept(event.commentary); }
-          }
-          if (done) break;
-        }
-      } finally { reader.releaseLock(); }
-      if (!completed) throw new Error("连接中断，请重新打开点评查看保存结果");
+      if (mounted) accept(commentary);
       if (mounted) { globalMessages.success("点评草稿已生成"); await loadList(); }
-    } catch (error) { if (mounted) fail(error); }
-    finally { if (mounted) { busy = false; progress = ""; } }
+    } catch (error) { if (mounted && !isAiRequestCancelled(error)) fail(error); }
+    finally { if (mounted) busy = false; }
   }
   async function loadRevisions() {
     if (!selected) return; const id = selected.id;
@@ -242,7 +233,7 @@
           <div class="generation-toolbar">
             <label><span>研报起始日期</span><Input type="date" bind:value={startDate} /></label>
             <label><span>研报截止日期</span><Input type="date" bind:value={endDate} /></label>
-            <Button permission="research.policy:generate&research.policy_commentary:update" disabled={busy || saveConflict || draft.eventName.trim().length < 2 || !startDate || !endDate || startDate > endDate} onclick={generateDraft}>{busy && progress ? progress : "检索并生成"}</Button>
+            <Button permission="research.policy:generate&research.policy_commentary:update" disabled={busy || saveConflict || draft.eventName.trim().length < 2 || !startDate || !endDate || startDate > endDate} onclick={generateDraft}>{busy ? "生成中" : "检索并生成"}</Button>
           </div>
         </fieldset>
       </ModuleCard>

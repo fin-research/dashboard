@@ -9,7 +9,7 @@
 - `PATCH /api/financing-model/conclusion`：增量更新目标 `model_run` 的当前整体结论；请求含 `runId`、`verdict`、`preferredWindow`、`narrative`，不修改模型基础结论。
 - `GET /api/financing-model/decisions`：读取历史择时决策记录；日期、历史分位和发行建议来自对应模型运行，按模型日期倒序返回。
 - `POST /api/financing-model/decisions`：按 `runId` 新增或覆盖一条人工记录；`decisionAction` 必填，`outcome` 可在结果形成后补录，不设置状态字段。
-- `POST /api/financing-model/sell-side`：按 `runId` 使用 AI Search 与 AI Gateway 生成并追加卖方逻辑汇总及 4–5 家逐机构观点，成功为 201。
+- `POST /api/financing-model/sell-side`：按 `runId` 使用 AI Search 与 AI Gateway 生成并追加卖方逻辑汇总及 4–5 家逐机构观点；前端携带 `Accept: text/event-stream` 时返回统一 `progress/result/error` SSE，普通 JSON 请求成功为 201。
 - `PATCH /api/financing-model/sell-side`：追加人工卖方逻辑汇总修订；请求含 `runId`、`logicSummary`，保留原检索口径与来源证据。
 
 ## 业务规则

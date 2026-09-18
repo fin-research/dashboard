@@ -27,10 +27,9 @@ test('路由立即建立 SSE，透传公开摘要，终帧返回经校验的股�
     const response = await POST(event());
     assert.match(response.headers.get('content-type'), /text\/event-stream/);
     const received = [];
-    await readSse(response.body, e => received.push({ event: e.event, data: JSON.parse(e.data) }), 10000);
-    assert.equal(received[0].data.text, '正在读取新闻');
-    assert.ok(received.some(e => e.data.type === 'summary' && e.data.text === '分析股市催化'));
-    assert.deepEqual(received.at(-1), { event: 'complete', data: { report_date: '2026-09-11', stock: '股市正文', bond: '债市正文', news_count: 1 } });
+    await readSse(response.body, e => received.push({ event: e.event, data: e.event === 'result' ? JSON.parse(e.data) : e.data }), 10000);
+    assert.deepEqual(received[0], { event: 'progress', data: '分析股市催化' });
+    assert.deepEqual(received.at(-1), { event: 'result', data: { report_date: '2026-09-11', stock: '股市正文', bond: '债市正文', news_count: 1 } });
   } finally { globalThis.fetch = original; }
 });
 
@@ -53,6 +52,6 @@ test('断开 SSE 取消上游调用，不触发重试；错误以 error 终帧�
     const events = [];
     await readSse(failed.body, e => events.push(e.event), 10000);
     assert.equal(events.at(-1), 'error');
-    assert.equal(events.includes('complete'), false);
+    assert.equal(events.includes('result'), false);
   } finally { globalThis.fetch = original; }
 });

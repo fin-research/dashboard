@@ -21,7 +21,7 @@ test.beforeEach(async ({page}) => {
     if(url.pathname.endsWith('/generate')) {
       const input=route.request().postDataJSON();expect(input.startDate).toBe('2026-09-09');
       stored={...stored,commentary:'1. 融资需求下降\n资金需求回落，融资成本下移。',edited:false,origin:'ai',updatedAt:'2026-09-15T03:02:00Z',evidence:[{sourceId:'S1',sourceKey:'report/2026-09-15/报告.md',title:'融资窗口分析',institution:'研究机构甲',publishedAt:'2026-09-15',section:'融资需求下降',text:'资金需求回落，融资成本下移。',startOffset:0,endOffset:18}]};
-      return route.fulfill({contentType:'application/x-ndjson',body:[{type:'progress',message:'检索研报'},{type:'complete',commentary:stored}].map(v=>JSON.stringify(v)).join('\n')+'\n'});
+      return route.fulfill({contentType:'text/event-stream',body:`event: progress\ndata: 检索研报\n\nevent: result\ndata: ${JSON.stringify(stored)}\n\n`});
     }
     if(url.pathname.endsWith('/revisions'))return route.fulfill({json:{revisions:[{savedAt:original.updatedAt,content:original}]}});
     if(method==='PUT') { const body=route.request().postDataJSON();expect(body.updatedAt).toBe(stored.updatedAt);stored={...stored,...body,updatedAt:'2026-09-15T03:01:00Z'};return route.fulfill({json:stored}); }

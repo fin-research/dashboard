@@ -152,10 +152,6 @@ export interface MarketReportLoadResult {
   resourceIssues: MarketReportResourceIssue[];
 }
 
-export type MarketBriefingProgress =
-  | { type: "status" | "reset"; text: string }
-  | { type: "summary"; id: string; text: string };
-
 export interface MarketBriefing {
   report_date: string;
   stock: string;

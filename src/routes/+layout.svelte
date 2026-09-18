@@ -14,14 +14,25 @@
   let loginDialog: LoginDialog;
 
   import GlobalMessages from "$lib/GlobalMessages.svelte";
+  import AiPanel from "$lib/AiPanel.svelte";
+  import { provideAiClient } from "$lib/ai-client.svelte";
   import { applyPreferences, readPreferences } from "$lib/preferences";
 
   let { children, data } = $props();
   const session = createClientSession(untrack(() => data.session));
+  const aiClient = provideAiClient();
+  let aiIdentity = untrack(() => data.session?.user?.id ?? null);
   setContext(CLIENT_SESSION_CONTEXT, session);
   setContext('site-account', () => $session?.account ?? null);
   setContext('site-account-checking', () => $session === null);
   $effect(() => { if (data.session) session.seedFromServer(data.session); });
+  $effect(() => {
+    const nextIdentity = $session?.user?.id ?? null;
+    if (nextIdentity !== aiIdentity) {
+      aiIdentity = nextIdentity;
+      aiClient.reset();
+    }
+  });
 
   beforeNavigate(createClientNavigationGuard(session, {
     origin: () => page.url.origin,
@@ -48,3 +59,4 @@
 <GlobalMessages />
 <LoginDialog bind:this={loginDialog} {session} />
 {@render children()}
+<AiPanel client={aiClient} />

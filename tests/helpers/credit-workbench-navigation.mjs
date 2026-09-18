@@ -18,6 +18,8 @@ globalThis.fetch = async url => {
 const Host = await loadComponent("tests/helpers/CreditWorkspaceHost.svelte", `<script>
   import CreditWorkbenchPage from "../../src/lib/credit-workbench/CreditWorkbenchPage.svelte";
   import WorkbenchShell from "../../src/lib/workbench/WorkbenchShell.svelte";
+  import { createAiClient, provideAiClient } from "../../src/lib/ai-client.svelte";
+  provideAiClient(createAiClient());
   let view = $state("assistant");
   let workspace = $state("credit");
   export function navigate(next) { view = next; }

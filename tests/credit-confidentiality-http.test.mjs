@@ -282,7 +282,7 @@ test("SSE milestones never re-expose historical private answers after a new unsi
   assert.match(events, /"running":false/);
 });
 
-test("SSE sends stages and draft text immediately, reconnects to the running turn, and closes on completion", async () => {
+test("SSE sends model summaries, reconnects to the running turn, and closes with the complete session", async () => {
   const app = setup();
   await app.request("session/institution", { institutionName: "银行甲" });
   await app.request("session", { institutionName: "银行甲", question: "年度报告.pdf" });
@@ -291,25 +291,25 @@ test("SSE sends stages and draft text immediately, reconnects to the running tur
   assert.match(response.headers.get("content-type"), /text\/event-stream/);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  assert.match(decoder.decode((await reader.read()).value), /"running":true/);
+  assert.match(decoder.decode((await reader.read()).value), /retry: 2000/);
   let finish;
   const gate = new Promise(resolve => { finish = resolve; });
   const realAnswer = globalThis.creditTestAnswer;
   globalThis.creditTestAnswer = async options => {
-    options.progress("正在检索材料", "retrieval"); options.draft("公司资产"); await gate;
+    options.progress("正在检索材料", "retrieval"); options.summary("正在分析授信材料"); await gate;
     return realAnswer(options);
   };
   const running = agent.answerQuestion(agent.jobs[0].payload);
-  const stage = decoder.decode((await reader.read()).value);
-  assert.match(stage, /"stage":"retrieval"/);
-  assert.match(decoder.decode((await reader.read()).value), /event: draft[\s\S]*公司资产/);
+  assert.match(decoder.decode((await reader.read()).value), /event: progress[\s\S]*正在分析授信材料/);
   await reader.cancel();
   const reconnected = await app.request("session/events");
   const restored = reconnected.body.getReader();
-  assert.match(decoder.decode((await restored.read()).value), /"draftText":"公司资产"/);
+  assert.match(decoder.decode((await restored.read()).value), /retry: 2000/);
+  assert.match(decoder.decode((await restored.read()).value), /event: progress[\s\S]*正在分析授信材料/);
   finish(); await running;
   let final = "";
   while (true) { const part = await restored.read(); if (part.done) break; final += decoder.decode(part.value); }
+  assert.match(final, /event: result/);
   assert.match(final, /"running":false/);
   assert.match(final, /年度报告.pdf/);
   assert.equal(agent.jobs.length, 1, "reconnect must not schedule a second answer");

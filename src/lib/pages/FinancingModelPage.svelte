@@ -32,6 +32,7 @@
     type TimingDecisionRecord,
   } from "$lib/financing-model";
   import { globalMessages } from "$lib/global-messages";
+  import { isAiRequestCancelled, useAiClient } from "$lib/ai-client.svelte";
   import { portal } from "$lib/portal";
   import type { MetricIconName } from "../../view-model";
   interface Props {
@@ -39,6 +40,7 @@
   }
 
   let { embedded = false }: Props = $props();
+  const aiClient = useAiClient();
 
   let report = $state<FinancingModelReport | null>(null);
   let loading = $state(true);
@@ -262,20 +264,17 @@
   async function generateResearch(): Promise<void> {
     if (!report || generatingResearch) return;
     generatingResearch = true;
-    globalMessages.info("正在检索最近七日卖方研报并归纳逻辑，可能需要数分钟", {
-      key: "financing-model-research",
-      title: "卖方观点生成中",
-      duration: 600_000,
-    });
     try {
-      const response = await fetch("/api/financing-model/sell-side", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId: report.snapshot.run_id }),
+      const sellSide = await aiClient.run({
+        title: "融资择时 · 卖方观点",
+        url: "/api/financing-model/sell-side",
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ runId: report.snapshot.run_id }),
+        },
+        parse: (value) => sellSidePayloadSchema.parse(value),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "卖方观点生成失败");
-      const sellSide = sellSidePayloadSchema.parse(payload);
       report = { ...report, sellSide };
       editingSellSide = false;
       resetSellSideEditor();
@@ -285,7 +284,7 @@
         duration: 6000,
       });
     } catch (error) {
-      globalMessages.error(
+      if (!isAiRequestCancelled(error)) globalMessages.error(
         error instanceof Error ? error.message : String(error),
         {
           key: "financing-model-research",

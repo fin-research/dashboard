@@ -156,7 +156,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
       "market-briefing:market-briefing-v7-structured-stream",
     );
     assert.deepEqual(query.reasoning, {
-      effort: "max",
+      effort: "xhigh",
       summary: "auto",
       context: "current_turn",
     });

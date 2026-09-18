@@ -8,13 +8,13 @@ const MAX_AI_GATEWAY_TIMEOUT_MS = 300_000;
 export const AI_GATEWAY_MODEL = "gpt-5.6-luna" as const;
 export const AI_GATEWAY_PROVIDER = "custom-codex" as const;
 export const AI_GATEWAY_REASONING_EFFORT_BY_TASK = {
-  generation: "high",
-  market_briefing: "max",
-  analysis: "high",
-  policy_commentary: "max",
-  tracking_commentary: "high",
-  credit_answer: "max",
-  summary: "low",
+  generation: "xhigh",
+  market_briefing: "xhigh",
+  analysis: "xhigh",
+  policy_commentary: "xhigh",
+  tracking_commentary: "xhigh",
+  credit_answer: "xhigh",
+  summary: "xhigh",
 } as const;
 
 export type AiGatewayTaskType = keyof typeof AI_GATEWAY_REASONING_EFFORT_BY_TASK;

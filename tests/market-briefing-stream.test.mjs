@@ -54,31 +54,23 @@ test('仅订阅摘要也启用 SSE；不完整股债结果同模型重试，取�
   assert.equal(count, 1);
 });
 
-test('浏览器逐帧接收摘要，拒绝断流、空正文和日期错配', async () => {
-  const original = globalThis.fetch;
-  const progress = [];
+test('浏览器市场点评统一通过 AI 客户端校验完整结果和日期', async () => {
   const complete = { report_date: '2026-09-11', stock: '股市', bond: '债市', news_count: 2 };
-  const sse = (event, value) => `event: ${event}\r\ndata: ${JSON.stringify(value)}\r\n\r\n`;
-  try {
-    let controller;
-    globalThis.fetch = async (_url, init) => {
-      assert.equal(init.headers.Accept, 'text/event-stream');
-      return new Response(new ReadableStream({ start(c) { controller = c; } }), { headers: { 'content-type': 'text/event-stream' } });
-    };
-    const pending = generateMarketBriefing('2026-09-11', undefined, value => progress.push(value));
-    await new Promise(resolve => setImmediate(resolve));
-    for (const byte of encoder.encode(sse('progress', { type: 'summary', id: '0:0', text: '分析中' }))) controller.enqueue(Uint8Array.of(byte));
-    await new Promise(resolve => setImmediate(resolve));
-    assert.equal(progress[0].text, '分析中');
-    controller.enqueue(encoder.encode(sse('complete', complete))); controller.close();
-    assert.deepEqual(await pending, complete);
-    for (const stream of [sse('progress', { type: 'status', text: '分析中' }), sse('complete', { ...complete, stock: '' }), sse('complete', { ...complete, report_date: '2026-09-10' }), sse('error', { error: '生成失败' })]) {
-      globalThis.fetch = async () => new Response(stream, { headers: { 'content-type': 'text/event-stream' } });
-      await assert.rejects(generateMarketBriefing('2026-09-11'));
-    }
-  } finally { globalThis.fetch = original; }
+  const calls = [];
+  const aiClient = { async run(options) { calls.push(options); return options.parse(complete); } };
+  assert.deepEqual(await generateMarketBriefing(aiClient, '2026-09-11'), complete);
+  assert.equal(calls[0].title, '市场点评 · 今日聚焦');
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].url, '/api/market-briefing?date=2026-09-11');
+  await assert.rejects(
+    generateMarketBriefing({ async run(options) { return options.parse({ ...complete, stock: '' }); } }, '2026-09-11'),
+  );
+  await assert.rejects(
+    generateMarketBriefing({ async run(options) { return options.parse({ ...complete, report_date: '2026-09-10' }); } }, '2026-09-11'),
+    /报告日期与请求日期不一致/,
+  );
 });
 
-test('今日聚焦生成失败保留草稿，进度去除加粗标记，完成由前端编号', async () => {
+test('今日聚焦生成期间保留草稿，完成由前端编号', async () => {
   await promisify(execFile)(process.execPath, ['--conditions=browser', 'tests/helpers/market-focus-lifecycle.mjs'], { cwd: new URL('../', import.meta.url), timeout: 20000, maxBuffer: 20000 });
 });

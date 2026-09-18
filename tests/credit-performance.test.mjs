@@ -248,10 +248,10 @@ test("checkpoint chunks preserve Unicode and remain small enough for SQL values"
   assert.ok(parts.every(part => !/[\uD800-\uDBFF]$/.test(part)));
 });
 
-test("an obsolete SSE instance closes on the next heartbeat so EventSource can reconnect", async t => {
+test("an obsolete SSE subscriber closes on the next heartbeat so a new client can resubscribe", async t => {
   t.mock.timers.enable({ apis: ["setInterval"] });
   const hub = new CreditEventHub();
-  const response = hub.response({ turns: [], running: true, progress: "", error: null, startedAt: 0 }, () => { throw new Error("code updated"); });
+  const response = hub.response({ turns: [], running: true, progress: "", error: null, startedAt: 0 }, "", () => { throw new Error("code updated"); });
   const reader = response.body.getReader();
   assert.equal((await reader.read()).done, false);
   t.mock.timers.tick(20_000);

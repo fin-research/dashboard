@@ -4,6 +4,7 @@ import {
   type HotspotRequestScope,
 } from "$lib/server/hotspots";
 import { loadLatestHotspotSnapshot } from "$lib/server/hotspot-snapshots";
+import { createAiSseResponse } from "$lib/server/ai-sse";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform }) => {
@@ -53,6 +54,24 @@ export const POST: RequestHandler = async ({ platform, request }) => {
   let scope: HotspotRequestScope | null = null;
   try {
     scope = requestScope(await parseJsonBody(request));
+    if (request.headers.get("accept")?.includes("text/event-stream")) {
+      const env = platform.env;
+      const currentScope = scope;
+      return createAiSseResponse(
+        request,
+        ({ signal, progress }) => generateMarketHotspots(env, currentScope, { signal, onProgress: progress }),
+        {
+          errorMessage: (error) => publicErrorMessage(error, error instanceof HotspotError ? error.status : 500),
+          onError: (error) => console.error(JSON.stringify({
+            event: "market_hotspots_failed",
+            action: "generate_snapshot",
+            scope: scopeForLog(currentScope),
+            status: error instanceof HotspotError ? error.status : 500,
+            error: describeError(error),
+          })),
+        },
+      );
+    }
     const result = await generateMarketHotspots(platform.env, scope);
     return Response.json(result, {
       status: 201,

@@ -22,11 +22,11 @@ python3 scripts/import-tracking-commentaries.py --input '<材料目录>' --outpu
 
 通过研究库 MCP `search` 进行主题与固收传导两次检索，每次50条、研报类型与published_at硬过滤；合并同key，不截断返回的原文块。关联政策的已有研报正文在所选日期内通过 DATA 最多5路并发读取；政策资讯作为事实材料。无研报或材料超过250000字符明确失败，要求调整主题/日期，不编造或裁切来源。新管线不使用模型 Web Search 生成不可逐字核验的摘录。
 
-AI Gateway使用独立 `tracking_commentary/high` 任务与版本化Prompt，输出选材而非正文改写：摘要和2—4点正文均为原文摘录，标题表达判断，融资建议独立撰写且必须关联已摘录来源。应用校验完整句界、逐字子串、来源ID及无行动套话；失败进入既有同模型重试一次。通过后由程序组装正文；保存源key、机构、日期、原句位置和检索文档哈希。机构/标题/时间只来自检索元数据，不接受模型填写。原文的条件和分歧不得删去，明确观点不等于虚构确定性。
+AI Gateway使用独立 `tracking_commentary/xhigh` 任务与版本化Prompt，输出选材而非正文改写：摘要和2—4点正文均为原文摘录，标题表达判断，融资建议独立撰写且必须关联已摘录来源。应用校验完整句界、逐字子串、来源ID及无行动套话；失败进入既有同模型重试一次。通过后由程序组装正文；保存源key、机构、日期、原句位置和检索文档哈希。机构/标题/时间只来自检索元数据，不接受模型填写。原文的条件和分歧不得删去，明确观点不等于虚构确定性。
 
-接口 `/api/tracking-commentaries` GET/POST（列表/建稿）、`/[id]` GET/PUT（读取/修订）、`/[id]/generate` POST（NDJSON进度/完成/失败，15秒心跳）、`/[id]/revisions` GET。创建/修订使用既有 `research.policy_commentary:update`，生成使用 `research.policy:generate`，读取使用 `research.policy:read`；由 Gateway 登记并同步展示契约。连接中断不保证后台继续生成，用户重新打开草稿读取实际保存结果。
+接口 `/api/tracking-commentaries` GET/POST（列表/建稿）、`/[id]` GET/PUT（读取/修订）、`/[id]/generate` POST（统一 `progress/result/error` SSE，15秒注释帧保活）、`/[id]/revisions` GET。创建/修订使用既有 `research.policy_commentary:update`，生成使用 `research.policy:generate`，读取使用 `research.policy:read`；由 Gateway 登记并同步展示契约。连接中断不保证后台继续生成，用户重新打开草稿读取实际保存结果。
 
-交互式生成通过统一 adapter 的 Responses 流接收模型事件，页面只展示选材、组织判断、生成与重试阶段，不展示推理正文或未校验JSON。单次AI请求300秒，保留统一的一次重试；日志只记录稿件ID、尝试序号、材料数、状态、Gateway log ID和token计数。Responses终止帧立即结束读取，不等上游EOF；截止和客户端取消贯穿读取，取消后不重试/写入。NDJSON禁止代理转换/缓冲，失败不保存半成品。
+交互式生成通过统一 adapter 的 Responses 流接收模型事件；Worker 仅将公开 reasoning summary 作为纯文本 `progress`，完成后将完整点评作为 JSON `result`，错误为纯文本 `error`，不发送推理正文或未校验 JSON。单次AI请求300秒，保留统一的一次重试；日志只记录稿件ID、尝试序号、材料数、状态、Gateway log ID和token计数。Responses终止帧立即结束读取，不等上游EOF；截止和客户端取消贯穿读取，取消后不重试/写入，失败不保存半成品。
 
 ## 手写稿与旧 AI 稿诊断
 
@@ -62,6 +62,6 @@ AI生成后，已存在点评的人工输入使用800ms防抖串行同步D1；�
 
 2026-09-18生产追踪确认两次上游HTTP 200后只收到推理摘要，分别在305秒本地截止，实际错误为 `The operation was aborted due to timeout`；未收到正文或终止帧，不能归因为鉴权或Schema错误。极简max请求14秒成功，同一批20篇研报与3篇参考稿的high对照85秒完成，但旧逐字抄写输出触发句界校验。
 
-v4为选材任务独立映射high，保留300秒预算及统一重试。完整上下文仍传入模型；程序为完整原句标记编号，模型只选编号、拟标题和建议，程序从原文组装正文。句子不按逗号/分号拆分，保留条件、否定与小数；摘要编号仅允许120字内原句。句界识别兼容中文引号和列表。参考稿不进入可选原句集合。
+v4选材任务现统一映射 `xhigh`，保留300秒预算及统一重试。完整上下文仍传入模型；程序为完整原句标记编号，模型只选编号、拟标题和建议，程序从原文组装正文。句子不按逗号/分号拆分，保留条件、否定与小数；摘要编号仅允许120字内原句。句界识别兼容中文引号和列表。参考稿不进入可选原句集合。
 
 AI失败返回 `AI_RESPONSE_TIMEOUT`、`AI_OUTPUT_INVALID` 或 `AI_UPSTREAM_ERROR`，并带尝试次数、HTTP状态和Gateway追踪ID；不回显上游正文、Prompt或secret。超时不会再被隐藏为通用“操作失败”。

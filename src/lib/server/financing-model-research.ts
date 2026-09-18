@@ -72,7 +72,9 @@ export async function generateFinancingModelResearch(
   snapshot: FinancingModelSnapshot,
   credentials: AiGatewayCredentials,
   fetcher: typeof fetch = fetch,
+  options: { signal?: AbortSignal; onProgress?: (summary: string) => void } = {},
 ): Promise<SellSidePayload> {
+  options.signal?.throwIfAborted();
   const period = aiSearchPeriod(snapshot.as_of_date);
   const searchQuery = buildResearchQuery(snapshot);
   const response = await fetcher(AI_SEARCH_MCP_URL, {
@@ -82,7 +84,7 @@ export async function generateFinancingModelResearch(
       Accept: "application/json, text/event-stream",
     },
     body: JSON.stringify(buildAiSearchToolCall(searchQuery, period)),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.any([AbortSignal.timeout(120_000), ...(options.signal ? [options.signal] : [])]),
   });
   const responseText = await readTextBounded(response, MAX_MCP_RESPONSE_BYTES);
   if (!response.ok) {
@@ -108,6 +110,10 @@ export async function generateFinancingModelResearch(
     researchOutputSchema,
     "financing_model_sell_side",
     {
+      signal: options.signal,
+      ...(options.onProgress ? {
+        onReasoningSummary: (summary: { id: string; text: string }) => options.onProgress?.(summary.text),
+      } : {}),
       promptCacheKey: PROMPT_CACHE_KEY,
       metadata: {
         tags: "financing-model,sell-side,ai-search",

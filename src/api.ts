@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { readSse } from "./lib/sse.ts";
+import type { AiClient } from "./lib/ai-client.svelte.ts";
 
 import {
   DataApiRequestError,
@@ -14,7 +14,6 @@ import {
 import { currentReportDate } from "./report-date.ts";
 import type {
   MarketBriefing,
-  MarketBriefingProgress,
   MarketReportLoadResult,
   MarketReportResource,
   MarketReportResourceIssue,
@@ -84,43 +83,22 @@ async function getJson<T>(
   return parsed.data;
 }
 
-const briefingProgressSchema = z.union([
-  z.object({ type: z.enum(["status", "reset"]), text: z.string() }),
-  z.object({ type: z.literal("summary"), id: z.string(), text: z.string() }),
-]);
-
 export async function generateMarketBriefing(
+  aiClient: AiClient,
   reportDate: string,
   signal?: AbortSignal,
-  onProgress?: (event: MarketBriefingProgress) => void,
 ): Promise<MarketBriefing> {
   const query = new URLSearchParams({ date: reportDate });
   const url = `/api/market-briefing?${query}`;
-  const response = await fetch(url, {
-    method: "POST", signal, credentials: "same-origin",
-    headers: { Accept: "text/event-stream" },
+  const result = await aiClient.run({
+    title: "市场点评 · 今日聚焦",
+    url,
+    init: { method: "POST" },
+    signal,
+    maxBytes: 2 * 1024 * 1024,
+    parse: (value) => marketBriefingSchema.parse(value),
   });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new DataApiRequestError(response.status, formatDataApiError(url, response.status, payload));
-  }
-  if (!response.headers.get("content-type")?.includes("text/event-stream"))
-    return marketBriefingSchema.parse(await response.json());
-  if (!response.body) throw new Error("生成连接未建立，请重试");
-  let result: MarketBriefing | undefined;
-  await readSse(response.body, ({ event, data }) => {
-    signal?.throwIfAborted();
-    if (event === "ping") return;
-    const payload: unknown = JSON.parse(data);
-    if (event === "progress") onProgress?.(briefingProgressSchema.parse(payload));
-    if (event === "complete") result = marketBriefingSchema.parse(payload);
-    if (event === "error") {
-      const error = z.object({ error: z.string() }).parse(payload);
-      throw new Error(error.error);
-    }
-  }, 2 * 1024 * 1024);
-  signal?.throwIfAborted();
-  if (!result || result.report_date !== reportDate) throw new Error("生成连接中断，请重试");
+  if (result.report_date !== reportDate) throw new Error("报告日期与请求日期不一致");
   return result;
 }
 

@@ -66,7 +66,7 @@ test('聚焦直接编辑、生成失败保留原稿，重新生成后跨标签�
   let fail = true;
   await page.route('**/api/market-briefing?*', route => route.fulfill(fail
     ? { status: 503, json: { error: '生成暂不可用' } }
-    : { contentType: 'text/event-stream', body: `event: complete\ndata: ${JSON.stringify({ report_date: marketSnapshot.report_date, stock: '重新生成的股票点评', bond: '重新生成的债券点评', news_count: 2 })}\n\n` }));
+    : { contentType: 'text/event-stream', body: `event: result\ndata: ${JSON.stringify({ report_date: marketSnapshot.report_date, stock: '重新生成的股票点评', bond: '重新生成的债券点评', news_count: 2 })}\n\n` }));
   await page.goto('/market-briefing');
   const editor = page.getByRole('textbox', { name: '输入今日聚焦' });
   await editor.fill('1、人工修订股票点评。\n2、人工修订债券点评。');
@@ -81,6 +81,36 @@ test('聚焦直接编辑、生成失败保留原稿，重新生成后跨标签�
   await expect(page.locator('.text-report__editor')).toContainText('生成后继续修改');
   await page.getByRole('link', { name: '可视化', exact: true }).click();
   await expect(editor).toContainText('生成后继续修改');
+  expect(unexpected).toEqual([]);
+});
+
+test('AI 生成自动展开统一面板并实时显示模型摘要', async ({ page }) => {
+  const unexpected = await mockResources(page);
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (!url.includes('/api/market-briefing?')) return nativeFetch(input, init);
+      const reportDate = new URL(url, window.location.href).searchParams.get('date');
+      const encoder = new TextEncoder();
+      const body = new ReadableStream({ start(controller) {
+        controller.enqueue(encoder.encode('event: progress\ndata: 正在核对股债市场驱动\n\n'));
+        window.__finishAiPanelVisual = () => {
+          controller.enqueue(encoder.encode(`event: result\ndata: ${JSON.stringify({ report_date: reportDate, stock: '股票结论', bond: '债券结论', news_count: 2 })}\n\n`));
+          controller.close();
+        };
+      } });
+      return Promise.resolve(new Response(body, { headers: { 'content-type': 'text/event-stream' } }));
+    };
+  });
+  await page.goto('/market-briefing');
+  await page.getByRole('button', { name: '重新生成今日聚焦' }).click();
+  const panel = page.getByRole('complementary', { name: 'AI 任务面板' });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText('正在核对股债市场驱动')).toBeVisible();
+  await expect(page).toHaveScreenshot('ai-panel-progress.png');
+  await page.evaluate(() => window.__finishAiPanelVisual());
+  await expect(page.getByRole('button', { name: '打开 AI 面板' })).toBeVisible();
   expect(unexpected).toEqual([]);
 });
 

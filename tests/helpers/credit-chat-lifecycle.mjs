@@ -9,9 +9,12 @@ globalThis.fetch = async () => new Promise(resolve => pending.push(() => resolve
 
 const Host = await loadComponent("tests/helpers/ChatHost.svelte", `<script>
   import CreditAssistantView from "../../src/lib/credit-assistant/CreditAssistantView.svelte";
+  import { createAiClient, provideAiClient } from "../../src/lib/ai-client.svelte";
+  const aiClient = provideAiClient(createAiClient());
   let view = $state("assistant");
   let customers = [{ name: "测试银行", confidentialityStatus: false, reportDate: "2026-09-09" }];
   export function changeView(next) { view = next; }
+  export function aiProgress() { return aiClient.activeTask?.progress.at(-1); }
 </script>
 <div class="tr-workbench">
   <header><div id="tr-topbar-actions"></div></header>
@@ -38,22 +41,29 @@ pending.splice(0).forEach(resolve => resolve());
 await tick();
 assert.equal(document.querySelectorAll(".credit-chat, .chat-toolbar, .tr-workbench").length, 0);
 
-// Exercise the real component with a controllable SSE transport. No browser or
-// authentication flow is involved in this DOM lifecycle regression.
+// Exercise the real component with the unified AI client and a controllable SSE
+// transport. No browser or authentication flow is involved in this regression.
 globalThis.localStorage = window.localStorage;
 localStorage.setItem("credit-assistant:institution", "测试银行");
 const streams = [];
-globalThis.EventSource = class {
-  constructor(url) { this.url = url; this.listeners = new Map(); this.closed = false; streams.push(this); }
-  addEventListener(name, callback) { this.listeners.set(name, callback); }
-  close() { this.closed = true; }
-  emit(name, value) { this.listeners.get(name)?.({ data: JSON.stringify(value) }); }
-};
 const customer = { name: "测试银行", confidentialityStatus: false, reportDate: "2026-09-09" };
 const activities = [{ id: 1, stage: "retrieval", message: "正在检索材料", startedAt: Date.now() }];
 const running = { ...session, running: true, questionId: "q-1", pendingQuestion: "公司资产是多少", customer, stage: "retrieval", progress: "正在检索材料", activities };
 const requests = [];
-globalThis.fetch = async (url, options) => { requests.push({ url, options }); return Response.json(running); };
+globalThis.fetch = async (url, options) => {
+  requests.push({ url: String(url), options });
+  if (!String(url).includes("/session/events")) return Response.json(running);
+  const stream = { url: String(url), closed: false };
+  const body = new ReadableStream({
+    start(controller) { stream.controller = controller; },
+    cancel() { stream.closed = true; },
+  });
+  stream.emit = (event, value) => stream.controller.enqueue(new TextEncoder().encode(
+    `event: ${event}\ndata: ${event === "result" ? JSON.stringify(value) : value}\n\n`,
+  ));
+  streams.push(stream);
+  return new Response(body, { headers: { "content-type": "text/event-stream" } });
+};
 const streamingApp = mount(Host, { target: document.body });
 flushSync();
 await new Promise(resolve => setImmediate(resolve));
@@ -65,37 +75,24 @@ assert.match(document.querySelector(".activity-summary").textContent, /检索材
 assert.equal(document.querySelector(".activity-details").open, false);
 document.querySelector(".activity-details").open = true;
 assert.equal(document.querySelector("#credit-question").hasAttribute("maxlength"), false);
-streams[0].emit("draft", { questionId: "other-question", text: "迟到的旧内容" });
+streams[0].emit("progress", "正在分析授信材料");
+await new Promise(resolve => setImmediate(resolve));
 flushSync();
-assert.equal(document.querySelector(".streaming-answer"), null);
-streams[0].emit("draft", { questionId: "q-1", text: "公司资产100亿元。" });
-flushSync();
-assert.match(document.querySelector(".streaming-answer").textContent, /公司资产100亿元/);
-activities.push({ id: 2, stage: "review", message: "正在复核", startedAt: Date.now() });
-streams[0].emit("session", { ...running, stage: "review", progress: "正在复核", activities, draftText: "公司资产100亿元。" });
-flushSync();
-assert.match(document.querySelector(".activity-summary").textContent, /复核答复/);
-activities.push({ id: 3, stage: "retrieval", message: "正在补充查证", startedAt: Date.now() });
-streams[0].emit("session", { ...running, activities, draftText: "" });
-flushSync();
-assert.match(document.querySelector(".activity-summary").textContent, /检索材料 · 第 2 轮/);
+assert.equal(streamingApp.aiProgress(), "正在分析授信材料");
 assert.equal(document.querySelector(".activity-details").open, true, "SSE preserves disclosure state");
-assert.deepEqual([...document.querySelectorAll(".activity-label")].map(node => node.textContent), ["检索材料", "复核答复", "检索材料 · 第 2 轮"]);
-assert.equal(document.querySelector(".streaming-answer"), null, "rejected draft is cleared before further retrieval");
-assert.equal(requests.length, 1, "SSE updates must not trigger polling");
+assert.equal(requests.length, 2, "one history request and one SSE request are sufficient");
 flushSync(() => streamingApp.changeView("weekly"));
+await new Promise(resolve => setImmediate(resolve));
 assert.equal(streams[0].closed, true);
-streams[0].emit("draft", { questionId: "q-1", text: "迟到响应" });
-flushSync();
-assert.equal(document.querySelector(".streaming-answer"), null);
 flushSync(() => streamingApp.changeView("assistant"));
 await new Promise(resolve => setImmediate(resolve));
 flushSync();
 assert.equal(streams.length, 2, "remount resumes the same customer session");
-streams[1].emit("session", { ...running, running: false, pendingQuestion: "", error: "模型暂不可用", draftText: "" });
+streams[1].emit("result", { ...running, running: false, pendingQuestion: "", error: "模型暂不可用" });
+await new Promise(resolve => setImmediate(resolve));
 flushSync();
 assert.equal(streams[1].closed, true);
 assert.match(document.querySelector(".answer-error").textContent, /模型暂不可用/);
 await unmount(streamingApp);
 await window.happyDOM.abort();
-console.log("Credit chat lifecycle, SSE phases/drafts, reconnect and late responses passed");
+console.log("Credit chat lifecycle, unified SSE progress, reconnect and cancellation passed");

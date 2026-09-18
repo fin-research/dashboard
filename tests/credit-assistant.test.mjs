@@ -79,14 +79,14 @@ test("review rejection requires correction; unverified invented claims never rea
   const answer = await answerCreditQuestion({ customer, question: "2025借款哪里借入", corpus, history: [], credentials, generate });
   assert.equal(answer.status, "insufficient"); assert.equal(answer.paragraphs.length, 0); assert.equal(modelSteps, 2);
 });
-test("credit model is pinned to codex with max effort and no provider fallback", async () => {
+test("credit model is pinned to codex with xhigh effort and no provider fallback", async () => {
   const calls = [];
   await assert.rejects(generateAiGatewayObject(credentials, [{ role: "user", content: "test" }], z.object({ ok: z.boolean() }), "test",
     { taskType: "credit_answer", metadata: {}, promptCacheKey: "test", requestTimeoutMs: 1000 }, async (url, init) => {
       calls.push({ url, body: JSON.parse(init.body) }); return new Response("Unavailable", { status: 503 });
     }));
   assert.equal(calls.length, 1); assert.match(calls[0].url, /custom-codex\/responses$/);
-  assert.equal(calls[0].body.model, "gpt-5.6-luna"); assert.equal(calls[0].body.reasoning.effort, "max");
+  assert.equal(calls[0].body.model, "gpt-5.6-luna"); assert.equal(calls[0].body.reasoning.effort, "xhigh");
 });
 
 test("slow semantic search does not block canonical lexical evidence", async t => {

@@ -2,6 +2,7 @@ import {
   generateMarketBriefing,
   MarketBriefingError,
 } from "$lib/server/market-briefing";
+import { createAiSseResponse } from "$lib/server/ai-sse";
 import type { RequestHandler } from "./$types";
 
 export const POST: RequestHandler = async ({ platform, url, request }) => {
@@ -19,35 +20,19 @@ export const POST: RequestHandler = async ({ platform, url, request }) => {
     const reportDate = resolveDate(url);
     if (request.headers.get("accept")?.includes("text/event-stream")) {
       const env = platform.env;
-      const abort = new AbortController();
-      const signal = AbortSignal.any([request.signal, abort.signal]);
-      const encoder = new TextEncoder();
-      const body = new ReadableStream<Uint8Array>({
-        async start(controller) {
-          const send = (event: string, data: unknown) => {
-            if (!signal.aborted) controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-          };
-          const heartbeat = setInterval(() => send("ping", {}), 15_000);
-          try {
-            const result = await generateMarketBriefing(env, reportDate, {
-              signal,
-              onProgress: (event) => send("progress", event),
-            });
-            send("complete", result);
-          } catch (error) {
-            send("error", { error: publicErrorMessage(error, 500) });
-          } finally {
-            clearInterval(heartbeat);
-            if (!abort.signal.aborted) controller.close();
-          }
+      return createAiSseResponse(
+        request,
+        ({ signal, progress }) => generateMarketBriefing(env, reportDate, { signal, onProgress: progress }),
+        {
+          errorMessage: (error) => publicErrorMessage(error, 500),
+          onError: (error) => console.error(JSON.stringify({
+            event: "market_briefing_failed",
+            date: reportDate,
+            status: error instanceof MarketBriefingError ? error.status : 500,
+            error: error instanceof Error ? error.message : String(error),
+          })),
         },
-        cancel() { abort.abort(); },
-      });
-      return new Response(body, { headers: {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-store, no-transform",
-        "X-Accel-Buffering": "no",
-      } });
+      );
     }
     const result = await generateMarketBriefing(platform.env, reportDate, { signal: request.signal });
     return Response.json(result, {
