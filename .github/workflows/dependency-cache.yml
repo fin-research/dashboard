@@ -1,0 +1,27 @@
+name: Warm dependency caches
+on:
+  push:
+    branches: [main]
+    paths:
+      - pnpm-lock.yaml
+      - package.json
+      - .github/actions/setup-ci/action.yml
+      - .github/workflows/dependency-cache.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dependency-cache-main
+  cancel-in-progress: false
+jobs:
+  warm:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      # Default-branch caches can be restored by all PR/merge-group refs.
+      # No tests, types, builds or screenshot generation run here.
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-ci
+        with:
+          browser: 'true'

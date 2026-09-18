@@ -15,18 +15,14 @@ jobs:
       - name: Require a task branch
         run: test "$GITHUB_REF" != refs/heads/main
       - uses: actions/checkout@v4
-      - run: npm install --global pnpm@10.33.2
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-ci
         with:
-          node-version: '24'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          browser: 'true'
       - run: pnpm check:quick
       - run: pnpm test:ci-tools
       - run: pnpm check:visual-coverage --candidate
       - run: pnpm exec vite build
       - run: pnpm build:visual
-      - run: pnpm exec playwright install chromium
       - run: pnpm test:visual:update
         env:
           VISUAL_COVERAGE_GATE: '1'

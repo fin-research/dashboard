@@ -4,7 +4,7 @@
 
 ## CI 命令
 
-每次 PR 创建/更新和 `main` 推送运行 `Dashboard CI`，包括以下测试与生产构建；普通分支 push 不重复运行。类型检查前置，构建阶段只打包；`test:coverage` 已运行完整 Node 测试集，不再重复调用 `test`。本地可下载 CI 证据并使用报告查看命令；推送、CI 等待与核验由子代理负责，详见 [DEVELOPMENT](DEVELOPMENT.md#默认验证与合并)。
+准备合并时，GitHub merge queue 在合并组提交上运行完整 `Dashboard CI`；普通分支 push 不运行，PR 创建/更新仅检查队列门禁，main 合并后不重复运行。Python/Node 覆盖率与类型/构建/视觉两条任务并行，统一门禁只接受两项均成功；类型检查在构建任务前置，构建阶段只打包；`test:coverage` 已运行完整 Node 测试集，不再重复调用 `test`。本地可下载 CI 证据并使用报告查看命令；推送、CI 等待与核验由子代理负责，详见 [DEVELOPMENT](DEVELOPMENT.md#默认验证与合并)。
 
 ```bash
 pnpm check:quick
@@ -27,17 +27,17 @@ pnpm test:visual:report
 
 当前场景：门户、交易总览与管理、交易流程及展开/编辑态、授信总览/日历/周报/失败态、研究辅助、二级池非空与空态、市场点评、融资时点/时段控件及重置，融资择时非空报告，以及 Maia 多选、弹窗、日历筛选与热点键盘交互。桌面 1440×900、手机 390×844 都运行。固定夹具覆盖实际图表与表格，不访问真实业务网络；未注册请求与浏览器异常会失败。
 
-默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。新增或有意改变页面时，先在本地通过快速检查并推送任务分支，在创建 PR 前手动触发独立候选 workflow；已有 PR 时也可主动触发，不必先等普通 CI 失败：
+默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。新增或有意改变页面时，先在本地通过快速检查并推送任务分支，在加入合并队列前手动触发独立候选 workflow；已有 PR 时也可主动触发，不必先等普通 CI 失败：
 
 ```bash
 gh workflow run visual-baselines.yml --ref <task-branch>
 ```
 
-候选 workflow 先生成，再立即不更新基线完整复跑；只有两次都通过才输出可导入工件。下载 `visual-baseline-candidates` artifact 到工作树外，核对生成提交 SHA 和预期后，只提交有意变化的截图，在同一 PR 说明预期变化与审阅依据，再推送并等待普通 `Dashboard CI` 比较通过；代码发生变化后不得直接使用旧候选。候选任务成功不构成验收；同一分支重新生成会取消旧候选运行。日常比较由每次 PR 更新和 `main` push 自动完成，不需要每次人工或 AI 看图。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。保留历史 `darwin` 基线；日常只维护 macOS 26/ARM64、锁定 Chromium 的 `macos-ci` 基线，不要求本地生成。普通 PR、`main` push 和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。系统字体/渲染版本变化须在 CI 重新确认基线。CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
+候选 workflow 先生成，再立即不更新基线完整复跑；只有两次都通过才输出可导入工件。下载 `visual-baseline-candidates` artifact 到工作树外，核对生成提交 SHA 和预期后，只提交有意变化的截图，在同一 PR 说明预期变化与审阅依据，再推送、加入合并队列并等待合并组 `Dashboard CI` 比较通过；代码发生变化后不得直接使用旧候选。候选任务成功不构成验收；同一分支重新生成会取消旧候选运行。日常比较由合并队列的 `merge_group` 自动完成，不需要每次人工或 AI 看图。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。保留历史 `darwin` 基线；日常只维护 macOS 26/ARM64、锁定 Chromium 的 `macos-ci` 基线，不要求本地生成。合并组和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。系统字体/渲染版本变化须在 CI 重新确认基线。CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
 
 ## 视觉变更的提交前准备
 
-先判断是否改变页面视觉，列出影响的页面、状态和设备；更新 `visual-coverage.json` 的对应场景。无意视觉变化时不更新 baseline，差异须先定位根因。需要更新时，由交付子代理先推送功能分支，**先生成候选、后创建 PR**，不要等待比较失败才补截图。普通分支 push 不触发完整验收；所有 PR（含草稿）及 main push 仍运行必需检查，不能跳过视觉比较。
+先判断是否改变页面视觉，列出影响的页面、状态和设备；更新 `visual-coverage.json` 的对应场景。无意视觉变化时不更新 baseline，差异须先定位根因。需要更新时，由交付子代理先推送功能分支，**先生成候选、后加入合并队列**，不要等待比较失败才补截图。普通分支 push、PR（含草稿）更新及 main push 不触发完整验收；合并队列必须执行完整视觉比较，PR 的轻量绿色门禁不算验收通过。
 
 ```sh
 gh workflow run visual-baselines.yml --ref <task-branch>
@@ -46,7 +46,13 @@ gh run download <candidate-run-id> -n visual-baseline-candidates -D <outside-che
 pnpm visual:baseline:import <outside-checkout-directory> --reviewed
 ```
 
-工件记录生成 SHA、run ID、各 CI PNG 的 SHA-256。导入要求工作树干净、HEAD 与生成 SHA 一致，并验证路径和校验和；代码变化后必须重新生成。候选严禁直接写 main，不自动提交，不替代随后 PR 普通比较。既有 PR 内有视觉变更时主动生成候选，最终只接受最新提交的严格比较成功；不要为避免红灯关闭必需检查。
+工件记录生成 SHA、run ID、各 CI PNG 的 SHA-256。导入要求工作树干净、HEAD 与生成 SHA 一致，并验证路径和校验和；代码变化后必须重新生成。候选严禁直接写 main，不自动提交，不替代随后合并组的普通比较。既有 PR 内有视觉变更时主动生成候选，最终只接受最终合并组提交的严格比较成功；不要为避免红灯关闭必需检查。
+
+## 并发与证据隔离
+
+不同 Actions job 在独立托管 runner/checkout 运行，固定端口和工作树内输出目录不会跨任务共享；候选 artifact 由运行 ID、源码 SHA 和 PNG 校验和绑定。入队前只导入当前任务、当前源码的已审候选，不导入另一个任务的整个截图目录。合并队列串行产生最终合并结果；如果共享样式或布局组合后发生差异，应按差异修复或重新审阅候选，不通过放宽容差、重复重跑或关闭门禁消除失败。
+
+候选生成与不更新基线复跑仍串行，确认截图在同一代码版本下稳定；普通 CI 保持零自动重试。依赖/浏览器缓存共用配置但不包含图片、生产输出或测试结果。覆盖率工件为 `unit-evidence`，截图、HTML、trace 和生产 CSS 清单为 `visual-evidence`。
 
 ## 页面覆盖清单门禁
 
