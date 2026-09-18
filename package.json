@@ -29,7 +29,6 @@
     "financing:db:import": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/import-debts.mjs",
     "financing:db:migrate:sqlite": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/migrate-sqlite-to-postgres.mjs",
     "financing:reminders:send": "node --env-file-if-exists=.env --env-file-if-exists=.env.database scripts/financing/send-reminders.mjs",
-    "financing:proto:generate": "protoc -I proto/financing --es_out=src/lib/financing/generated --es_opt=target=js+dts,import_extension=js proto/financing/debt_import.proto",
     "verify:routes": "node scripts/verify-profile-routes.mjs && node scripts/verify-financing-routes.mjs",
     "auth:db:migrate": "node --env-file-if-exists=.env.local scripts/apply-unified-permissions.mjs",
     "test:auth": "node --test tests/authorization-access.test.mjs tests/unified-permissions.test.mjs tests/access.test.mjs tests/programmatic-login.test.mjs tests/auth0-deploy.test.mjs",
@@ -48,7 +47,6 @@
     "build:visual": "vite build --config vite.visual.config.mjs && node scripts/prepare-visual-build.mjs"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.14.1",
     "@internationalized/date": "3.12.4",
     "@lucide/svelte": "^1.27.0",
     "@noble/hashes": "^2.3.0",
@@ -58,7 +56,6 @@
     "@xyflow/svelte": "^1.6.6",
     "agents": "^0.22.0",
     "bits-ui": "2.19.2",
-    "brotli-wasm": "^3.0.1",
     "clsx": "2.1.1",
     "d3-cloud": "^1.2.9",
     "decimal.js": "^10.6.0",
@@ -76,7 +73,6 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@bufbuild/protoc-gen-es": "^2.14.1",
     "@cloudflare/workers-types": "5.20260823.1",
     "@electric-sql/pglite": "^0.3.12",
     "@playwright/test": "1.62.0",
