@@ -111,6 +111,8 @@ test('导出并发下载图片与归档，保存失败保留编辑且可重试',
   releaseSave();
   await expect(page.getByRole('button', { name: '导出图片', exact: true })).toBeEnabled();
   await expect(editor).toContainText('导出的人工点评');
+  await page.getByRole('button', { name: '关闭通知' }).click();
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
   fail = false;
   releaseSave = undefined;
   const retryDownload = page.waitForEvent('download');
@@ -119,6 +121,8 @@ test('导出并发下载图片与归档，保存失败保留编辑且可重试',
   releaseSave();
   await retryDownload;
   await expect(page.getByRole('button', { name: '导出图片', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '关闭通知' }).click();
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
   await page.getByRole('button', { name: '刷新', exact: true }).click();
   await expect(editor).toContainText('导出的人工点评');
   expect(unexpected).toEqual([]);
