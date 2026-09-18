@@ -1,6 +1,6 @@
 // Replace all harness CSS with the unmodified stylesheets emitted by SvelteKit.
 // Route-node stylesheet order is preserved; no CSS is re-minified or concatenated.
-import { cp, readFile, writeFile, readdir, mkdir, rm } from 'node:fs/promises';
+import { cp, readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import { resolve, relative, join } from 'node:path';
 import { createHash } from 'node:crypto';
 
@@ -25,13 +25,18 @@ function stylesFor(...sources) {
 }
 const layout = 'src/routes/+layout.svelte';
 const financing = 'src/routes/financing/+layout.svelte';
+// Schedule is a component fixture: its ModuleCard wrapper is not on the SOP
+// route itself. Include that component's shipping chunk, never harness CSS.
+const clientManifest = JSON.parse(await readFile('.svelte-kit/output/client/.vite/manifest.json', 'utf8'));
+const moduleCardStyles = Object.values(clientManifest).filter(chunk => chunk.name === 'ModuleCard').flatMap(chunk => chunk.css ?? []);
+if (!moduleCardStyles.length) throw new Error('Missing production ModuleCard CSS for the schedule fixture');
 const map = {
   '/': stylesFor(layout, 'src/routes/+page.svelte'),
   '/trading-research': stylesFor(layout, 'src/routes/trading-research/+page.svelte', 'src/routes/trading-research/[view]/+page.svelte'),
   '/credit-workbench': stylesFor(layout, 'src/routes/credit-workbench/[[view]]/+page.svelte'),
   '/market-briefing': stylesFor(layout, 'src/routes/market-briefing/+page.svelte'),
   '/management/messenger': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/messenger/+page.svelte'),
-  '/financing/schedule': stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte'),
+  '/financing/schedule': [...new Set([...stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte'), ...moduleCardStyles])],
   '/ui-contracts': stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte', 'src/routes/financing/debts/[id]/+page.svelte'),
 };
 const files = [...new Set(Object.values(map).flat())];
