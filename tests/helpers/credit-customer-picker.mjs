@@ -4,7 +4,13 @@ import { installDom, loadComponent } from "./svelte-dom.mjs";
 const window = installDom();
 globalThis.localStorage = window.localStorage;
 const { mount, unmount, flushSync } = await import("svelte");
-const Assistant = await loadComponent("src/lib/credit-assistant/CreditAssistantView.svelte");
+const Assistant = await loadComponent("tests/helpers/CreditCustomerAssistantHost.svelte", `<script>
+  import CreditAssistantView from "../../src/lib/credit-assistant/CreditAssistantView.svelte";
+  import { createAiClient, provideAiClient } from "../../src/lib/ai-client.svelte";
+  let { customerOptions = null } = $props();
+  provideAiClient(createAiClient());
+</script>
+<CreditAssistantView {customerOptions} />`);
 const customers = [
   { name: "银行甲", confidentialityStatus: true, reportDate: "2026-09-09" },
   { name: "银行乙", confidentialityStatus: false, reportDate: "2026-09-09" },
@@ -14,6 +20,7 @@ const empty = { turns: [], running: false, progress: "", error: null, startedAt:
 const requests = [];
 globalThis.fetch = (url, options) => new Promise(resolve => requests.push({ url: String(url), options, resolve }));
 const settle = async () => { await new Promise(resolve => setImmediate(resolve)); flushSync(); };
+const sseResult = value => new Response(`event: result\ndata: ${JSON.stringify(value)}\n\n`, { headers: { "content-type": "text/event-stream" } });
 function input(selector, value) {
   const element = document.querySelector(selector);
   flushSync(() => { element.value = value; element.dispatchEvent(new Event("input", { bubbles: true })); });
@@ -51,7 +58,7 @@ flushSync(() => document.querySelector(".chat-composer").dispatchEvent(new Event
 assert.equal(requests.length, 3);
 assert.deepEqual(JSON.parse(requests[2].options.body), { question: "保留我的草稿", institutionName: "银行乙" });
 assert.equal(requests[1].options.signal.aborted, true);
-requests[2].resolve(Response.json({ ...empty, customer: customers[1], error: "测试任务结束" }));
+requests[2].resolve(sseResult({ ...empty, customer: customers[1], error: "测试任务结束" }));
 requests[1].resolve(Response.json({ ...empty, customer: customers[1], error: "迟到历史不得覆盖答复" }));
 await settle();
 assert.match(document.querySelector(".answer-error").textContent, /测试任务结束/);
@@ -84,6 +91,8 @@ globalThis.fetch = async url => {
 };
 const Host = await loadComponent("tests/helpers/CreditCustomerHost.svelte", `<script>
   import CreditWorkbenchPage from "../../src/lib/credit-workbench/CreditWorkbenchPage.svelte";
+  import { createAiClient, provideAiClient } from "../../src/lib/ai-client.svelte";
+  provideAiClient(createAiClient());
   let view = $state("calendar");
   export function navigate(next) { view = next; }
 </script><CreditWorkbenchPage viewId={view} />`);

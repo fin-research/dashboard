@@ -80,7 +80,7 @@ export class CreditTrace {
   chat<T>(attributes: CreditTraceAttributes, callback: (span: CreditSpan) => T | Promise<T>): Promise<T> {
     return this.run(`chat ${AI_GATEWAY_MODEL}`, { ...attributes, "gen_ai.operation.name": "chat",
       "gen_ai.provider.name": AI_GATEWAY_PROVIDER, "gen_ai.request.model": AI_GATEWAY_MODEL,
-      "credit.reasoning_effort": "max" }, callback);
+      "credit.reasoning_effort": "xhigh" }, callback);
   }
   tool<T>(name: "load_materials" | "search_many" | "search" | "ai_search" | "lexical_search" | "read" | "calculate" | "calculate_batch" | "finalize_answer" | "model_checkpoint",
     attributes: CreditTraceAttributes, callback: (span: CreditSpan) => T | Promise<T>): Promise<T> {

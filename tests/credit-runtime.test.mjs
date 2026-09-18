@@ -43,9 +43,9 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
           await options.trace.tool('calculate_batch', {'credit.calculation_count':1}, () =>
             options.trace.tool('calculate', {'credit.input_count':2}, () => 2));
           options.progress('正在检索材料','retrieval');
-          options.draft('公司资产');
+          options.summary('正在分析公司资产');
           await new Promise(resolve=>setTimeout(resolve,150));
-          options.draft('公司资产100亿元。');
+          options.summary('正在核对公司资产口径');
           options.progress('正在复核','review');
           await new Promise(resolve=>setTimeout(resolve,150));
           return {status:'complete',paragraphs:[{text:'公司资产100亿元。',citations:[]}],gaps:[],attachments:[],sources:[],calculations:[],files:[],warnings:[],
@@ -72,9 +72,10 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
     assert.match(response.headers.get("content-type"), /text\/event-stream/);
     releaseGate();
     const events = [];
-    await readSse(response.body, event => events.push({ type: event.event, data: JSON.parse(event.data) }), 100000);
-    assert.ok(events.some(event => event.type === "draft" && event.data.text === "公司资产"));
-    assert.ok(events.some(event => event.type === "session" && event.data.stage === "review"));
+    await readSse(response.body, event => events.push({ type: event.event, data: event.event === "result" ? JSON.parse(event.data) : event.data }), 100000);
+    assert.ok(events.some(event => event.type === "progress" && event.data === "正在分析公司资产"));
+    assert.ok(events.some(event => event.type === "progress" && event.data === "正在核对公司资产口径"));
+    assert.equal(events.at(-1).type, "result");
     assert.equal(events.at(-1).data.running, false);
     const read = () => request("session?institutionName=" + encodeURIComponent(customer.institutionName)).then(response => response.json());
     const saved = await read();

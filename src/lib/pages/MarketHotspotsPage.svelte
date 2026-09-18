@@ -5,6 +5,7 @@
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import { Input } from "$lib/components/ui/input/index.js";
   import { onDestroy, onMount } from "svelte";
+  import { isAiRequestCancelled, useAiClient } from "$lib/ai-client.svelte";
 
   import WordCloud from "$lib/components/WordCloud.svelte";
   import type {
@@ -18,6 +19,7 @@
   }
 
   let { embedded = false }: Props = $props();
+  const aiClient = useAiClient();
 
   let scopeMode: "rolling" | "range" = $state("rolling");
   let rollingCount = $state(20);
@@ -60,7 +62,7 @@
       syncScopeControls(payload.scope);
       selected = null;
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
+      if (!isAiRequestCancelled(error)) {
         errorMessage = error instanceof Error ? error.message : String(error);
       }
     } finally {
@@ -76,24 +78,22 @@
     regenerating = true;
     errorMessage = "";
     try {
-      const response = await fetch("/api/rag/hotspots", {
-        method: "POST",
-        signal: request.signal,
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
+      const payload = await aiClient.run({
+        title: "市场热点",
+        url: "/api/rag/hotspots",
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(scope),
         },
-        body: JSON.stringify(scope),
+        signal: request.signal,
+        parse: (value) => value as HotspotApiResponse,
       });
-      const payload = (await response.json()) as HotspotApiResponse & {
-        error?: string;
-      };
-      if (!response.ok) throw new Error(payload.error || "热点生成失败");
       data = payload;
       syncScopeControls(payload.scope);
       selected = null;
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
+      if (!isAiRequestCancelled(error)) {
         errorMessage = error instanceof Error ? error.message : String(error);
       }
     } finally {

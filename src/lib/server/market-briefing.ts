@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { stockSummarySchema } from "../../data-contracts.ts";
 import { formatDataApiError } from "../../data-api-error.ts";
-import type { MarketBriefing, MarketBriefingProgress } from "../../types";
+import type { MarketBriefing } from "../../types";
 import { generateAiGatewayObject } from "./ai-gateway.ts";
 
 const PROMPT_VERSION = "market-briefing-v7-structured-stream";
@@ -142,14 +142,13 @@ export async function generateMarketBriefing(
   options: MarketBriefingOptions = {},
 ): Promise<MarketBriefing> {
   options.signal?.throwIfAborted();
-  options.onProgress?.({ type: "status", text: "正在读取新闻" });
   const news = await fetchBriefingNews(env, reportDate, options.signal);
   return generateMarketBriefingFromNews(env, reportDate, news, options);
 }
 
 interface MarketBriefingOptions {
   signal?: AbortSignal;
-  onProgress?: (event: MarketBriefingProgress) => void;
+  onProgress?: (summary: string) => void;
   retry?: boolean;
 }
 
@@ -158,7 +157,6 @@ export async function generateMarketBriefingFromNews(
   env: Env, reportDate: string, news: BriefingNews, options: MarketBriefingOptions = {},
 ): Promise<MarketBriefing> {
   options.signal?.throwIfAborted();
-  options.onProgress?.({ type: "status", text: "正在分析股债市场" });
   const output = await generateAiGatewayObject(
     {
       accountId: env.CLOUDFLARE_ACCOUNT_ID,
@@ -179,10 +177,7 @@ export async function generateMarketBriefingFromNews(
       retry: options.retry,
       ...(options.onProgress ? {
         onReasoningSummary: (summary: { id: string; text: string }) =>
-          options.onProgress?.({ type: "summary", ...summary }),
-        onAttempt: (attempt: "primary" | "retry") => {
-          if (attempt === "retry") options.onProgress?.({ type: "reset", text: "正在重新生成" });
-        },
+          options.onProgress?.(summary.text),
       } : {}),
       promptCacheKey: `market-briefing:${PROMPT_VERSION}`,
       requestTimeoutMs: 300_000,

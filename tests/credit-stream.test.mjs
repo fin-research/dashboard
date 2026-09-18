@@ -24,8 +24,8 @@ const event = data => `data: ${JSON.stringify(data)}\r\n\r\n`;
 
 test("SSE decoding preserves split Chinese UTF-8, CRLF, multiline events and trailing frames", async () => {
   const received = [];
-  await readSse(byteStream(': heartbeat\r\nevent: draft\r\ndata: 第一行\r\ndata: 第二行\r\n\r\ndata: 尾帧'), value => received.push(value), 1000);
-  assert.deepEqual(received, [{ event: "draft", data: "第一行\n第二行" }, { event: "message", data: "尾帧" }]);
+  await readSse(byteStream(': heartbeat\r\nevent: progress\r\ndata: 第一行\r\ndata: 第二行\r\n\r\ndata: 尾帧'), value => received.push(value), 1000);
+  assert.deepEqual(received, [{ event: "progress", data: "第一行\n第二行" }, { event: "message", data: "尾帧" }]);
   await assert.rejects(readSse(byteStream("data: oversized"), () => {}, 4), /size limit/);
 });
 

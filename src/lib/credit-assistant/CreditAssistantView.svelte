@@ -6,10 +6,12 @@
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
   import { portal } from "../portal";
   import { globalMessages } from "../global-messages";
+  import { useAiClient } from "../ai-client.svelte";
   import { customerAnswerText, creditCustomerSchema, confidentialityLabel, type CreditAnswer, type CreditCustomer, type CreditSession } from "./types";
   import CreditActivityView from "./CreditActivityView.svelte";
 
   let { customerOptions = $bindable(null) }: { customerOptions?: CreditCustomer[] | null } = $props();
+  const aiClient = useAiClient();
 
   let session = $state<CreditSession>({ turns: [], running: false, progress: "", error: null, startedAt: 0 });
   let question = $state("");
@@ -20,8 +22,6 @@
   let creating = $state(false);
   let customerName = $state("");
   let activeInstitution = $state("");
-  let draftText = $state("");
-  let streamNotice = $state("");
   let chosenCustomer = $state<CreditCustomer | null>(null);
   const customers = $derived((customerOptions ?? []).filter(customer => customer.name.toLocaleLowerCase().includes(customerName.trim().toLocaleLowerCase())).slice(0, 20));
   let searching = $state(false);
@@ -33,8 +33,7 @@
   let chat: HTMLDivElement;
   let textarea = $state<HTMLTextAreaElement>(null!);
   let form: HTMLFormElement;
-  let stream: EventSource | undefined;
-  let streamFailures = 0;
+  let streamController: AbortController | undefined;
   let mounted = false;
   let revision = 0;
   const pendingQuestion = $derived(session.pendingQuestion || optimisticQuestion);
@@ -52,7 +51,8 @@
     return data as T;
   }
   function stopStream() {
-    stream?.close(); stream = undefined; streamNotice = "";
+    streamController?.abort();
+    streamController = undefined;
   }
   function rememberInstitution(name: string) {
     activeInstitution = name;
@@ -60,37 +60,30 @@
   }
   function watchSession() {
     if (!mounted || !session.running || !activeInstitution) { stopStream(); return; }
-    if (stream) return;
+    if (streamController) return;
     const current = revision;
-    const source = new EventSource(`/api/credit-assistant/session/events?institutionName=${encodeURIComponent(activeInstitution)}`);
-    stream = source;
-    source.addEventListener("session", event => {
-      if (!mounted || current !== revision || stream !== source) return;
-      try {
-        const next = JSON.parse((event as MessageEvent).data) as CreditSession;
+    const controller = new AbortController();
+    streamController = controller;
+    void aiClient.run({
+      title: `授信助手 · ${activeInstitution}`,
+      url: `/api/credit-assistant/session/events?institutionName=${encodeURIComponent(activeInstitution)}`,
+      signal: controller.signal,
+      cancellable: false,
+      parse: (value) => value as CreditSession,
+    }).then((next) => {
+      if (!mounted || current !== revision || streamController !== controller) return;
         const followLatest = nearLatest();
         session = next;
-        draftText = next.draftText ?? "";
-        streamNotice = ""; streamFailures = 0; loadError = "";
-        if (!next.running) { if (!next.error) optimisticQuestion = ""; draftText = ""; stopStream(); }
+        loadError = "";
+        if (!next.running && !next.error) optimisticQuestion = "";
         if (followLatest) void scrollLatest();
-      } catch { loadError = "读取答复失败，请重新连接。"; stopStream(); }
-    });
-    source.addEventListener("draft", event => {
-      if (!mounted || current !== revision || stream !== source) return;
-      try {
-        const data = JSON.parse((event as MessageEvent).data) as { text: string; questionId: string };
-        if (data.questionId !== session.questionId || typeof data.text !== "string") return;
-        const followLatest = nearLatest();
-        draftText = data.text;
-        if (followLatest) void scrollLatest();
-      } catch { /* A subsequent session snapshot restores the current draft. */ }
-    });
-    source.onerror = () => {
-      if (!mounted || current !== revision || stream !== source) return;
-      streamNotice = "连接中断，正在重连…";
-      if (++streamFailures >= 3 || source.readyState === 2) { loadError = "连接已断开，请重新连接以查看答复。"; stopStream(); }
-    };
+      }).catch((error) => {
+        if (mounted && current === revision && !controller.signal.aborted) {
+          loadError = error instanceof Error ? error.message : "连接已断开，请重新连接以查看答复。";
+        }
+      }).finally(() => {
+        if (streamController === controller) streamController = undefined;
+      });
   }
   function nearLatest() {
     const workspace = chat?.closest<HTMLElement>(".tr-workspace");
@@ -114,7 +107,6 @@
       const next = await api<CreditSession>("session", { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]) });
       if (!mounted || current !== revision || controller.signal.aborted || restoreController !== controller) return;
       session = next;
-      draftText = next.draftText ?? "";
       if (!chosenCustomer && next.customer) chosenCustomer = next.customer;
       loadError = "";
       if (!session.running && !session.error) optimisticQuestion = "";
@@ -155,7 +147,7 @@
     customerName = customer.name;
     rememberInstitution(customer.name);
     session = { turns: [], running: false, progress: "", error: null, startedAt: 0 };
-    optimisticQuestion = ""; draftText = ""; streamFailures = 0; loadError = "";
+    optimisticQuestion = ""; loadError = "";
     textarea?.focus({ preventScroll: true });
     void refresh();
   }
@@ -189,14 +181,23 @@
     optimisticQuestion = text;
     const draft = question;
     question = "";
-    draftText = ""; streamFailures = 0;
     session = { ...session, error: null, pendingQuestion: "", activities: [], startedAt: 0 };
     void scrollLatest();
     try {
-      const next = await api<CreditSession>("session", { method: "POST", body: JSON.stringify({ question: text, institutionName: selectedCustomer.name }) });
+      const next = await aiClient.run({
+        title: `授信助手 · ${selectedCustomer.name}`,
+        url: `/api/credit-assistant/session?institutionName=${encodeURIComponent(selectedCustomer.name)}`,
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: text, institutionName: selectedCustomer.name }),
+        },
+        cancellable: false,
+        parse: (value) => value as CreditSession,
+      });
       if (!mounted) return;
       session = next;
-      watchSession();
+      if (!next.error) optimisticQuestion = "";
     } catch (error) {
       if (!mounted) return;
       question ||= draft || text;
@@ -235,7 +236,6 @@
       optimisticQuestion = "";
       question = "";
       customerName = next.customer?.name ?? "";
-      draftText = "";
       showCustomers = false;
       loadError = "";
       await tick();
@@ -349,8 +349,7 @@
         <div class="message message--assistant">
           <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手</span></div>
           {#if session.running || sending}
-            <CreditActivityView {session} {sending} notice={streamNotice} />
-            {#if draftText}<div class="streaming-answer" aria-label="正在生成的答复" aria-live="off"><span class="draft-label">答复草稿 · 正在核对</span><p class="answer-paragraph">{draftText}</p></div>{/if}
+            <CreditActivityView {session} {sending} />
           {:else if session.error}
             <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<Button permission="credit.assistant:ask" data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button"} type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</Button>{/if}</div>
           {/if}
@@ -437,8 +436,6 @@
   .source { padding: 16px 0; border-top: 1px solid var(--border-color); scroll-margin-top: 24px; }
   .source-kind { display: block; color: var(--text-3); margin-top: 4px; }
   blockquote { margin: 10px 0; padding: 4px 12px; border-left: 2px solid var(--border-strong); white-space: pre-wrap; }
-  .streaming-answer { min-width: 0; padding-top: 8px; }
-  .draft-label { display: block; color: var(--text-3); font-size: .875rem; margin-bottom: 8px; }
   .answer-error p, .chat-load-error p { margin: 0 0 12px; color: var(--text-2); }
   .chat-load-error { margin-bottom: 24px; }
   .composer-dock { position: sticky; z-index: 2; bottom: 0; width: 100%; padding: 16px 24px max(20px, env(safe-area-inset-bottom)); background: var(--bg-page); }

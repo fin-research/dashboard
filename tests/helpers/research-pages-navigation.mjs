@@ -11,6 +11,8 @@ globalThis.fetch = async (_url, init) => {
 const Host = await loadComponent("tests/helpers/ResearchHost.svelte", `<script>
   import MarketHotspotsPage from "../../src/lib/pages/MarketHotspotsPage.svelte";
   import PolicyTrackingPage from "../../src/lib/pages/PolicyTrackingPage.svelte";
+  import { createAiClient, provideAiClient } from "../../src/lib/ai-client.svelte";
+  provideAiClient(createAiClient());
   let view = $state("hotspots");
   export function navigate(next) { view = next; }
 </script>

@@ -131,7 +131,7 @@ test("direct Responses call uses the custom-codex provider-specific URL", async 
     prompt_cache_key: "probe:v1",
     instructions: "system",
     reasoning: {
-      effort: "low",
+      effort: "xhigh",
       summary: "auto",
       context: "current_turn",
     },
@@ -153,7 +153,7 @@ test("direct Responses call uses the custom-codex provider-specific URL", async 
   assert.equal(Object.hasOwn(JSON.parse(calls[0].init.body), "include"), false);
   assert.match(logs[0], /"provider":"custom-codex"/);
   assert.match(logs[0], /"task_type":"summary"/);
-  assert.match(logs[0], /"reasoning_effort":"low"/);
+  assert.match(logs[0], /"reasoning_effort":"xhigh"/);
   assert.match(logs[0], /"requested_reasoning_summary":"auto"/);
   assert.match(logs[0], /"requested_reasoning_context":"current_turn"/);
   assert.match(logs[0], /"reasoning_summary_count":1/);
@@ -165,13 +165,13 @@ test("direct Responses call uses the custom-codex provider-specific URL", async 
 
 test("reasoning effort is fixed by task type", () => {
   assert.deepEqual(AI_GATEWAY_REASONING_EFFORT_BY_TASK, {
-    generation: "high",
-    market_briefing: "max",
-    analysis: "high",
-    policy_commentary: "max",
-    tracking_commentary: "high",
-    credit_answer: "max",
-    summary: "low",
+    generation: "xhigh",
+    market_briefing: "xhigh",
+    analysis: "xhigh",
+    policy_commentary: "xhigh",
+    tracking_commentary: "xhigh",
+    credit_answer: "xhigh",
+    summary: "xhigh",
   });
 });
 
@@ -185,7 +185,7 @@ test("structured final answers exclude assistant commentary messages", async () 
   assert.deepEqual(value, { ok: true });
 });
 
-test("credit max-effort responses allow a bounded larger envelope while validating the final object", async () => {
+test("credit responses allow a bounded larger envelope while validating the final object", async () => {
   const { value } = await withoutAiLogs(() => generateAiGatewayObject(credentials,
     [{ role: "user", content: "Verify the source" }], z.object({ ok: z.boolean() }), "probe", { ...options, taskType: "credit_answer" },
     async () => Response.json({ status: "completed", output: [
@@ -198,7 +198,7 @@ test("credit max-effort responses allow a bounded larger envelope while validati
     async () => new Response("x".repeat(8 * 1024 * 1024 + 1))), /exceeds 8388608 bytes/);
 });
 
-test("market briefing enables Responses web search with max reasoning effort", async () => {
+test("market briefing enables Responses web search with xhigh reasoning effort", async () => {
   const calls = [];
   const fetcher = async (url, init) => {
     calls.push({ url: String(url), init });
@@ -222,11 +222,11 @@ test("market briefing enables Responses web search with max reasoning effort", a
 
   assert.deepEqual(value, { ok: true });
   const body = JSON.parse(calls[0].init.body);
-  assert.equal(body.reasoning.effort, "max");
+  assert.equal(body.reasoning.effort, "xhigh");
   assert.deepEqual(body.tools, [{ type: "web_search" }]);
 });
 
-test("policy commentary enables Responses web search with max reasoning effort", async () => {
+test("policy commentary enables Responses web search with xhigh reasoning effort", async () => {
   const calls = [];
   const fetcher = async (url, init) => {
     calls.push({ url: String(url), init });
@@ -250,7 +250,7 @@ test("policy commentary enables Responses web search with max reasoning effort",
 
   assert.deepEqual(value, { ok: true });
   const body = JSON.parse(calls[0].init.body);
-  assert.equal(body.reasoning.effort, "max");
+  assert.equal(body.reasoning.effort, "xhigh");
   assert.deepEqual(body.tools, [{ type: "web_search" }]);
 });
 

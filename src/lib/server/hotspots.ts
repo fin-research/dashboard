@@ -84,7 +84,9 @@ const AGGREGATE_SYSTEM = `你是服务于专业投资者的中国股债市场研
 export async function generateMarketHotspots(
   env: Env,
   requestScope: HotspotRequestScope,
+  options: { signal?: AbortSignal; onProgress?: (summary: string) => void } = {},
 ): Promise<HotspotApiResponse> {
+  options.signal?.throwIfAborted();
   const cards = await loadEvidenceCards(env.DB, requestScope);
   if (cards.length === 0) {
     throw new HotspotError(404, "所选范围内尚无已完成特征抽取的文章");
@@ -104,6 +106,10 @@ export async function generateMarketHotspots(
     hotspotOutputSchema,
     "market_hotspots",
     {
+      signal: options.signal,
+      ...(options.onProgress ? {
+        onReasoningSummary: (summary: { id: string; text: string }) => options.onProgress?.(summary.text),
+      } : {}),
       promptCacheKey: `market-hotspots:${PROMPT_VERSION}`,
       requestTimeoutMs: HOTSPOT_REQUEST_TIMEOUT_MS,
       taskType: "generation",
@@ -122,6 +128,7 @@ export async function generateMarketHotspots(
   const generatedAt = new Date().toISOString();
   const payload = JSON.stringify(analysis);
 
+  options.signal?.throwIfAborted();
   await saveHotspotSnapshot(env.DB, {
     inputFingerprint: fingerprint,
     generatedAt,

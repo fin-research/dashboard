@@ -13,6 +13,7 @@ import {
   generateFinancingModelResearch,
 } from "$lib/server/financing-model-research";
 import { withPostgres } from "$lib/server/postgres";
+import { createAiSseResponse } from "$lib/server/ai-sse";
 import type { RequestHandler } from "./$types";
 
 const requestSchema = z.object({ runId: z.string().uuid() }).strict();
@@ -34,6 +35,40 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
       "eastmoney-financing-model-research-read",
       (client) => loadFinancingModelReport(client, runId),
     );
+    if (request.headers.get("accept")?.includes("text/event-stream")) {
+      return createAiSseResponse(
+        request,
+        async ({ signal, progress }) => {
+          const research = await generateFinancingModelResearch(
+            report.snapshot,
+            {
+              accountId: env.CLOUDFLARE_ACCOUNT_ID,
+              gatewayId: env.AI_GATEWAY_ID || "default",
+              token: env.CF_AIG_TOKEN,
+            },
+            fetch,
+            { signal, onProgress: progress },
+          );
+          signal.throwIfAborted();
+          return withPostgres(
+            env.HYPERDRIVE?.connectionString,
+            "eastmoney-financing-model-research-save",
+            (client) => saveSellSideSnapshot(client, report.snapshot, research),
+          );
+        },
+        {
+          errorMessage: (error) => error instanceof FinancingModelResearchError
+            ? error.message
+            : "卖方观点生成失败，请稍后重试",
+          onError: (error) => console.error(JSON.stringify({
+            event: "financing_model_sell_side_failed",
+            status: error instanceof FinancingModelResearchError ? error.status : 500,
+            path: url.pathname,
+            error: error instanceof Error ? error.message : String(error),
+          })),
+        },
+      );
+    }
     const research = await generateFinancingModelResearch(
       report.snapshot,
       {

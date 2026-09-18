@@ -21,6 +21,7 @@
   import { exportReportImage } from "./export";
   import { chineseDateParts } from "./formatters";
   import { globalMessages } from "./lib/global-messages";
+  import { isAiRequestCancelled, useAiClient } from "./lib/ai-client.svelte";
   import { deriveReport, type ReportDerived } from "./report-view";
   import {
     pathnameForReportView,
@@ -60,6 +61,7 @@
     inventory: [],
   };
   let reportSurface = $state<HTMLElement>(null!);
+  const aiClient = useAiClient();
   let dateInput = $state<HTMLInputElement>(null!);
   let selectedDate = $state("");
   let data = $state<MarketReportSnapshot | null>(null);
@@ -74,8 +76,6 @@
   let focusText = $state("");
   let generating = $state(false);
   let generatedBriefing = $state<MarketBriefing | null>(null);
-  let progressText = $state("正在分析股债市场");
-  let summaries = $state<Array<{ id: string; text: string }>>([]);
   let briefingRequest: AbortController | null = null;
   let resourceIssues = $state<MarketReportResourceIssue[]>([]);
 
@@ -164,23 +164,13 @@
     briefingRequest = request;
     generatedBriefing = null;
     generating = true;
-    progressText = "正在分析股债市场";
-    summaries = [];
     try {
-      const result = await generateMarketBriefing(reportDate, request.signal, (event) => {
-        if (request.signal.aborted) return;
-        if (event.type === "summary") {
-          summaries = [...summaries.filter((item) => item.id !== event.id), event];
-        } else {
-          progressText = event.text;
-          if (event.type === "reset") summaries = [];
-        }
-      });
+      const result = await generateMarketBriefing(aiClient, reportDate, request.signal);
       if (request.signal.aborted || data?.report_date !== reportDate) return;
       generatedBriefing = result;
       focusText = `1、${result.stock}\n2、${result.bond}`;
     } catch (error) {
-      if (!request.signal.aborted) globalMessages.error(
+      if (!request.signal.aborted && !isAiRequestCancelled(error)) globalMessages.error(
         `今日聚焦生成失败：${error instanceof Error ? error.message : String(error)}`,
         { key: "market-focus-generate" },
       );
@@ -357,7 +347,7 @@
           {#if $allowed("research.market_report:update") || $allowed("research.market_report:generate")}
             <FocusEditor reportDate={data.report_date} initialText={focusText}
               finalizedAt={data.finalized_at ?? data.generated_at} {generating} {generatedBriefing}
-              {progressText} {summaries} disabled={exporting || !$allowed("research.market_report:update")}
+              disabled={exporting || !$allowed("research.market_report:update")}
               onTextChange={(value) => focusText = value} onBriefingApplied={() => generatedBriefing = null} />
           {:else}
             <div class="focus-editor" aria-label="今日聚焦">{@html plainTextToFocusHtml(focusText)}</div>

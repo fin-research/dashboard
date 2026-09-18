@@ -63,7 +63,6 @@ export type CreditSession = {
   questionId?: string;
   stage?: CreditStage;
   activities?: CreditActivity[];
-  draftText?: string;
 };
 // Responses structured outputs support nested anyOf; Zod's discriminated union emits oneOf.
 export const stepSchema = z.object({ step: z.union([

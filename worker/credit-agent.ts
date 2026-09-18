@@ -16,8 +16,7 @@ import { CreditTrace, type CreditSpan } from "../src/lib/server/credit-tracing.t
 export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   initialState: CreditSession = { turns: [], running: false, progress: "", error: null, startedAt: 0, pendingQuestion: "", customer: null };
   private events = new CreditEventHub();
-  private draftText = "";
-  private lastDraftPush = 0;
+  private latestAiProgress = "";
   private activeCorpus: CreditCorpus | undefined;
 
   private runCache(runId: string): CreditRunCache {
@@ -48,8 +47,10 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
     // raw persisted state would re-expose history hidden in the initial GET.
     const visible = this.activeCorpus && state.customer ? discloseCreditSession(state, this.activeCorpus, state.customer)
       : { ...state, turns: [] };
-    this.events.send("session", { ...visible, draftText: this.draftText });
-    if (!state.running) this.events.finish();
+    if (!state.running) {
+      this.events.result(visible);
+      this.events.finish();
+    }
   }
 
   private progress(progress: string, stage?: CreditStage) {
@@ -58,13 +59,11 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
       activities: appendCreditActivity(this.state, progress, currentStage) });
   }
 
-  private draft(text: string) {
-    this.draftText = text;
-    // Send at most ten snapshots a second without a SQLite write per token.
-    if (!text || Date.now() - this.lastDraftPush >= 100) {
-      this.lastDraftPush = Date.now();
-      this.events.send("draft", { text, questionId: this.state.questionId });
-    }
+  private aiProgress(summary: string) {
+    const next = summary.trim();
+    if (!next || next === this.latestAiProgress) return;
+    this.latestAiProgress = next;
+    this.events.progress(next);
   }
 
   private async customer(name: string): Promise<CreditCustomer | null> {
@@ -105,12 +104,12 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         return Response.json({ error: CREDIT_NDA_REQUIRED }, { status: 403 });
       }
       return new URL(request.url).pathname.endsWith("/events")
-        ? this.events.response({ ...state, draftText: this.draftText }, () => { this.sql`SELECT 1`; }) : Response.json(state);
+        ? this.events.response(state, this.latestAiProgress, () => { this.sql`SELECT 1`; }) : Response.json(state);
     }
     if (request.method === "DELETE") {
       if (this.state.running) return Response.json({ error: "当前问答仍在处理中" }, { status: 409 });
       this.clearRunCache();
-      this.draftText = "";
+      this.latestAiProgress = "";
       this.save({ ...this.initialState, turns: [], customer: this.state.customer, conversationId: crypto.randomUUID() });
       return Response.json(this.state);
     }
@@ -142,7 +141,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         this.sql`INSERT INTO credit_conversation_archive (id, state) VALUES (${this.state.conversationId ?? crypto.randomUUID()}, ${JSON.stringify(this.state)})`;
       }
       this.clearRunCache();
-      this.draftText = "";
+      this.latestAiProgress = "";
       this.save({ ...this.initialState, turns: [], customer, conversationId: crypto.randomUUID() });
       return Response.json(this.state);
     }
@@ -155,7 +154,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
     const id = crypto.randomUUID();
     this.runCache(id); // Initialise before dropping only the previous run's temporary checkpoints.
     this.clearRunCache();
-    this.draftText = "";
+    this.latestAiProgress = "";
     this.activeCorpus = undefined;
     const progress = "正在判断问题范围";
     this.save({ ...this.state, customer, conversationId: this.state.conversationId ?? crypto.randomUUID(), running: true, progress, stage: "scope",
@@ -193,7 +192,7 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
       const generated = await answerCreditQuestion({ question: payload.question, corpus, customer, history: this.state.turns,
         credentials: { accountId: this.env.CLOUDFLARE_ACCOUNT_ID, gatewayId: this.env.AI_GATEWAY_ID, token: this.env.CF_AIG_TOKEN },
         progress: (progress, stage) => this.progress(progress, stage),
-        draft: text => this.draft(text),
+        summary: summary => this.aiProgress(summary),
         runId: payload.id, trace,
         cache: this.runCache(payload.id), startedAt: this.state.startedAt,
         operation: operation => {
@@ -212,7 +211,6 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
       const answer = creditAnswerForTurn(generated, payload.id);
       console.log(JSON.stringify({ event: "credit_answer_completed", run_id: payload.id, elapsed_ms: Date.now() - started,
         model_calls: modelCalls, search_calls: searchCalls, answer_status: answer.status }));
-      this.draftText = "";
       this.save({ ...this.state, turns: [...this.state.turns, { id: payload.id, question: payload.question, answer, createdAt: answer.createdAt }],
         running: false, progress: "", error: null, pendingQuestion: "" });
       span.set({ "credit.outcome": answer.notice === CREDIT_SCOPE_REFUSAL ? "refused_scope"
@@ -236,7 +234,6 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         } : {}),
       }));
       const message = `${failure.message}（错误编号：${payload.id}）`;
-      this.draftText = "";
       this.save({ ...this.state, running: false, progress: "", error: message });
     } finally {
       span.set({ "credit.model_calls": modelCalls, "credit.search_calls": searchCalls });

@@ -18,6 +18,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 
 - `src/routes/` 负责页面装配、路由参数和 HTTP 边界，不承载复杂业务计算。
 - `src/App.svelte` 保留市场点评的整体报告装配。
+- `src/lib/ai-client.svelte.ts` 是浏览器发起 AI 请求的唯一入口，统一解析 SSE、取消请求并保留当前标签页内的调用历史；根 layout 挂载 `AiPanel.svelte`，在所有页面提供固定 AI 入口和任务右面板。业务页面只提交任务标题、路由、请求参数与终态 Schema，不自行解析流。
 - `src/api.ts` 只 GET 完整 R2 市场点评定稿；无定稿明确失败，不触发原始资源或 AI。默认报告日由服务端按上海 17:00 截止时点及交易日证据选择。
 - `src/market-report-resources.ts` 维护市场点评筛选、合并和换算，供后台 Workflow 汇总唯一 `ReportData`，视觉与文字版只做展示派生。
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
@@ -38,6 +39,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 - `src/lib/server/market-report.ts` 负责完整定稿的按日 R2 读取、Workflow 写入与旧接口兼容覆盖，读取和写入都经同一快照 Schema 校验，不查询 Data API。
 - `src/lib/server/data-news.ts` 通过 `DATA` Service Binding 有界读取并校验单篇研报正文，供研报详情和政策点评生成复用。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器；传输契约见 [共享 AI](../../eastmoney/docs/AI.md)，业务 Prompt 和 Schema 留在调用模块。
+- `src/lib/server/ai-sse.ts` 是前端交互式 AI 的统一 Worker 流边界：上游 Responses 持续流入公开 reasoning summary，客户端只接收纯文本 `progress`、完整 JSON `result` 或纯文本 `error`，保活使用 SSE 注释帧。
 - `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
 - Gateway 拥有 Auth0 个人信息与角色权限服务；Dashboard `/profile` 保留界面，`/api/profile` 由 Gateway 直接处理，后端兼容转发使用 `IDENTITY` binding。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。

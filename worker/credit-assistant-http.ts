@@ -29,6 +29,8 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
     if (["/api/credit-assistant/session", "/api/credit-assistant/session/new", "/api/credit-assistant/session/institution", "/api/credit-assistant/session/events"].includes(url.pathname)) {
       const newSession = url.pathname.endsWith("/new");
       const stream = url.pathname.endsWith("/events");
+      const streamQuestion = request.method === "POST" && url.pathname === "/api/credit-assistant/session"
+        && request.headers.get("accept")?.includes("text/event-stream");
       if (stream && request.method !== "GET") return new Response(null, { status: 405 });
       if ((newSession || url.pathname.endsWith("/institution")) && request.method !== "POST") return new Response(null, { status: 405 });
       if (!["GET", "POST", "DELETE"].includes(request.method)) return new Response(null, { status: 405 });
@@ -59,10 +61,16 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
         : Response.json({ error: "请先输入客户名称并从列表中选择机构。" }, { status: 400, headers: PRIVATE_HEADERS });
       if (!creditCustomerSelectionSchema.safeParse({ institutionName }).success) return new Response(null, { status: 400 });
       const agent = await getAgentByName(env.CREDIT_AGENT, creditAgentName(userId, institutionName));
-      const response = await agent.fetch(forwarded);
+      let response = await agent.fetch(forwarded);
+      if (streamQuestion && response.status === 202) {
+        await response.body?.cancel();
+        response = await agent.fetch(new Request(`${url.origin}/api/credit-assistant/session/events`, {
+          headers: { Accept: "text/event-stream" },
+        }));
+      }
       const headers = new Headers(response.headers);
       for (const [key, value] of Object.entries(PRIVATE_HEADERS)) headers.set(key, value);
-      if (stream) headers.set("cache-control", "private, no-store, no-transform");
+      if (stream || streamQuestion) headers.set("cache-control", "private, no-store, no-transform");
       return new Response(response.body, { status: response.status, headers });
     }
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405 });

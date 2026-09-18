@@ -1,8 +1,8 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { registerHooks } from "node:module";
+import { registerHooks, stripTypeScriptTypes } from "node:module";
 import { compile, compileModule } from "svelte/compiler";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { Window } from "happy-dom";
 
 // Vite accepts extensionless TypeScript imports; reproduce that resolution in
@@ -23,7 +23,10 @@ registerHooks({
   load(url, context, nextLoad) {
     if (url.endsWith('.css')) return { format: 'module', source: '', shortCircuit: true };
     if (url.endsWith('.svelte')) return { format: 'module', source: compile(readFileSync(new URL(url), 'utf8'), { filename: new URL(url).pathname, generate: 'client', dev: false }).js.code, shortCircuit: true };
-    if (/\.svelte\.[jt]s$/.test(url)) return { format: 'module', source: compileModule(readFileSync(new URL(url), 'utf8'), { filename: new URL(url).pathname, generate: 'client', dev: false }).js.code, shortCircuit: true };
+    if (/\.svelte\.[jt]s$/.test(url)) return { format: 'module', source: compileModule(
+      stripTypeScriptTypes(readFileSync(new URL(url), 'utf8'), { mode: 'strip' }),
+      { filename: new URL(url).pathname, generate: 'client', dev: false },
+    ).js.code, shortCircuit: true };
     return nextLoad(url, context);
   }
 });
@@ -72,7 +75,9 @@ export async function componentUrl(file, sourceOverride) {
     } else if (specifier.startsWith("$lib/")) resolved = new URL("src/lib/" + specifier.slice(5), root);
     else if (specifier.startsWith(".")) resolved = new URL(specifier, url);
     else resolved = new URL(import.meta.resolve(specifier));
-    if (!/\.[a-z]+$/.test(resolved.pathname)) resolved = new URL(resolved.href + ".ts");
+    if (resolved.pathname.endsWith(".svelte") && !existsSync(resolved) && existsSync(new URL(resolved.href + ".ts"))) {
+      resolved = new URL(resolved.href + ".ts");
+    } else if (!/\.[a-z]+$/.test(resolved.pathname)) resolved = new URL(resolved.href + ".ts");
     const target = resolved.pathname.endsWith(".svelte") ? await componentUrl(resolved) : resolved.href;
     code = code.replace(match[0], match[0].replace(specifier, target));
   }

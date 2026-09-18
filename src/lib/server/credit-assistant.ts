@@ -94,6 +94,7 @@ export async function answerCreditQuestion(options: {
   question: string; corpus: CreditCorpus; history: CreditTurn[]; credentials: AiGatewayCredentials;
   customer: CreditCustomer;
   semanticSearch?: CreditSearch; progress?: (message: string, stage?: CreditStage) => void; generate?: CreditGenerate;
+  summary?: (text: string) => void;
   draft?: (text: string) => void; runId?: string; operation?: (event: CreditOperation) => void;
   cache?: CreditRunCache; startedAt?: number; trace?: CreditTrace;
 }): Promise<CreditAnswer> {
@@ -145,6 +146,10 @@ export async function answerCreditQuestion(options: {
       const value = await trace.chat({ "credit.stage": operation, "credit.step": metrics.step, "credit.input_chars": metrics.inputChars }, async span => {
         const value = await provider(credentials, messages, schema, name, { ...config,
           metadata: { ...config.metadata, ...(options.runId ? { credit_run_id: options.runId } : {}) },
+          onReasoningSummary: summary => {
+            config.onReasoningSummary?.(summary);
+            options.summary?.(summary.text);
+          },
           onTelemetry: metadata => { span.modelResponse(metadata); config.onTelemetry?.(metadata); },
         });
         if (operation === "review" && value && typeof value === "object" && "approved" in value && typeof value.approved === "boolean") {

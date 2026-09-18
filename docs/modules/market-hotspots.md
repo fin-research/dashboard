@@ -5,7 +5,7 @@
 ## 接口
 
 - `GET /api/rag/hotspots`：返回最近快照；无快照为 404；不接受范围参数。
-- `POST /api/rag/hotspots`：生成并追加快照，成功为 201。
+- `POST /api/rag/hotspots`：生成并追加快照；前端携带 `Accept: text/event-stream` 时返回统一 `progress/result/error` SSE，普通 JSON 请求成功为 201。
 - 滚动请求：`{"mode":"rolling","rollingCount":20}`，数量必须为 8–100 的整数。
 - 日期请求：`{"mode":"range","startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}`。
 
