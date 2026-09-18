@@ -462,6 +462,18 @@
           "snapshots": [
             "messenger.png"
           ]
+        },
+        {
+          "spec": "tests/visual/messenger.spec.mjs",
+          "test": "通知管理测试消息支持编辑、单发群发和渠道选择",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "messenger-test-single.png",
+            "messenger-test-bulk.png"
+          ]
         }
       ]
     },

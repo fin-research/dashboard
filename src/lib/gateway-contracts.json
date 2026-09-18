@@ -3,6 +3,6 @@
   "version": 1,
   "files": {
     "permissions.ts": "81bf0e687c598bd1f553908e9d93972dad175743bed13dd97992f3a8715786c4",
-    "route-permissions.ts": "612c14a33e7e44cb7777a854906b0d82dbf37fad2d6c13e14c89073019d66777"
+    "route-permissions.ts": "d497c6cd1298a7ab19227e864dcbcd8e1392341de62169f98ba24acc499c0248"
   }
 }

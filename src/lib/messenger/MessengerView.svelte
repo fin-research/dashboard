@@ -17,7 +17,7 @@
     <form method="GET" class="filters">
       <label>渠道<NativeSelect class="min-h-11" name="channel" value={filters.channel??''}><option value="">全部</option><option value="email">邮件</option><option value="telegram">Telegram</option><option value="webpush">Web Push</option></NativeSelect></label>
       <label>状态<NativeSelect class="min-h-11" name="status" value={filters.status??''}><option value="">全部</option>{#each Object.entries(labels) as [value,label]}<option {value}>{label}</option>{/each}</NativeSelect></label>
-      <label>来源<NativeSelect class="min-h-11" name="source" value={filters.source??''}><option value="">全部</option><option value="market-briefing">市场点评</option><option value="financing">融资提醒</option><option value="ingest">央行资讯</option><option value="notification">用户订阅</option><option value="workflow">Workflow</option></NativeSelect></label>
+      <label>来源<NativeSelect class="min-h-11" name="source" value={filters.source??''}><option value="">全部</option><option value="market-briefing">市场点评</option><option value="financing">融资提醒</option><option value="ingest">央行资讯</option><option value="notification">用户订阅</option><option value="workflow">Workflow</option><option value="admin-test">测试消息</option></NativeSelect></label>
       <Button type="submit">筛选</Button><Button variant="outline" href="/management/messenger">刷新</Button>
     </form>
     <div class="counts" aria-label="消息统计">{#each list.counts as item}<span>{labels[item.status]??item.status} <strong>{item.count}</strong></span>{/each}</div>

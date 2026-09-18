@@ -11,6 +11,7 @@ export default defineConfig({
   plugins: [tailwindcss(), svelte({ configFile: false })],
   resolve: { alias: {
     $lib: local('./src/lib/'),
+    '$app/forms': local('./tests/visual/harness/forms.js'),
     '$app/navigation': local('./tests/visual/harness/navigation.js'),
     '$app/state': local('./tests/visual/harness/state.js'),
     '$app/environment': local('./tests/visual/harness/environment.js'),
