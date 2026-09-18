@@ -18,7 +18,7 @@ const output = { eventSummary:{sourceId:'S1',text:sentence},sections:[{heading:'
 test('interactive generation streams phase labels without exposing unvalidated model content and reports retries', () => {
   const phases = [];
   const options = trackingGenerationOptions('draft',20,message => phases.push(message));
-  assert.equal(options.requestTimeoutMs,120000);
+  assert.equal(options.requestTimeoutMs,300000);
   options.onAttempt('primary');
   options.onReasoningSummary({id:'r',text:'private reasoning'});
   options.onReasoningSummary({id:'r',text:'more reasoning'});

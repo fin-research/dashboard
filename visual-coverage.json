@@ -455,7 +455,7 @@
       "id": "messenger",
       "url": "/management/messenger",
       "kind": "screenshot",
-      "state": "共享header、消息投递、测试单发/群发及tab深链刷新",
+      "state": "紧凑64px共享header、无边线曲面标签、消息投递、测试单发/群发及tab深链刷新",
       "evidence": [
         {
           "spec": "tests/visual/messenger.spec.mjs",
