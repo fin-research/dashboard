@@ -102,6 +102,7 @@ test('聚焦直接编辑、生成失败保留原稿，重新生成后跨标签�
 
 test('AI 生成自动展开任务详情、轮替模型摘要并保留完成结果', async ({ page }) => {
   const unexpected = await mockResources(page);
+  await page.clock.setFixedTime(new Date('2026-09-15T11:00:00+08:00'));
   await page.addInitScript(() => {
     const nativeFetch = window.fetch.bind(window);
     window.fetch = (input, init) => {
