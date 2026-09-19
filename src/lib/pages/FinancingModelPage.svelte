@@ -278,11 +278,6 @@
       report = { ...report, sellSide };
       editingSellSide = false;
       resetSellSideEditor();
-      globalMessages.success("卖方观点已生成并保存", {
-        key: "financing-model-research",
-        title: "生成完成",
-        duration: 6000,
-      });
     } catch (error) {
       if (!isAiRequestCancelled(error)) globalMessages.error(
         error instanceof Error ? error.message : String(error),

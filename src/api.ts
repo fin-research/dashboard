@@ -96,9 +96,12 @@ export async function generateMarketBriefing(
     init: { method: "POST" },
     signal,
     maxBytes: 2 * 1024 * 1024,
-    parse: (value) => marketBriefingSchema.parse(value),
+    parse: (value) => {
+      const parsed = marketBriefingSchema.parse(value);
+      if (parsed.report_date !== reportDate) throw new Error("报告日期与请求日期不一致");
+      return parsed;
+    },
   });
-  if (result.report_date !== reportDate) throw new Error("报告日期与请求日期不一致");
   return result;
 }
 

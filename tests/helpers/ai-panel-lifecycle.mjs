@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { get } from "svelte/store";
 import { installDom, loadComponent } from "./svelte-dom.mjs";
 
 const window = installDom();
 const { mount, unmount, flushSync } = await import("svelte");
+const { globalMessages } = await import("../../src/lib/global-messages.ts");
 const streams = [];
 globalThis.fetch = async (_url, init) => {
   assert.equal(new Headers(init.headers).get("accept"), "text/event-stream");
@@ -26,50 +28,72 @@ const Host = await loadComponent("tests/helpers/AiPanelHost.svelte", `<script>
 </script>
 <AiPanel {client} />`);
 
+const settle = async () => {
+  await new Promise(resolve => setTimeout(resolve, 260));
+  flushSync();
+};
+
 const app = mount(Host, { target: document.body });
 flushSync();
 assert.equal(document.querySelector("[aria-label='打开 AI 面板']").textContent.trim(), "AI");
+
 const pending = app.run();
-await new Promise(resolve => setImmediate(resolve));
-flushSync();
+await settle();
 assert.ok(document.querySelector("#global-ai-panel"));
-assert.match(document.querySelector(".ai-current").textContent, /测试分析.*正在处理/s);
-const secondPending = app.run("第二任务");
-await new Promise(resolve => setImmediate(resolve));
-flushSync();
-assert.equal(document.querySelectorAll(".ai-current").length, 2, "all concurrent tasks remain visible");
+assert.match(document.querySelector(".ai-task-detail").textContent, /测试分析.*正在处理/s);
 streams[0].emit("progress", "正在核对材料");
+await settle();
+assert.equal(document.querySelector(".ai-progress-copy").textContent.trim(), "正在核对材料");
+streams[0].emit("progress", "正在形成结论");
+await settle();
+assert.equal(document.querySelector(".ai-progress-copy").textContent.trim(), "正在形成结论", "only the newest summary occupies the live progress slot");
+const thinking = document.querySelector(".ai-thinking");
+assert.equal(thinking.open, false);
+assert.deepEqual([...thinking.querySelectorAll("li")].map(item => item.textContent), ["正在核对材料", "正在形成结论"]);
+
+const secondPending = app.run("第二任务");
+await settle();
+assert.match(document.querySelector(".ai-task-detail").textContent, /第二任务.*正在处理/s, "a new task opens its own detail");
+document.querySelector("[aria-label='返回任务列表']").click();
+await settle();
+assert.equal(document.querySelectorAll(".ai-task-list li").length, 2, "all concurrent tasks are listed one by one");
+assert.doesNotMatch(document.querySelector("#global-ai-panel").textContent, /调用记录|清除/);
+document.querySelector("[aria-label='查看第二任务']").click();
+await settle();
 streams[1].emit("progress", "正在比较结果");
-await new Promise(resolve => setImmediate(resolve));
-flushSync();
-assert.match(document.querySelector(".ai-panel-body").textContent, /正在核对材料/);
-assert.match(document.querySelector(".ai-panel-body").textContent, /正在比较结果/);
-streams[0].emit("result", { ok: true });
-assert.deepEqual(await pending, { ok: true });
+await settle();
+assert.equal(document.querySelector(".ai-progress-copy").textContent.trim(), "正在比较结果");
+
 streams[1].emit("result", { ok: "second" });
 assert.deepEqual(await secondPending, { ok: "second" });
-flushSync();
-assert.equal(streams[0].cancelled, true);
+await settle();
+assert.ok(document.querySelector("#global-ai-panel"), "the panel remains open after completion");
+assert.match(document.querySelector(".ai-result").textContent, /"ok": "second"/);
+assert.match(document.querySelector(".ai-task-detail").textContent, /已完成/);
 assert.equal(streams[1].cancelled, true);
-assert.equal(document.querySelector(".ai-current"), null);
-const completedTrigger = document.querySelector("[aria-label='打开 AI 面板']");
-assert.ok(completedTrigger, "the panel collapses after the last task completes");
-completedTrigger.click();
-await new Promise(resolve => setImmediate(resolve));
-flushSync();
-assert.match(document.querySelector(".ai-task-list").textContent, /测试分析.*已完成.*正在核对材料/s);
-assert.match(document.querySelector(".ai-task-list").textContent, /第二任务.*已完成.*正在比较结果/s);
+assert.match(get(globalMessages).at(-1)?.message ?? "", /第二任务已生成/);
+
+streams[0].emit("result", { ok: true });
+assert.deepEqual(await pending, { ok: true });
+await settle();
+assert.equal(streams[0].cancelled, true);
+document.querySelector("[aria-label='返回任务列表']").click();
+await settle();
+assert.match(document.querySelector(".ai-task-list").textContent, /测试分析.*已完成/s);
+assert.match(document.querySelector(".ai-task-list").textContent, /第二任务.*已完成/s);
+document.querySelector("[aria-label='查看测试分析']").click();
+await settle();
+assert.match(document.querySelector(".ai-result").textContent, /"ok": true/);
+
 document.querySelector(".ai-panel-close").click();
-await new Promise(resolve => setImmediate(resolve));
-flushSync();
+await settle();
 const trigger = document.querySelector("[aria-label='打开 AI 面板']");
 assert.equal(document.activeElement, trigger);
 trigger.click();
-await new Promise(resolve => setImmediate(resolve));
-flushSync();
-document.querySelector(".ai-clear").click();
-flushSync();
-assert.match(document.querySelector(".ai-empty").textContent, /暂无调用记录/);
+await settle();
+assert.equal(document.querySelectorAll(".ai-task-list li").length, 2, "opening the label returns to the task list");
+
+globalMessages.clear();
 await unmount(app);
 await window.happyDOM.abort();
-console.log("Unified AI panel lifecycle and in-memory history passed");
+console.log("Unified AI panel detail, progress history, result and completion notification passed");

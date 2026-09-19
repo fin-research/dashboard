@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createAiSseResponse, encodeAiSse } from "../src/lib/server/ai-sse.ts";
+import { CreditEventHub } from "../src/lib/server/credit-events.ts";
 import { readSse } from "../src/lib/sse.ts";
 
 const decoder = new TextDecoder();
@@ -18,8 +19,8 @@ test("AI SSE uses native event types, plain-text progress and one complete JSON 
 
   const request = new Request("https://example.test/api/ai", { method: "POST" });
   const response = createAiSseResponse(request, async ({ progress }) => {
-    progress("正在分析");
-    progress("正在分析");
+    progress(" **正在分析** ");
+    progress("__正在分析__");
     progress("正在形成结论");
     return { answer: "完整结果" };
   }, { errorMessage: () => "生成失败" });
@@ -31,6 +32,23 @@ test("AI SSE uses native event types, plain-text progress and one complete JSON 
     { event: "result", data: '{"answer":"完整结果"}' },
   ]);
   assert.doesNotMatch(events[0].data, /"type"|"id"/);
+  assert.doesNotMatch(events[0].data, /\*\*/);
+});
+
+test("credit SSE also strips Markdown bold markers from restored progress", async () => {
+  const hub = new CreditEventHub();
+  const response = hub.response(
+    { turns: [], running: true, progress: "", error: null, startedAt: 0 },
+    "**正在核对授信材料**",
+  );
+  assert.ok(response.body);
+  const reader = response.body.getReader();
+  assert.equal(decoder.decode((await reader.read()).value), "retry: 2000\n\n");
+  assert.equal(
+    decoder.decode((await reader.read()).value),
+    "event: progress\ndata: 正在核对授信材料\n\n",
+  );
+  await reader.cancel();
 });
 
 test("AI SSE emits a plain-text error without a result frame", async () => {

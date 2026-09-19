@@ -84,7 +84,7 @@ test('聚焦直接编辑、生成失败保留原稿，重新生成后跨标签�
   expect(unexpected).toEqual([]);
 });
 
-test('AI 生成自动展开统一面板并实时显示模型摘要', async ({ page }) => {
+test('AI 生成自动展开任务详情、轮替模型摘要并保留完成结果', async ({ page }) => {
   const unexpected = await mockResources(page);
   await page.addInitScript(() => {
     const nativeFetch = window.fetch.bind(window);
@@ -94,6 +94,7 @@ test('AI 生成自动展开统一面板并实时显示模型摘要', async ({ pa
       const reportDate = new URL(url, window.location.href).searchParams.get('date');
       const encoder = new TextEncoder();
       const body = new ReadableStream({ start(controller) {
+        controller.enqueue(encoder.encode('event: progress\ndata: 正在读取市场材料\n\n'));
         controller.enqueue(encoder.encode('event: progress\ndata: 正在核对股债市场驱动\n\n'));
         window.__finishAiPanelVisual = () => {
           controller.enqueue(encoder.encode(`event: result\ndata: ${JSON.stringify({ report_date: reportDate, stock: '股票结论', bond: '债券结论', news_count: 2 })}\n\n`));
@@ -108,9 +109,13 @@ test('AI 生成自动展开统一面板并实时显示模型摘要', async ({ pa
   const panel = page.getByRole('complementary', { name: 'AI 任务面板' });
   await expect(panel).toBeVisible();
   await expect(panel.getByText('正在核对股债市场驱动')).toBeVisible();
+  await expect(panel.getByText('正在读取市场材料')).not.toBeVisible();
   await expect(page).toHaveScreenshot('ai-panel-progress.png');
   await page.evaluate(() => window.__finishAiPanelVisual());
-  await expect(page.getByRole('button', { name: '打开 AI 面板' })).toBeVisible();
+  await expect(panel.getByRole('heading', { name: '结果' })).toBeVisible();
+  await expect(panel).toContainText('股票结论');
+  await expect(page.getByText('生成完成', { exact: true })).toBeVisible();
+  await expect(page).toHaveScreenshot('ai-panel-complete.png');
   expect(unexpected).toEqual([]);
 });
 
