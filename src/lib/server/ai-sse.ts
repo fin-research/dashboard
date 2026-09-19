@@ -1,3 +1,5 @@
+import { sanitizeReasoningSummary } from "./ai-summary.ts";
+
 export const AI_SSE_HEADERS = {
   "Content-Type": "text/event-stream; charset=utf-8",
   "Cache-Control": "no-store, no-transform",
@@ -59,7 +61,7 @@ export function createAiSseResponse<T>(
         const result = await run({
           signal,
           progress(summary) {
-            const next = summary.trim();
+            const next = sanitizeReasoningSummary(summary);
             if (!next || next === previousSummary) return;
             previousSummary = next;
             send("progress", next);

@@ -1,5 +1,6 @@
 import type { CreditSession } from "../credit-assistant/types.ts";
 import { encodeAiSse } from "./ai-sse.ts";
+import { sanitizeReasoningSummary } from "./ai-summary.ts";
 
 /** Per-DO live subscribers. Only milestones and final answers are persisted. */
 export class CreditEventHub {
@@ -26,7 +27,8 @@ export class CreditEventHub {
   }
 
   progress(summary: string) {
-    if (summary.trim()) this.send("progress", summary.trim());
+    const sanitized = sanitizeReasoningSummary(summary);
+    if (sanitized) this.send("progress", sanitized);
   }
 
   result(state: CreditSession) {
@@ -51,7 +53,8 @@ export class CreditEventHub {
           controller.close();
           return;
         }
-        if (latestProgress.trim()) controller.enqueue(encodeAiSse("progress", latestProgress.trim()));
+        const sanitizedProgress = sanitizeReasoningSummary(latestProgress);
+        if (sanitizedProgress) controller.enqueue(encodeAiSse("progress", sanitizedProgress));
         this.clients.add(controller);
         this.heartbeat ??= setInterval(() => {
           try { checkAlive?.(); } catch { this.finish(); return; }

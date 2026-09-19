@@ -1,4 +1,5 @@
 import { getContext, setContext } from "svelte";
+import { globalMessages } from "./global-messages.ts";
 import { readSse } from "./sse.ts";
 
 const AI_CLIENT_CONTEXT = Symbol("ai-client");
@@ -15,6 +16,7 @@ export interface AiTaskRecord {
   startedAt: number;
   finishedAt?: number;
   progress: string[];
+  result?: unknown;
   error?: string;
 }
 
@@ -33,7 +35,9 @@ export interface AiClient {
   readonly tasks: AiTaskRecord[];
   readonly activeTasks: AiTaskRecord[];
   readonly activeTask: AiTaskRecord | undefined;
+  readonly selectedTaskId: string | null;
   setOpen(value: boolean): void;
+  selectTask(taskId: string | null): void;
   clearHistory(): void;
   reset(): void;
   cancel(taskId: string): void;
@@ -43,6 +47,7 @@ export interface AiClient {
 export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
   let open = $state(false);
   let tasks = $state<AiTaskRecord[]>([]);
+  let selectedTaskId = $state<string | null>(null);
   const controllers = new Map<string, AbortController>();
 
   function update(id: string, change: (task: AiTaskRecord) => AiTaskRecord) {
@@ -52,7 +57,6 @@ export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
   function complete(id: string, status: Exclude<AiTaskStatus, "running">, error?: string) {
     controllers.delete(id);
     update(id, (task) => ({ ...task, status, finishedAt: Date.now(), ...(error ? { error } : {}) }));
-    if (!tasks.some((task) => task.status === "running")) open = false;
   }
 
   const client: AiClient = {
@@ -68,16 +72,24 @@ export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
     get activeTask() {
       return tasks.find((task) => task.status === "running");
     },
+    get selectedTaskId() {
+      return selectedTaskId;
+    },
     setOpen(value) {
       open = value;
     },
+    selectTask(taskId) {
+      selectedTaskId = taskId;
+    },
     clearHistory() {
       tasks = tasks.filter((task) => task.status === "running");
+      if (!tasks.some((task) => task.id === selectedTaskId)) selectedTaskId = null;
     },
     reset() {
       for (const controller of controllers.values()) controller.abort();
       controllers.clear();
       tasks = [];
+      selectedTaskId = null;
       open = false;
     },
     cancel(taskId) {
@@ -97,6 +109,7 @@ export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
         progress: [],
       };
       tasks = trimTaskHistory([task, ...tasks]);
+      selectedTaskId = id;
       open = true;
       try {
         const headers = new Headers(init?.headers);
@@ -125,6 +138,7 @@ export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
             }
             if (event === "result") {
               result = parse(JSON.parse(data) as unknown);
+              update(id, (task) => ({ ...task, result }));
               return;
             }
             if (event === "error") throw new Error(data || "AI 请求失败");
@@ -136,6 +150,11 @@ export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
         requestSignal.throwIfAborted();
         if (result === undefined) throw new Error("AI 连接中断，请重试");
         complete(id, "completed");
+        globalMessages.success(`${title}已生成`, {
+          key: `ai-task-complete:${id}`,
+          title: "生成完成",
+          duration: 6000,
+        });
         return result;
       } catch (error) {
         if (requestSignal.aborted || isAiRequestCancelled(error)) complete(id, cancellable ? "cancelled" : "disconnected");
@@ -164,7 +183,7 @@ function mergeProgress(items: string[], next: string): string[] {
   const previous = items.at(-1);
   if (previous === text) return items;
   if (previous && text.startsWith(previous)) return [...items.slice(0, -1), text];
-  return [...items, text].slice(-20);
+  return [...items, text];
 }
 
 function publicError(value: unknown, fallback: string): string {

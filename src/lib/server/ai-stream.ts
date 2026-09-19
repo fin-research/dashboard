@@ -1,4 +1,5 @@
 import { readSse } from "../sse.ts";
+import { sanitizeReasoningSummary } from "./ai-summary.ts";
 export { readSse } from "../sse.ts";
 
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object";
@@ -11,11 +12,14 @@ export async function readResponsesStream(
 ): Promise<unknown> {
   let completed: unknown;
   const summaries = new Map<string, string>();
+  const publishedSummaries = new Map<string, string>();
   function summary(id: string, text: string) {
-    if (text && summaries.get(id) !== text) {
-      summaries.set(id, text);
-      onSummary?.({ id, text });
-    }
+    if (!text) return;
+    summaries.set(id, text);
+    const sanitized = sanitizeReasoningSummary(text);
+    if (!sanitized || publishedSummaries.get(id) === sanitized) return;
+    publishedSummaries.set(id, sanitized);
+    onSummary?.({ id, text: sanitized });
   }
   function itemSummaries(item: Record<string, unknown>, index: number) {
     if (item.type !== "reasoning" || !Array.isArray(item.summary)) return;

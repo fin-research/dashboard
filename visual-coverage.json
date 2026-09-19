@@ -125,7 +125,8 @@
       "source": "src/routes/market-briefing/+page.svelte",
       "scenarios": [
         "market-report",
-        "market-report-edit-export"
+        "market-report-edit-export",
+        "ai-panel"
       ]
     },
     {
@@ -647,6 +648,26 @@
           "projects": [
             "desktop",
             "mobile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ai-panel",
+      "url": "/market-briefing",
+      "kind": "screenshot",
+      "state": "AI 任务详情的流式摘要与完成结果",
+      "evidence": [
+        {
+          "spec": "tests/visual/market-report.spec.mjs",
+          "test": "AI 生成自动展开任务详情、轮替模型摘要并保留完成结果",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "ai-panel-progress.png",
+            "ai-panel-complete.png"
           ]
         }
       ]

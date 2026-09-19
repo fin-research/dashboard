@@ -170,7 +170,7 @@
         parse: (value) => value as TrackingCommentary,
       });
       if (mounted) accept(commentary);
-      if (mounted) { globalMessages.success("点评草稿已生成"); await loadList(); }
+      if (mounted) await loadList();
     } catch (error) { if (mounted && !isAiRequestCancelled(error)) fail(error); }
     finally { if (mounted) busy = false; }
   }

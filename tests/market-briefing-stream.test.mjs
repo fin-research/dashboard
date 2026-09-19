@@ -19,10 +19,11 @@ test('公开摘要在完成前流入，delta/done/summary 数组去重，不泄�
   for (const value of [
     { type: 'response.reasoning_text.delta', delta: 'raw secret' },
     { type: 'response.function_call_arguments.delta', delta: 'tool secret' },
-    { type: 'response.reasoning_summary_text.delta', output_index: 0, summary_index: 0, delta: '正在分析' },
-    { type: 'response.reasoning_summary_text.delta', output_index: 0, summary_index: 0, delta: '股市' },
-    { type: 'response.reasoning_summary_text.done', output_index: 0, summary_index: 0, text: '正在分析股市' },
-    { type: 'response.output_item.done', output_index: 0, item: { type: 'reasoning', summary: [{ type: 'summary_text', text: '正在分析股市' }, { type: 'summary_text', text: '正在分析债市' }] } },
+    { type: 'response.reasoning_summary_text.delta', output_index: 0, summary_index: 0, delta: '**正在分析' },
+    { type: 'response.reasoning_summary_text.done', output_index: 0, summary_index: 0, text: '' },
+    { type: 'response.reasoning_summary_text.delta', output_index: 0, summary_index: 0, delta: '股市**' },
+    { type: 'response.reasoning_summary_text.done', output_index: 0, summary_index: 0, text: '**正在分析股市**' },
+    { type: 'response.output_item.done', output_index: 0, item: { type: 'reasoning', summary: [{ type: 'summary_text', text: '**正在分析股市**' }, { type: 'summary_text', text: '**正在分析债市**' }] } },
   ]) controller.enqueue(encoder.encode(frame(value)));
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(summaries, [{ id: '0:0', text: '正在分析' }, { id: '0:0', text: '正在分析股市' }, { id: '0:1', text: '正在分析债市' }]);
