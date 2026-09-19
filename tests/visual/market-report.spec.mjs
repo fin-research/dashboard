@@ -124,8 +124,9 @@ test('AI 生成自动展开任务详情、轮替模型摘要并保留完成结�
   await page.getByRole('button', { name: '重新生成今日聚焦' }).click();
   const panel = page.getByRole('complementary', { name: 'AI 任务面板' });
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole('status').getByText('正在核对股债市场驱动', { exact: true })).toBeVisible();
-  await expect(panel.getByText('正在读取市场材料')).not.toBeVisible();
+  const liveProgress = panel.getByRole('status');
+  await expect(liveProgress.getByText('正在核对股债市场驱动', { exact: true })).toBeVisible();
+  await expect(liveProgress).not.toContainText('正在读取市场材料');
   await expect(page).toHaveScreenshot('ai-panel-progress.png');
   await page.evaluate(() => window.__finishAiPanelVisual());
   await expect(panel.getByRole('heading', { name: '结果' })).toBeVisible();
