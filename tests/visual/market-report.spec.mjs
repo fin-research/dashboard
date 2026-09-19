@@ -1,6 +1,20 @@
 import { test, expect } from '@playwright/test';
 import { mockResources, marketSnapshot } from './fixtures.mjs';
 
+async function closeAiSurfaces(page) {
+  const closePanel = page.getByRole('button', { name: '关闭 AI 面板' });
+  if (await closePanel.isVisible()) {
+    await closePanel.click();
+    await expect(page.getByRole('complementary', { name: 'AI 任务面板' })).not.toBeVisible();
+  }
+  const notifications = page.getByRole('button', { name: '关闭通知' });
+  while (await notifications.count()) {
+    const count = await notifications.count();
+    await notifications.first().click();
+    await expect(notifications).toHaveCount(count - 1);
+  }
+}
+
 test('报告只读取归档，控件的选择悬浮按下及焦点状态可辨识', async ({ page, isMobile }) => {
   const unexpected = await mockResources(page);
   const requests=[];
@@ -73,9 +87,11 @@ test('聚焦直接编辑、生成失败保留原稿，重新生成后跨标签�
   await page.getByRole('button', { name: '重新生成今日聚焦' }).click();
   await expect(page.getByRole('button', { name: '重新生成今日聚焦' })).toBeEnabled();
   await expect(editor).toContainText('人工修订股票点评');
+  await closeAiSurfaces(page);
   fail = false;
   await page.getByRole('button', { name: '重新生成今日聚焦' }).click();
   await expect(editor).toContainText('重新生成的股票点评');
+  await closeAiSurfaces(page);
   await editor.fill('1、生成后继续修改。\n2、债券点评。');
   await page.getByRole('link', { name: '文字版', exact: true }).click();
   await expect(page.locator('.text-report__editor')).toContainText('生成后继续修改');
@@ -108,7 +124,7 @@ test('AI 生成自动展开任务详情、轮替模型摘要并保留完成结�
   await page.getByRole('button', { name: '重新生成今日聚焦' }).click();
   const panel = page.getByRole('complementary', { name: 'AI 任务面板' });
   await expect(panel).toBeVisible();
-  await expect(panel.getByText('正在核对股债市场驱动')).toBeVisible();
+  await expect(panel.getByRole('status').getByText('正在核对股债市场驱动', { exact: true })).toBeVisible();
   await expect(panel.getByText('正在读取市场材料')).not.toBeVisible();
   await expect(page).toHaveScreenshot('ai-panel-progress.png');
   await page.evaluate(() => window.__finishAiPanelVisual());

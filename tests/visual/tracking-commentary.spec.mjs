@@ -1,5 +1,20 @@
 import { test, expect } from '@playwright/test';
 import { mockResources } from './fixtures.mjs';
+
+async function closeAiSurfaces(page) {
+  const closePanel = page.getByRole('button', { name: '关闭 AI 面板' });
+  if (await closePanel.isVisible()) {
+    await closePanel.click();
+    await expect(page.getByRole('complementary', { name: 'AI 任务面板' })).not.toBeVisible();
+  }
+  const notifications = page.getByRole('button', { name: '关闭通知' });
+  while (await notifications.count()) {
+    const count = await notifications.count();
+    await notifications.first().click();
+    await expect(notifications).toHaveCount(count - 1);
+  }
+}
+
 const original = {
   id:'archive-1',policyId:null,type:'current_affairs',eventName:'资金价格下移与融资窗口',sources:'研究机构甲',eventPublishedAt:'2026-09-15',commentaryDate:'2026-09-15',
   eventSummary:'资金需求回落，融资窗口打开。',commentary:'1. 资金价格下移打开融资窗口\n资金需求回落，负债成本下降，公司债发行具备有利条件。',recommendation:'融资发行方面，前置中长期公司债发行，锁定当前负债成本。',
@@ -48,6 +63,7 @@ test('tracking archive opens, edits, generates and retains source evidence',asyn
   await expect(page.getByLabel('跟踪点评',{exact:true})).toHaveValue(stored.commentary);
   await expect(page.getByRole('heading',{name:'取材原句'})).toBeVisible();
   await expect(page.getByText('融资窗口分析',{exact:true})).toBeVisible();
+  await closeAiSurfaces(page);
   const downloaded=page.waitForEvent('download');
   await page.getByRole('button',{name:'保存 PDF',exact:true}).click();
   await (await downloaded).saveAs(testInfo.outputPath('tracking-commentary-saved.pdf'));
