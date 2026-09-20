@@ -100,7 +100,7 @@
 
 	function formatAxisDate(value: number) {
 		const date = new Date(value);
-		return `${date.getUTCMonth() + 1}月`;
+		return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
 	}
 
 	function formatTooltip(params: any) {

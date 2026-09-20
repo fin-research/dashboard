@@ -48,7 +48,7 @@
 				data: months.map((month) => Number(findRow(month, type)?.amountYi ?? 0))
 			})),
 			...issuanceTrendTypes.map((type) => ({
-				name: `${type}加权发行利率`,
+				name: type,
 				type: 'line',
 				yAxisIndex: 1,
 				showSymbol: true,
@@ -59,19 +59,22 @@
 				itemStyle: { color: issuanceTrendColors[type] },
 				label: {
 					show: true,
-					position: 'right',
+					position: 'left',
 					distance: 8,
 					color: issuanceTrendColors[type],
 					fontSize: 11,
 					fontWeight: 'bolder',
+					backgroundColor: 'rgba(255,255,255,0.9)',
+					padding: [2, 3],
+					borderRadius: 2,
 					formatter: (params: any) => params.dataIndex === lastRateIndices[type]
 						? `${Number(params.value).toFixed(2)}%`
 						: ''
 				},
 				tooltip: { valueFormatter: (value: unknown) => `${Number(value).toFixed(2)}%` },
-				data: months.map((month) => {
+				data: months.map((month, index) => {
 					const value = findRow(month, type)?.weightedRatePct;
-					return value == null ? null : Number(value);
+					return value == null ? null : { value: Number(value), label: { show: index === lastRateIndices[type] } };
 				})
 			}))
 		],

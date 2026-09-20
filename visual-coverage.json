@@ -18,7 +18,9 @@
     },
     {
       "source": "src/routes/articles/[id]/+page.svelte",
-      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
+      "scenarios": [
+        "articles-detail"
+      ]
     },
     {
       "source": "src/routes/auth/verify-email/+page.svelte",
@@ -30,7 +32,9 @@
     },
     {
       "source": "src/routes/commentaries/[id]/+page.svelte",
-      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
+      "scenarios": [
+        "commentaries-detail"
+      ]
     },
     {
       "source": "src/routes/credit-workbench/[[view]]/+page.svelte",
@@ -69,7 +73,9 @@
     },
     {
       "source": "src/routes/financing/liability-report/+page.svelte",
-      "exemption": "服务端报表数据，未建浏览器夹具"
+      "scenarios": [
+        "liability-six-pages"
+      ]
     },
     {
       "source": "src/routes/financing/login/+page.svelte",
@@ -153,7 +159,9 @@
     },
     {
       "source": "src/routes/news/[id]/+page.svelte",
-      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
+      "scenarios": [
+        "news-detail"
+      ]
     },
     {
       "source": "src/routes/policy-tracking/+page.svelte",
@@ -626,8 +634,21 @@
     {
       "id": "credit-assistant",
       "url": "/credit-workbench/assistant",
-      "kind": "deferred",
-      "reason": "授信助手流式会话尚未建立浏览器夹具。"
+      "kind": "screenshot",
+      "state": "empty/customer-picker/cited-reply",
+      "evidence": [
+        {
+          "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
+          "test": "desktop credit assistant supports customer selection and readable cited replies",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-assistant-picker.png",
+            "credit-assistant-citation.png"
+          ]
+        }
+      ]
     },
     {
       "id": "workflow-expanded",
@@ -977,6 +998,84 @@
           "snapshots": [
             "overview-preset.png",
             "calendar-preset.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "news-detail",
+      "url": "/news/news-1",
+      "kind": "screenshot",
+      "state": "nonempty/reading",
+      "evidence": [
+        {
+          "spec": "tests/visual/document-details.spec.mjs",
+          "test": "desktop news detail recovers and shows structured content",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "news-detail-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "articles-detail",
+      "url": "/articles/A001",
+      "kind": "screenshot",
+      "state": "nonempty/reading",
+      "evidence": [
+        {
+          "spec": "tests/visual/document-details.spec.mjs",
+          "test": "desktop research detail shows its body and related policies",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "article-detail-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "commentaries-detail",
+      "url": "/commentaries/archive-1",
+      "kind": "screenshot",
+      "state": "nonempty/reading",
+      "evidence": [
+        {
+          "spec": "tests/visual/document-details.spec.mjs",
+          "test": "desktop commentary detail wraps titles and centers standalone reports",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "commentary-detail-desktop.png",
+            "commentary-standalone-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "liability-six-pages",
+      "url": "/financing/liability-report",
+      "kind": "screenshot",
+      "state": "nonempty/six-pages",
+      "evidence": [
+        {
+          "spec": "tests/visual/liability-desktop.spec.mjs",
+          "test": "desktop liability report retains six complete pages with readable charts",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "liability-page-1.png",
+            "liability-page-2.png",
+            "liability-page-3.png",
+            "liability-page-4.png",
+            "liability-page-5.png",
+            "liability-page-6.png"
           ]
         }
       ]

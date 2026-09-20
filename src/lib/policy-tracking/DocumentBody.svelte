@@ -26,6 +26,9 @@
   .document-body h3 { margin: 26px 0 10px; color: #172033; font-size: 1.125rem; }
   .document-body p { margin: 0 0 18px; white-space: pre-wrap; }
   .document-body ol, .document-body ul { display: grid; gap: 10px; margin: 0 0 20px; padding-left: 24px; }
+  .document-body ul { list-style: disc; }
+  .document-body ol { list-style: decimal; }
+  .document-body h2, .document-body h3 { font-weight: bold; }
   .table-scroll { overflow-x: auto; margin-block: 16px; }
   table { width: 100%; border-collapse: collapse; }
   th, td { padding: 10px; border: 1px solid var(--border-color); text-align: left; white-space: pre-wrap; vertical-align: top; }

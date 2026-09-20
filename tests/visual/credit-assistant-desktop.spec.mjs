@@ -1,0 +1,32 @@
+import {test,expect} from '@playwright/test';
+import {mockResources} from './fixtures.mjs';
+import {assistantCustomers,assistantSession} from './audit-fixtures.mjs';
+
+test('desktop credit assistant supports customer selection and readable cited replies',async({page},testInfo)=>{
+  test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
+  await mockResources(page);
+  await page.setViewportSize({width:1280,height:900});
+  await page.route('**/api/credit-assistant/institutions**',route=>route.fulfill({json:{institutions:assistantCustomers}}));
+  await page.route('**/api/credit-assistant/session?**',route=>route.fulfill({json:assistantSession}));
+  await page.goto('/credit-workbench/assistant');
+  const input=page.getByRole('textbox',{name:'输入消息',exact:true});
+  await expect(input).toHaveAttribute('placeholder','输入问题');
+  await expect(page.getByRole('button',{name:'发送消息',exact:true})).toBeDisabled();
+  const customer=page.getByRole('combobox',{name:'客户名称',exact:true});
+  await customer.fill('不存在的机构');
+  await expect(page.getByRole('status').filter({hasText:'未找到机构'})).toBeVisible();
+  await customer.fill('测试');
+  await customer.press('ArrowDown');
+  await expect(page.getByRole('option',{name:'测试银行甲 已签署保密协议',exact:true})).toHaveAttribute('aria-selected','true');
+  await expect(page).toHaveScreenshot('credit-assistant-picker.png');
+  await customer.press('Enter');
+  await expect(input).toBeFocused();
+  await expect(page.getByText(assistantSession.turns[0].answer.paragraphs[0].text,{exact:false})).toBeVisible();
+  await page.getByRole('link',{name:'查看资料来源1',exact:true}).click();
+  await expect(page.locator('#source-audit-turn-audit-source')).toBeFocused();
+  await expect(page.getByText('测试公司2026年半年度报告 · 第12页',{exact:true})).toBeVisible();
+  await expect(page).toHaveScreenshot('credit-assistant-citation.png');
+  await input.fill('请进一步核实最新月份指标。');
+  await expect(page.getByRole('button',{name:'发送消息',exact:true})).toBeEnabled();
+  await expect(input).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+});

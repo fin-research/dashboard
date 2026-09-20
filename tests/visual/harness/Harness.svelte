@@ -13,10 +13,14 @@
   const component: Promise<{ default: Component<any> }> = path === '/' ? import('../../../src/routes/+page.svelte')
     : path.startsWith('/trading-research') ? import('../../../src/lib/trading-research/WorkbenchPage.svelte')
     : path.startsWith('/credit-workbench') ? import('../../../src/lib/credit-workbench/CreditWorkbenchPage.svelte')
+    : path.startsWith('/news/') ? import('../../../src/routes/news/[id]/+page.svelte')
+    : path.startsWith('/articles/') ? import('../../../src/routes/articles/[id]/+page.svelte')
+    : path.startsWith('/commentaries/') ? import('../../../src/routes/commentaries/[id]/+page.svelte')
     : path === '/fund-report' ? import('./FundReports.svelte')
     : path === '/management/messenger' ? import('./Messenger.svelte')
     : path === '/management/permissions' ? import('./Permissions.svelte')
     : path === '/ui-contracts' ? import('./Primitives.svelte')
+    : path === '/financing/liability-report' ? import('./LiabilityReport.svelte')
     : path === '/financing/schedule' ? import('./Schedule.svelte')
     : path === '/financing/sop' ? import('./FinancingSop.svelte')
     : path === '/financing/bond-investors' ? import('./FinancingInvestors.svelte')
@@ -30,7 +34,7 @@
 <GlobalMessages />
 <AiPanel client={aiClient} />
 {#await component then module}
-  <module.default viewId={view || 'overview'} />
+  <module.default viewId={view || 'overview'} {...(/^(?:\/news|\/articles|\/commentaries)\//.test(path) ? {data:{id:view}} : {})} />
 {:catch error}
   <pre role="alert">{error.message}</pre>
 {/await}
