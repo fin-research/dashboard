@@ -101,6 +101,7 @@ export async function generateMarketBriefing(
       if (parsed.report_date !== reportDate) throw new Error("报告日期与请求日期不一致");
       return parsed;
     },
+    resultText: value => `股票市场\n${value.stock}\n\n债券市场\n${value.bond}`,
   });
   return result;
 }

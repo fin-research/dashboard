@@ -168,6 +168,7 @@
           body: JSON.stringify({ ...range, updatedAt: current.updatedAt }),
         },
         parse: (value) => value as TrackingCommentary,
+        resultText: value => [value.eventName, value.eventSummary, value.commentary, value.recommendation].filter(Boolean).join('\n\n'),
       });
       if (mounted) accept(commentary);
       if (mounted) await loadList();

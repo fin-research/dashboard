@@ -88,6 +88,7 @@
         },
         signal: request.signal,
         parse: (value) => value as HotspotApiResponse,
+        resultText: value => [value.marketSummary, ...value.hotspots.map(item => `${item.keyword}\n${item.explanation}`)].filter(Boolean).join('\n\n'),
       });
       data = payload;
       syncScopeControls(payload.scope);

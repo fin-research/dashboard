@@ -70,6 +70,7 @@
       signal: controller.signal,
       cancellable: false,
       parse: (value) => value as CreditSession,
+      resultText: sessionResultText,
     }).then((next) => {
       if (!mounted || current !== revision || streamController !== controller) return;
         const followLatest = nearLatest();
@@ -194,6 +195,7 @@
         },
         cancellable: false,
         parse: (value) => value as CreditSession,
+        resultText: sessionResultText,
       });
       if (!mounted) return;
       session = next;
@@ -258,6 +260,10 @@
     } catch (error) { globalMessages.error(error instanceof Error ? error.message : "复制失败，请重试"); }
   }
   function citations(answer: CreditAnswer): string[] { return [...new Set(answer.paragraphs.flatMap(p => p.citations.map(c => c.sourceId)))]; }
+  function sessionResultText(value: CreditSession): string {
+    const answer = value.turns.at(-1)?.answer;
+    return value.error || (answer ? customerAnswerText(answer) : '');
+  }
   async function showCitation(event: MouseEvent, turnId: string, sourceId: string) {
     event.preventDefault();
     const details = document.getElementById(`references-${turnId}`);

@@ -17,6 +17,7 @@ export interface AiTaskRecord {
   finishedAt?: number;
   progress: string[];
   result?: unknown;
+  displayResult?: string;
   error?: string;
 }
 
@@ -25,6 +26,7 @@ export interface AiRequest<T> {
   url: string;
   init?: RequestInit;
   parse: (value: unknown) => T;
+  resultText?: (value: T) => string;
   signal?: AbortSignal;
   maxBytes?: number;
   cancellable?: boolean;
@@ -95,7 +97,7 @@ export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
     cancel(taskId) {
       if (tasks.find((task) => task.id === taskId)?.cancellable) controllers.get(taskId)?.abort();
     },
-    async run<T>({ title, url, init, parse, signal, maxBytes = MAX_AI_CLIENT_RESPONSE_BYTES, cancellable = true }: AiRequest<T>): Promise<T> {
+    async run<T>({ title, url, init, parse, resultText, signal, maxBytes = MAX_AI_CLIENT_RESPONSE_BYTES, cancellable = true }: AiRequest<T>): Promise<T> {
       const id = crypto.randomUUID();
       const controller = new AbortController();
       controllers.set(id, controller);
@@ -138,7 +140,8 @@ export function createAiClient(fetcher: typeof fetch = fetch): AiClient {
             }
             if (event === "result") {
               result = parse(JSON.parse(data) as unknown);
-              update(id, (task) => ({ ...task, result }));
+              const displayResult = resultText ? resultText(result) : typeof result === 'string' ? result : undefined;
+              update(id, (task) => ({ ...task, result, displayResult }));
               return;
             }
             if (event === "error") throw new Error(data || "AI 请求失败");

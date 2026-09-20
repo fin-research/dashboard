@@ -274,6 +274,7 @@
           body: JSON.stringify({ runId: report.snapshot.run_id }),
         },
         parse: (value) => sellSidePayloadSchema.parse(value),
+        resultText: value => [value.logicSummary, ...value.views.map(view => `${view.institution} · ${view.title}\n${view.summary}\n${view.implication}`)].join('\n\n'),
       });
       report = { ...report, sellSide };
       editingSellSide = false;

@@ -667,7 +667,7 @@
       "id": "credit-assistant",
       "url": "/credit-workbench/assistant",
       "kind": "screenshot",
-      "state": "empty/customer-picker/cited-reply",
+      "state": "empty/customer-picker/cited-reply/processing/error/retry",
       "evidence": [
         {
           "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
@@ -678,6 +678,27 @@
           "snapshots": [
             "credit-assistant-picker.png",
             "credit-assistant-citation.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
+          "test": "desktop assistant processing records remain readable above the composer",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-assistant-processing.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
+          "test": "desktop assistant failed answer can be retried without losing the question",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-assistant-failed.png",
+            "credit-assistant-result.png"
           ]
         }
       ]
@@ -1057,7 +1078,8 @@
             "desktop"
           ],
           "snapshots": [
-            "news-detail-desktop.png"
+            "news-detail-desktop.png",
+            "document-retry-desktop.png"
           ]
         }
       ]

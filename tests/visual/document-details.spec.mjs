@@ -13,6 +13,7 @@ test('desktop news detail recovers and shows structured content',async({page})=>
   await page.route('**/api/news/news-1',route=>route.fulfill(++attempts===1?{status:503,json:{error:'新闻资讯暂时不可用'}}:{json:newsDetailAudit}));
   await page.goto('/news/news-1');
   await expect(page.getByRole('alert')).toContainText('新闻资讯暂时不可用');
+  await expect(page).toHaveScreenshot('document-retry-desktop.png');
   await page.getByRole('button',{name:'重新读取',exact:true}).click();
   await expect(page.getByRole('heading',{name:newsDetailAudit.title,exact:true})).toBeVisible();
   await expect(page.locator('.document-body ul')).toHaveCSS('list-style-type','disc');
@@ -23,8 +24,11 @@ test('desktop news detail recovers and shows structured content',async({page})=>
 });
 
 test('desktop research detail shows its body and related policies',async({page})=>{
-  await page.route('**/api/articles/A001',route=>route.fulfill({json:articleDetailAudit}));
+  let attempts=0;
+  await page.route('**/api/articles/A001',route=>route.fulfill(++attempts===1?{status:503,json:{error:'研报暂时不可用'}}:{json:articleDetailAudit}));
   await page.goto('/articles/A001');
+  await expect(page.getByRole('alert')).toContainText('研报暂时不可用');
+  await page.getByRole('button',{name:'重新读取',exact:true}).click();
   await expect(page.getByRole('heading',{name:articleDetailAudit.title,exact:true})).toBeVisible();
   await expect(page.getByRole('table')).toContainText('发行窗口和认购需求');
   await expect(page.getByRole('complementary',{name:'关联政策',exact:true}).getByRole('link')).toHaveCount(2);
@@ -32,8 +36,11 @@ test('desktop research detail shows its body and related policies',async({page})
 });
 
 test('desktop commentary detail wraps titles and centers standalone reports',async({page})=>{
-  await page.route('**/api/commentaries/**',route=>route.fulfill({json:{...commentaryDetailAudit,policy:route.request().url().endsWith('/standalone')?null:commentaryDetailAudit.policy}}));
+  let attempts=0;
+  await page.route('**/api/commentaries/**',route=>route.fulfill(++attempts===1?{status:503,json:{error:'点评暂时不可用'}}:{json:{...commentaryDetailAudit,policy:route.request().url().endsWith('/standalone')?null:commentaryDetailAudit.policy}}));
   await page.goto('/commentaries/archive-1');
+  await expect(page.getByRole('alert')).toContainText('点评暂时不可用');
+  await page.getByRole('button',{name:'重新读取',exact:true}).click();
   const title=page.getByRole('heading',{name:commentaryDetailAudit.commentary.eventName,exact:true});
   await expect(title).toBeVisible();
   await expect(title).toHaveCSS('white-space','normal');
