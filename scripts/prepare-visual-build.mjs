@@ -37,6 +37,7 @@ const map = {
   '/fund-report': stylesFor(layout, 'src/routes/fund-report/+page.svelte'),
   '/market-briefing': stylesFor(layout, 'src/routes/market-briefing/+page.svelte'),
   '/management/messenger': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/messenger/+page.svelte'),
+  '/management/permissions': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/permissions/+page.svelte'),
   '/financing/schedule': [...new Set([...stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte'), ...moduleCardStyles])],
   '/ui-contracts': stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte', 'src/routes/financing/debts/[id]/+page.svelte'),
 };

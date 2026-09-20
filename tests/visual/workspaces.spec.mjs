@@ -53,6 +53,21 @@ test('portal exposes real destinations', async ({ page }) => {
   await expect(page.getByText('资金存量指标', { exact: true })).toBeVisible();
 });
 
+test('desktop trading keeps the status column visible while filtering and sorting', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop table layout');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/trading-research/trading');
+  await page.getByRole('combobox', { name: '交易状态', exact: true }).selectOption('待确认');
+  await page.getByRole('combobox', { name: '交易排序', exact: true }).selectOption('amount-desc');
+  const table = page.getByRole('table', { name: '交易研究工作台交易记录' });
+  await expect(table.locator('tbody tr')).toHaveCount(2);
+  await expect(table.locator('tbody tr').first()).toContainText('农业银行');
+  const region = page.getByRole('region', { name: '交易记录', exact: true });
+  const rightEdge = (await region.boundingBox()).x + (await region.boundingBox()).width;
+  const status = await table.getByRole('columnheader', { name: '状态', exact: true }).boundingBox();
+  expect(status.x + status.width).toBeLessThanOrEqual(rightEdge + 1);
+});
+
 test('workflow expands a branch and opens the real editor', async ({ page }) => {
   await page.goto('/trading-research/workflow');
   const collapse = page.getByRole('button', { name: '折叠拆借', exact: true });

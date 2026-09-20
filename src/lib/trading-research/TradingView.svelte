@@ -251,7 +251,7 @@
 
   <ModuleCard labelledBy="trade-table-title">
     <PanelHeading id="trade-table-title" title="实时交易记录" wrap>
-      <div class="tr-table-controls" role="search">
+      <div class="tr-table-controls tr-table-controls--trading" role="search">
         <label class="tr-search-control">
           <span class="sr-only">搜索交易</span>
           <WorkbenchIcon name="search" />
@@ -294,7 +294,7 @@
         <span class="tr-result-count">共 {filteredTrades.length} 笔</span>
       </div>
     </PanelHeading>
-    <div class="tr-table-scroll">
+    <div class="tr-table-scroll" role="region" aria-label="交易记录" tabindex="0">
       <table class="ui-table tr-data-table tr-trade-table">
         <caption class="sr-only">交易研究工作台交易记录</caption>
         <thead>

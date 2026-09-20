@@ -10,6 +10,23 @@ test.beforeEach(async ({page}) => {
 });
 test.afterEach(()=>{ expect(errors).toEqual([]); expect(requests).toEqual([]); });
 
+test('permission search keeps the active scope visible and recoverable',async({page})=>{
+  await page.goto('/management/permissions');
+  const pool=page.getByRole('button',{name:'二级债券池',exact:true});
+  const all=page.getByRole('button',{name:'全部范围',exact:true});
+  await pool.click();
+  await page.getByRole('searchbox',{name:'搜索权限'}).fill('市场');
+  await expect(pool).toBeVisible();
+  await expect(pool).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByRole('status')).toHaveText('无匹配权限');
+  const selectedBackground=await pool.evaluate(node=>getComputedStyle(node).backgroundColor);
+  expect(selectedBackground).not.toBe(await all.evaluate(node=>getComputedStyle(node).backgroundColor));
+  await expect(page).toHaveScreenshot('permissions-filtered.png',{fullPage:true});
+  await all.click();
+  await expect(page.getByRole('region',{name:'市场研究',exact:true})).toBeVisible();
+  await expect(page.getByRole('searchbox',{name:'搜索权限'})).toHaveValue('市场');
+});
+
 test('Maia multiselect restores focus and survives reopening and clearing',async({page})=>{
   await page.goto('/ui-contracts');
   const trigger=page.getByRole('button',{name:/负债品种：/});

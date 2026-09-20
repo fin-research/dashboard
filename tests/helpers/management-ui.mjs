@@ -21,6 +21,14 @@ assert.equal(document.querySelectorAll('.action-granted').length,0);
 const search=document.querySelector('input[aria-label="搜索权限"]');
 flushSync(()=>{search.value='没有的权限';search.dispatchEvent(new window.Event('input',{bubbles:true}));});
 assert.ok(document.querySelector('.permission-editor').textContent.includes('无匹配权限'));
+const scopeButton = label => [...document.querySelectorAll('.scope-filters button')].find(button => button.textContent.trim() === label);
+flushSync(()=>{search.value='';search.dispatchEvent(new window.Event('input',{bubbles:true}));scopeButton('二级债券池').click();});
+flushSync(()=>{search.value='市场';search.dispatchEvent(new window.Event('input',{bubbles:true}));});
+assert.equal(scopeButton('二级债券池').getAttribute('aria-pressed'),'true','search must keep the active scope visible');
+assert.ok(document.querySelector('.permission-editor').textContent.includes('无匹配权限'));
+flushSync(()=>scopeButton('全部范围').click());
+assert.ok(document.querySelector('.scope-section[aria-label="市场研究"]'),'clearing the scope recovers matching search results');
+assert.equal(search.value,'市场','changing scope preserves the search');
 await unmount(app);
 globalMessages.clear();
 

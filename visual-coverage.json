@@ -120,7 +120,9 @@
     },
     {
       "source": "src/routes/management/permissions/+page.svelte",
-      "exemption": "权限刷新/Auth0 边界，未建浏览器夹具"
+      "scenarios": [
+        "permissions-filtered"
+      ]
     },
     {
       "source": "src/routes/market-briefing/+page.svelte",
@@ -252,7 +254,7 @@
       "id": "trading",
       "url": "/trading-research/trading",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "正常态；桌面1280宽筛选排序后末列可见",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -728,7 +730,7 @@
       "id": "workbench-navigation",
       "url": "/management/messenger",
       "kind": "screenshot",
-      "state": "交易/授信/管理及融资 SOP 控件夹具、授信周报/融资模型报告共用主题蓝导航；无左竖条、图标/圆角/页头控件一致；桌面折叠和手机抽屉。融资夹具不代表完整融资业务页面。",
+      "state": "普通页与报告页共享浅蓝标题栏，与工作区区分；导航折叠和标签切换",
       "evidence": [
         {
           "spec": "tests/visual/page-layout.spec.mjs",
@@ -739,6 +741,25 @@
           ],
           "snapshots": [
             "workbench-navigation.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "permissions-filtered",
+      "url": "/management/permissions",
+      "kind": "screenshot",
+      "state": "范围筛选与搜索组合、清除范围恢复结果",
+      "evidence": [
+        {
+          "spec": "tests/visual/ui-contracts.spec.mjs",
+          "test": "permission search keeps the active scope visible and recoverable",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "permissions-filtered.png"
           ]
         }
       ]
