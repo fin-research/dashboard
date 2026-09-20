@@ -3,7 +3,7 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { shiborRatesSchema, type ShiborRate } from '../../data-contracts';
   import { blankDirectory, directoryKey, directorySchema, remember, type InquiryDirectory, type InquiryRow } from '../trading-workflow/inquiries';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import ModuleCard from "../../components/ModuleCard.svelte";
   import { Clock } from '@lucide/svelte';
   import { portal } from '../portal';
@@ -40,6 +40,13 @@
     if (saving) return;
     if (config && JSON.stringify(draft) !== JSON.stringify(config.nodes) && !window.confirm('放弃未保存的流程修改？')) return;
     editing = false; selectedId = '';
+  }
+  async function closeEditor() {
+    const id = selectedId;
+    selectedId = '';
+    await tick();
+    Array.from(document.querySelectorAll<HTMLElement>('[data-workflow-node]')).find(node => node.dataset.workflowNode === id)
+      ?.querySelector<HTMLButtonElement>('.node-surface')?.focus({ preventScroll: true });
   }
   async function saveDraft() {
     if (saving) return;
@@ -217,7 +224,7 @@
         onSelect={id => selectedId = id} onMove={move} onComplete={complete} onBranch={setBranch} onEnable={setEnabled} onNote={note} onRows={quoteRows} onRemember={rememberRow} {directory} {rates} {now} />
       {#if editing && (selectedId || !draft.length)}
         {#key selectedId}<WorkflowEditor flows={config.flows} bind:nodes={draft} {selectedId} disabled={saving} onSelect={id => selectedId = id}
-          onClose={() => selectedId = ''} onBranch={(id, value) => setBranch([id], value)} expanded={!!preview.branches[selectedId]}
+          onClose={closeEditor} onBranch={(id, value) => setBranch([id], value)} expanded={!!preview.branches[selectedId]}
           onSave={saveDraft} onDelete={deleteNode} onAdd={addNode} onReset={() => draft = draft.map(({ offset, ...node }) => node)}
           />{/key}
       {/if}

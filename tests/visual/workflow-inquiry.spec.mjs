@@ -15,6 +15,32 @@ async function open(page, rows = []) {
 const cell = (page, id, field) => page.locator(`[data-row="${id}"][data-field="${field}"]`);
 const allRows = page => page.locator('.inquiry-row');
 
+test('desktop workflow exposes complete inquiry labels and reachable node settings',async({page},testInfo)=>{
+ test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
+ await page.setViewportSize({width:1280,height:900});
+ await open(page);
+ await expect(page.getByRole('combobox',{name:'金额（亿）',exact:true})).toHaveAttribute('placeholder','金额/亿');
+ await expect(page.locator('[data-workflow-node="loan-quote"]')).toHaveScreenshot('workflow-inquiry-labels-desktop.png');
+ await page.getByRole('checkbox',{name:'编辑模式',exact:true}).check();
+ await page.getByRole('button',{name:'本币发交易',exact:true}).click();
+ const editor=page.getByRole('complementary',{name:'节点编辑',exact:true});
+ const region=page.getByRole('region',{name:'流程图滚动区域',exact:true});
+ await expect(region).toHaveAttribute('tabindex','0');
+ await expect.poll(()=>page.evaluate(()=>{const outer=document.querySelector('.flow-scroll').getBoundingClientRect(),node=document.querySelector('.workflow-node.chosen').getBoundingClientRect();return node.left>=outer.left-1&&node.right<=outer.right+1;})).toBe(true);
+ expect(await editor.locator('.connection-link').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ await expect(editor).toHaveScreenshot('workflow-node-editor-desktop.png');
+ await editor.getByText('节点设置',{exact:true}).click();
+ await expect(editor.getByRole('group',{name:'节点图标',exact:true})).toBeVisible();
+ await expect(editor.getByRole('combobox',{name:'节点类型',exact:true})).toBeVisible();
+ await expect(editor.locator('.editor-advanced')).toHaveScreenshot('workflow-node-settings-desktop.png');
+ await region.press('End');expect(await region.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);
+ await editor.getByRole('combobox',{name:'编辑节点',exact:true}).selectOption('reverse-confirm');
+ await expect.poll(()=>page.evaluate(()=>{const outer=document.querySelector('.flow-scroll').getBoundingClientRect(),node=document.querySelector('.workflow-node.chosen').getBoundingClientRect();return node.left>=outer.left-1&&node.right<=outer.right+1;})).toBe(true);
+ await page.getByRole('button',{name:'关闭节点编辑',exact:true}).click();
+ await expect(page.locator('[data-workflow-node="reverse-confirm"] .node-surface')).toBeFocused();
+ await page.getByRole('checkbox',{name:'编辑模式',exact:true}).uncheck();
+});
+
 test('inquiry keeps blank numeric cells until a candidate is accepted, and validates input', async ({ page }) => {
   const requests = await open(page, seed);
   const amount = cell(page, 'b', 'amount');

@@ -2,6 +2,15 @@ import {test,expect} from '@playwright/test';
 import {mockResources} from './fixtures.mjs';
 import {creditFull} from './audit-fixtures.mjs';
 
+test('desktop credit weekly report presents nonempty news and five product details',async({page},testInfo)=>{
+ test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
+ await mockResources(page);await page.route('**/api/credit**',route=>route.fulfill({json:creditFull}));
+ await page.setViewportSize({width:1280,height:900});await page.goto('/credit-workbench/weekly');
+ await expect(page.getByRole('region',{name:'本周授信快讯',exact:true})).toContainText('较前额增加5亿');
+ await expect(page.getByRole('table',{name:'所选报表日前近6个月新增、续作和扩额授信批复',exact:true})).toContainText('同业拆借 3.00亿');
+ await expect(page).toHaveScreenshot('credit-weekly-full-desktop.png');
+});
+
 test('desktop credit metrics and expanded records stay within the workspace',async({page},testInfo)=>{
   test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
   await mockResources(page);

@@ -162,7 +162,8 @@
         {@const message = error(row, field)}
         <div class="inquiry-cell" class:cell-selected={inSelection(row.id, field)} role="cell">
           <Input data-ui-owner="lib-trading-workflow-InquiryTable-svelte" class={"ui-input"} type="text" inputmode={field === 'amount' || field === 'price' ? 'decimal' : 'text'}
-            data-row={row.id} data-field={field} aria-label={placeholders[field]} placeholder={placeholders[field]}
+            data-row={row.id} data-field={field} aria-label={placeholders[field]} placeholder={field === 'amount' ? '金额/亿' : placeholders[field]}
+            title={displayField(row, field, loan, rates, date, now) || undefined}
             maxlength={field === 'counterparty' ? 160 : field === 'trader' ? 80 : 24}
             role="combobox" aria-autocomplete="list" aria-expanded={active?.id === row.id && active.field === field && options.length > 0}
             aria-controls={`choices-${row.id}-${field}`}

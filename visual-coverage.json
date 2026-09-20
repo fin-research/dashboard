@@ -321,6 +321,18 @@
           "snapshots": [
             "workflow.png"
           ]
+        },
+        {
+          "spec": "tests/visual/workflow-inquiry.spec.mjs",
+          "test": "desktop workflow exposes complete inquiry labels and reachable node settings",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "workflow-inquiry-labels-desktop.png",
+            "workflow-node-editor-desktop.png",
+            "workflow-node-settings-desktop.png"
+          ]
         }
       ]
     },
@@ -387,6 +399,16 @@
           ],
           "snapshots": [
             "credit-weekly.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "desktop credit weekly report presents nonempty news and five product details",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-weekly-full-desktop.png"
           ]
         }
       ]

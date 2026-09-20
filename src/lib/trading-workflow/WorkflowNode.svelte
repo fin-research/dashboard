@@ -44,7 +44,7 @@
 <Handle id="bottom" type="source" position={Position.Bottom} isConnectable={false} aria-hidden="true" tabindex={-1} />
 
 <style>
-  .workflow-node { position: relative; --node-tone: #087cff; }
+  .workflow-node { position: relative; scroll-margin: 8px; --node-tone: #087cff; }
   .workflow-node[data-scope="reverse"] { --node-tone: #00a773; }
   .workflow-node[data-scope="exchange"] { --node-tone: #8090aa; }
   .node-surface { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-align: left; background: #fff; color: var(--tr-text); border: 1px solid #dbe7f7; border-radius: 8px; cursor: pointer; box-shadow: 0 3px 10px rgb(32 91 153 / 5%); font: inherit; transition: border-color .15s, box-shadow .15s; }
