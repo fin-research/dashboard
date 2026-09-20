@@ -439,6 +439,25 @@
       ]
     },
     {
+      "id": "financing-model-online",
+      "url": "/trading-research/financing-model",
+      "kind": "screenshot",
+      "state": "online result and legacy history",
+      "evidence": [
+        {
+          "spec": "tests/visual/reports.spec.mjs",
+          "test": "financing-model shows online results and switches to legacy history",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "financing-model-online.png"
+          ]
+        }
+      ]
+    },
+    {
       "id": "tracking-commentary",
       "url": "/trading-research/tracking-commentary?id=archive-1",
       "kind": "screenshot",

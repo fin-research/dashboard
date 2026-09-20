@@ -25,7 +25,7 @@ pnpm dev
 3. 准备合并时使用 `gh pr merge <number> --auto` 加入 GitHub 合并队列（禁止 `--admin`）；完整 `.github/workflows/tests.yml` 只在 `merge_group` 上自动执行，手动 `workflow_dispatch` 留作排障。队列用最新 main 加上待合并改动生成独立提交；无需为其它 PR 先合并反复更新任务分支。真实 Git/视觉冲突仍须修复，禁止直接覆盖其它任务截图。
 4. 全量检查分为并行的两项：Python 与 Node 完整覆盖率；CI 工具/视觉覆盖门禁、类型检查、生产构建、复用生产 CSS 的浏览器构建及严格截图/交互比较。最后统一 `Dashboard CI` 要求两项均成功，失败、取消、跳过和缺失结果都拒绝合并。保留完整测试范围与截图容差，不按文件路径跳过。
 5. `main` ruleset 同时要求 PR、merge queue 和 GitHub Actions 来源的 `Dashboard CI`；无人工审批要求、无管理员或应用 bypass，禁止删除/强推。队列一次构建/合并一个 PR，避免前序失败引发多个推测合并组重建；不要求作者分支追平 main，最新 main 的兼容性由队列检查保证。配置源 `.github/main-ruleset.json` 必须通过 rulesets API 应用并读回核验；不能只改文件，不能在未启用队列时使用轻量 PR 门禁。
-6. 子代理等待对应 `merge_group` 的完整检查并确认队列完成合并，记录 PR head、合并组 SHA、运行链接、合并提交和 Cloudflare 构建状态。被移出队列、取消、失败或仍在运行均不是交付成功；主代理根据证据修复，再派新的子代理处理。合并后的 main 不重复跑测试、覆盖率或截图；Cloudflare Git 仍负责生产部署。CI 成功不代表生产鉴权或全部路由 E2E 已验收。
+6. 按 [CI 等待与收尾](TESTING.md#ci-等待与收尾2026-09-20) 使用 `scripts/wait-ci.mjs`，单个子代理只等待一次对应 `merge_group` 的完整检查并确认队列完成合并，记录 PR head、合并组 SHA、运行链接、合并提交和 Cloudflare 构建状态。被移出队列、取消、失败或仍在运行均不是交付成功；主代理根据证据修复，再派新的子代理处理。合并后的 main 不重复跑测试、覆盖率或截图；Cloudflare Git 仍负责生产部署。CI 成功不代表生产鉴权或全部路由 E2E 已验收。
 
 pnpm 下载缓存和按 OS/架构/Playwright 版本固定的 Chromium 缓存由 `.github/actions/setup-ci` 共用，依赖安装仍为 frozen lockfile，浏览器安装命令仍核对缺失文件。PR/合并组缓存受 GitHub ref 作用域限制，不能作为其它任务的公共缓存；因此 `dependency-cache.yml` 仅在 main 的依赖/缓存配置变化时预热可共享的默认分支缓存，不执行测试或构建。Python uv 缓存依赖键使用实际声明 PEP 723 依赖的 `tests/test_credit_materials.py`。不缓存构建产物、截图基线、实际截图或测试通过结论。
 
