@@ -10,6 +10,14 @@ export const financingModelSnapshotSchema = z
     generated_at: z.string().min(1),
     as_of_date: z.string().date(),
     market_data_date: z.string().date(),
+    online_run: z.object({
+      model_version: z.string().regex(/^[a-f0-9]{20}$/),
+      feature_version: z.literal("online-market-v1"),
+      training_as_of: z.string().date(),
+      retrain_after: z.string().date(),
+      excluded_groups: z.array(z.string()),
+      runtime: z.literal("cloudflare-workflow"),
+    }).strict().nullable().optional(),
     issue_terms: z
       .object({
         issue_size_billion_yuan: z.number().positive(),

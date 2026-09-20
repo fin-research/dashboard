@@ -569,6 +569,7 @@
         </ModuleCard>
       </section>
 
+      {#if company}
       <section class="business-section" aria-labelledby="business-title">
         <PanelHeading id="business-title" title="业务指标" />
         <div class="business-metric-grid">
@@ -586,6 +587,7 @@
         </div>
       </section>
 
+      {/if}
       {#if productRecommendation}
         <section class="product-section" aria-labelledby="product-title">
           <div class="product-layout">

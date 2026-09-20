@@ -56,6 +56,14 @@ export async function loadFinancingModelReport(
          ),
          'as_of_date', to_char(run.as_of_date, 'YYYY-MM-DD'),
          'market_data_date', to_char(run.market_data_date, 'YYYY-MM-DD'),
+         'online_run', CASE WHEN run.online_model_version IS NULL THEN NULL ELSE jsonb_build_object(
+           'model_version', run.online_model_version,
+           'feature_version', run.online_feature_version,
+           'training_as_of', to_char(run.online_training_as_of, 'YYYY-MM-DD'),
+           'retrain_after', to_char(run.online_retrain_after, 'YYYY-MM-DD'),
+           'excluded_groups', to_jsonb(run.online_excluded_groups),
+           'runtime', 'cloudflare-workflow'
+         ) END,
          'issue_terms', jsonb_build_object(
            'issue_size_billion_yuan', run.issue_size_billion_yuan,
            'tenor_years', run.tenor_years,
