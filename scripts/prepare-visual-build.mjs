@@ -50,6 +50,8 @@ const map = {
 const files = [...new Set(Object.values(map).flat())];
 if (!files.length || Object.values(map).some(styles => !styles.length)) throw new Error('Production stylesheets are empty');
 await cp('.svelte-kit/output/client/_app', 'visual-dist/_app', { recursive: true });
+// Match shipping static assets as well as route CSS; logos must not become broken-image placeholders.
+await cp('static', 'visual-dist', { recursive: true });
 const hashes = {};
 for (const file of files) {
   const original = await readFile(`.svelte-kit/output/client/${file}`);

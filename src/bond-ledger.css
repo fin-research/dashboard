@@ -803,3 +803,23 @@
     transition: none;
   }
 }
+
+.ledger-range-popover .calendar-grid .ledger-range-day {
+  min-height: 44px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 8px;
+  box-shadow: none;
+  font-weight: normal;
+}
+.ledger-range-popover .calendar-grid .ledger-range-day.in-range {
+  color: var(--brand-deep);
+  background: var(--brand-soft);
+  border-radius: 0;
+}
+.ledger-range-popover .calendar-grid .ledger-range-day.endpoint {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-radius: 8px;
+  font-weight: bold;
+}

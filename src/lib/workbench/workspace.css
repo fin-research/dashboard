@@ -49,3 +49,11 @@
   .tr-shell--workspace .tr-credit-metric-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .tr-shell--workspace .tr-credit-metric-grid .research-metric-card__content { align-self: stretch; justify-content: flex-start; }
 }
+
+@media (min-width: 1200px) {
+  .tr-shell--workspace .tr-credit-editor-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .tr-shell--workspace .tr-credit-editor-grid > label { grid-column: span 4; }
+  .tr-shell--workspace .tr-credit-editor-grid > label:nth-child(-n + 4) { grid-column: span 3; }
+  .tr-shell--workspace .tr-credit-item-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; }
+  .tr-shell--workspace .tr-credit-item-grid fieldset { align-content: start; }
+}

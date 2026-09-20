@@ -125,7 +125,7 @@ export function renderWeeklyPoolScaleLeverage(
       },
     ],
     grid: [
-      { left: 10, right: 12, top: 52, height: "43%", containLabel: true },
+      { left: 10, right: 12, top: 66, height: "40%", containLabel: true },
       { left: 10, right: 12, top: "70%", bottom: 2, containLabel: true },
     ],
     tooltip: {
@@ -187,11 +187,11 @@ export function renderWeeklyPoolScaleLeverage(
         type: "value",
         gridIndex: 0,
         name: "时间加权本金（亿元）",
+        nameTextStyle: { ...weeklyAxisLabel, align: "right" },
         scale: true,
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: weeklyAxisLabel,
-        nameTextStyle: weeklyAxisLabel,
         splitLine: { show: false },
       },
       {
@@ -306,7 +306,7 @@ export function renderWeeklyPoolScaleLeverage(
           const placement = chooseBestLabelPlacement({
             point,
             label: { width: params.labelRect.width, height: params.labelRect.height },
-            bounds: { x: 42, y: 58, width: Math.max(0, host.clientWidth - 84), height: Math.max(0, host.clientHeight * 0.43 - 12) },
+            bounds: { x: 42, y: 72, width: Math.max(0, host.clientWidth - 84), height: Math.max(0, host.clientHeight * 0.40 - 12) },
             obstacles: placed,
             lineObstacles: lines,
             linePadding: 7,

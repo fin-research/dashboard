@@ -2009,3 +2009,7 @@ body:has(.tr-workbench) {
 
 .tr-navigation-list { display: grid; align-content: start; width: 100%; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .tr-navigation-list li { min-width: 0; }
+
+@media screen and (min-width: 1200px) {
+  .tr-credit-weekly-report .tr-metric-grid--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}

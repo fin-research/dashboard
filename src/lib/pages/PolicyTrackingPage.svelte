@@ -286,7 +286,7 @@
   .filters label { gap: 7px; color: #475467; font-size: .875rem; font-weight: bold; }
   .filters label > span { flex: 0 0 auto; white-space: nowrap; }
   :global(.filters input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]), :global(.filters select[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { width: 10rem; padding: 0 10px; }
-  :global(button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]) { padding: 0 14px; }
+  :global(button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:not([role="checkbox"])) { padding: 0 14px; }
   :global(button[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:focus-visible), :global(input[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:focus-visible), :global(select[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:focus-visible), :global(textarea[data-ui-owner="lib-pages-PolicyTrackingPage-svelte"]:focus-visible), a:focus-visible { outline: 3px solid rgba(47, 111, 214, .25); outline-offset: 2px; }
   .policy-main { width: min(1600px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0 64px; }
   .page-state { display: flex; min-height: 240px; align-items: center; justify-content: center; gap: 14px; border: 1px solid #d8e2f0; border-radius: 10px; background: #fff; }

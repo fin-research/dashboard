@@ -55,3 +55,15 @@ test('financing-model shows online results and switches to legacy history', asyn
   await expect(page.getByRole('heading',{name:'业务指标',exact:true})).toBeVisible();
   expect(errors).toEqual([]);expect(requests).toEqual([]);
 });
+
+test('desktop financing seller views load their shipping institution logos',async({page},testInfo)=>{
+  test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
+  await mockResources(page);
+  await page.goto('/trading-research/financing-model');
+  const sellers=page.getByRole('region',{name:'卖方观点',exact:true});
+  await sellers.scrollIntoViewIfNeeded();
+  const logos=sellers.locator('.institution-logo img');
+  await expect(logos.first()).toBeVisible();
+  await expect.poll(()=>logos.evaluateAll(images=>images.every(image=>image.complete&&image.naturalWidth>0))).toBe(true);
+  await expect(sellers).toHaveScreenshot('financing-seller-logos.png');
+});

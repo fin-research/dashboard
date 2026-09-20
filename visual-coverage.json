@@ -412,6 +412,16 @@
           "snapshots": [
             "secondary.png"
           ]
+        },
+        {
+          "spec": "tests/visual/secondary-desktop.spec.mjs",
+          "test": "desktop secondary report date range shows endpoints and selected interval",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "secondary-date-range.png"
+          ]
         }
       ]
     },
@@ -469,6 +479,16 @@
           "snapshots": [
             "financing-model.png"
           ]
+        },
+        {
+          "spec": "tests/visual/reports.spec.mjs",
+          "test": "desktop financing seller views load their shipping institution logos",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "financing-seller-logos.png"
+          ]
         }
       ]
     },
@@ -506,6 +526,16 @@
           ],
           "snapshots": [
             "tracking-commentary.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/research-overlays.spec.mjs",
+          "test": "desktop commentary preview prioritizes the report and returns to its draft",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "tracking-reading-desktop.png"
           ]
         }
       ]
@@ -554,14 +584,38 @@
             "desktop",
             "mobile"
           ]
+        },
+        {
+          "spec": "tests/visual/research-overlays.spec.mjs",
+          "test": "desktop hotspot scope selection is visible and details use readable width",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "hotspot-scope-desktop.png",
+            "hotspot-detail-desktop.png"
+          ]
         }
       ]
     },
     {
       "id": "policy-tracking",
       "url": "/trading-research/policy-tracking",
-      "kind": "deferred",
-      "reason": "政策列表与详情尚未建立浏览器夹具；不计作截图覆盖。"
+      "kind": "screenshot",
+      "state": "非空政策与关联研报、取消选择及政策类型筛选",
+      "evidence": [
+        {
+          "spec": "tests/visual/research-overlays.spec.mjs",
+          "test": "desktop policy association choices remain square and cancel preserves the list",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "policy-card-desktop.png",
+            "policy-association-desktop.png"
+          ]
+        }
+      ]
     },
     {
       "id": "bond",

@@ -1,9 +1,11 @@
 import {test,expect} from '@playwright/test';
 import {mockResources} from './fixtures.mjs';
+import {creditFull} from './audit-fixtures.mjs';
 
 test('desktop credit metrics and expanded records stay within the workspace',async({page},testInfo)=>{
   test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
   await mockResources(page);
+  await page.route('**/api/credit**',route=>route.fulfill({json:creditFull}));
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/credit-workbench');
   await expect(page.getByRole('rowheader',{name:'银行甲',exact:true})).toBeVisible();
@@ -18,6 +20,9 @@ test('desktop credit metrics and expanded records stay within the workspace',asy
   await region.getByRole('button',{name:'详情',exact:true}).click();
   await expect(region).toHaveJSProperty('scrollLeft',0);
   await expect(region.getByRole('textbox',{name:'机构性质',exact:true})).toHaveValue('商业银行');
+  const products=await region.getByRole('group').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().y));
+  expect(products).toHaveLength(5);
+  expect(Math.max(...products)-Math.min(...products)).toBeLessThanOrEqual(1);
   await expect(region).toHaveScreenshot('credit-record-expanded.png');
   await region.getByRole('button',{name:'收起',exact:true}).click();
   await expect(region.getByRole('textbox',{name:'机构性质',exact:true})).toHaveCount(0);

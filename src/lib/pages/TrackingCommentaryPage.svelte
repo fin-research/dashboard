@@ -205,7 +205,7 @@
 </script>
 
 <svelte:window onbeforeunload={beforeUnload} onbeforeprint={enablePrintMode} onafterprint={clearPrintMode} />
-<div class="tracking-workspace">
+<div class="tracking-workspace" class:tracking-workspace--preview={preview}>
   <div class="writing">
     <div class="writing-toolbar">
       <Button permission="research.policy_commentary:update" variant="outline" disabled={busy} onclick={newDraft}>新建点评</Button>
@@ -221,6 +221,7 @@
     </div>
     {#if opening}<ModuleCard><p aria-live="polite">正在读取点评</p></ModuleCard>
     {:else}
+      {#if !preview}
       <ModuleCard>
         <PanelHeading id="tracking-write" title="撰写点评" />
         <fieldset disabled={busy || !$allowed("research.policy_commentary:update")}>
@@ -237,6 +238,7 @@
           </div>
         </fieldset>
       </ModuleCard>
+      {/if}
       <div class="editor-grid">
         <ModuleCard>
           <PanelHeading id="tracking-body" title={preview ? "点评预览" : "点评正文"} />
@@ -329,7 +331,8 @@
   summary { cursor:pointer; font-weight:bold; min-height:44px; line-height:1.6; }
   blockquote { margin:12px 0; padding-inline-start:12px; border-inline-start:3px solid var(--primary); }
   .evidence-column p, .evidence-column li { overflow-wrap:anywhere; line-height:1.7; }
-  @media(max-width:1300px) { .editor-grid { grid-template-columns:minmax(0,1fr); } }
+  .tracking-workspace--preview .editor-grid { grid-template-columns: minmax(0,1fr); }
+  @media(max-width:1600px) { .editor-grid { grid-template-columns:minmax(0,1fr); } }
   @media(max-width:760px) { .tracking-workspace { grid-template-columns:minmax(0,1fr); } .writing { grid-column:1; grid-row:1; } .archive { grid-column:1; grid-row:2; } .metadata-fields { grid-template-columns:minmax(0,1fr); } .generation-toolbar { display:grid; } }
   .tracking-print-host { position:fixed; left:-10000px; top:0; width:720px; background:white; pointer-events:none; }
   @media print {
