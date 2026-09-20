@@ -43,7 +43,7 @@ function requireDatabase(db) {
 	return db;
 }
 
-export async function collectDueReminders({ asOf, asOfDate, db, directory } = {}) {
+export async function collectDueReminders({ asOf, asOfDate, db, directory, onCandidates } = {}) {
 	db = requireDatabase(db);
 	const instant = normaliseAsOf(asOf, asOfDate);
 	const asOfIso = instant.toISOString();
@@ -78,6 +78,7 @@ export async function collectDueReminders({ asOf, asOfDate, db, directory } = {}
 			AND ?::timestamptz < triggerAt + INTERVAL '1 day'
 		ORDER BY scheduledFor, ruleId, targetId, periodId
 	`).all(asOfIso, asOfIso);
+	onCandidates?.(rows.length);
 	const people = rows.length ? await directory() : [];
 	const accounts = new Map(people.filter(person => person.active).map(person => [person.id, person]));
 	const reminders = [];
@@ -114,7 +115,8 @@ export async function collectDueReminders({ asOf, asOfDate, db, directory } = {}
 export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, config = process.env, directory } = {}) {
 	db = requireDatabase(db);
 	const instant = normaliseAsOf(asOf, asOfDate);
-	const reminders = await collectDueReminders({ asOf: instant, db, directory: directory ?? (() => createDirectory(config).people()) });
+	let candidateCount = 0;
+	const reminders = await collectDueReminders({ asOf: instant, db, directory: directory ?? (() => createDirectory(config).people()), onCandidates: count => { candidateCount = count; } });
 	const messenger = config.MESSENGER;
 	const results = [];
 	const existingRows = reminders.length ? await db.prepare(`
@@ -207,5 +209,5 @@ export async function sendDueReminders({ asOf, asOfDate, dryRun = false, db, con
 			sent_at: delivery.sentAt
 		}))));
 	}
-	return { asOf: instant.toISOString(), asOfDate: isoDate(instant), dryRun: dryRun || !messenger, count: reminders.length, results };
+	return { asOf: instant.toISOString(), asOfDate: isoDate(instant), dryRun: dryRun || !messenger, count: reminders.length, candidateCount, results };
 }

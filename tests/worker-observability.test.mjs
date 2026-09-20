@@ -8,7 +8,7 @@ test('Worker tracing is explicitly enabled and persisted without changing logs o
   assert.deepEqual(config.observability.logs, { head_sampling_rate: 1 });
   assert.deepEqual(config.observability.traces, {
     enabled: true,
-    head_sampling_rate: 1,
+    head_sampling_rate: 0.1,
     persist: true,
   });
 });

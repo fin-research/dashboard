@@ -44,6 +44,7 @@
 | Gateway、Auth0、权限、Secret | [SECURITY](SECURITY.md)；权限发布读 [UNIFIED_PERMISSIONS](UNIFIED_PERMISSIONS.md) | [共享架构身份所有权](../../eastmoney/docs/ARCHITECTURE.md#身份与授权所有权) |
 | AI 调用 | 目标模块 Prompt / Schema | [共享 AI](../../eastmoney/docs/AI.md) |
 | 开发、测试、Git、发布 | [DEVELOPMENT](DEVELOPMENT.md) | 项目组 AGENTS 的并行规则 |
+| Neon / Cloudflare 用量、额度与性能基线 | [云资源审计 2026-09-21](operations/cloud-resource-audit-2026-09-21.md) | 共享存储所有权 |
 
 ## 文档所有权
 
