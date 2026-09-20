@@ -17,6 +17,19 @@ test('desktop liability report retains six complete pages with readable charts',
     expect(await sheet.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
     await expect(sheet).toHaveScreenshot(snapshots[index]);
   }
+  const peerChart=page.getByRole('region',{name:'可比券商申报及发行',exact:true}).locator('.chart-host');
+  const legend=(name)=>peerChart.locator('svg').getByText(name,{exact:true});
+  await legend('公募债').click();
+  await expect(peerChart).toHaveAttribute('aria-label',/表示合计的柱状图，其数据是——广发证券的数据是180，0/);
+  await expect(peerChart.locator('svg').getByText('232',{exact:true})).toHaveCount(0);
+  await expect.poll(()=>peerChart.locator('svg').getByText('180',{exact:true}).last().evaluate(el=>Number(el.getAttribute('fill-opacity')??1))).toBe(1);
+  for(const name of ['次级债','短期公司债','短期融资券']) await legend(name).click();
+  await expect(peerChart).toBeVisible();
+  await expect(legend('公募债')).toBeVisible();
+  await legend('公募债').click();
+  await expect(peerChart).toHaveAttribute('aria-label',/表示合计的柱状图，其数据是——广发证券的数据是52，0/);
+  for(const name of ['次级债','短期公司债','短期融资券']) await legend(name).click();
+  await expect(peerChart).toHaveAttribute('aria-label',/表示合计的柱状图，其数据是——广发证券的数据是232，0/);
   await page.getByRole('link',{name:'公募债',exact:true}).click();
   await expect(page).toHaveURL(/\/financing\/debts\/1$/);
 });

@@ -66,7 +66,7 @@ function getResizeObserver(): ResizeObserver | null {
   return resizeObserver;
 }
 
-export function setChart(host: HTMLElement, option: ChartOption): void {
+export function setChart(host: HTMLElement, option: ChartOption): ChartInstance {
   let chart = instances.get(host);
   if (!chart) {
     host.replaceChildren();
@@ -91,6 +91,7 @@ export function setChart(host: HTMLElement, option: ChartOption): void {
     : boundedOption;
   chart.setOption(resolvedOption, { notMerge: true });
   setChartBounds(host, chart);
+  return chart;
 }
 
 export function seriesLineSegments(

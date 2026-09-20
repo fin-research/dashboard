@@ -32,3 +32,15 @@ export const issuanceTrendColors: Record<(typeof issuanceTrendTypes)[number], st
 export function liabilityTypeColor(type: string | null | undefined, index = 0) {
 	return liabilityTypeColors[String(type ?? '')] ?? fallbackColors[index % fallbackColors.length];
 }
+
+export function visibleStackedTotals(
+	rows: Array<{ label: string; type: string; value: number }>,
+	labels: string[],
+	types: string[],
+	selected: Record<string, boolean> = {}
+) {
+	const visibleTypes = new Set(types.filter((type) => selected[type] !== false));
+	return labels.map((label) => rows
+		.filter((row) => row.label === label && visibleTypes.has(row.type))
+		.reduce((sum, row) => sum + Number(row.value ?? 0), 0));
+}

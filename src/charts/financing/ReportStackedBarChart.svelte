@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ChartHost from '../../components/ChartHost.svelte';
-	import { liabilityTypeColor } from './report';
+	import { setChart, type ChartOption } from '../charting';
+	import { liabilityTypeColor, visibleStackedTotals } from './report';
 
 	let {
 		title,
@@ -20,7 +21,8 @@
 		highlightLabel?: string;
 	} = $props();
 
-	const totals = $derived(labels.map((label) => rows.filter((row) => row.label === label).reduce((sum, row) => sum + Number(row.value ?? 0), 0)));
+	let selected = $state<Record<string, boolean>>({});
+	const totals = $derived(visibleStackedTotals(rows, labels, types, selected));
 	const maximumTotal = $derived(Math.max(0, ...totals));
 	const barSeries = $derived(types.map((type, index) => ({
 		name: type,
@@ -28,7 +30,7 @@
 		stack: 'total',
 		barMaxWidth: horizontal ? 24 : 44,
 		itemStyle: { color: liabilityTypeColor(type, index) },
-		emphasis: { focus: 'series' },
+		emphasis: { focus: 'none' },
 		label: horizontal ? {
 			show: true,
 			position: 'inside',
@@ -52,6 +54,7 @@
 			position: horizontal ? 'right' : 'top',
 			distance: horizontal ? 8 : 4,
 			formatter: (params: any) => {
+				if (Number(params.value) === 0) return '';
 				const value = formatAmount(params.value);
 				if (horizontal && isHighlighted(labels[params.dataIndex])) return `{highlight|${value}}`;
 				if (!horizontal && Number(params.value) === maximumTotal) return `{maximum|${value}}`;
@@ -68,7 +71,7 @@
 	const option = $derived({
 		aria: { enabled: true, decal: { show: false } },
 		tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (value: unknown) => `${Number(value).toFixed(2)} 亿元` },
-		legend: { type: 'scroll', bottom: 0, data: types, textStyle: { color: '#334155', fontSize: 12 } },
+		legend: { type: 'scroll', bottom: 0, data: types, selected, textStyle: { color: '#334155', fontSize: 12 } },
 		grid: horizontal
 			? { left: 12, right: 36, top: 16, bottom: 48, containLabel: true }
 			: { left: 16, right: 10, top: 28, bottom: 58, containLabel: true },
@@ -101,6 +104,17 @@
 		}]
 	});
 
+	function onLegendChange(event: unknown) {
+		const selection = event as { selected: Record<string, boolean> };
+		selected = { ...selection.selected };
+	}
+
+	function renderChart(host: HTMLElement, chartOption: ChartOption) {
+		const chart = setChart(host, chartOption);
+		chart.off('legendselectchanged', onLegendChange);
+		chart.on('legendselectchanged', onLegendChange);
+	}
+
 	function compactLabel(label: string) {
 		if (!/^\d{4}-\d{2}$/.test(label)) return label;
 		const [year, month] = label.split('-');
@@ -120,8 +134,8 @@
 	}
 </script>
 
-{#if labels.length && totals.some((value) => value > 0)}
-	<ChartHost {option} ariaLabel={title} height={height / 16} />
+{#if labels.length && rows.some((row) => row.value > 0)}
+	<ChartHost {option} renderer={renderChart} ariaLabel={title} height={height / 16} />
 {:else}
 	<div class="chart-empty">暂无可靠分类数据</div>
 {/if}
