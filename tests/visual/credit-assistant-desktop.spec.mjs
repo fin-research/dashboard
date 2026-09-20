@@ -47,7 +47,7 @@ test('desktop assistant failed answer can be retried without losing the question
  await expect(page.getByRole('region',{name:'结果',exact:true})).not.toContainText('corpusVersion');
  await expect(page.getByRole('region',{name:'结果',exact:true})).toHaveScreenshot('credit-assistant-result.png');
  await page.getByRole('button',{name:'关闭 AI 面板',exact:true}).click();
- await expect(page.getByText(assistantSession.turns[0].answer.paragraphs[0].text,{exact:false})).toBeVisible();
+ await expect(page.getByRole('log',{name:'对话记录',exact:true}).getByText(assistantSession.turns[0].answer.paragraphs[0].text,{exact:false})).toBeVisible();
  expect(sentQuestion).toBe(assistantRunning.pendingQuestion);
  await expect(page.getByRole('button',{name:'重新发送',exact:true})).toHaveCount(0);
 });

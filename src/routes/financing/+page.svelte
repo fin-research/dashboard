@@ -109,7 +109,7 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 		{
 			label: '1年以内短期负债占净资本', shortLabel: '短期负债 / 净资本', value: ratioText(dashboard.metrics.shortDebtRatio),
 			tone: ratioTone(dashboard.metrics.shortDebtRatio, 100),
-			limit: '100%', detailLabel: '短期负债', detailValue: `${dashboard.metrics.shortDebtYi.toFixed(2)}亿元`
+			limit: '100%', detailLabel: '短债', detailValue: `${dashboard.metrics.shortDebtYi.toFixed(2)}亿元`
 		},
 		{
 			label: '新增单笔借款较证券上年末净资产', shortLabel: '单笔 / 证券净资产', value: ratioText(dashboard.metrics.largestBorrowingRatio),
