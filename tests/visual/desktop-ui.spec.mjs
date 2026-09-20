@@ -103,9 +103,10 @@ test('desktop financing data has balanced metrics and a compact financial editor
   const dialog=page.getByRole('dialog',{name:'编辑月度财务数据',exact:true});
   const capital=dialog.getByRole('spinbutton',{name:'净资本（亿元）',exact:true});
   await expect(capital).toHaveValue('800');
-  const assets=dialog.getByRole('spinbutton',{name:'证券净资产（亿元）',exact:true});
-  const ca=await capital.boundingBox(),as=await assets.boundingBox();
-  expect(Math.abs(ca.y-as.y)).toBeLessThanOrEqual(1);
+  // Read both fields in one frame: the dialog may still be entering.
+  const rowDelta=await dialog.getByRole('spinbutton').evaluateAll(inputs=>
+    Math.abs(inputs[0].getBoundingClientRect().y-inputs[1].getBoundingClientRect().y));
+  expect(rowDelta).toBeLessThanOrEqual(1);
   await expect(page).toHaveScreenshot('financing-data-edit.png',{fullPage:true});
   await dialog.getByRole('button',{name:'取消',exact:true}).click();
   await expect(dialog).not.toBeVisible();
