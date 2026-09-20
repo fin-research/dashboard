@@ -25,7 +25,7 @@ body:has(.tr-workbench) {
   --tr-surface: var(--bg-card);
   --tr-surface-muted: var(--panel);
   --tr-primary: var(--color-primary);
-  --tr-primary-deep: #245bb2;
+  --tr-primary-deep: var(--brand-deep);
   --tr-primary-soft: var(--color-primary-soft);
   --tr-text: var(--text-1);
   --tr-text-2: var(--text-2);
@@ -43,6 +43,7 @@ body:has(.tr-workbench) {
   --tr-shadow: var(--shadow-card);
   --tr-radius-card: var(--radius-card);
   --tr-radius-control: var(--radius-control);
+  --tr-nav-radius: 12px;
   --tr-motion: 200ms ease;
   height: 100%;
   min-height: 0;
@@ -138,13 +139,12 @@ body:has(.tr-workbench) {
   overflow: hidden;
   border-right: 1px solid var(--tr-border);
   background: var(--tr-surface);
-  box-shadow: 8px 0 24px rgba(23, 32, 51, 0.035);
 }
 
 .tr-sidebar-toggle,
 .tr-mobile-menu,
 .tr-portal-link {
-  border-radius: var(--tr-radius-control);
+  border-radius: var(--tr-nav-radius);
 }
 
 .tr-sidebar-toggle,
@@ -153,6 +153,7 @@ body:has(.tr-workbench) {
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
+  padding: 0;
   place-items: center;
 }
 
@@ -168,7 +169,7 @@ body:has(.tr-workbench) {
   min-height: 0;
   flex-direction: column;
   gap: 6px;
-  padding: 14px 12px;
+  padding: 16px 12px;
   overflow-y: auto;
 }
 
@@ -180,8 +181,8 @@ body:has(.tr-workbench) {
   gap: 12px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: var(--tr-radius-control);
-  color: var(--tr-muted);
+  border-radius: var(--tr-nav-radius);
+  color: var(--tr-text-2);
   text-decoration: none;
   transition: color var(--tr-motion), border-color var(--tr-motion), background var(--tr-motion);
 }
@@ -198,23 +199,13 @@ body:has(.tr-workbench) {
   font-weight: bold;
 }
 
-.tr-drawer__nav a.active::before {
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: -1px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--tr-primary);
-  content: "";
-}
-
 .tr-nav-icon {
   display: grid;
   width: 24px;
   height: 24px;
   flex: 0 0 24px;
   place-items: center;
+  color: var(--tr-primary-deep);
 }
 
 .tr-nav-icon svg {
@@ -224,7 +215,7 @@ body:has(.tr-workbench) {
 
 .tr-nav-label {
   min-width: 0;
-  font-size: 0.9375rem;
+  font-size: 1rem;
   white-space: nowrap;
 }
 
@@ -1993,5 +1984,5 @@ body:has(.tr-workbench) {
   }
 }
 
-.tr-navigation-list { width: 100%; gap: 6px; padding: 0; }
+.tr-navigation-list { display: grid; align-content: start; width: 100%; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .tr-navigation-list li { min-width: 0; }

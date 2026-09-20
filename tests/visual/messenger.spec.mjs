@@ -7,6 +7,16 @@ test('消息记录、尝试明细和不确定结果重试确认',async({page})=>
   await expect(page.getByRole('region',{name:'消息记录'})).toBeVisible();
   await expect(page.getByRole('region',{name:'发送尝试'})).toContainText('EMAIL_RATE_LIMIT');
   await expect(page.getByText('<p>节点提醒</p>',{exact:true})).toBeVisible();
+  const longSubject = page.locator('.subject').filter({ hasText: 'economic-indicator-sync' });
+  await expect(longSubject).toBeVisible();
+  expect(await longSubject.evaluate(cell => {
+    const range = document.createRange();
+    range.selectNodeContents(cell.querySelector('a'));
+    const box = cell.getBoundingClientRect();
+    const fragments = [...range.getClientRects()];
+    return fragments.length > 1 && fragments.every(rect => rect.left >= box.left && rect.right <= box.right + 1 && rect.bottom <= box.bottom + 1);
+  })).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await expect(page).toHaveScreenshot('messenger.png',{fullPage:true});
   await page.getByRole('button',{name:'重试 中国央行：开展公开市场操作',exact:true}).click();
   await expect(page.getByRole('alertdialog')).toContainText('重试可能重复发送');
