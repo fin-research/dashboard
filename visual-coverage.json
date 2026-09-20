@@ -47,11 +47,13 @@
     },
     {
       "source": "src/routes/financing/+page.svelte",
-      "exemption": "融资工作台生产页未接入 visual harness"
+      "exemption": "融资仪表盘完整页面未接入 harness；本轮仅以 financing-presets 组件场景检查预设文字和筛选，不代表整页覆盖"
     },
     {
       "source": "src/routes/financing/bond-investors/+page.svelte",
-      "exemption": "权限 gated 数据页，未建浏览器夹具"
+      "scenarios": [
+        "financing-investors"
+      ]
     },
     {
       "source": "src/routes/financing/data/+page.svelte",
@@ -61,7 +63,9 @@
     },
     {
       "source": "src/routes/financing/debts/[id]/+page.svelte",
-      "exemption": "服务端负债详情，未建浏览器夹具"
+      "scenarios": [
+        "financing-debt"
+      ]
     },
     {
       "source": "src/routes/financing/liability-report/+page.svelte",
@@ -356,7 +360,7 @@
       "id": "research",
       "url": "/trading-research/research",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "常规和丰富历史数据；桌面主图/小图日期刻度及指标卡",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -367,6 +371,17 @@
           ],
           "snapshots": [
             "research.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/research-audit.spec.mjs",
+          "test": "desktop research history keeps main and small time axes readable",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "research-rates-history.png",
+            "research-prices-history.png"
           ]
         }
       ]
@@ -842,6 +857,62 @@
           "snapshots": [
             "financing-data.png",
             "financing-data-edit.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-investors",
+      "url": "/financing/bond-investors",
+      "kind": "screenshot",
+      "state": "桌面筛选标签、排序、独立品种及空范围",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-layout.spec.mjs",
+          "test": "desktop investor filters remain horizontal and update independent distributions",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "investor-filters.png",
+            "investor-distribution.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-debt",
+      "url": "/financing/debts/1",
+      "kind": "screenshot",
+      "state": "桌面核心字段、单行现金流与完整字段排列",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-layout.spec.mjs",
+          "test": "desktop debt details group secondary fields beneath cashflows",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "debt-details.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-presets",
+      "url": "/financing/filters",
+      "kind": "screenshot",
+      "state": "仅实际筛选组件；长预设可见和两组选择独立，不覆盖完整仪表盘",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-layout.spec.mjs",
+          "test": "desktop financing presets show complete labels and retain selections",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "overview-preset.png",
+            "calendar-preset.png"
           ]
         }
       ]

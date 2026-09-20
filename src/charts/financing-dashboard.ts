@@ -12,14 +12,14 @@ export const financingChartCommon = {
 };
 const common = financingChartCommon;
 
-export function financingCompositionOption(rows: Array<{ type: string; amountYi: number }>): ChartOption {
+export function financingCompositionOption(rows: Array<{ type: string; amountYi: number }>, compactLabels = false): ChartOption {
   return {
     ...common,
     tooltip: { ...common.tooltip, trigger: 'item', valueFormatter: (value: number) => `${value.toFixed(2)}亿元` },
-    legend: { type: 'scroll', bottom: 0, textStyle: { fontSize: 16 } },
-    series: [{ type: 'pie', radius: ['38%', '65%'], center: ['50%', '44%'],
-      label: { formatter: '{b}\n{d}%', fontSize: 16, overflow: 'break' },
-      data: rows.map(row => ({ name: row.type, value: row.amountYi })) }],
+    legend: { type: compactLabels ? 'plain' : 'scroll', bottom: 0, left: compactLabels ? 8 : undefined, right: compactLabels ? 8 : undefined, textStyle: { fontSize: 16 } },
+    series: [{ type: 'pie', radius: compactLabels ? ['30%', '52%'] : ['38%', '65%'], center: ['50%', compactLabels ? '40%' : '44%'],
+      label: { formatter: '{b}\n{d}%', fontSize: 16, overflow: compactLabels ? 'none' : 'break', ...(compactLabels ? { alignTo: 'edge', edgeDistance: 8 } : {}) },
+      data: rows.filter(row => !compactLabels || row.amountYi > 0).map(row => ({ name: row.type, value: row.amountYi })) }],
   };
 }
 
