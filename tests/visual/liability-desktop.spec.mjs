@@ -9,14 +9,18 @@ test('desktop liability report retains six complete pages with readable charts',
   const pages=page.locator('.report-page');
   await expect(pages).toHaveCount(6);
   await expect(page.getByRole('button',{name:'导出 PDF',exact:true})).toBeEnabled();
+  // A4 sheets must fit inside the real scrolling workspace for complete captures.
+  await page.setViewportSize({width:1280,height:1600});
   const snapshots=['liability-page-1.png','liability-page-2.png','liability-page-3.png','liability-page-4.png','liability-page-5.png','liability-page-6.png'];
   for(let index=0;index<6;index++){
     const sheet=pages.nth(index);
     await sheet.scrollIntoViewIfNeeded();
+    await expect(sheet).toBeInViewport({ratio:1});
     await expect(sheet.getByText(`第 ${index+1} 页 · 共 6 页`,{exact:true})).toBeVisible();
     expect(await sheet.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
     await expect(sheet).toHaveScreenshot(snapshots[index]);
   }
+  await page.setViewportSize({width:1280,height:900});
   const peerChart=page.getByRole('region',{name:'可比券商申报及发行',exact:true}).locator('.chart-host');
   const legend=(name)=>peerChart.locator('svg').getByText(name,{exact:true});
   await legend('公募债').click();

@@ -32,7 +32,10 @@ test('desktop workflow exposes complete inquiry labels and reachable node settin
  await editor.getByText('节点设置',{exact:true}).click();
  await expect(editor.getByRole('group',{name:'节点图标',exact:true})).toBeVisible();
  await expect(editor.getByRole('combobox',{name:'节点类型',exact:true})).toBeVisible();
+ await page.setViewportSize({width:1280,height:1600});
+ await editor.locator('.editor-advanced').scrollIntoViewIfNeeded();await expect(editor.locator('.editor-advanced')).toBeInViewport({ratio:1});
  await expect(editor.locator('.editor-advanced')).toHaveScreenshot('workflow-node-settings-desktop.png');
+ await page.setViewportSize({width:1280,height:900});
  await region.press('End');expect(await region.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);
  await editor.getByRole('combobox',{name:'编辑节点',exact:true}).selectOption('reverse-confirm');
  await expect.poll(()=>page.evaluate(()=>{const outer=document.querySelector('.flow-scroll').getBoundingClientRect(),node=document.querySelector('.workflow-node.chosen').getBoundingClientRect();return node.left>=outer.left-1&&node.right<=outer.right+1;})).toBe(true);
