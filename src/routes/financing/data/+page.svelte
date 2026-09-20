@@ -31,6 +31,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 <style>
 	.data-page { padding-bottom: 5.5rem; }
+	@media (min-width: 901px) { .data-page { display: grid; gap: 1.5rem; } }
 	:global(.permission-empty) { padding: 1.25rem; }
 	:global(.permission-empty) h2 { margin: 0; }
 	:global(.permission-empty) p { margin: 0.5rem 0 0; color: #475467; }

@@ -12,3 +12,4 @@ export function goto(url) { window.location.assign(String(url)); return Promise.
 export function beforeNavigate(_callback) {}
 
 export function invalidate() { return Promise.resolve(); }
+export function invalidateAll() { return Promise.resolve(); }

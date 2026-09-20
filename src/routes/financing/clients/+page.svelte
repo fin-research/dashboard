@@ -4,6 +4,7 @@
   import ModuleCard from '../../../components/ModuleCard.svelte';
   import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { NativeSelect } from '$lib/components/ui/native-select/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import * as Table from '$lib/components/ui/table/index.js';
@@ -45,7 +46,7 @@
       <input type="hidden" name="id" value={editing.id??''}/><input type="hidden" name="version" value={editing.version??''}/>
       <label for="client-name">客户名称</label><Input id="client-name" name="name" value={editing.name??''} required maxlength={500}/>
       <label for="client-fullname">全称</label><Input id="client-fullname" name="fullname" value={editing.fullname??''} maxlength={500}/>
-      <label for="client-type">类型</label><select class="ui-select" id="client-type" name="type" value={editing.type}>{#each clientTypes as type}<option value={type}>{type}</option>{/each}</select>
+      <label for="client-type">类型</label><NativeSelect id="client-type" name="type" value={editing.type}>{#each clientTypes as type}<option value={type}>{type}</option>{/each}</NativeSelect>
       <label for="client-subtype">子类</label><Input id="client-subtype" name="subtype" value={editing.subtype??''} maxlength={100}/>
       <label for="client-aliases">别名（每行一个）</label><Textarea id="client-aliases" name="aliases" value={editing.aliases?.join('\n')??''} rows={5}/>
       {#if formError}<p role="alert">{formError}</p>{/if}
@@ -56,5 +57,9 @@
 <style>
   .client-toolbar,.client-toolbar form,.client-pagination,.client-actions{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
   .client-toolbar{justify-content:space-between;margin-block:1rem}.client-pagination{justify-content:flex-end;margin-top:1rem}
+  @media(min-width:901px){
+    .client-toolbar form{flex:0 1 34rem;flex-wrap:nowrap;min-width:0}
+    .client-toolbar form :global(input){flex:1 1 0;min-width:0}
+  }
   .client-form{display:grid;gap:.75rem}.client-actions{justify-content:flex-end;margin-top:1rem}.client-form p{color:var(--red)}
 </style>
