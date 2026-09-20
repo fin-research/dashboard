@@ -1164,6 +1164,37 @@ h2 {
   }
 }
 
+@media (min-width: 901px) {
+  .page-shell .primary-table :is(th, td),
+  .page-shell .secondary-table :is(th, td) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+  }
+
+  .page-shell .equity-value__name,
+  .page-shell .summary-strip__item span {
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+  }
+
+  .page-shell .equity-value__name { grid-column: 1 / -1; }
+  .page-shell .equity-value__numbers { grid-row: 1; }
+  .page-shell .primary-table th,
+  .page-shell .primary-table td:first-child,
+  .page-shell .primary-table td:nth-child(2),
+  .page-shell .primary-table td:nth-child(n + 4) { white-space: nowrap; }
+}
+
+@media (min-width: 901px) and (max-width: 1600px) {
+  .page-shell .equity-value strong,
+  .page-shell .equity-value small { font-size: 1rem; }
+  .page-shell .summary-strip__item span { font-size: .875rem; }
+  .page-shell .summary-strip__item strong { font-size: 1rem; }
+}
+
 @media (max-height: 900px) {
   #report-surface {
     grid-template-rows: 40px minmax(0, 1fr);
