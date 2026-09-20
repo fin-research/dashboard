@@ -26,10 +26,8 @@ jobs:
       - run: pnpm test:visual:update
         env:
           VISUAL_COVERAGE_GATE: '1'
-      - name: Compare candidates without updating
-        run: pnpm test:visual
-        env:
-          VISUAL_COVERAGE_GATE: '1'
+      # Review/import this candidate, then require the ordinary merge-group
+      # comparison. Repeating the full suite here adds no merge acceptance.
       - run: node scripts/visual-baselines.mjs record
       - uses: actions/upload-artifact@v4
         with:

@@ -47,6 +47,9 @@
 - 本地推送前必须通过 `pnpm check:quick`（差异、Svelte/应用及 Worker 类型检查）；逻辑变更或缺陷修复还须运行直接相关的轻量单元测试，不等待云端首次发现简单错误。纯文档修改只需 `git diff --check`。完整验收保留在 GitHub Actions：任务分支 push 不触发 CI，PR 更新只核验合并队列门禁；准备合并时进入 GitHub merge queue，在最新 main 与队列改动的合并结果上运行 `Dashboard CI`（类型、Python、Node 单元/覆盖率、构建、Playwright 浏览器组件集成测试及截图比较），合并后不重复跑全量 CI。本地默认不重复全量覆盖率、浏览器截图或生产构建，排障需要时可运行；本地通过不能替代当前提交的 CI 通过。
 - 每次改完代码后派一个新的子代理负责提交/推送任务分支、创建或更新 PR、加入合并队列并核对最终合并组提交的 CI；推送与 CI 核验属于子代理执行职责。子代理不修改业务代码，失败时返回运行链接和日志，由主代理修复后重新委派。禁止直接推送 `main` 或绕过必需检查；完整流程见 [DEVELOPMENT](docs/DEVELOPMENT.md)。
 
+
+CI 等待统一使用 `node scripts/wait-ci.mjs <owner/repo> <run-id> <full-sha> <event>`；一个运行只启动一次等待，主代理不并行轮询，终态齐备立即结束。候选只生成一次，审阅导入后由普通 CI 严格比较；具体超时、失败和停止条件见 [CI 等待与收尾](docs/TESTING.md#ci-等待与收尾2026-09-20)。
+
 ## Commands
 
 - 安装：`pnpm install`
