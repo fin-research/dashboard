@@ -49,3 +49,7 @@
 Dashboard 不持有 `AUTHORIZATION_DB` 或 Auth0 管理 Secret。`/management/people` 经私有 Gateway 服务读取缓存中的角色授权，只读展示并链接 Auth0 管理。个人页与角色页复用 scope/resource/action 权限组件；个人 `GET /auth/permissions` 获取自己的缓存权限，管理员 `POST /auth/permissions/refresh` 在同源及权限检查后更新当前 Cloudflare 节点缓存。其他节点最长 1 小时后按需更新。角色与权限以 Auth0 为唯一来源，内测所有用户持有基础 authenticated 角色，全部角色授予全部本站权限。
 
 融资数据后台继续使用表/字段白名单、参数化 SQL、完整主键与乐观条件。事务用 Gateway 已确认的 Auth0 ID、permissions 和 operation 设置 `request.auth.*` 后 `SET LOCAL ROLE authenticated`；提交/回滚清除上下文。RLS 保留 read/create/update/delete 及记录归属约束，不接受浏览器提供的权限集合。
+
+## MCP 业务调用
+
+`/api/mcp` 仅消费 Gateway 已验证用户，目录与每次执行通过 IDENTITY 私有桥接向 Gateway 查询真实路由权限，再执行原业务接口；不使用前端权限契约代替服务端授权。详见 [MCP](MCP.md)。
