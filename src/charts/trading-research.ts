@@ -467,6 +467,7 @@ export function renderLiquidityRateChart(
       boundaryGap: false,
       axisLabel: {
         ...axisLabel,
+        hideOverlap: true,
         formatter: (value: number) => {
           const date = new Date(value);
           return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;

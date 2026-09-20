@@ -88,6 +88,7 @@
         },
         signal: request.signal,
         parse: (value) => value as HotspotApiResponse,
+        resultText: value => [value.marketSummary, ...value.hotspots.map(item => `${item.keyword}\n${item.explanation}`)].filter(Boolean).join('\n\n'),
       });
       data = payload;
       syncScopeControls(payload.scope);
@@ -253,7 +254,6 @@
           <div id="hotspot-scope-panel" class="scope-panel">
             <div class="scope-panel__header">
               <div>
-                <span>EVIDENCE WINDOW</span>
                 <h2>配置证据范围</h2>
               </div>
               <Button data-ui-owner="lib-pages-MarketHotspotsPage-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭配置" onclick={closeConfiguration}>
@@ -358,7 +358,7 @@
       </section>
 
       {#if selected}
-        <Modal open aria-label={`${selected.keyword}热点详情`} onclose={closeDetails} class="p-0 gap-0 min-w-0 w-[min(30rem,calc(100vw-2rem))] sm:max-w-[30rem]">
+        <Modal open aria-label={`${selected.keyword}热点详情`} onclose={closeDetails} class="hotspot-detail-dialog p-0 gap-0 min-w-0 w-[min(30rem,calc(100vw-2rem))] sm:max-w-[30rem]">
         <div class="detail-panel">
           <div class="detail-header">
             <div>
@@ -637,6 +637,7 @@
   :global(.scope-field input[data-ui-owner="lib-pages-MarketHotspotsPage-svelte"]) {
     width: 100%;
     padding: 0 11px;
+    font-weight: normal;
   }
 
   .number-field {
@@ -1177,5 +1178,10 @@
     .range-fields { grid-template-columns: minmax(0, 1fr); }
     .summary-heading { grid-template-columns: minmax(0, 1fr); }
     .summary-heading > span { justify-self: start; min-height: 32px; padding: 4px 12px; letter-spacing: 0; }
+  }
+  @media (min-width: 901px) {
+    :global(.hotspot-detail-dialog) { width: 42rem; max-width: calc(100vw - 3rem); }
+    .detail-section { margin-top: 20px; padding-top: 14px; }
+    .explanation { margin-top: 16px; }
   }
 </style>

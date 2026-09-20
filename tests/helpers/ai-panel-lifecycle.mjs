@@ -24,7 +24,7 @@ const Host = await loadComponent("tests/helpers/AiPanelHost.svelte", `<script>
   import AiPanel from "../../src/lib/AiPanel.svelte";
   import { createAiClient, provideAiClient } from "../../src/lib/ai-client.svelte";
   const client = provideAiClient(createAiClient());
-  export function run(title = "测试分析") { return client.run({ title, url: "/api/test-ai", parse: value => value }); }
+  export function run(title = "测试分析") { return client.run({ title, url: "/api/test-ai", parse: value => value, resultText: value => value.ok === true ? "材料核对完成。" : "比较结果已生成。" }); }
 </script>
 <AiPanel {client} />`);
 
@@ -68,7 +68,8 @@ streams[1].emit("result", { ok: "second" });
 assert.deepEqual(await secondPending, { ok: "second" });
 await settle();
 assert.ok(document.querySelector("#global-ai-panel"), "the panel remains open after completion");
-assert.match(document.querySelector(".ai-result").textContent, /"ok": "second"/);
+assert.match(document.querySelector(".ai-result").textContent, /比较结果已生成。/);
+assert.doesNotMatch(document.querySelector(".ai-result").textContent, /"ok"/);
 assert.match(document.querySelector(".ai-task-detail").textContent, /已完成/);
 assert.equal(streams[1].cancelled, true);
 assert.match(get(globalMessages).at(-1)?.message ?? "", /第二任务已生成/);
@@ -83,7 +84,7 @@ assert.match(document.querySelector(".ai-task-list").textContent, /测试分析.
 assert.match(document.querySelector(".ai-task-list").textContent, /第二任务.*已完成/s);
 document.querySelector("[aria-label='查看测试分析']").click();
 await settle();
-assert.match(document.querySelector(".ai-result").textContent, /"ok": true/);
+assert.match(document.querySelector(".ai-result").textContent, /材料核对完成。/);
 
 document.querySelector(".ai-panel-close").click();
 await settle();

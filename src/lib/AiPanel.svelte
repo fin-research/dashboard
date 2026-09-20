@@ -57,9 +57,8 @@
     return task.status === "running" ? "正在处理" : status(task);
   }
 
-  function resultText(value: unknown): string {
-    if (typeof value === "string") return value;
-    return JSON.stringify(value, null, 2) ?? String(value);
+  function resultText(task: AiTaskRecord): string {
+    return task.displayResult ?? (typeof task.result === 'string' ? task.result : '');
   }
 
   function motionDuration(duration: number): number {
@@ -146,10 +145,10 @@
               <p class="ai-task-error" role="alert">{selectedTask.error}</p>
             {/if}
 
-            {#if selectedTask.result !== undefined}
+            {#if resultText(selectedTask)}
               <section class="ai-result" aria-labelledby={`ai-result-title-${selectedTask.id}`} in:fade|local={{ duration: motionDuration(220) }}>
                 <h3 id={`ai-result-title-${selectedTask.id}`}>结果</h3>
-                <pre>{resultText(selectedTask.result)}</pre>
+                <div class="ai-result-text">{resultText(selectedTask)}</div>
               </section>
             {/if}
           </article>
@@ -234,7 +233,7 @@
   .ai-task-error { margin: 18px 0 0; color: var(--destructive); line-height: 1.6; }
   .ai-result { margin-top: 24px; }
   .ai-result h3 { margin: 0 0 12px; font-size: 1rem; font-weight: bold; }
-  .ai-result pre { margin: 0; padding: 16px; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--border-color); border-radius: var(--radius-control); background: color-mix(in srgb, var(--brand-soft) 22%, var(--surface)); color: var(--text-1); font: inherit; line-height: 1.65; }
+  .ai-result-text { margin: 0; padding: 16px; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--border-color); border-radius: var(--radius-control); background: color-mix(in srgb, var(--brand-soft) 22%, var(--surface)); color: var(--text-1); font: inherit; line-height: 1.65; }
   .ai-empty { margin: 36px 0; color: var(--text-muted); text-align: center; }
   .ai-task-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
   .ai-task-list button { display: grid; width: 100%; min-height: 72px; gap: 8px; padding: 14px 12px 14px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-control); background: var(--surface); color: var(--text-1); font: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease; }

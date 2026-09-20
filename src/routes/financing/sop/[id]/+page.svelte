@@ -50,7 +50,7 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 	let handledForm = $state<unknown>(null);
 	let suppressFormFeedback = $state(false);
 	let addNodeDialog = $state<Modal>();
-	let addNodeNameInput = $state<HTMLInputElement>();
+	let addNodeNameInput = $state<HTMLInputElement | null>(null);
 	let reorderForm: HTMLFormElement;
 	let draggedNodeId = $state<string | null>(null);
 	let pointerId = $state<number | null>(null);
@@ -178,10 +178,11 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 		};
 	};
 
-	function openAddNode() {
+	async function openAddNode() {
 		if (!canManage) return;
 		addNodeDialog?.showModal();
-		queueMicrotask(() => addNodeNameInput?.focus());
+		await tick();
+		requestAnimationFrame(() => addNodeNameInput?.focus());
 	}
 
 	function announcePosition(nodeId: string) {
@@ -313,12 +314,11 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 				</header>
 				<div class="node-list">
 					{#each nodes as node, index (node.id)}
-						<article class:dragging={draggedNodeId === node.id} class:read-only={!canManage} class="node-card" data-node-id={node.id}>
+						<article class:dragging={draggedNodeId === node.id || keyboardGrabbedId === node.id} class:read-only={!canManage} class="node-card" data-node-id={node.id}>
 							<div class="node-order">
 								<strong>{index + 1}</strong>
-								<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="outline"
-
-									class={["ui-button drag-handle", keyboardGrabbedId === node.id && "grabbed"]}
+								<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant={keyboardGrabbedId === node.id ? "default" : "outline"}
+									class="ui-button drag-handle"
 									type="button"
 									aria-label={`拖拽排序 ${node.name}，当前第 ${index + 1} 项`}
 									aria-pressed={keyboardGrabbedId === node.id}
@@ -414,12 +414,11 @@ import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session'
 			<Plus size={23} />
 		</Button>
 
-		<Modal  bind:this={addNodeDialog}>
-<div class="dialog-body config-modal">
+		<Modal bind:this={addNodeDialog} aria-label="添加流程节点" class="w-[min(36rem,calc(100vw-3rem))]">
+<div class="dialog-body config-modal management-page">
 		<form method="post" action="?/addNode" use:enhance={enhanceForm('add-node', { resetOnSuccess: true, closeOnSuccess: true })}>
 			<div class="modal-header">
 				<div>
-					<p class="eyebrow">SOP NODE</p>
 					<h2>添加流程节点</h2>
 				</div>
 				<Button data-ui-owner="routes-financing-sop--id---page-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => addNodeDialog?.close()}><X size={18} /></Button>

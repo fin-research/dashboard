@@ -32,14 +32,30 @@ const moduleCardStyles = Object.values(clientManifest).filter(chunk => chunk.nam
 if (!moduleCardStyles.length) throw new Error('Missing production ModuleCard CSS for the schedule fixture');
 const map = {
   '/': stylesFor(layout, 'src/routes/+page.svelte'),
+  '/auth/verify-email': stylesFor(layout, 'src/routes/auth/verify-email/+page.svelte'),
   '/trading-research': stylesFor(layout, 'src/routes/trading-research/+page.svelte', 'src/routes/trading-research/[view]/+page.svelte'),
   '/credit-workbench': stylesFor(layout, 'src/routes/credit-workbench/[[view]]/+page.svelte'),
+  '/news': stylesFor(layout, 'src/routes/news/[id]/+page.svelte'),
+  '/articles': stylesFor(layout, 'src/routes/articles/[id]/+page.svelte'),
+  '/commentaries': stylesFor(layout, 'src/routes/commentaries/[id]/+page.svelte'),
   '/fund-report': stylesFor(layout, 'src/routes/fund-report/+page.svelte'),
   '/market-briefing': stylesFor(layout, 'src/routes/market-briefing/+page.svelte'),
+  '/management/people': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/people/+page.svelte'),
+  '/management/me': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/me/+page.svelte'),
+  '/management/notifications': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/notifications/+page.svelte'),
   '/management/messenger': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/messenger/+page.svelte'),
   '/management/permissions': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/permissions/+page.svelte'),
+  '/financing': stylesFor(layout, financing, 'src/routes/financing/+page.svelte'),
+  '/financing/projects/project-1': stylesFor(layout, financing, 'src/routes/financing/projects/[id]/+page.svelte'),
+  '/financing/projects': stylesFor(layout, financing, 'src/routes/financing/projects/+page.svelte'),
+  '/financing/liability-report': stylesFor(layout, financing, 'src/routes/financing/liability-report/+page.svelte'),
   '/financing/schedule': [...new Set([...stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte'), ...moduleCardStyles])],
+  '/financing/sop/short-term': stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte'),
+  '/financing/sop/reminders': stylesFor(layout, financing, 'src/routes/financing/sop/reminders/+page.svelte'),
   '/financing/sop': stylesFor(layout, financing, 'src/routes/financing/sop/+page.svelte'),
+  '/financing/bond-investors': stylesFor(layout, financing, 'src/routes/financing/bond-investors/+page.svelte'),
+  '/financing/debts': stylesFor(layout, financing, 'src/routes/financing/debts/[id]/+page.svelte'),
+  '/financing/filters': stylesFor(layout, financing, 'src/routes/financing/+page.svelte'),
   '/financing/data': stylesFor(layout, financing, 'src/routes/financing/data/+page.svelte'),
   '/financing/clients': stylesFor(layout, financing, 'src/routes/financing/clients/+page.svelte'),
   '/ui-contracts': stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte', 'src/routes/financing/debts/[id]/+page.svelte'),
@@ -47,6 +63,8 @@ const map = {
 const files = [...new Set(Object.values(map).flat())];
 if (!files.length || Object.values(map).some(styles => !styles.length)) throw new Error('Production stylesheets are empty');
 await cp('.svelte-kit/output/client/_app', 'visual-dist/_app', { recursive: true });
+// Match shipping static assets as well as route CSS; logos must not become broken-image placeholders.
+await cp('static', 'visual-dist', { recursive: true });
 const hashes = {};
 for (const file of files) {
   const original = await readFile(`.svelte-kit/output/client/${file}`);

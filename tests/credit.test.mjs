@@ -265,7 +265,8 @@ test("授信最终 schema、API 与页面使用规范表、日历和自动保存
   assert.doesNotMatch(view, /使用额度变动/);
   assert.match(view, /打印 \/ 导出 PDF/);
   assert.match(view, /label="30日内到期"/);
-  assert.match(view, /label="授信额度使用率"/);
+  assert.match(view, /label="额度使用率" value=\{report\.summary\.utilization\.toFixed\(1\)\} unit="%"/);
+  assert.match(view, /title="授信额度使用率"/);
   assert.match(view, /title="授信预警"/);
   assert.doesNotMatch(view, /高使用率机构|tr-result-count|一览表全口径|数据截至/);
   assert.doesNotMatch(metricCard, /research-metric-card__balance/);

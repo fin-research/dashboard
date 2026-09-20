@@ -70,7 +70,7 @@
         {#each flows as flow}<label class="editor-checkbox"><Checkbox checked={nodeFlowIds(selected, nodes).includes(flow.id)} disabled={!selected.flowIds.includes(flow.id) && nodeFlowIds(selected, nodes).includes(flow.id)} onCheckedChange={checked => setFlow(flow.id, checked)} />{flow.label}</label>{/each}
       </fieldset>
       <fieldset class="connection-fields"><legend>前序节点</legend>
-        {#each previous as node}<Button variant="ghost" type="button" onclick={() => onSelect(node.id)}>{flowLabel(node, nodes, flows)} · {node.title}</Button>{:else}<span>起点</span>{/each}
+        {#each previous as node}<Button variant="ghost" class="connection-link" type="button" onclick={() => onSelect(node.id)}>{flowLabel(node, nodes, flows)} · {node.title}</Button>{:else}<span>起点</span>{/each}
       </fieldset>
       <fieldset class="connection-fields"><legend>后续节点</legend>
         {#each selected.nextIds as id, index}
@@ -87,7 +87,7 @@
       <label>备注<Textarea data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" class={"ui-textarea"} maxlength={1200} rows={4} bind:value={selected.detail}></Textarea></label>
       <Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="default" class={"ui-button  editor-save"} type="button" onclick={onSave}>{disabled ? '保存中…' : '保存'}</Button>
       <div class="editor-actions"><Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="destructive" type="button" class={"ui-button  "} onclick={() => selected && remove(selected)}>删除节点</Button><Button data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte" variant="outline" type="button" class={"ui-button  "} onclick={() => selected && addChild(selected)}>新增下级节点</Button></div>
-      <details class="collapse editor-advanced"><summary class="collapse-title">节点设置</summary><div class="collapse-content editor-settings">
+      <details class="editor-advanced"><summary>节点设置</summary><div class="editor-settings">
       <fieldset class="icon-options"><legend>节点图标</legend>
         {#each Object.entries(workflowIcons) as [value, item]}
           <button type="button" aria-label={item.label} aria-pressed={nodeIcon(selected) === value} onclick={() => { if (selected) selected.icon = value as NonNullable<WorkflowNode['icon']>; }}><item.component size={20} aria-hidden="true" /></button>
@@ -133,17 +133,21 @@
   .editor-fields .editor-checkbox { display: flex; align-items: center; gap: 10px; }
   .connection-fields { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; min-width: 0; }
   .connection-fields legend { font-weight: bold; margin-bottom: 8px; }
+  .connection-fields :global(.connection-link) { height: auto; justify-content: flex-start; padding-inline: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; }
   .connection-row { display: flex; gap: 8px; min-width: 0; }
   .connection-row :global(select) { min-width: 0; flex: 1; }
   .editor-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   :global(.editor-save[data-ui-owner="lib-trading-workflow-WorkflowEditor-svelte"]) { width: 100%; }
   .editor-advanced { border: 1px solid var(--tr-border); border-radius: 8px; }
-  .editor-settings { display: grid; gap: 16px; }
+  .editor-advanced > summary { min-height: 44px; padding: 10px 12px; cursor: pointer; font-weight: bold; }
+  .editor-advanced[open] > summary { border-bottom: 1px solid var(--tr-border); }
+  .editor-settings { display: grid; gap: 16px; padding: 12px; }
   .icon-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; border: 0; padding: 0; margin: 0; }
   .icon-options legend { font-weight: bold; margin-bottom: 8px; }
   .icon-options button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--tr-border); border-radius: 8px; background: var(--background); color: var(--tr-muted); cursor: pointer; }
   .icon-options button[aria-pressed="true"] { color: var(--brand); border-color: var(--brand); background: var(--accent); }
   .icon-options button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (min-width: 1024px) { .workflow-editor { padding-bottom: 88px; } }
   @media (max-width: 1200px) { .workflow-editor { position: fixed; right: 16px; bottom: 16px; z-index: 30; width: min(340px, calc(100vw - 32px)); max-height: calc(100dvh - 130px); border: 1px solid var(--tr-border); box-shadow: 0 8px 32px rgb(23 32 51 / 12%); } }
 </style>

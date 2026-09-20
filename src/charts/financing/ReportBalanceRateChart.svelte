@@ -9,13 +9,15 @@
 	const annotationIndices = $derived(withLastIndex(yearTickIndices, values.length));
 	const balancePoints = $derived(annotationIndices.map((index) => ({
 		coord: [values[index]!.date, Number(values[index]!.balanceYi)],
-		value: Number(values[index]!.balanceYi)
+		value: Number(values[index]!.balanceYi),
+		label: { align: index === 0 ? 'left' : index === values.length - 1 ? 'right' : 'center' }
 	})));
 	const ratePoints = $derived(annotationIndices
 		.filter((index) => values[index]!.weightedRatePct != null)
 		.map((index) => ({
 			coord: [values[index]!.date, Number(values[index]!.weightedRatePct)],
-			value: Number(values[index]!.weightedRatePct)
+			value: Number(values[index]!.weightedRatePct),
+			label: { align: index === 0 ? 'left' : index === values.length - 1 ? 'right' : 'center' }
 		})));
 	const option = $derived({
 		aria: { enabled: true, decal: { show: false } },
@@ -69,10 +71,13 @@
 					itemStyle: { color: '#154575', borderColor: '#ffffff', borderWidth: 1.5 },
 					label: {
 						show: true,
-						position: 'top',
+						position: 'bottom',
 						color: '#154575',
 						fontSize: 11,
 						fontWeight: 'bolder',
+						backgroundColor: 'rgba(255,255,255,0.9)',
+						padding: [2, 3],
+						borderRadius: 2,
 						formatter: (params: any) => `${formatAmount(params.value)}亿`
 					},
 					data: balancePoints
@@ -99,6 +104,9 @@
 						color: '#df2926',
 						fontSize: 11,
 						fontWeight: 'bolder',
+						backgroundColor: 'rgba(255,255,255,0.9)',
+						padding: [2, 3],
+						borderRadius: 2,
 						formatter: (params: any) => `${Number(params.value).toFixed(2)}%`
 					},
 					data: ratePoints

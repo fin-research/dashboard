@@ -57,13 +57,13 @@
   <meta name="description" content="政策跟踪标准化研究点评" />
 </svelte:head>
 
-<DetailPageShell eyebrow="RESEARCH COMMENTARY" title="研究点评" backHref="/trading-research/tracking-commentary" backLabel="返回跟踪点评">
+<DetailPageShell eyebrow="RESEARCH COMMENTARY" title="研究点评" backHref="/trading-research/tracking-commentary" backLabel="返回跟踪点评" wrapHeadings>
   {#if loading}
     <section class="page-state" aria-live="polite"><span class="spinner"></span><strong>正在读取研究点评</strong></section>
   {:else if errorMessage}
     <section class="page-state page-state--error" role="alert"><strong>{errorMessage}</strong><Button data-ui-owner="routes-commentaries--id---page-svelte" variant="outline" class={"ui-button"} type="button" onclick={loadCommentary}>重新读取</Button></section>
   {:else if detail}
-    <div class="commentary-layout">
+    <div class="commentary-layout" class:commentary-layout--standalone={!detail.policy}>
       <ModuleCard class="commentary-card" labelledBy="commentary-title">
         <header class="commentary-brand"><strong>【东财证券】资金管理部 · 跟踪点评</strong><span>{detail.commentary.edited ? "人工修订" : "AI 初版"}</span></header>
         <h2 class="commentary-event-title" id="commentary-title">{detail.commentary.eventName}</h2>
@@ -98,6 +98,7 @@
   :global(.page-state button[data-ui-owner="routes-commentaries--id---page-svelte"]:focus-visible), aside a:focus-visible { outline: 3px solid rgba(47, 111, 214, .28); outline-offset: 2px; }
   .spinner { width: 22px; height: 22px; border: 3px solid #d8e2f0; border-top-color: #2f6fd6; border-radius: 50%; animation: spin .8s linear infinite; }
   .commentary-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+  .commentary-layout--standalone { grid-template-columns: minmax(0, 1fr); max-width: 900px; margin-inline: auto; }
   :global(.commentary-card) { padding: 28px 32px; }
   .commentary-brand { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: #2f6fd6; }
   .commentary-brand span { padding: 4px 9px; border-radius: 6px; color: #475467; font-size: .75rem; font-weight: bold; background: #eef2f7; }
@@ -108,7 +109,7 @@
   dd { margin: 0; color: #344054; line-height: 1.5; }
   .divider { height: 1px; margin: 26px 0; background: #e4e7ec; }
   .commentary-section + .commentary-section { margin-top: 28px; }
-  .commentary-section h3 { margin: 0 0 10px; font-size: 1.125rem; }
+  .commentary-section h3 { margin: 0 0 10px; font-size: 1.125rem; font-weight: bold; }
   .commentary-section p { max-width: 800px; margin: 0; color: #344054; line-height: 1.9; white-space: pre-wrap; }
   .policy-meta { display: flex; justify-content: space-between; gap: 10px; color: #667085; font-size: .75rem; }
   .policy-meta span { color: #2f6fd6; font-weight: bold; }

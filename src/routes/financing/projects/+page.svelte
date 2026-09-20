@@ -281,8 +281,8 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		/>
 	</div>
 	<div class="view-switcher" aria-label="时间视图">
-		<Button data-ui-owner="routes-financing-projects--page-svelte" variant="ghost" class={["ui-button ", view === 'month' && "is-selected"]}  type="button" onclick={() => (view = 'month')}>月</Button>
-		<Button data-ui-owner="routes-financing-projects--page-svelte" variant="ghost" class={["ui-button ", view === 'quarter' && "is-selected"]}  type="button" onclick={() => (view = 'quarter')}
+		<Button data-ui-owner="routes-financing-projects--page-svelte" variant={view === 'month' ? "default" : "ghost"} class="ui-button" aria-pressed={view === 'month'}  type="button" onclick={() => (view = 'month')}>月</Button>
+		<Button data-ui-owner="routes-financing-projects--page-svelte" variant={view === 'quarter' ? "default" : "ghost"} class="ui-button" aria-pressed={view === 'quarter'}  type="button" onclick={() => (view = 'quarter')}
 			>季</Button
 		>
 	</div>
@@ -444,7 +444,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	</Button>
 {/if}
 
-<Modal  bind:this={newProjectDialog}>
+<Modal bind:this={newProjectDialog} aria-label="新建融资项目" class="w-[min(35rem,calc(100vw-3rem))]">
 <div class="dialog-body new-project-modal">
 	<form method="post" action="?/createProject" use:enhance={enhanceProjectAction('create', 'create')}>
 		<div class="modal-header">
@@ -509,7 +509,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 </div>
 </Modal>
 
-<Modal  bind:this={editProjectDialog}>
+<Modal bind:this={editProjectDialog} aria-label="修改融资项目" class="w-[min(35rem,calc(100vw-3rem))]">
 <div class="dialog-body new-project-modal">
 	{#if editingProject}
 		<form method="post" action="?/updateProject" use:autoSave use:enhance={enhanceProjectAction('edit')}>
@@ -708,12 +708,12 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 		margin-left: auto;
 		padding: 0;
 		border: 1px solid #d0d5dd;
-		border-radius: 0.4375rem;
-		background: #f9fafb;
+		border-radius: var(--radius-control);
+		background: var(--muted);
 	}
 
 	:global(.view-switcher button[data-ui-owner="routes-financing-projects--page-svelte"]) {
-		min-width: 2rem;
+		min-width: 2.75rem;
 	}
 
 	.gantt-panel {
@@ -1164,7 +1164,7 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 	.form-grid {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 0.8125rem;
 		padding: 1.0625rem 0;
 	}

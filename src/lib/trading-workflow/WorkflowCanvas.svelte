@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
+  import { scrollableRegion } from '../scrollable-region';
   import { ChevronLeft, ChevronRight } from '@lucide/svelte';
   import type { InquiryRow, InquiryDirectory } from './inquiries';
   import type { ShiborRate } from '../../data-contracts';
@@ -27,6 +28,7 @@
   let pendingGraph: FlowGraph | undefined;
   let pendingHeights: Record<string, number> = {};
   let viewportWidth = $state(1040);
+  let scrollRegion = $state<HTMLDivElement | null>(null);
   let dragging = $state(false);
   let inquiries = $state<Record<string, boolean>>({});
   let flowNodes = $state.raw<FlowNode[]>([]);
@@ -34,6 +36,17 @@
   let heights = $state<Record<string, number>>({});
   let graph = $state.raw<FlowGraph>({ nodes: [], edges: [], bases: {}, timeline: [], height: 680, width: 1040, lanes: {} });
   const cursor = $derived(timelineCursor(graph.timeline, clockMinutes));
+  $effect(() => {
+    const id = selectedId;
+    viewportWidth;
+    if (!editing || !id || !scrollRegion) return;
+    let cancelled = false;
+    void tick().then(() => {
+      if (!cancelled) Array.from(scrollRegion?.querySelectorAll<HTMLElement>('[data-workflow-node]') ?? [])
+        .find(node => node.dataset.workflowNode === id)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+    });
+    return () => { cancelled = true; };
+  });
   function measureHeight(id: string, height: number) {
     if (height <= 0) return;
     // ResizeObserver may deliver the final size during the lane animation.
@@ -124,7 +137,7 @@
 </script>
 
 <div class="workflow-diagram" class:editing aria-label="交易流程图">
-  <div class="flow-scroll" bind:clientWidth={viewportWidth}>
+  <div class="flow-scroll" bind:this={scrollRegion} bind:clientWidth={viewportWidth} role="region" aria-label="流程图滚动区域" use:scrollableRegion>
     <div class="flow-canvas" style:width={`${graph.width}px`} style:height={`${graph.height}px`}>
       <div class="product-categories">
         {#each enabledProducts as product (product.id)}

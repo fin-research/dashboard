@@ -70,6 +70,7 @@
       signal: controller.signal,
       cancellable: false,
       parse: (value) => value as CreditSession,
+      resultText: sessionResultText,
     }).then((next) => {
       if (!mounted || current !== revision || streamController !== controller) return;
         const followLatest = nearLatest();
@@ -194,6 +195,7 @@
         },
         cancellable: false,
         parse: (value) => value as CreditSession,
+        resultText: sessionResultText,
       });
       if (!mounted) return;
       session = next;
@@ -258,6 +260,10 @@
     } catch (error) { globalMessages.error(error instanceof Error ? error.message : "复制失败，请重试"); }
   }
   function citations(answer: CreditAnswer): string[] { return [...new Set(answer.paragraphs.flatMap(p => p.citations.map(c => c.sourceId)))]; }
+  function sessionResultText(value: CreditSession): string {
+    const answer = value.turns.at(-1)?.answer;
+    return value.error || (answer ? customerAnswerText(answer) : '');
+  }
   async function showCitation(event: MouseEvent, turnId: string, sourceId: string) {
     event.preventDefault();
     const details = document.getElementById(`references-${turnId}`);
@@ -387,7 +393,7 @@
     </div>
     <form data-permission="credit.assistant:ask" class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
-      <Textarea data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" class={"ui-textarea textarea-ghost"} id="credit-question" bind:ref={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows={2} disabled={creating}></Textarea>
+      <Textarea data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" class={"ui-textarea textarea-ghost"} id="credit-question" placeholder="输入问题" bind:ref={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows={2} disabled={creating}></Textarea>
       <div class="composer-actions">
         <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="default" class={"ui-button  chat-button chat-button--send"} type="submit" disabled={!selectedCustomer || !question.trim() || busy} aria-label={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></Button>
       </div>
@@ -451,7 +457,7 @@
   .customer-options p { margin: 0; padding: 12px; color: var(--text-2); }
   .chat-composer { max-width: 832px; margin-inline: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 160ms ease; }
   .chat-composer:focus-within { border-color: var(--brand); outline: 2px solid var(--brand); outline-offset: 2px; }
-  :global(textarea[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { display: block; width: 100%; max-height: 180px; padding: 0; border: 0; box-shadow: none; resize: none; min-height: 56px; }
+  :global(textarea[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { display: block; width: 100%; max-height: 180px; padding: 0; border: 0; box-shadow: none; resize: none; min-height: 56px; background: transparent; border-radius: 0; }
   :global(.chat-composer textarea[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]:focus-visible) { outline: none; }
   :global(textarea[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]::placeholder) { color: var(--text-3); }
   .composer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-top: 8px; }

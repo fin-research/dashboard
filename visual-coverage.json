@@ -18,11 +18,15 @@
     },
     {
       "source": "src/routes/articles/[id]/+page.svelte",
-      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
+      "scenarios": [
+        "articles-detail"
+      ]
     },
     {
       "source": "src/routes/auth/verify-email/+page.svelte",
-      "exemption": "认证/邮件状态页，视觉 harness 明确无 auth bypass"
+      "scenarios": [
+        "verification-notice"
+      ]
     },
     {
       "source": "src/routes/bond/+page.svelte",
@@ -30,7 +34,9 @@
     },
     {
       "source": "src/routes/commentaries/[id]/+page.svelte",
-      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
+      "scenarios": [
+        "commentaries-detail"
+      ]
     },
     {
       "source": "src/routes/credit-workbench/[[view]]/+page.svelte",
@@ -47,11 +53,16 @@
     },
     {
       "source": "src/routes/financing/+page.svelte",
-      "exemption": "融资工作台生产页未接入 visual harness"
+      "scenarios": [
+        "financing-dashboard",
+        "financing-calendar"
+      ]
     },
     {
       "source": "src/routes/financing/bond-investors/+page.svelte",
-      "exemption": "权限 gated 数据页，未建浏览器夹具"
+      "scenarios": [
+        "financing-investors"
+      ]
     },
     {
       "source": "src/routes/financing/data/+page.svelte",
@@ -61,11 +72,15 @@
     },
     {
       "source": "src/routes/financing/debts/[id]/+page.svelte",
-      "exemption": "服务端负债详情，未建浏览器夹具"
+      "scenarios": [
+        "financing-debt"
+      ]
     },
     {
       "source": "src/routes/financing/liability-report/+page.svelte",
-      "exemption": "服务端报表数据，未建浏览器夹具"
+      "scenarios": [
+        "liability-six-pages"
+      ]
     },
     {
       "source": "src/routes/financing/login/+page.svelte",
@@ -73,11 +88,15 @@
     },
     {
       "source": "src/routes/financing/projects/+page.svelte",
-      "exemption": "融资项目数据与权限，未建浏览器夹具"
+      "scenarios": [
+        "financing-projects"
+      ]
     },
     {
       "source": "src/routes/financing/projects/[id]/+page.svelte",
-      "exemption": "服务端项目详情，未建浏览器夹具"
+      "scenarios": [
+        "financing-project-detail"
+      ]
     },
     {
       "source": "src/routes/financing/sop/+page.svelte",
@@ -87,11 +106,15 @@
     },
     {
       "source": "src/routes/financing/sop/[id]/+page.svelte",
-      "exemption": "服务端 SOP 详情，未建浏览器夹具"
+      "scenarios": [
+        "sop-detail"
+      ]
     },
     {
       "source": "src/routes/financing/sop/reminders/+page.svelte",
-      "exemption": "提醒历史服务端数据，未建浏览器夹具"
+      "scenarios": [
+        "sop-history"
+      ]
     },
     {
       "source": "src/routes/fund-report/+page.svelte",
@@ -101,11 +124,13 @@
     },
     {
       "source": "src/routes/management/+page.svelte",
-      "exemption": "没有页面截图/交互；组件只有 head"
+      "exemption": "服务端303跳转到/management/me，无独立页面正文；目标页面已覆盖"
     },
     {
       "source": "src/routes/management/me/+page.svelte",
-      "exemption": "身份资料 API 页面，未建浏览器夹具"
+      "scenarios": [
+        "management-me"
+      ]
     },
     {
       "source": "src/routes/management/messenger/+page.svelte",
@@ -116,11 +141,15 @@
     },
     {
       "source": "src/routes/management/notifications/+page.svelte",
-      "exemption": "Web Push/设备 API，未建浏览器夹具"
+      "scenarios": [
+        "management-notifications"
+      ]
     },
     {
       "source": "src/routes/management/people/+page.svelte",
-      "exemption": "Auth0 管理边界，浏览器无法伪造 Gateway 身份"
+      "scenarios": [
+        "management-people"
+      ]
     },
     {
       "source": "src/routes/management/permissions/+page.svelte",
@@ -149,15 +178,17 @@
     },
     {
       "source": "src/routes/news/[id]/+page.svelte",
-      "exemption": "详情页改用PageHeader，共享层级链接由DOM测试覆盖；服务端正文和此URL尚未建立浏览器夹具"
+      "scenarios": [
+        "news-detail"
+      ]
     },
     {
       "source": "src/routes/policy-tracking/+page.svelte",
-      "exemption": "LegacyWorkbenchRedirect；canonical dynamic view 也无 visual spec"
+      "exemption": "LegacyWorkbenchRedirect；canonical政策跟踪视图已覆盖，兼容URL不重复计作页面"
     },
     {
       "source": "src/routes/profile/+page.svelte",
-      "exemption": "认证身份页，visual harness 无 auth bypass"
+      "exemption": "服务端303跳转到/management/me，无独立页面正文；目标页面已覆盖"
     },
     {
       "source": "src/routes/secondary-bond-pool/+page.svelte",
@@ -292,6 +323,18 @@
           "snapshots": [
             "workflow.png"
           ]
+        },
+        {
+          "spec": "tests/visual/workflow-inquiry.spec.mjs",
+          "test": "desktop workflow exposes complete inquiry labels and reachable node settings",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "workflow-inquiry-labels-desktop.png",
+            "workflow-node-editor-desktop.png",
+            "workflow-node-settings-desktop.png"
+          ]
         }
       ]
     },
@@ -310,6 +353,16 @@
           ],
           "snapshots": [
             "credit.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "desktop credit metrics and expanded records stay within the workspace",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-record-expanded.png"
           ]
         }
       ]
@@ -349,6 +402,16 @@
           "snapshots": [
             "credit-weekly.png"
           ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "desktop credit weekly report presents nonempty news and five product details",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-weekly-full-desktop.png"
+          ]
         }
       ]
     },
@@ -356,7 +419,7 @@
       "id": "research",
       "url": "/trading-research/research",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "常规和丰富历史数据；桌面主图/小图日期刻度及指标卡",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -367,6 +430,17 @@
           ],
           "snapshots": [
             "research.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/research-audit.spec.mjs",
+          "test": "desktop research history keeps main and small time axes readable",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "research-rates-history.png",
+            "research-prices-history.png"
           ]
         }
       ]
@@ -386,6 +460,16 @@
           ],
           "snapshots": [
             "secondary.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/secondary-desktop.spec.mjs",
+          "test": "desktop secondary report date range shows endpoints and selected interval",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "secondary-date-range.png"
           ]
         }
       ]
@@ -444,6 +528,16 @@
           "snapshots": [
             "financing-model.png"
           ]
+        },
+        {
+          "spec": "tests/visual/reports.spec.mjs",
+          "test": "desktop financing seller views load their shipping institution logos",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "financing-seller-logos.png"
+          ]
         }
       ]
     },
@@ -481,6 +575,16 @@
           ],
           "snapshots": [
             "tracking-commentary.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/research-overlays.spec.mjs",
+          "test": "desktop commentary preview prioritizes the report and returns to its draft",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "tracking-reading-desktop.png"
           ]
         }
       ]
@@ -529,26 +633,99 @@
             "desktop",
             "mobile"
           ]
+        },
+        {
+          "spec": "tests/visual/research-overlays.spec.mjs",
+          "test": "desktop hotspot scope selection is visible and details use readable width",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "hotspot-scope-desktop.png",
+            "hotspot-detail-desktop.png"
+          ]
         }
       ]
     },
     {
       "id": "policy-tracking",
       "url": "/trading-research/policy-tracking",
-      "kind": "deferred",
-      "reason": "政策列表与详情尚未建立浏览器夹具；不计作截图覆盖。"
+      "kind": "screenshot",
+      "state": "非空政策与关联研报、取消选择及政策类型筛选",
+      "evidence": [
+        {
+          "spec": "tests/visual/research-overlays.spec.mjs",
+          "test": "desktop policy association choices remain square and cancel preserves the list",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "policy-card-desktop.png",
+            "policy-association-desktop.png"
+          ]
+        }
+      ]
     },
     {
       "id": "bond",
       "url": "/trading-research/bond",
-      "kind": "deferred",
-      "reason": "逐日台账组件尚未建立浏览器夹具；周报截图不替代此页面。"
+      "kind": "screenshot",
+      "state": "60日历史、六类持仓、非空成交、账户切换和台账管理",
+      "evidence": [
+        {
+          "spec": "tests/visual/bond-ledger-desktop.spec.mjs",
+          "test": "desktop daily ledger shows balanced metrics and recoverable management controls",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "bond-ledger-desktop.png",
+            "bond-ledger-trades-desktop.png",
+            "bond-ledger-management-desktop.png",
+            "bond-ledger-distributions-desktop.png"
+          ]
+        }
+      ]
     },
     {
       "id": "credit-assistant",
       "url": "/credit-workbench/assistant",
-      "kind": "deferred",
-      "reason": "授信助手流式会话尚未建立浏览器夹具。"
+      "kind": "screenshot",
+      "state": "empty/customer-picker/cited-reply/processing/error/retry",
+      "evidence": [
+        {
+          "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
+          "test": "desktop credit assistant supports customer selection and readable cited replies",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-assistant-picker.png",
+            "credit-assistant-citation.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
+          "test": "desktop assistant processing records remain readable above the composer",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-assistant-processing.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
+          "test": "desktop assistant failed answer can be retried without losing the question",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-assistant-failed.png",
+            "credit-assistant-result.png"
+          ]
+        }
+      ]
     },
     {
       "id": "workflow-expanded",
@@ -787,6 +964,16 @@
             "sop-actions.png",
             "sop-create.png"
           ]
+        },
+        {
+          "spec": "tests/visual/sop-detail-desktop.spec.mjs",
+          "test": "desktop reminder editor keeps multiple periods and custom recipients readable",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "sop-reminder-periods-desktop.png"
+          ]
         }
       ]
     },
@@ -842,6 +1029,330 @@
           "snapshots": [
             "financing-data.png",
             "financing-data-edit.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-investors",
+      "url": "/financing/bond-investors",
+      "kind": "screenshot",
+      "state": "桌面筛选标签、排序、独立品种及空范围",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-layout.spec.mjs",
+          "test": "desktop investor filters remain horizontal and update independent distributions",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "investor-filters.png",
+            "investor-distribution.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-debt",
+      "url": "/financing/debts/1",
+      "kind": "screenshot",
+      "state": "桌面核心字段、单行现金流与完整字段排列",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-layout.spec.mjs",
+          "test": "desktop debt details group secondary fields beneath cashflows",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "debt-details.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-presets",
+      "url": "/financing/filters",
+      "kind": "screenshot",
+      "state": "仅实际筛选组件；长预设可见和两组选择独立，不覆盖完整仪表盘",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-layout.spec.mjs",
+          "test": "desktop financing presets show complete labels and retain selections",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "overview-preset.png",
+            "calendar-preset.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "news-detail",
+      "url": "/news/news-1",
+      "kind": "screenshot",
+      "state": "nonempty/reading",
+      "evidence": [
+        {
+          "spec": "tests/visual/document-details.spec.mjs",
+          "test": "desktop news detail recovers and shows structured content",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "news-detail-desktop.png",
+            "document-retry-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "articles-detail",
+      "url": "/articles/A001",
+      "kind": "screenshot",
+      "state": "nonempty/reading",
+      "evidence": [
+        {
+          "spec": "tests/visual/document-details.spec.mjs",
+          "test": "desktop research detail shows its body and related policies",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "article-detail-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "commentaries-detail",
+      "url": "/commentaries/archive-1",
+      "kind": "screenshot",
+      "state": "nonempty/reading",
+      "evidence": [
+        {
+          "spec": "tests/visual/document-details.spec.mjs",
+          "test": "desktop commentary detail wraps titles and centers standalone reports",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "commentary-detail-desktop.png",
+            "commentary-standalone-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "liability-six-pages",
+      "url": "/financing/liability-report",
+      "kind": "screenshot",
+      "state": "nonempty/six-pages",
+      "evidence": [
+        {
+          "spec": "tests/visual/liability-desktop.spec.mjs",
+          "test": "desktop liability report retains six complete pages with readable charts",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "liability-page-1.png",
+            "liability-page-2.png",
+            "liability-page-3.png",
+            "liability-page-4.png",
+            "liability-page-5.png",
+            "liability-page-6.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "management-people",
+      "url": "/management/people",
+      "kind": "screenshot",
+      "state": "desktop/selection",
+      "evidence": [
+        {
+          "spec": "tests/visual/management-desktop.spec.mjs",
+          "test": "desktop role catalog identifies the selected role without changing permissions",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "management-role-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "management-me",
+      "url": "/management/me",
+      "kind": "screenshot",
+      "state": "desktop/selection",
+      "evidence": [
+        {
+          "spec": "tests/visual/management-desktop.spec.mjs",
+          "test": "desktop profile aligns actions and keeps unsaved settings local",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "management-profile-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "management-notifications",
+      "url": "/management/notifications",
+      "kind": "screenshot",
+      "state": "desktop/selection",
+      "evidence": [
+        {
+          "spec": "tests/visual/management-desktop.spec.mjs",
+          "test": "desktop notification choices align with their channel headings",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "management-notifications-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-projects",
+      "url": "/financing/projects",
+      "kind": "screenshot",
+      "state": "desktop/forms",
+      "evidence": [
+        {
+          "spec": "tests/visual/projects-desktop.spec.mjs",
+          "test": "desktop projects expose selected timeline views and consistent edit dialogs",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "projects-expanded-desktop.png",
+            "project-create-desktop.png",
+            "project-edit-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-project-detail",
+      "url": "/financing/projects/project-1",
+      "kind": "screenshot",
+      "state": "desktop/forms",
+      "evidence": [
+        {
+          "spec": "tests/visual/projects-desktop.spec.mjs",
+          "test": "desktop project detail displays period endpoints and unscheduled tasks",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "project-detail-desktop.png",
+            "project-add-period-desktop.png",
+            "project-members-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sop-detail",
+      "url": "/financing/sop/short-term",
+      "kind": "screenshot",
+      "state": "desktop/interaction",
+      "evidence": [
+        {
+          "spec": "tests/visual/sop-detail-desktop.spec.mjs",
+          "test": "desktop SOP opens node dialog and cancels keyboard sorting cleanly",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "sop-keyboard-sort-desktop.png",
+            "sop-add-period-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sop-history",
+      "url": "/financing/sop/reminders",
+      "kind": "screenshot",
+      "state": "desktop/interaction",
+      "evidence": [
+        {
+          "spec": "tests/visual/sop-detail-desktop.spec.mjs",
+          "test": "desktop reminder history supports pagination filters and empty recovery",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "reminder-history-desktop.png",
+            "reminder-empty-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-dashboard",
+      "url": "/financing/?preset=all",
+      "kind": "screenshot",
+      "state": "desktop/nonempty/interaction",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-dashboard-desktop.spec.mjs",
+          "test": "desktop financing dashboard keeps balanced metrics and complete table values",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "financing-dashboard-desktop.png",
+            "financing-quota-desktop.png",
+            "financing-simulation-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-calendar",
+      "url": "/financing/?preset=all",
+      "kind": "screenshot",
+      "state": "desktop/nonempty/interaction",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-dashboard-desktop.spec.mjs",
+          "test": "desktop financing calendar reveals busy dates without stretching every week",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "financing-calendar-desktop.png",
+            "financing-calendar-more-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "verification-notice",
+      "url": "/auth/verify-email",
+      "kind": "screenshot",
+      "state": "静态验证提示与返回入口，不模拟认证服务",
+      "evidence": [
+        {
+          "spec": "tests/visual/verification-notice.spec.mjs",
+          "test": "desktop verification notice provides clear navigation without handling credentials",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "verification-notice-desktop.png"
           ]
         }
       ]

@@ -7,3 +7,6 @@ export function enhance(form) {
   form.addEventListener('submit', prevent);
   return {destroy: () => form.removeEventListener('submit', prevent)};
 }
+
+export function applyAction() { throw new Error('Server actions are unavailable in the read-only visual fixture'); }
+export function deserialize() { throw new Error('Server action responses are unavailable in the read-only visual fixture'); }

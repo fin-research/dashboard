@@ -125,7 +125,7 @@ export function renderWeeklyPoolScaleLeverage(
       },
     ],
     grid: [
-      { left: 10, right: 12, top: 52, height: "43%", containLabel: true },
+      { left: 10, right: 12, top: 66, height: "40%", containLabel: true },
       { left: 10, right: 12, top: "70%", bottom: 2, containLabel: true },
     ],
     tooltip: {
@@ -187,11 +187,11 @@ export function renderWeeklyPoolScaleLeverage(
         type: "value",
         gridIndex: 0,
         name: "时间加权本金（亿元）",
+        nameTextStyle: { ...weeklyAxisLabel, align: "right" },
         scale: true,
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: weeklyAxisLabel,
-        nameTextStyle: weeklyAxisLabel,
         splitLine: { show: false },
       },
       {
@@ -306,7 +306,7 @@ export function renderWeeklyPoolScaleLeverage(
           const placement = chooseBestLabelPlacement({
             point,
             label: { width: params.labelRect.width, height: params.labelRect.height },
-            bounds: { x: 42, y: 58, width: Math.max(0, host.clientWidth - 84), height: Math.max(0, host.clientHeight * 0.43 - 12) },
+            bounds: { x: 42, y: 72, width: Math.max(0, host.clientWidth - 84), height: Math.max(0, host.clientHeight * 0.40 - 12) },
             obstacles: placed,
             lineObstacles: lines,
             linePadding: 7,
@@ -711,11 +711,11 @@ export function renderBondScaleReturnTrend(
     (value): value is number => value !== null && Number.isFinite(value),
   );
   const returnAxisMin =
-    account === "all" || !validReturns.length
+    !validReturns.length
       ? 0
       : Math.min(0, Math.floor(Math.min(...validReturns)));
   const returnAxisMax =
-    account === "all" || !validReturns.length
+    !validReturns.length
       ? 4
       : Math.max(4, Math.ceil(Math.max(...validReturns)));
   setChart(host, {
@@ -851,13 +851,13 @@ export function renderHoldingDistribution(
     },
     color: [...FIN_OPS_CHART_PALETTE],
     legend: {
-      type: "scroll",
-      orient: "vertical",
-      right: 8,
-      top: "middle",
+      type: "plain",
+      orient: "horizontal",
+      left: "center",
+      bottom: 0,
       itemWidth: 12,
       itemHeight: 12,
-      textStyle: ledgerAxisLabel,
+      textStyle: { ...ledgerAxisLabel, fontSize: 12 },
     },
     tooltip: {
       ...tooltip,
@@ -879,8 +879,8 @@ export function renderHoldingDistribution(
       {
         name: "持仓分布",
         type: "pie",
-        radius: ["38%", "68%"],
-        center: ["38%", "52%"],
+        radius: ["34%", "58%"],
+        center: ["50%", "43%"],
         avoidLabelOverlap: true,
         minAngle: 2,
         itemStyle: {
@@ -892,9 +892,14 @@ export function renderHoldingDistribution(
           show: true,
           color: colors.ink,
           fontFamily,
-          fontSize: chartTextSize,
+          fontSize: 12,
+          lineHeight: 16,
+          alignTo: "edge",
+          edgeDistance: 8,
+          distanceToLabelLine: 4,
+          overflow: "break",
           formatter: ({ name, percent }: { name: string; percent: number }) =>
-            `${name} ${percent.toFixed(1)}%`,
+            `${name}\n${percent.toFixed(1)}%`,
         },
         labelLine: { length: 12, length2: 8 },
         data: valid.map((stat) => ({
@@ -944,7 +949,7 @@ export function renderMaturityDistribution(
       data: stats.map((stat) => stat.bucket),
       axisLine: { lineStyle: { color: colors.line } },
       axisTick: { show: false },
-      axisLabel: { ...ledgerAxisLabel, interval: 0 },
+      axisLabel: { ...ledgerAxisLabel, fontSize: 12, interval: 0, formatter: (value: string) => value === '10年以上' ? '10年\n以上' : value.replace('及以上', '\n及以上') },
     },
     yAxis: {
       type: "value",

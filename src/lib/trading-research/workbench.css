@@ -1208,8 +1208,13 @@ body:has(.tr-workbench) {
 }
 
 .tr-credit-table {
-  min-width: 1240px;
+  min-width: 0;
 }
+
+.tr-credit-table :is(th, td) { padding-inline: 8px; }
+.tr-credit-table tbody th { min-width: 5rem; max-width: 12rem; white-space: normal; overflow-wrap: anywhere; }
+.tr-credit-table .tr-sort-button { min-width: 0; padding: 0; border-radius: var(--radius-tag); font-size: inherit; }
+
 
 .tr-sort-button {
   display: inline-flex;
@@ -2004,3 +2009,7 @@ body:has(.tr-workbench) {
 
 .tr-navigation-list { display: grid; align-content: start; width: 100%; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .tr-navigation-list li { min-width: 0; }
+
+@media screen and (min-width: 1200px) {
+  .tr-credit-weekly-report .tr-metric-grid--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}

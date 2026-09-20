@@ -224,6 +224,14 @@
   gap: 8px;
 }
 
+@media (min-width: 1101px) {
+  .ledger-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1700px) {
+  .ledger-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
 .ledger-return-risk-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -600,7 +608,9 @@
 
 .management-calendar .calendar-grid button {
   align-content: center;
-  min-height: 52px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 8px;
 }
 
 .ledger-management-detail {
@@ -802,4 +812,24 @@
   .ledger-management-button {
     transition: none;
   }
+}
+
+.ledger-range-popover .calendar-grid .ledger-range-day {
+  min-height: 44px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 8px;
+  box-shadow: none;
+  font-weight: normal;
+}
+.ledger-range-popover .calendar-grid .ledger-range-day.in-range {
+  color: var(--brand-deep);
+  background: var(--brand-soft);
+  border-radius: 0;
+}
+.ledger-range-popover .calendar-grid .ledger-range-day.endpoint {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-radius: 8px;
+  font-weight: bold;
 }

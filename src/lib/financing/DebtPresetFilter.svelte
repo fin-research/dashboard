@@ -105,6 +105,17 @@
 		width: 12rem;
 	}
 
+	@media (min-width: 901px) {
+		.debt-filter { border-radius: var(--radius-card); }
+		.debt-filter.compact { border: 0; border-radius: 0; background: transparent; }
+		label { flex: 0 0 auto; }
+		:global(select[data-ui-owner="lib-financing-DebtPresetFilter-svelte"]),
+		:global(.debt-filter.compact select[data-ui-owner="lib-financing-DebtPresetFilter-svelte"]) {
+			width: auto;
+			min-width: 12rem;
+		}
+	}
+
 	@media (max-width: 64rem) {
 		.debt-filter {
 			align-items: stretch;
