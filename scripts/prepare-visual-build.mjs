@@ -39,6 +39,7 @@ const map = {
   '/management/messenger': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/messenger/+page.svelte'),
   '/management/permissions': stylesFor(layout, 'src/routes/management/+layout.svelte', 'src/routes/management/permissions/+page.svelte'),
   '/financing/schedule': [...new Set([...stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte'), ...moduleCardStyles])],
+  '/financing/sop': stylesFor(layout, financing, 'src/routes/financing/sop/+page.svelte'),
   '/ui-contracts': stylesFor(layout, financing, 'src/routes/financing/sop/[id]/+page.svelte', 'src/routes/financing/debts/[id]/+page.svelte'),
 };
 const files = [...new Set(Object.values(map).flat())];

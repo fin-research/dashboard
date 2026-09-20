@@ -18,6 +18,7 @@
     : path === '/management/permissions' ? import('./Permissions.svelte')
     : path === '/ui-contracts' ? import('./Primitives.svelte')
     : path === '/financing/schedule' ? import('./Schedule.svelte')
+    : path === '/financing/sop' ? import('./FinancingSop.svelte')
     : path.startsWith('/market-briefing') ? import('../../../src/App.svelte')
     : Promise.reject(new Error(`Unregistered visual scenario: ${path}`));
 </script>

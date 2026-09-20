@@ -79,7 +79,9 @@
     },
     {
       "source": "src/routes/financing/sop/+page.svelte",
-      "exemption": "SOP 数据/权限，未建浏览器夹具"
+      "scenarios": [
+        "sop-actions"
+      ]
     },
     {
       "source": "src/routes/financing/sop/[id]/+page.svelte",
@@ -129,7 +131,8 @@
       "scenarios": [
         "market-report",
         "market-report-edit-export",
-        "ai-panel"
+        "ai-panel",
+        "market-report-readable"
       ]
     },
     {
@@ -760,6 +763,43 @@
           ],
           "snapshots": [
             "permissions-filtered.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sop-actions",
+      "url": "/financing/sop",
+      "kind": "screenshot",
+      "state": "桌面新增按钮与AI不重叠，真实新增弹窗打开与关闭",
+      "evidence": [
+        {
+          "spec": "tests/visual/desktop-ui.spec.mjs",
+          "test": "desktop SOP create action remains clear of AI and opens a dismissible dialog",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "sop-actions.png",
+            "sop-create.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "market-report-readable",
+      "url": "/market-briefing",
+      "kind": "screenshot",
+      "state": "桌面1280非空表格与完整名称",
+      "evidence": [
+        {
+          "spec": "tests/visual/desktop-ui.spec.mjs",
+          "test": "desktop market report retains full names and table cells at 1280 pixels",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "market-report-readable.png"
           ]
         }
       ]

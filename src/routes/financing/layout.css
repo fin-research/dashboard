@@ -123,6 +123,12 @@
   transform: translateY(-0.125rem);
 }
 
+@media (min-width: 901px) {
+  :where(.financing-scope) .floating-create-button {
+    bottom: max(5.5rem, calc(env(safe-area-inset-bottom) + 5.5rem));
+  }
+}
+
 @media (max-width: 56.25rem) {
 
   :where(.financing-scope) .navigation-progress {
