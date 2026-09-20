@@ -1,6 +1,6 @@
 # 融资择时模型
 
-入口：`/financing-model`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
+入口：`/trading-research/financing-model`，兼容 `/financing-model`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
 
 ## 接口
 
@@ -26,7 +26,7 @@
 
 ## 数据流
 
-quant pipeline → 本地结构化结果 → Neon `financing_model.model_run` 标量列、原生数组及有序明细表 → dashboard 重建最新运行。人工结论通过 PATCH 增量更新同一条 `model_run` 的当前结论列；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳为单段逻辑汇总及 4–5 家逐机构观点后追加保存。人工编辑逻辑汇总时保留原逐机构观点和检索证据，并追加新快照。
+Quant 线上 Workflow → R2 校验归档 → `publish_online_result` 原子发布 → Neon `financing_model.model_run` 标量列、原生数组及有序明细表 → dashboard 重建最新运行。人工结论通过 PATCH 增量更新同一条 `model_run` 的当前结论列；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳为单段逻辑汇总及 4–5 家逐机构观点后追加保存。人工编辑逻辑汇总时保留原逐机构观点和检索证据，并追加新快照。
 
 ## 存储：Neon：融资择时模型
 
@@ -49,3 +49,11 @@ Worker 通过同一 `HYPERDRIVE` 访问 `financing_model` schema：
 - 卖方快照只保存结构化观点、检索口径和源文档 key，不保存 AI Search 返回的完整正文。
 
 资金缺口保留在模型输入与结构化快照中供内部判断，但报告指标卡及自动生成业务文字不展示其数值和状态。其来源为资金日报规范化历史，见 [Quant 输入](quant-inputs.md)。
+
+## 线上自动结果
+
+- Quant 工作日 08:30 自动运行，完成 R2 `quant-trial/runs/{date}/{instanceId}/result.json` 归档后，通过 Hyperdrive 调用 `financing_model.publish_online_result(jsonb, text)`。页面 GET 只读数据库，不触发推理或写入。
+- `0007_online_model_publication.sql` 维护发布函数和原生来源列；原始 JSON 只保留在 R2，模型字段继续使用现有标量、数组和四张有序明细表。API 的可选 `snapshot.online_run` 返回模型版本、特征版本、训练日、重训截止日、排除组和运行环境，不暴露原始输入。
+- 线上结果优先接管同日旧本地模型，保留稳定 runId、人工结论、决策与卖方快照；接管后只接受生成时间更晚的线上结果，旧本地上传不能覆盖。同日重试、乱序结果不重复新增明细；任何明细失败整次发布回滚。
+- 线上 `online-market-v1` 不包含公司业务输入，`company_metrics` 保持 null；前端不显示业务指标区域。历史记录有公司快照时继续显示，不借用旧日期公司数据。
+- 本次仅接入自动结果，不增加手动运行入口。先应用 Dashboard migration，再部署 Quant 发布步骤，最后通过受控 Workflow 参数 `publish_result_key` 补录已有成功归档；无需重新训练或推理。发布完成后核对 API 日期、版本、明细、历史和人工记录。
