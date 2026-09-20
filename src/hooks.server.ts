@@ -4,6 +4,7 @@ import { loginUrl } from '$lib/auth-navigation';
 import { dashboardAccessFailure } from '$lib/server/dashboard-access';
 import { gatewayContext } from '$lib/server/gateway-context';
 import { closeDatabase } from '$lib/server/financing/db.js';
+import { withReminderCheckpointInvalidation } from '$lib/server/financing/reminder-checkpoint.js';
 
 export const handle: Handle = async ({ event, resolve }) => {
   event.locals.user = null;
@@ -19,7 +20,13 @@ export const handle: Handle = async ({ event, resolve }) => {
       if (event.isDataRequest && failure instanceof AccessError && failure.status === 401) redirect(303, loginUrl(event.url.pathname + event.url.search));
       return dashboardAccessFailure(event.request, failure);
     }
-    const response = await resolve(event);
+    const financingWrite = !['GET', 'HEAD', 'OPTIONS'].includes(event.request.method)
+      && (event.url.pathname === '/financing' || event.url.pathname.startsWith('/financing/'));
+    // Await both invalidations so a scan racing with a mutation cannot extend an
+    // old empty result. A failed mutation must also leave the next scan enabled.
+    const response = financingWrite
+      ? await withReminderCheckpointInvalidation(event.platform.env.DB, () => resolve(event))
+      : await resolve(event);
     if (response.status === 401) {
       if (event.isDataRequest) redirect(303, loginUrl(event.url.pathname + event.url.search));
       return dashboardAccessFailure(event.request, new AccessError(401, '请先登录'));

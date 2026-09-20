@@ -41,3 +41,11 @@
 ### 集中通知调度
 
 融资提醒不再由 Dashboard 的小时 Cron 触发；Messenger 每分钟经私有 NotificationSource 调用既有业务候选查询。责任人/经办人及规则指定的本站账号形成 userIds，提交 financing 通知事件；Messenger 解析用户订阅、独立联系方式和渠道。reminder_deliveries 保留历史与逻辑通知提交 ID，queued 不表示渠道送达；规则中的历史 email 列仅保留兼容，实际渠道由个人订阅决定。
+
+### 空闲扫描检查点
+
+Dashboard 的 `1020_financing_reminder_checkpoint.sql` 在 D1 保存单行调度元数据，不复制 Neon 业务数据或账号资格。SQL 候选集为空且非 dry-run 时，只在下一个整点再次访问 Neon；所有周期均为整小时，原自然日、09:00 和小时倒推规则保持不变。存在候选（即使没有有效收件人）、发送失败或查询失败时，仍按分钟重试。
+
+`/financing` 下所有写请求在动作前后同步失效检查点；generation 条件更新防止并发扫描重新写入旧空结果。数据库错误直接返回失败，不把失败缓存为空。直接 SQL / CLI 修改不经过 HTTP hooks，下一整点自动重查；需要下一分钟生效的维护操作应在修改前后运行 `UPDATE financing_reminder_checkpoint SET generation=generation+1,next_scan_at=0 WHERE id=1`（D1），不得修改 Neon 业务内容来刷新检查点。
+
+部署必须先应用 Dashboard 的 D1 migration；无业务变更时回滚 Worker 即恢复分钟扫描，检查点表可保留。交易提醒先检查工作日及节点起止时间的五分钟窗口，仅在可能到期时调用 Gateway 的实时资格目录；实际投递的 `/eligible` 仍每次实时查询，未缓存权限。
