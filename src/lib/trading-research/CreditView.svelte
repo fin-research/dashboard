@@ -758,12 +758,12 @@
   {:else if activeTab === "overview"}
     <section aria-labelledby="credit-metrics-title">
       <SectionHeading id="credit-metrics-title" title="授信总览" />
-      <div class="tr-metric-grid tr-metric-grid--five">
+      <div class="tr-metric-grid tr-metric-grid--five tr-credit-metric-grid">
         <MetricCard label="授信总额" value={report.summary.totalLimit.toFixed(1)} unit="亿元" detail={`${report.summary.institutionCount}家机构`} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
         <MetricCard label="已用额度" value={report.summary.totalUsed.toFixed(1)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
         <MetricCard label="可用额度" value={report.summary.totalAvailable.toFixed(1)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
         <MetricCard label="30日内到期" value={String(report.summary.expiringWithin30Days)} unit="笔" iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="red" compact />
-        <MetricCard label="授信额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" detail={report.previousSummary ? `${report.summary.utilization - report.previousSummary.utilization >= 0 ? "+" : ""}${(report.summary.utilization - report.previousSummary.utilization).toFixed(1)}个百分点较上期` : `${report.summary.approvedCount}家已获批`} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact />
+        <MetricCard label="额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" detail={report.previousSummary ? `${report.summary.utilization - report.previousSummary.utilization >= 0 ? "+" : ""}${(report.summary.utilization - report.previousSummary.utilization).toFixed(1)}个百分点较上期` : `${report.summary.approvedCount}家已获批`} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact />
       </div>
     </section>
 
@@ -835,21 +835,21 @@
           </label>
         </div>
       </PanelHeading>
-      <div class="tr-table-scroll">
+      <div class="tr-table-scroll" role="region" aria-label="授信机构记录" use:scrollableRegion>
         <table class="tr-data-table tr-credit-table">
           <caption class="sr-only">授信一览表</caption>
           <thead>
             <tr>
               <th>序号</th>
-              <th aria-sort={ariaSort("institutionName")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span></Button></th>
-              <th aria-sort={ariaSort("institutionType")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionType")}>机构性质<span aria-hidden="true">{sortIndicator("institutionType")}</span></Button></th>
-              <th aria-sort={ariaSort("status")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("status")}>状态<span aria-hidden="true">{sortIndicator("status")}</span></Button></th>
-              <th class="is-numeric" aria-sort={ariaSort("totalLimit")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalLimit")}>总额度<span aria-hidden="true">{sortIndicator("totalLimit")}</span></Button></th>
-              <th class="is-numeric" aria-sort={ariaSort("totalUsed")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalUsed")}>已使用<span aria-hidden="true">{sortIndicator("totalUsed")}</span></Button></th>
-              <th class="is-numeric" aria-sort={ariaSort("availableAmount")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("availableAmount")}>可用<span aria-hidden="true">{sortIndicator("availableAmount")}</span></Button></th>
-              <th class="is-numeric" aria-sort={ariaSort("utilization")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("utilization")}>使用率<span aria-hidden="true">{sortIndicator("utilization")}</span></Button></th>
-              <th aria-sort={ariaSort("effectiveDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("effectiveDate")}>生效日<span aria-hidden="true">{sortIndicator("effectiveDate")}</span></Button></th>
-              <th aria-sort={ariaSort("expiryDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("expiryDate")}>到期日<span aria-hidden="true">{sortIndicator("expiryDate")}</span></Button></th>
+              <th aria-sort={ariaSort("institutionName")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span></Button></th>
+              <th aria-sort={ariaSort("institutionType")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionType")}>机构性质<span aria-hidden="true">{sortIndicator("institutionType")}</span></Button></th>
+              <th aria-sort={ariaSort("status")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("status")}>状态<span aria-hidden="true">{sortIndicator("status")}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("totalLimit")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalLimit")}>总额度<span aria-hidden="true">{sortIndicator("totalLimit")}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("totalUsed")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalUsed")}>已使用<span aria-hidden="true">{sortIndicator("totalUsed")}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("availableAmount")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("availableAmount")}>可用<span aria-hidden="true">{sortIndicator("availableAmount")}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("utilization")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("utilization")}>使用率<span aria-hidden="true">{sortIndicator("utilization")}</span></Button></th>
+              <th aria-sort={ariaSort("effectiveDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("effectiveDate")}>生效日<span aria-hidden="true">{sortIndicator("effectiveDate")}</span></Button></th>
+              <th aria-sort={ariaSort("expiryDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("expiryDate")}>到期日<span aria-hidden="true">{sortIndicator("expiryDate")}</span></Button></th>
               <th><span class="sr-only">操作</span></th>
             </tr>
           </thead>

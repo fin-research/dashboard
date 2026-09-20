@@ -44,3 +44,8 @@
 @media (max-width: 720px) {
   .tr-shell--workspace .tr-credit-calendar-nav { width: 100%; justify-content: space-between; }
 }
+
+@media (min-width: 1200px) {
+  .tr-shell--workspace .tr-credit-metric-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tr-shell--workspace .tr-credit-metric-grid .research-metric-card__content { align-self: stretch; justify-content: flex-start; }
+}

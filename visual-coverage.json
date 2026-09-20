@@ -315,6 +315,16 @@
           "snapshots": [
             "credit.png"
           ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "desktop credit metrics and expanded records stay within the workspace",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-record-expanded.png"
+          ]
         }
       ]
     },
