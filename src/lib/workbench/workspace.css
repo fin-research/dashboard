@@ -16,7 +16,7 @@
 }
 
 /* Labels remain emphasized; entered values use normal body weight. */
-.tr-shell--workspace :is(.ui-input, .ui-select, .ui-textarea) { font-weight: normal; }
+.tr-shell--workspace :is(.ui-input, .ui-select, .ui-textarea, [data-slot="input"], [data-slot="textarea"], [data-slot="native-select"]) { font-weight: normal; }
 .tr-shell--workspace .ui-tone-success {
   color: color-mix(in srgb, var(--color-success-content) 80%, var(--text-1));
 }
@@ -56,4 +56,10 @@
   .tr-shell--workspace .tr-credit-editor-grid > label:nth-child(-n + 4) { grid-column: span 3; }
   .tr-shell--workspace .tr-credit-item-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; }
   .tr-shell--workspace .tr-credit-item-grid fieldset { align-content: start; }
+}
+
+/* Keep the last action row reachable above the fixed AI launcher on desktop. */
+@media (min-width: 1024px) {
+  .tr-shell--workspace #tr-workbench-main:where(:not(.tr-chat-page):not(.tr-canvas-page)) { padding-bottom: 88px; }
+  .tr-shell--workspace #tr-workbench-main:has(.floating-create-button) { padding-bottom: 104px; }
 }

@@ -35,11 +35,11 @@ async function refreshCache() {
     <ModuleCard class="role-catalog">
       <PanelHeading id="role-catalog-title" title="角色" />
       <ul class="role-list" aria-labelledby="role-catalog-title">
-        {#each data.roles as item}<li><Button data-ui-owner="routes-management-people--page-svelte" variant="ghost" class={["ui-button ", selectedRole === item.id && "is-selected"]}  type="button" aria-pressed={selectedRole === item.id} onclick={() => selectedRole = item.id}><span>{roleLabel(item.name)}</span><UiBadge variant="secondary" class="ui-badge ui-tone-neutral">{data.configurations[item.id]?.permissions.length ?? 0}</UiBadge></Button></li>{/each}
+        {#each data.roles as item}<li><Button data-ui-owner="routes-management-people--page-svelte" variant={selectedRole === item.id ? "default" : "ghost"} class="ui-button"  type="button" aria-pressed={selectedRole === item.id} onclick={() => selectedRole = item.id}><span>{roleLabel(item.name)}</span><UiBadge variant="secondary" class="ui-badge ui-tone-neutral">{data.configurations[item.id]?.permissions.length ?? 0}</UiBadge></Button></li>{/each}
       </ul>
     </ModuleCard>
     <ModuleCard class="permission-editor">
-      {#if role}<PanelHeading id="role-permissions-title" title={roleLabel(role.name)}><UiBadge variant="secondary" class="ui-badge ui-tone-neutral">只读</UiBadge></PanelHeading><PermissionExplorer permissions={data.configurations[selectedRole]?.permissions ?? []} />{:else}<p>暂无角色。</p>{/if}
+      {#if role}<PanelHeading id="role-permissions-title" title={roleLabel(role.name)} controlsBesideTitle><UiBadge variant="secondary" class="ui-badge ui-tone-neutral">只读</UiBadge></PanelHeading><PermissionExplorer permissions={data.configurations[selectedRole]?.permissions ?? []} />{:else}<p>暂无角色。</p>{/if}
     </ModuleCard>
   </div>
 </div>

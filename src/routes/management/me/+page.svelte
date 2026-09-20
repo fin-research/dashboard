@@ -120,7 +120,7 @@
         <PanelHeading id="profile-preferences-title" title="个性化配置" accent="var(--business-purple)" />
         <form class="profile-form" onsubmit={(event) => { event.preventDefault(); persistPreferences(); }}>
           <fieldset><legend>行情颜色逻辑</legend>
-            <RadioGroup.Root name="marketColorConvention" bind:value={marketColorConvention}>
+            <RadioGroup.Root name="marketColorConvention" bind:value={marketColorConvention} class="flex flex-wrap gap-x-5 gap-y-0">
             <label class="profile-choice"><RadioGroup.Item value="red-up-green-down" /><span>红涨绿跌</span></label>
             <label class="profile-choice"><RadioGroup.Item value="green-up-red-down" /><span>绿涨红跌</span></label>
             </RadioGroup.Root>

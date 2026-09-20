@@ -54,6 +54,11 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		else globalMessages.error(message, { key: 'project-detail-action' });
 	});
 
+	function memberResponsibilities(member: { responsibility: string; roles?: { name: string }[] }) {
+		const roles = member.roles?.map(role => role.name) ?? [];
+		return [...new Set([member.responsibility, ...(roles.length ? roles : ['未分配角色'])])].join(' · ');
+	}
+
 	const statusLabels: Record<string, string> = {
 		planning: '规划中',
 		in_progress: '执行中',
@@ -350,7 +355,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 						<span>{member.name.slice(0, 1)}</span>
 						<div>
 							<strong>{member.name}</strong>
-							<p>{member.responsibility} · {member.roles?.map((role: { name: string }) => role.name).join('、') || '未分配角色'}</p>
+							<p>{memberResponsibilities(member)}</p>
 							<small>{member.email ?? '未填写邮箱'}</small>
 						</div>
 					</li>
@@ -597,7 +602,8 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		font-weight: bold;
 		color: #344054;
 	}
-	.member-list,
+	.member-list { display: grid; margin: 0; padding: 0; list-style: none; }
+	.member-list li > div { min-width: 0; flex: 1; }
 	.member-list li {
 		display: flex;
 		align-items: center;

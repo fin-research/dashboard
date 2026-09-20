@@ -83,11 +83,15 @@
     },
     {
       "source": "src/routes/financing/projects/+page.svelte",
-      "exemption": "融资项目数据与权限，未建浏览器夹具"
+      "scenarios": [
+        "financing-projects"
+      ]
     },
     {
       "source": "src/routes/financing/projects/[id]/+page.svelte",
-      "exemption": "服务端项目详情，未建浏览器夹具"
+      "scenarios": [
+        "financing-project-detail"
+      ]
     },
     {
       "source": "src/routes/financing/sop/+page.svelte",
@@ -115,7 +119,9 @@
     },
     {
       "source": "src/routes/management/me/+page.svelte",
-      "exemption": "身份资料 API 页面，未建浏览器夹具"
+      "scenarios": [
+        "management-me"
+      ]
     },
     {
       "source": "src/routes/management/messenger/+page.svelte",
@@ -126,11 +132,15 @@
     },
     {
       "source": "src/routes/management/notifications/+page.svelte",
-      "exemption": "Web Push/设备 API，未建浏览器夹具"
+      "scenarios": [
+        "management-notifications"
+      ]
     },
     {
       "source": "src/routes/management/people/+page.svelte",
-      "exemption": "Auth0 管理边界，浏览器无法伪造 Gateway 身份"
+      "scenarios": [
+        "management-people"
+      ]
     },
     {
       "source": "src/routes/management/permissions/+page.svelte",
@@ -1076,6 +1086,100 @@
             "liability-page-4.png",
             "liability-page-5.png",
             "liability-page-6.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "management-people",
+      "url": "/management/people",
+      "kind": "screenshot",
+      "state": "desktop/selection",
+      "evidence": [
+        {
+          "spec": "tests/visual/management-desktop.spec.mjs",
+          "test": "desktop role catalog identifies the selected role without changing permissions",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "management-role-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "management-me",
+      "url": "/management/me",
+      "kind": "screenshot",
+      "state": "desktop/selection",
+      "evidence": [
+        {
+          "spec": "tests/visual/management-desktop.spec.mjs",
+          "test": "desktop profile aligns actions and keeps unsaved settings local",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "management-profile-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "management-notifications",
+      "url": "/management/notifications",
+      "kind": "screenshot",
+      "state": "desktop/selection",
+      "evidence": [
+        {
+          "spec": "tests/visual/management-desktop.spec.mjs",
+          "test": "desktop notification choices align with their channel headings",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "management-notifications-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-projects",
+      "url": "/financing/projects",
+      "kind": "screenshot",
+      "state": "desktop/forms",
+      "evidence": [
+        {
+          "spec": "tests/visual/projects-desktop.spec.mjs",
+          "test": "desktop projects expose selected timeline views and consistent edit dialogs",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "projects-expanded-desktop.png",
+            "project-create-desktop.png",
+            "project-edit-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-project-detail",
+      "url": "/financing/projects/project-1",
+      "kind": "screenshot",
+      "state": "desktop/forms",
+      "evidence": [
+        {
+          "spec": "tests/visual/projects-desktop.spec.mjs",
+          "test": "desktop project detail displays period endpoints and unscheduled tasks",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "project-detail-desktop.png",
+            "project-add-period-desktop.png",
+            "project-members-desktop.png"
           ]
         }
       ]

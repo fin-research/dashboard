@@ -42,5 +42,6 @@ onMount(()=>{try{currentDevice=localStorage.getItem(deviceKey())??'';}catch{}sup
 {/if}
 </div>
 <style>
+.subscription-table :global([role="checkbox"]) { margin-inline: auto; }
 .notification-settings{display:grid;gap:20px;max-width:1100px}.contact-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}label{display:grid;gap:10px}.subscription-table{overflow:auto;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{padding:16px;border-bottom:1px solid var(--border-color);text-align:center}th:first-child{text-align:left}.device-actions,li{display:flex;align-items:center;justify-content:space-between;gap:16px}ul{list-style:none;padding:0}li{padding:12px 0}@media(max-width:720px){.contact-fields{grid-template-columns:1fr}}
 </style>
