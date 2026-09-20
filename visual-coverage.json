@@ -24,7 +24,9 @@
     },
     {
       "source": "src/routes/auth/verify-email/+page.svelte",
-      "exemption": "认证/邮件状态页，视觉 harness 明确无 auth bypass"
+      "scenarios": [
+        "verification-notice"
+      ]
     },
     {
       "source": "src/routes/bond/+page.svelte",
@@ -122,7 +124,7 @@
     },
     {
       "source": "src/routes/management/+page.svelte",
-      "exemption": "没有页面截图/交互；组件只有 head"
+      "exemption": "服务端303跳转到/management/me，无独立页面正文；目标页面已覆盖"
     },
     {
       "source": "src/routes/management/me/+page.svelte",
@@ -182,11 +184,11 @@
     },
     {
       "source": "src/routes/policy-tracking/+page.svelte",
-      "exemption": "LegacyWorkbenchRedirect；canonical dynamic view 也无 visual spec"
+      "exemption": "LegacyWorkbenchRedirect；canonical政策跟踪视图已覆盖，兼容URL不重复计作页面"
     },
     {
       "source": "src/routes/profile/+page.svelte",
-      "exemption": "认证身份页，visual harness 无 auth bypass"
+      "exemption": "服务端303跳转到/management/me，无独立页面正文；目标页面已覆盖"
     },
     {
       "source": "src/routes/secondary-bond-pool/+page.svelte",
@@ -1333,6 +1335,24 @@
           "snapshots": [
             "financing-calendar-desktop.png",
             "financing-calendar-more-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "verification-notice",
+      "url": "/auth/verify-email",
+      "kind": "screenshot",
+      "state": "静态验证提示与返回入口，不模拟认证服务",
+      "evidence": [
+        {
+          "spec": "tests/visual/verification-notice.spec.mjs",
+          "test": "desktop verification notice provides clear navigation without handling credentials",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "verification-notice-desktop.png"
           ]
         }
       ]

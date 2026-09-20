@@ -35,7 +35,7 @@ test('desktop financing calendar reveals busy dates without stretching every wee
  await page.getByRole('button',{name:'展开周末，显示完整日历',exact:true}).click();
  await expect(page.locator('.calendar-grid > .weekday')).toHaveCount(7);
  await page.setViewportSize({width:1280,height:1600});
- await page.locator('.calendar-card').scrollIntoViewIfNeeded();await expect(page.locator('.calendar-card')).toBeInViewport({ratio:1});
+ await page.locator('.calendar-card').evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));await expect(page.locator('.calendar-card')).toBeInViewport({ratio:1});
  await expect(page.locator('.calendar-card')).toHaveScreenshot('financing-calendar-desktop.png');
  await page.setViewportSize({width:1280,height:900});
  await more.click();

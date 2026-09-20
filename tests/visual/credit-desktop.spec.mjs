@@ -33,7 +33,7 @@ test('desktop credit metrics and expanded records stay within the workspace',asy
   expect(products).toHaveLength(5);
   expect(Math.max(...products)-Math.min(...products)).toBeLessThanOrEqual(1);
   await page.setViewportSize({width:1280,height:1600});
-  await region.scrollIntoViewIfNeeded();await expect(region).toBeInViewport({ratio:1});
+  await region.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));await expect(region).toBeInViewport({ratio:1});
   await expect(region).toHaveScreenshot('credit-record-expanded.png');
   await page.setViewportSize({width:1280,height:900});
   await region.getByRole('button',{name:'收起',exact:true}).click();

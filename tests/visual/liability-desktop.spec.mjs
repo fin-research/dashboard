@@ -14,7 +14,7 @@ test('desktop liability report retains six complete pages with readable charts',
   const snapshots=['liability-page-1.png','liability-page-2.png','liability-page-3.png','liability-page-4.png','liability-page-5.png','liability-page-6.png'];
   for(let index=0;index<6;index++){
     const sheet=pages.nth(index);
-    await sheet.scrollIntoViewIfNeeded();
+    await sheet.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
     await expect(sheet).toBeInViewport({ratio:1});
     await expect(sheet.getByText(`第 ${index+1} 页 · 共 6 页`,{exact:true})).toBeVisible();
     expect(await sheet.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);

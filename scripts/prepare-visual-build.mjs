@@ -32,6 +32,7 @@ const moduleCardStyles = Object.values(clientManifest).filter(chunk => chunk.nam
 if (!moduleCardStyles.length) throw new Error('Missing production ModuleCard CSS for the schedule fixture');
 const map = {
   '/': stylesFor(layout, 'src/routes/+page.svelte'),
+  '/auth/verify-email': stylesFor(layout, 'src/routes/auth/verify-email/+page.svelte'),
   '/trading-research': stylesFor(layout, 'src/routes/trading-research/+page.svelte', 'src/routes/trading-research/[view]/+page.svelte'),
   '/credit-workbench': stylesFor(layout, 'src/routes/credit-workbench/[[view]]/+page.svelte'),
   '/news': stylesFor(layout, 'src/routes/news/[id]/+page.svelte'),

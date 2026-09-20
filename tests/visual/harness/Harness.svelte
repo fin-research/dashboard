@@ -11,6 +11,7 @@
   const path = window.location.pathname;
   const view = path.split('/')[2];
   const component: Promise<{ default: Component<any> }> = path === '/' ? import('../../../src/routes/+page.svelte')
+    : path === '/auth/verify-email' ? import('../../../src/routes/auth/verify-email/+page.svelte')
     : path.startsWith('/trading-research') ? import('../../../src/lib/trading-research/WorkbenchPage.svelte')
     : path.startsWith('/credit-workbench') ? import('../../../src/lib/credit-workbench/CreditWorkbenchPage.svelte')
     : path.startsWith('/news/') ? import('../../../src/routes/news/[id]/+page.svelte')
