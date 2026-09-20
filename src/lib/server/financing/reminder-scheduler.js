@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createPostgresDatabase } from '../../financing/postgres.js';
 import { sendDueReminders } from './reminders.js';
+import { readReminderCheckpoint, saveEmptyReminderCheckpoint } from './reminder-checkpoint.js';
 
 function statusCounts(results) {
 	return results.reduce((counts, result) => {
@@ -22,6 +23,10 @@ export async function runScheduledReminderCheck({
 }) {
 	const asOf = new Date(scheduledTime);
 	if (!Number.isFinite(asOf.getTime())) throw new Error('提醒调度时间无效');
+	const checkpoint = env.DB ? await readReminderCheckpoint(env.DB) : null;
+	if (checkpoint && checkpoint.checked_at <= scheduledTime && scheduledTime < checkpoint.next_scan_at) {
+		return { event: 'reminders.cron.idle', asOf: asOf.toISOString(), count: 0, dryRun: false, statuses: {} };
+	}
 
 	const database = createDatabase(
 		env.HYPERDRIVE.connectionString,
@@ -29,6 +34,9 @@ export async function runScheduledReminderCheck({
 	);
 	try {
 		const result = await send({ asOf, db: database, config: env });
+		if (checkpoint && result.candidateCount === 0 && !result.dryRun) {
+			await saveEmptyReminderCheckpoint(env.DB, checkpoint.generation, scheduledTime);
+		}
 		return {
 			event: 'reminders.cron.completed',
 			asOf: result.asOf,
