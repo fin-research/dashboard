@@ -141,7 +141,7 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 					</div>
 					<div>
 						<strong>{row.ruleName}</strong>
-						<span>{row.targetType} · {row.targetId}</span>
+						<span>{row.targetType === 'project_task' ? '项目任务' : row.targetType} · {row.targetId}</span>
 					</div>
 					<div class="recipient-list">
 						{#each row.recipients as recipient}
@@ -386,6 +386,9 @@ import { formatFinancingTimestamp } from '$lib/financing/time.js';
 		border-radius: 999rem;
 		font-weight: bold;
 	}
+
+	.history-row a { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
+	.status-pill.queued { color: var(--brand-deep); background: var(--brand-soft); }
 
 	.status-pill.sent {
 		color: #067647;

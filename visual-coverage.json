@@ -51,7 +51,10 @@
     },
     {
       "source": "src/routes/financing/+page.svelte",
-      "exemption": "融资仪表盘完整页面未接入 harness；本轮仅以 financing-presets 组件场景检查预设文字和筛选，不代表整页覆盖"
+      "scenarios": [
+        "financing-dashboard",
+        "financing-calendar"
+      ]
     },
     {
       "source": "src/routes/financing/bond-investors/+page.svelte",
@@ -101,11 +104,15 @@
     },
     {
       "source": "src/routes/financing/sop/[id]/+page.svelte",
-      "exemption": "服务端 SOP 详情，未建浏览器夹具"
+      "scenarios": [
+        "sop-detail"
+      ]
     },
     {
       "source": "src/routes/financing/sop/reminders/+page.svelte",
-      "exemption": "提醒历史服务端数据，未建浏览器夹具"
+      "scenarios": [
+        "sop-history"
+      ]
     },
     {
       "source": "src/routes/fund-report/+page.svelte",
@@ -1180,6 +1187,83 @@
             "project-detail-desktop.png",
             "project-add-period-desktop.png",
             "project-members-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sop-detail",
+      "url": "/financing/sop/short-term",
+      "kind": "screenshot",
+      "state": "desktop/interaction",
+      "evidence": [
+        {
+          "spec": "tests/visual/sop-detail-desktop.spec.mjs",
+          "test": "desktop SOP opens node dialog and cancels keyboard sorting cleanly",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "sop-keyboard-sort-desktop.png",
+            "sop-add-period-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sop-history",
+      "url": "/financing/sop/reminders",
+      "kind": "screenshot",
+      "state": "desktop/interaction",
+      "evidence": [
+        {
+          "spec": "tests/visual/sop-detail-desktop.spec.mjs",
+          "test": "desktop reminder history supports pagination filters and empty recovery",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "reminder-history-desktop.png",
+            "reminder-empty-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-dashboard",
+      "url": "/financing/?preset=all",
+      "kind": "screenshot",
+      "state": "desktop/nonempty/interaction",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-dashboard-desktop.spec.mjs",
+          "test": "desktop financing dashboard keeps balanced metrics and complete table values",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "financing-dashboard-desktop.png",
+            "financing-quota-desktop.png",
+            "financing-simulation-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "financing-calendar",
+      "url": "/financing/?preset=all",
+      "kind": "screenshot",
+      "state": "desktop/nonempty/interaction",
+      "evidence": [
+        {
+          "spec": "tests/visual/financing-dashboard-desktop.spec.mjs",
+          "test": "desktop financing calendar reveals busy dates without stretching every week",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "financing-calendar-desktop.png",
+            "financing-calendar-more-desktop.png"
           ]
         }
       ]

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Modal from "$lib/components/Modal.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import { NativeSelect } from "$lib/components/ui/native-select/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
@@ -111,17 +112,17 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 			limit: '100%', detailLabel: '短期负债', detailValue: `${dashboard.metrics.shortDebtYi.toFixed(2)}亿元`
 		},
 		{
-			label: '新增单笔借款较证券上年末净资产', shortLabel: '新增单笔 / 证券净资产', value: ratioText(dashboard.metrics.largestBorrowingRatio),
+			label: '新增单笔借款较证券上年末净资产', shortLabel: '单笔 / 证券净资产', value: ratioText(dashboard.metrics.largestBorrowingRatio),
 			tone: ratioTone(dashboard.metrics.largestBorrowingRatio, 20),
 			limit: '20%', detailLabel: '最大单笔', detailValue: `${dashboard.metrics.largestBorrowingYi.toFixed(2)}亿元`
 		},
 		{
-			label: '累计新增借款较证券上年末净资产', shortLabel: '累计新增 / 证券净资产', value: ratioText(dashboard.metrics.cumulativeSecuritiesRatio),
+			label: '累计新增借款较证券上年末净资产', shortLabel: '累计 / 证券净资产', value: ratioText(dashboard.metrics.cumulativeSecuritiesRatio),
 			tone: ratioTone(dashboard.metrics.cumulativeSecuritiesRatio, 50),
 			limit: '50%', detailLabel: '净新增', detailValue: `${dashboard.metrics.cumulativeBorrowingYi > 0 ? '+' : ''}${dashboard.metrics.cumulativeBorrowingYi.toFixed(2)}亿元`
 		},
 		{
-			label: '累计新增借款较集团上年末净资产', shortLabel: '累计新增 / 集团净资产', value: ratioText(dashboard.metrics.cumulativeGroupRatio),
+			label: '累计新增借款较集团上年末净资产', shortLabel: '累计 / 集团净资产', value: ratioText(dashboard.metrics.cumulativeGroupRatio),
 			tone: ratioTone(dashboard.metrics.cumulativeGroupRatio, 10),
 			limit: '10%', detailLabel: '净新增', detailValue: `${dashboard.metrics.cumulativeBorrowingYi > 0 ? '+' : ''}${dashboard.metrics.cumulativeBorrowingYi.toFixed(2)}亿元`
 		}
@@ -146,7 +147,9 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 	const initialCalendarTypes = () => data.dashboard.typeOptions.filter((type: string) => !['同业拆借', '浮动收益凭证'].includes(type));
 	let calendarTypes = $state<string[]>(initialCalendarTypes());
 	let calendarExpanded = $state(false);
+	let calendarDetailDate = $state<string | null>(null);
 	const visibleEvents = $derived(dashboard.events.filter((event: any) => calendarTypes.length === 0 || calendarTypes.includes(event.filterType)));
+	const calendarDetailEvents = $derived(visibleEvents.filter((event: any) => event.date === calendarDetailDate));
 	const cellsPerWeek = $derived(calendarExpanded ? 7 : 5);
 	const calendarCells = $derived(financingCalendarDates(dashboard.calendarMonth, calendarExpanded).map((key) => ({
     date: key,
@@ -204,7 +207,7 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 			{#each regulatoryItems as item}
 				<div class="regulatory-cell">
 					<div class="regulatory-title">
-						<span>{item.shortLabel}</span>
+						<span title={item.label}>{item.shortLabel}</span>
 						<span class={`financing-status-light ${item.tone}`} role="img" aria-label={toneLabel(item.tone)}></span>
 					</div>
 					<div class="regulatory-value-row"><strong class:financing-muted-value={item.value === '待配置'}>{item.value}</strong><span>上限 {item.limit}</span></div>
@@ -220,27 +223,27 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 <section class="overview-row">
 	<ModuleCard class="financing-panel structure-panel">
 		<PanelHeading id="financing-panel-1" title="存量负债结构" controlsInline><span>{compositionTotal.toFixed(2)}亿元</span></PanelHeading>
-    <ChartHost option={financingCompositionOption(dashboard.composition)} ariaLabel={`存量负债结构，合计 ${compositionTotal.toFixed(2)}亿元`} height={17} />
+    <ChartHost option={financingCompositionOption(dashboard.composition, true)} ariaLabel={`存量负债结构，合计 ${compositionTotal.toFixed(2)}亿元`} height={20} />
 	</ModuleCard>
 
 	<ModuleCard class="financing-panel maturity-panel">
 		<PanelHeading id="financing-panel-2" title="到期分布" accent="var(--orange)" controlsInline><span>未来 6 个月 · 亿元</span></PanelHeading>
-    <ChartHost option={financingMaturityOption(dashboard.maturityDistribution)} ariaLabel="未来六个月到期本金分布，单位亿元" height={17} />
+    <ChartHost option={financingMaturityOption(dashboard.maturityDistribution)} ariaLabel="未来六个月到期本金分布，单位亿元" height={20} />
 	</ModuleCard>
 </section>
 
 <section class="dashboard-grid">
 	<ModuleCard class="financing-panel project-panel">
-		<PanelHeading id="financing-panel-3" title="推进中的融资项目" accent="var(--violet)" controlsInline></PanelHeading>
+		<PanelHeading id="financing-panel-3" title="推进中的融资项目" accent="var(--violet)" controlsInline><span>亿元</span></PanelHeading>
 		<div class="financing-table-scroll" role="region" aria-label="推进中的融资项目明细" use:scrollableRegion>
-		<table class="ui-table"><thead><tr><th>融资方式</th><th>融资金额</th><th>期限</th><th>融资成本</th><th>落地时间</th></tr></thead><tbody>
+		<table class="ui-table"><thead><tr><th>融资方式</th><th>金额</th><th>期限</th><th>融资成本</th><th>落地时间</th></tr></thead><tbody>
 			{#each dashboard.projects as project}<tr><td><a data-ui-owner="routes-financing--page-svelte" href={withBase(`/projects/${project.id}`)}>{project.debtType}</a><span class="project-name">{project.name}</span></td><td>{project.amountYi.toFixed(2)}</td><td>{project.tenor}</td><td>{project.cost}</td><td>{#if project.landingDate}<time class="financing-date" datetime={project.landingDate}>{dateLabel(project.landingDate)}</time>{:else}待定{/if}</td></tr>{/each}
 		</tbody><tfoot><tr><th>合计</th><th>{projectTableAmountYi.toFixed(2)}</th><th colspan="3"></th></tr></tfoot></table>
 		</div>
 	</ModuleCard>
 
 	<ModuleCard class="financing-panel issuance-panel">
-		<PanelHeading id="financing-panel-4" title="月度发行统计" accent="var(--teal)" controlsInline></PanelHeading>
+		<PanelHeading id="financing-panel-4" title="月度发行统计" accent="var(--teal)" controlsInline><span>亿元</span></PanelHeading>
 		<div class="financing-table-scroll" role="region" aria-label="月度发行统计明细" use:scrollableRegion>
 		<table class="ui-table"><thead><tr><th>品种</th><th>{dashboard.monthlyIssuance.currentMonth.replace('-', '年')}月</th><th>{dashboard.monthlyIssuance.comparisonMonth.replace('-', '年')}月</th></tr></thead><tbody>
 			{#each dashboard.monthlyIssuance.rows as row}<tr><td>{row.label}</td><td>{row.currentYi.toFixed(2)}</td><td>{row.comparisonYi.toFixed(2)}</td></tr>{/each}
@@ -249,9 +252,9 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 	</ModuleCard>
 
 	<ModuleCard class="financing-panel limit-card">
-		<PanelHeading id="financing-panel-5" title="负债额度管理" controlsInline></PanelHeading>
+		<PanelHeading id="financing-panel-5" title="负债额度管理" controlsInline><span>亿元</span></PanelHeading>
 		<div class="financing-table-scroll" role="region" aria-label="负债额度明细" use:scrollableRegion>
-		<table class="ui-table"><thead><tr><th>融资品种</th><th>可发行额度</th><th>已发行额度</th><th>剩余可用额度</th><th>获批日期</th><th>到期日期</th></tr></thead><tbody>
+		<table class="ui-table"><thead><tr><th>融资品种</th><th>可发行</th><th>已发行</th><th>剩余可用</th><th>获批日期</th><th>到期日期</th></tr></thead><tbody>
 			{#each dashboard.limits as item}<tr><td><strong>{item.debtType}</strong></td><td>{item.limitYi.toFixed(2)}</td><td>{item.issuedYi.toFixed(2)}</td><td class:negative={item.remainingYi < 0}><strong>{item.remainingYi.toFixed(2)}</strong><span class="quota-utilization">已用 {item.limitYi > 0 ? (item.issuedYi / item.limitYi * 100).toFixed(0) : 0}%</span></td><td><time class="financing-date" datetime={item.approvedDate ?? undefined}>{dateLabel(item.approvedDate)}</time></td><td><time class="financing-date" datetime={item.expiryDate ?? undefined}>{dateLabel(item.expiryDate)}</time></td></tr>{/each}
 		</tbody><tfoot><tr><th>合计</th><th>{dashboard.limitTotals.limitYi.toFixed(2)}</th><th>{dashboard.limitTotals.issuedYi.toFixed(2)}</th><th>{dashboard.limitTotals.remainingYi.toFixed(2)}</th><th></th><th></th></tr></tfoot></table>
 		</div>
@@ -296,7 +299,8 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 					<div class:other={cell.other} class:today={cell.today} class="calendar-cell">
 						<span class="day-number">{cell.day}</span>
 						<div class="calendar-events">
-							{#each cell.events as event}<a data-ui-owner="routes-financing--page-svelte" class={event.tone} href={withBase(event.href)} title={event.title}>{event.title}</a>{/each}
+							{#each cell.events.slice(0, 3) as event}<a data-ui-owner="routes-financing--page-svelte" class={event.tone} href={withBase(event.href)} title={event.title}>{event.title}</a>{/each}
+                        {#if cell.events.length > 3}<Button variant="ghost" class="calendar-more-trigger" aria-haspopup="dialog" aria-label={`${cell.date} 更多 ${cell.events.length - 3} 项融资事件`} onclick={() => calendarDetailDate = cell.date}>更多 {cell.events.length - 3} 项</Button>{/if}
 						</div>
 					</div>
 				{/each}
@@ -304,3 +308,10 @@ import { financingCompositionOption, financingMaturityOption } from '../../chart
 		</div>
 	</ModuleCard>
 </section>
+
+{#if calendarDetailDate}
+  <Modal open aria-label={`${calendarDetailDate} 融资日程`} class="w-[min(36rem,calc(100vw-3rem))]" onclose={() => calendarDetailDate = null}>
+    <div class="calendar-more-header"><h2>{dateLabel(calendarDetailDate)} 融资日程</h2><Button variant="ghost" onclick={() => calendarDetailDate = null}>关闭</Button></div>
+    <div class="calendar-events calendar-more-events">{#each calendarDetailEvents as event}<a class={event.tone} href={withBase(event.href)}>{event.title}</a>{/each}</div>
+  </Modal>
+{/if}

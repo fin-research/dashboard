@@ -136,7 +136,7 @@ test('project KPI follows dashboard types while the project table remains comple
 	assert.match(page, /\{projectTableAmountYi\.toFixed\(2\)\}/);
 });
 
-test('dashboard metric cards keep an isolated two-row, three-column layout', async () => {
+test('dashboard metric cards keep an isolated two-row, three-column layout with equal rows', async () => {
 	const [page, styles] = await Promise.all([
 		readFile(new URL('../../src/routes/financing/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/dashboard.css', import.meta.url), 'utf8')
@@ -145,6 +145,6 @@ test('dashboard metric cards keep an isolated two-row, three-column layout', asy
 	assert.match(page, /<section class="financing-metric-grid" aria-label="融资指标">/);
 	assert.match(page, /<MetricCard label=\{metric\.label\}/);
 	assert.doesNotMatch(page, /financing-metric-card/);
-	assert.match(styles, /\.financing-metric-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);[\s\S]*?grid-auto-rows:\s*minmax\(10rem,\s*auto\);/);
+	assert.match(styles, /\.financing-metric-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);[\s\S]*?grid-auto-rows:\s*minmax\(10rem,\s*1fr\);/);
 	assert.doesNotMatch(page, /class="metric-grid"|class={`metric-card/);
 });
