@@ -142,7 +142,7 @@
 {/if}
 
 <Modal  bind:this={dialog} aria-labelledby="parameter-editor-title" oncancel={(event) => { if (saving) event.preventDefault(); }}>
-<div class="dialog-body config-modal">
+<div class="dialog-body config-modal management-page">
 	<form onsubmit={(event) => { event.preventDefault(); void save(); }}>
 		<div class="modal-header"><h2 id="parameter-editor-title">{original ? '编辑' : '新增'}月度财务数据</h2><Button data-ui-owner="lib-financing-FinanceParametersPanel-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭财务数据编辑" onclick={() => dialog.close()} disabled={saving}><X size={20} /></Button></div>
 		<fieldset disabled={saving}>
@@ -192,6 +192,12 @@
 	.ratio-preview p { margin: 0 0 .5rem; }
 	.config-modal .error-message { padding-inline: 0; }
 	:global(input[data-ui-owner="lib-financing-FinanceParametersPanel-svelte"]), :global(select[data-ui-owner="lib-financing-FinanceParametersPanel-svelte"]), :global(textarea[data-ui-owner="lib-financing-FinanceParametersPanel-svelte"]) { min-width: 0; }
+	@media (min-width: 901px) {
+		.parameter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+		.parameter-card { display: flex; flex-direction: column; gap: .75rem; }
+		.parameter-value { margin-top: auto; }
+		.parameter-notes, .reconciliation { margin-top: 1rem; }
+	}
 	@media (max-width: 75rem) { .parameter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 	@media (max-width: 35rem) { .parameter-grid { grid-template-columns: minmax(0, 1fr); } }
 </style>

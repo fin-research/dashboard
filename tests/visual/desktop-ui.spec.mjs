@@ -1,5 +1,35 @@
+import { mockFinancialMonths } from './financing-data-fixture.mjs';
 import { test, expect } from '@playwright/test';
 import { mockResources, marketSnapshot } from './fixtures.mjs';
+
+test('desktop client search stays on one row and edit dialog restores focus', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop UI audit');
+  await mockResources(page);
+  await page.goto('/financing/clients');
+  const input=page.getByRole('textbox',{name:'搜索客户或别名'});
+  const search=page.getByRole('button',{name:'搜索',exact:true});
+  const create=page.getByRole('button',{name:'新增客户',exact:true});
+  for(const width of [1440,1280]){
+    await page.setViewportSize({width,height:900});
+    const a=await input.boundingBox(),b=await search.boundingBox(),c=await create.boundingBox();
+    expect(Math.abs(a.y-b.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(a.y-c.y)).toBeLessThanOrEqual(1);
+    expect(a.width).toBeGreaterThan(200);
+  }
+  await expect(page).toHaveScreenshot('clients-toolbar.png',{fullPage:true});
+  const edit=page.getByRole('button',{name:'编辑银行甲',exact:true});
+  await edit.click();
+  const dialog=page.getByRole('dialog',{name:'编辑客户',exact:true});
+  await expect(dialog.getByRole('textbox',{name:'客户名称',exact:true})).toHaveValue('银行甲');
+  await expect(page).toHaveScreenshot('clients-edit.png',{fullPage:true});
+  await dialog.getByRole('button',{name:'取消',exact:true}).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(edit).toBeFocused();
+  await input.fill('甲行');await search.click();
+  await expect(page).toHaveURL(/q=%E7%94%B2%E8%A1%8C/);
+  await expect(page.getByRole('button',{name:'编辑银行甲',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'编辑证券乙',exact:true})).toHaveCount(0);
+});
 
 test('desktop SOP create action remains clear of AI and opens a dismissible dialog', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop UI audit');
@@ -44,4 +74,41 @@ test('desktop market report retains full names and table cells at 1280 pixels', 
     expect(clipped, selector).toEqual([]);
   }
   await expect(page).toHaveScreenshot('market-report-readable.png', { fullPage: true });
+});
+
+
+test('desktop financing data has balanced metrics and a compact financial editor', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop UI audit');
+  await mockResources(page);
+  await mockFinancialMonths(page);
+  await page.goto('/financing/data');
+  const financial=page.getByRole('region',{name:'月度财务数据',exact:true});
+  await expect(financial.getByText('824.7991',{exact:false})).toBeVisible();
+  const upload=page.getByRole('region',{name:'借入资金汇总表',exact:true});
+  const a=await upload.boundingBox(),b=await financial.boundingBox();
+  expect(b.y-a.y-a.height).toBeGreaterThanOrEqual(20);
+  for(const width of [1440,1280]){
+    await page.setViewportSize({width,height:900});
+    const cards=await financial.getByRole('article').all();
+    const first=await cards[0].boundingBox(),fourth=await cards[3].boundingBox(),last=await cards[7].boundingBox();
+    expect(Math.abs(first.y-fourth.y)).toBeLessThanOrEqual(1);
+    expect(last.y).toBeGreaterThan(first.y);
+    expect(await page.locator('.parameter-card').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth+1))).toBe(true);
+  }
+  await expect(page).toHaveScreenshot('financing-data.png',{fullPage:true});
+  await page.getByRole('combobox',{name:'数据月份',exact:true}).selectOption('2025-12-31');
+  await expect(financial.getByText('800',{exact:false})).toBeVisible();
+  const edit=page.getByRole('button',{name:'编辑本月',exact:true});
+  await edit.click();
+  const dialog=page.getByRole('dialog',{name:'编辑月度财务数据',exact:true});
+  const capital=dialog.getByRole('spinbutton',{name:'净资本（亿元）',exact:true});
+  await expect(capital).toHaveValue('800');
+  // Read both fields in one frame: the dialog may still be entering.
+  const rowDelta=await dialog.getByRole('spinbutton').evaluateAll(inputs=>
+    Math.abs(inputs[0].getBoundingClientRect().y-inputs[1].getBoundingClientRect().y));
+  expect(rowDelta).toBeLessThanOrEqual(1);
+  await expect(page).toHaveScreenshot('financing-data-edit.png',{fullPage:true});
+  await dialog.getByRole('button',{name:'取消',exact:true}).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(edit).toBeFocused();
 });
