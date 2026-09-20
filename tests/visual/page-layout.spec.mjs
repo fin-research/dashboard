@@ -45,6 +45,15 @@ test('普通页与报告页共用主题蓝导航和页头控件', async ({ page 
     const mobile = testInfo.project.name === 'mobile';
     const toggle = page.getByRole('button', { name: mobile ? '打开导航菜单' : '折叠侧边导航', exact: true });
     await expect(toggle).toBeVisible();
+    const surfaces = await page.locator('.page-header').evaluate(header => ({
+      header: getComputedStyle(header).backgroundColor,
+      headerImage: getComputedStyle(header).backgroundImage,
+      workspace: getComputedStyle(document.querySelector('.tr-workspace')).backgroundColor,
+    }));
+    if (surfaces.headerImage === 'none') {
+      expect(surfaces.header, `${url}: header must remain distinct from workspace`).not.toBe(surfaces.workspace);
+      expect(surfaces.header).not.toBe('rgba(0, 0, 0, 0)');
+    }
     if (mobile) await toggle.click();
     const active = page.locator('.tr-drawer__nav [aria-current="page"]');
     await expect(active).toHaveCount(1);

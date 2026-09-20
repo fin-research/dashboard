@@ -15,6 +15,7 @@
     : path.startsWith('/credit-workbench') ? import('../../../src/lib/credit-workbench/CreditWorkbenchPage.svelte')
     : path === '/fund-report' ? import('./FundReports.svelte')
     : path === '/management/messenger' ? import('./Messenger.svelte')
+    : path === '/management/permissions' ? import('./Permissions.svelte')
     : path === '/ui-contracts' ? import('./Primitives.svelte')
     : path === '/financing/schedule' ? import('./Schedule.svelte')
     : path.startsWith('/market-briefing') ? import('../../../src/App.svelte')

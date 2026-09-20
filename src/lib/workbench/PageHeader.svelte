@@ -73,12 +73,12 @@
     min-width: 0;
     min-height: 64px;
     padding: var(--header-padding-block) clamp(16px, 2vw, 32px);
-    background: var(--bg-page);
+    background: color-mix(in srgb, var(--brand) 14%, var(--bg-card));
     color: var(--text-1);
     font-family: var(--font);
   }
   .page-header__identity { display: flex; align-items: center; gap: 16px; min-width: 0; max-width: 100%; }
-  .page-header--tabs { background: linear-gradient(to top, var(--bg-card) 4px, var(--bg-page) 4px); }
+  .page-header--tabs { background: linear-gradient(to top, var(--bg-card) 4px, color-mix(in srgb, var(--brand) 14%, var(--bg-card)) 4px); }
   .page-header__leading { flex: 0 0 auto; }
   .page-header__heading { display: grid; min-width: 0; gap: 2px; }
   .page-header__brand { width: fit-content; color: var(--brand-deep); font-size: 0.875rem; line-height: 18px; font-weight: bold; text-decoration: none; }

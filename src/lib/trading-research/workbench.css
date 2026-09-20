@@ -827,6 +827,13 @@ body:has(.tr-workbench) {
   padding: 0 32px 0 11px;
 }
 
+@media (min-width: 901px) {
+  .tr-table-controls--trading > label { flex: 0 0 auto; }
+  .tr-table-controls--trading > .tr-search-control { flex: 1 1 160px; min-width: 120px; }
+  .tr-table-controls--trading input { width: 100%; }
+  .tr-table-controls--trading select { width: auto; }
+}
+
 .tr-table-action {
   padding-inline: 13px;
 }
@@ -906,7 +913,18 @@ body:has(.tr-workbench) {
 }
 
 .tr-trade-table {
-  min-width: 1320px;
+  min-width: 100%;
+}
+
+.tr-trade-table td:nth-child(4),
+.tr-trade-table td:nth-child(5) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.tr-table-scroll:focus-visible {
+  outline: 2px solid var(--tr-primary);
+  outline-offset: 2px;
 }
 
 .tr-empty-cell {

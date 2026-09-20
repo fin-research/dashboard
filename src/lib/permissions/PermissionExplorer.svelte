@@ -7,6 +7,7 @@
   let query = $state('');
   let scope = $state('');
   const tree = $derived(permissionTree(permissions, query, grantedOnly));
+  const scopes = $derived(permissionTree(permissions, '', grantedOnly));
   const visible = $derived(tree.filter(group => !scope || group.scope === scope));
   const total = $derived(permissionTree(permissions, '', true));
   const resources = $derived(total.reduce((sum, group) => sum + group.resources.length, 0));
@@ -21,9 +22,9 @@
   </div>
   <label class="permission-search"><Search size={18} aria-hidden="true" /><Input class="pl-10" type="search" bind:value={query} aria-label="搜索权限" /></label>
   <div class="scope-filters" aria-label="业务范围筛选">
-    <Button data-ui-owner="lib-permissions-PermissionExplorer-svelte" variant="ghost" type="button" class={["ui-button ", !scope && "is-selected"]}  aria-pressed={!scope} onclick={() => scope = ''}>全部范围</Button>
-    {#each tree as group}
-      <Button data-ui-owner="lib-permissions-PermissionExplorer-svelte" variant="ghost" type="button" class={["ui-button ", scope === group.scope && "is-selected"]}  aria-pressed={scope === group.scope} onclick={() => scope = group.scope}>{group.label}</Button>
+    <Button data-ui-owner="lib-permissions-PermissionExplorer-svelte" variant={!scope ? 'default' : 'ghost'} type="button" class="ui-button" aria-pressed={!scope} onclick={() => scope = ''}>全部范围</Button>
+    {#each scopes as group}
+      <Button data-ui-owner="lib-permissions-PermissionExplorer-svelte" variant={scope === group.scope ? 'default' : 'ghost'} type="button" class="ui-button" aria-pressed={scope === group.scope} onclick={() => scope = group.scope}>{group.label}</Button>
     {/each}
   </div>
   <div class="permission-tree">
