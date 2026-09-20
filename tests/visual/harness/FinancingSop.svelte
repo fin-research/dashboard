@@ -1,11 +1,10 @@
 <script lang="ts">
-  import WorkbenchShell from '../../../src/lib/workbench/WorkbenchShell.svelte';
+  import FinancingLayout from '../../../src/routes/financing/+layout.svelte';
   import SopPage from '../../../src/routes/financing/sop/+page.svelte';
   import '../../../src/routes/financing/layout.css';
-  import type { WorkbenchPageLink } from '../../../src/lib/workbench/navigation';
   import { PERMISSION_CODES } from '../../../src/lib/permissions';
-  const views: WorkbenchPageLink[] = [{ id: 'sop', label: 'SOP 管理', href: '/financing/sop', icon: 'check' }];
-  const data = { permissions: [...PERMISSION_CODES], user: null, account: null, session: null, auth0: true,
+  import { managementAudit } from '../management-fixtures.mjs';
+  const data = { ...managementAudit, permissions: [...PERMISSION_CODES],
     reminders: { items: [], total: 0 }, settings: {
     sopTemplates: [{ id: 'short-term', name: '短期融资券发行 SOP', debtType: '短期融资券', isActive: true,
       description: '立项、申报、发行和存续期管理。', nodeCount: 2,
@@ -15,6 +14,6 @@
   } };
 </script>
 
-<WorkbenchShell title="融资工作台" homeHref="/financing/" {views} activeViewId="sop" class="financing-scope">
+<FinancingLayout {data}>
   <SopPage {data} />
-</WorkbenchShell>
+</FinancingLayout>

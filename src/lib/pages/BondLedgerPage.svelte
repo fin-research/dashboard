@@ -890,7 +890,7 @@
       </div>
       <div class="calendar-grid">
         {#each managementCalendarDays as day (day.date)}
-          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant="outline" class={["ui-button", !day.inMonth && "outside", day.hasLedger && "available", day.date === selectedManagedDate && "selected"]}
+          <Button data-ui-owner="lib-pages-BondLedgerPage-svelte" variant={day.date === selectedManagedDate ? "default" : "ghost"} class={["ui-button", !day.inMonth && "outside", day.hasLedger && "available"]} aria-pressed={day.date === selectedManagedDate}
             type="button"
 
 

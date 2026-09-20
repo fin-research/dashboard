@@ -214,12 +214,11 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	{/if}
 
 	{#if canCreateReminder}
-	<Modal  bind:this={reminderDialog}>
-<div class="dialog-body config-modal">
+	<Modal bind:this={reminderDialog} aria-label="配置邮件提醒" class="w-[min(36rem,calc(100vw-3rem))]" onclose={resetReminderDraft}>
+<div class="dialog-body config-modal management-page">
 		<form method="post" action="?/createReminder" use:enhance={enhanceAction('reminder', '提醒规则已保存')}>
 			<div class="modal-header">
 				<div>
-					<p class="eyebrow">REMINDER RULE</p>
 					<h2>配置邮件提醒</h2>
 				</div>
 				<Button data-ui-owner="routes-financing-sop--page-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => reminderDialog?.close()}>×</Button>
@@ -306,12 +305,11 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	{/if}
 
 	{#if canCreateSop}
-	<Modal  bind:this={sopDialog}>
-<div class="dialog-body config-modal">
+	<Modal bind:this={sopDialog} aria-label="新建负债品种 SOP" class="w-[min(36rem,calc(100vw-3rem))]">
+<div class="dialog-body config-modal management-page">
 		<form method="post" action="?/createSop" use:enhance={enhanceAction('sop', 'SOP 模板已创建')}>
 			<div class="modal-header">
 				<div>
-					<p class="eyebrow">SOP TEMPLATE</p>
 					<h2>新建负债品种 SOP</h2>
 				</div>
 				<Button data-ui-owner="routes-financing-sop--page-svelte" variant="outline" class={"ui-button"} type="button" aria-label="关闭" onclick={() => sopDialog?.close()}>×</Button>

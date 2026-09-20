@@ -2,6 +2,28 @@ import {test,expect} from '@playwright/test';
 import {mockResources} from './fixtures.mjs';
 import {reminderMore} from './sop-fixtures.mjs';
 
+test('desktop reminder editor keeps multiple periods and custom recipients readable',async({page},testInfo)=>{
+ test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
+ await mockResources(page);await page.setViewportSize({width:1280,height:900});
+ await page.goto('/financing/sop');
+ const add=page.getByRole('button',{name:'新增提醒',exact:true});await add.click();
+ const dialog=page.getByRole('dialog',{name:'配置邮件提醒',exact:true});
+ await dialog.getByRole('checkbox',{name:'簿记发行',exact:true}).check();
+ await dialog.getByRole('button',{name:'添加周期',exact:true}).click();
+ await dialog.getByRole('combobox',{name:'收件人',exact:true}).selectOption('custom');
+ await dialog.getByRole('textbox',{name:'指定邮箱',exact:true}).fill('test@18.cn');
+ await expect(dialog.getByRole('spinbutton',{name:'天',exact:true})).toHaveCount(2);
+ await expect(dialog).toHaveScreenshot('sop-reminder-periods-desktop.png');
+ await dialog.getByRole('button',{name:'删除第 2 个提醒周期',exact:true}).click();
+ await expect(dialog.getByRole('button',{name:'删除第 1 个提醒周期',exact:true})).toBeDisabled();
+ await page.keyboard.press('Escape');await expect(add).toBeFocused();
+ await add.click();await expect(dialog.getByRole('checkbox',{name:'簿记发行',exact:true})).not.toBeChecked();
+ await expect(dialog.getByRole('combobox',{name:'收件人',exact:true})).toHaveValue('assignee');
+ await expect(dialog.getByRole('spinbutton',{name:'天',exact:true})).toHaveValue('3');
+ await expect(dialog.getByRole('textbox',{name:'指定邮箱',exact:true})).toHaveCount(0);
+ await page.keyboard.press('Escape');
+});
+
 test('desktop SOP opens node dialog and cancels keyboard sorting cleanly',async({page},testInfo)=>{
  test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
  const errors=[];page.on('pageerror',error=>errors.push(error.message));

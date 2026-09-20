@@ -645,8 +645,23 @@
     {
       "id": "bond",
       "url": "/trading-research/bond",
-      "kind": "deferred",
-      "reason": "逐日台账组件尚未建立浏览器夹具；周报截图不替代此页面。"
+      "kind": "screenshot",
+      "state": "60日历史、六类持仓、非空成交、账户切换和台账管理",
+      "evidence": [
+        {
+          "spec": "tests/visual/bond-ledger-desktop.spec.mjs",
+          "test": "desktop daily ledger shows balanced metrics and recoverable management controls",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "bond-ledger-desktop.png",
+            "bond-ledger-trades-desktop.png",
+            "bond-ledger-management-desktop.png",
+            "bond-ledger-distributions-desktop.png"
+          ]
+        }
+      ]
     },
     {
       "id": "credit-assistant",
@@ -903,6 +918,16 @@
           "snapshots": [
             "sop-actions.png",
             "sop-create.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/sop-detail-desktop.spec.mjs",
+          "test": "desktop reminder editor keeps multiple periods and custom recipients readable",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "sop-reminder-periods-desktop.png"
           ]
         }
       ]
