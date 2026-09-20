@@ -49,6 +49,9 @@ test('普通页与报告页共用主题蓝导航和页头控件', async ({ page 
     const active = page.locator('.tr-drawer__nav [aria-current="page"]');
     await expect(active).toHaveCount(1);
     await expect(active).toBeVisible();
+    // Compare completed interaction states, not device-dependent transition frames.
+    await page.locator(mobile ? '.tr-mobile-menu' : '.tr-sidebar-toggle')
+      .evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
     const appearance = await active.evaluate(el => {
       const style = (target, keys) => {
         const css = getComputedStyle(target);
