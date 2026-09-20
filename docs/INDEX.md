@@ -57,3 +57,5 @@
 新增市场/公司原始输入、EDB 历史回填、SHIBOR 与 R2 日报规范化 → [Quant 输入](modules/quant-inputs.md)。
 
 - 消息投递与渠道收口：[messenger](modules/messenger.md)。
+
+- 业务 MCP 与 Cloudflare Portal 接入：[MCP](MCP.md)。

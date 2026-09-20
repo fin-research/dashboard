@@ -58,3 +58,7 @@ Data 错误保留安全诊断字段；市场点评 Workflow 对失败资源独�
 内部数据接口保持 `/financing/data/token`、`/financing/data/api/*`、`/financing/data/import`。Auth0 模式不向浏览器返回 Neon JWT。字段、表、主键与分页仍使用原白名单；请求身份在事务内设置并执行 RLS。
 
 全站业务 GET/HEAD、API 写入及 named actions 均由 Gateway 的 `permission-policy.ts` 登记和检查，门户及身份 bootstrap 除外。权限目录由 Gateway 维护，`src/lib/permissions.ts` 为前端展示快照；请求传入的权限、角色、人员身份或来源标记不能代替服务端授权。
+
+## 业务 MCP
+
+`POST /api/mcp` 提供经 Gateway 逐用户授权的查询、修改与 AI 工具；定义、边界及验证见 [MCP](MCP.md)。
