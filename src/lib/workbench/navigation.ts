@@ -9,6 +9,15 @@ export type WorkbenchPageLink = PageTab & {
   separatorBefore?: boolean;
 };
 
+export const managementViews: readonly WorkbenchPageLink[] = [
+  { id: 'me', label: '我的', href: '/management/me', icon: 'user' },
+  { id: 'permissions', label: '权限', href: '/management/permissions', icon: 'credit' },
+  { id: 'notifications', label: '通知', href: '/management/notifications', icon: 'file' },
+  { id: 'messenger', label: '通知管理', href: '/management/messenger', icon: 'file', permission: 'admin', separatorBefore: true },
+  { id: 'people', label: '角色权限', href: '/management/people', icon: 'credit', permission: 'admin' },
+  { id: 'fund-report', label: '资金日报', href: '/fund-report?upload=1', icon: 'file', permission: 'admin' },
+];
+
 export const notificationTabs: readonly PageTab[] = [
   { id: 'delivery', label: '消息投递', href: '/management/messenger?tab=delivery' },
   { id: 'test', label: '测试消息', href: '/management/messenger?tab=test' },

@@ -106,7 +106,8 @@
     {
       "source": "src/routes/management/messenger/+page.svelte",
       "scenarios": [
-        "messenger"
+        "messenger",
+        "workbench-navigation"
       ]
     },
     {
@@ -460,7 +461,7 @@
       "id": "messenger",
       "url": "/management/messenger",
       "kind": "screenshot",
-      "state": "紧凑64px共享header、无边线曲面标签、消息投递、测试单发/群发及tab深链刷新",
+      "state": "共享主题蓝导航、紧凑 header、消息长 JSON/URL 换行不覆盖相邻列、测试单发/群发及 tab 深链",
       "evidence": [
         {
           "spec": "tests/visual/messenger.spec.mjs",
@@ -700,6 +701,25 @@
           "projects": [
             "desktop",
             "mobile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "workbench-navigation",
+      "url": "/management/messenger",
+      "kind": "screenshot",
+      "state": "交易/授信/管理及融资 SOP 控件夹具、授信周报/融资模型报告共用主题蓝导航；无左竖条、图标/圆角/页头控件一致；桌面折叠和手机抽屉。融资夹具不代表完整融资业务页面。",
+      "evidence": [
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "普通页与报告页共用主题蓝导航和页头控件",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "workbench-navigation.png"
           ]
         }
       ]

@@ -5,7 +5,7 @@
   import ScheduleFields from '../../../src/lib/financing/components/ScheduleFields.svelte';
   import '../../../src/routes/financing/dashboard.css';
 </script>
-<WorkbenchShell title="融资工作台" homeHref="/financing" views={[]} activeViewId="sop" activeLabel="发行节点" tone="orange">
+<WorkbenchShell title="融资工作台" homeHref="/financing" views={[{id:'sop',label:'SOP 管理',href:'/financing/sop',icon:'check'}]} activeViewId="sop" activeLabel="发行节点" tone="orange">
   <div class="financing-scope">
     <ModuleCard>
       <form>

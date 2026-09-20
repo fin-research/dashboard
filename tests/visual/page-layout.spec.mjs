@@ -36,3 +36,53 @@ test('共享顶栏保持紧凑且标签贴合底边', async ({ page }, testInfo)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
 });
+
+test('普通页与报告页共用主题蓝导航和页头控件', async ({ page }, testInfo) => {
+  await mockResources(page);
+  let reference;
+  for (const url of ['/trading-research', '/credit-workbench', '/credit-workbench/weekly', '/trading-research/financing-model', '/financing/schedule', '/management/messenger']) {
+    await page.goto(url);
+    const mobile = testInfo.project.name === 'mobile';
+    const toggle = page.getByRole('button', { name: mobile ? '打开导航菜单' : '折叠侧边导航', exact: true });
+    await expect(toggle).toBeVisible();
+    if (mobile) await toggle.click();
+    const active = page.locator('.tr-drawer__nav [aria-current="page"]');
+    await expect(active).toHaveCount(1);
+    await expect(active).toBeVisible();
+    const appearance = await active.evaluate(el => {
+      const style = (target, keys) => {
+        const css = getComputedStyle(target);
+        return Object.fromEntries(keys.map(key => [key, css[key]]));
+      };
+      const header = document.querySelector('.page-header');
+      const toggle = header.querySelector(innerWidth <= 900 ? '.tr-mobile-menu' : '.tr-sidebar-toggle');
+      const root = getComputedStyle(document.documentElement);
+      return {
+        link: style(el, ['color', 'backgroundColor', 'borderColor', 'borderRadius', 'fontWeight', 'minHeight', 'paddingLeft', 'gap']),
+        icon: style(el.querySelector('.tr-nav-icon'), ['color', 'width', 'height', 'backgroundColor']),
+        title: style(header.querySelector('h1 a'), ['fontFamily', 'fontSize', 'fontWeight', 'color']),
+        toggle: style(toggle, ['width', 'height', 'borderRadius', 'paddingLeft', 'paddingRight', 'backgroundColor', 'color']),
+        marker: getComputedStyle(el, '::before').content,
+        brand: root.getPropertyValue('--brand-deep').trim(),
+        soft: root.getPropertyValue('--brand-soft').trim(),
+      };
+    });
+    expect(appearance.link.color, url).toBe('rgb(36, 91, 178)');
+    expect(appearance.link.backgroundColor, url).toBe('rgb(234, 241, 253)');
+    expect(appearance.marker, url).toBe('none');
+    if (reference) expect(appearance, url).toEqual(reference);
+    else reference = appearance;
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBe(true);
+    if (url === '/management/messenger') await expect(page).toHaveScreenshot('workbench-navigation.png', { fullPage: true });
+    if (mobile) {
+      await page.keyboard.press('Escape');
+      await expect(active).not.toBeVisible();
+    } else {
+      await toggle.click();
+      await expect(active.locator('.tr-nav-label')).not.toBeVisible();
+      await expect(active.locator('.tr-nav-icon')).toBeVisible();
+      await page.getByRole('button', { name: '展开侧边导航', exact: true }).click();
+      await expect(active.locator('.tr-nav-label')).toBeVisible();
+    }
+  }
+});

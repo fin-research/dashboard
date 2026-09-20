@@ -1,6 +1,6 @@
 /* Frozen report controls. Business/report layout and chart rules remain in their
    existing owners; these values preserve the pre-migration report chrome. */
-:where(.page-shell, .layout-report, .tr-shell:not(.tr-shell--workspace)) [data-slot="button"] {
+:where(.page-shell, .layout-report, .tr-shell:not(.tr-shell--workspace) .tr-workspace) [data-slot="button"] {
   height: auto;
   min-height: 44px;
   border: 1px solid #f6f8fb;
@@ -19,7 +19,7 @@
   min-height: var(--report-control-size);
   line-height: 1.35;
 }
-:where(.page-shell, .layout-report, .tr-shell:not(.tr-shell--workspace)) [data-slot="input"] {
+:where(.page-shell, .layout-report, .tr-shell:not(.tr-shell--workspace) .tr-workspace) [data-slot="input"] {
   width: auto;
   height: 40px;
   border-radius: 8px;
