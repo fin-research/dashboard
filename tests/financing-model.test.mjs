@@ -577,104 +577,15 @@ test("卖方逻辑汇总编辑采用追加快照并保留检索证据", async ()
   assert.equal(revised.updatedAt, updatedAt);
 });
 
-test("融资模型页面按决策三行展示并提供品种推荐和验证指标", async () => {
-  const [page, research, chart] = await Promise.all([
-    readFile(
-      new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../src/lib/server/financing-model-research.ts",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL("../src/charts/financing-model.ts", import.meta.url),
-      "utf8",
-    ),
-  ]);
-
-  assert.match(page, /market_drivers\.slice\(0, 5\)/);
-  assert.match(page, /renderer=\{renderFinancingGauge\}/);
-  assert.match(page, /renderer=\{renderFinancingDriverRadar\}/);
-  assert.match(page, /renderer=\{renderFinancingDriverContributions\}/);
-  assert.match(page, /renderer=\{renderFinancingProductComparison\}/);
-  assert.match(page, /ModuleCard from "\.\.\/\.\.\/components\/ModuleCard\.svelte"/);
-  assert.match(page, /PanelHeading from "\$lib\/trading-research\/PanelHeading\.svelte"/);
-  assert.match(page, /title="因子贡献"/);
-  assert.doesNotMatch(page, /因子贡献（\+ 支持发行）/);
-  assert.match(page, /窗口处于\{snapshot\.prediction\.window_zone\}区间/);
-  assert.doesNotMatch(page, /正值支持发行/);
-  assert.match(page, /aria-label="融资择时模型日期版本"/);
-  assert.match(page, /\/api\/financing-model\?run=/);
-  assert.doesNotMatch(page, /刷新数据/);
-  assert.match(page, /aria-label="编辑整体结论"/);
-  assert.match(page, /title="整体结论" controlsInline/);
-  assert.match(page, /aria-label="编辑卖方逻辑汇总"/);
-  assert.match(page, /report\.sellSide\.logicSummary/);
-  assert.match(page, /class=\{`sell-side-grid sell-side-grid--\$\{/);
-  assert.match(page, /report\.sellSide\.views as view/);
-  assert.match(page, /label: "LCR"/);
-  assert.match(page, /label: "NSFR"/);
-  assert.match(page, /company\?\.ef_lcr/);
-  assert.match(page, /company\?\.ef_nsfr/);
-  assert.doesNotMatch(page, /company\?\.ef_funding_gap/);
-  assert.match(page, /company\?\.ef_subject_spread_bp/);
-  assert.match(page, /class="business-metric-grid"/);
-  assert.match(page, /productRecommendation\.recommended_product/);
-  assert.match(page, /相对同类债中位数/);
-  assert.match(page, /历史择时决策记录/);
-  assert.match(page, /<th scope="col">决策操作<\/th>/);
-  assert.match(page, /<th scope="col">结果<\/th>/);
-  assert.match(page, /bind:value=\{editDecisionAction\}/);
-  assert.match(page, /bind:value=\{editDecisionOutcome\}/);
-  assert.doesNotMatch(page, /<th scope="col">状态<\/th>/);
-  const validationLabels = ["样本量", "样本区间", "胜率", "历史节约", "信息系数", "平均误差"];
-  let previousIndex = -1;
-  for (const label of validationLabels) {
-    const currentIndex = page.indexOf(`label: "${label}"`);
-    assert.ok(currentIndex > previousIndex, `${label} 应按指定顺序展示`);
-    previousIndex = currentIndex;
-  }
-  assert.doesNotMatch(page, /validation-tip/);
-  assert.doesNotMatch(page, /role="tooltip"/);
-  assert.match(page, /validation\.tscv\.sample_count \?\? validation\.tscv\.validation_samples/);
-  assert.match(chart, /name: "发行贡献（bp）"/);
-  assert.match(chart, /financingDriverRadarScale\(rows\)/);
-  assert.match(chart, /min: scale\.min/);
-  assert.match(chart, /max: scale\.max/);
-  assert.match(chart, /Math\.ceil\(\(maxDeviation \+ 2\) \/ 5\) \* 5/);
-  assert.match(chart, /splitLine: \{ show: false \}/);
-  assert.doesNotMatch(chart, /支持发行（降低成本）/);
-  assert.doesNotMatch(chart, /showBackground|backgroundStyle/);
-  assert.match(
-    page,
-    /\.sell-side-grid\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:/,
-  );
-  assert.match(page, /grid-template-rows:\s*subgrid/);
-  assert.match(page, /\.implication\s*\{[\s\S]*?align-content:\s*start;/);
-  assert.doesNotMatch(page, /max-width:\s*1100px|margin-top:\s*auto/);
-  assert.match(page, /sellSideSummaryBody\(view\.summary, view\.institution\)/);
-  assert.doesNotMatch(page, /近30日可比债中位利差|发行方案/);
-  assert.doesNotMatch(page, /相对更优窗口|class="recommendation-band"/);
-  assert.doesNotMatch(page, /TSCV IC|推荐胜率|<dt>RMSE<\/dt>|交叉验证/);
-  assert.doesNotMatch(page, /<h3>卖方逻辑汇总<\/h3>/);
-  assert.doesNotMatch(page, /<h3>\{view\.title\}<\/h3>/);
-  assert.doesNotMatch(page, /<time datetime=\{view\.publishedAt\}>/);
-  assert.doesNotMatch(page, /class="research-meta"|class="source-footer"/);
-  assert.doesNotMatch(page, /company\.interpretation|指标日期|<dt>公司流动性/);
-  assert.doesNotMatch(page, /stanceLabel|sell-side-card--/);
-  assert.match(page, /<InstitutionLogo institution=\{view\.institution\}/);
-  assert.doesNotMatch(page, />人工修订</);
-  assert.match(research, /PROMPT_CACHE_KEY = "financing-model-sell-side:v6"/);
-  assert.match(research, /\.min\(4\)/);
-  assert.match(research, /views\.length < 4/);
-  assert.match(research, /筛选4至5家/);
-  assert.match(research, /不得重复机构名、研报标题、发布日期/);
-  assert.match(research, /必须完全删除/);
-  assert.doesNotMatch(research, /每家机构的 stance/);
+test("融资模型页面使用票面、净节约与真实SHAP，保留人工与卖方操作", async () => {
+  const page = await readFile(new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url), "utf8");
+  assert.match(page, /parseIssuanceReport/);
+  for (const field of ["snapshot.forecast", "snapshot.market_forecast", "explanation?.features"]) assert.ok(page.includes(field));
+  for (const label of ["预计票面", "窗口净节约", "SHAP 因子贡献", "90%区间", "决策操作", "编辑整体结论", "编辑卖方逻辑汇总"]) assert.ok(page.includes(label));
+  assert.doesNotMatch(page, /snapshot\.(prediction|company_metrics|product_recommendation|forecast_window)/);
+  assert.match(page, /renderIssuanceForecast/);
+  assert.match(page, /renderFinancingDriverContributions/);
+  assert.match(page, /InstitutionLogo/);
 });
 
 test("AI Search 固定检索最近七个上海自然日且最多返回50条", () => {

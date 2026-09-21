@@ -375,8 +375,8 @@ export async function loadTimingDecisionHistory(
   const result = await client.query<{
     run_id: string;
     decision_date: string;
-    historical_percentile: number;
-    recommendation: "strong_buy" | "neutral" | "wait";
+    historical_percentile: number | null;
+    recommendation: "strong_buy" | "neutral" | "wait" | null;
     recommendation_label: string;
     decision_action: string;
     outcome: string;
@@ -403,7 +403,7 @@ export async function loadTimingDecisionHistory(
     result.rows.map((row) => ({
       runId: row.run_id,
       decisionDate: row.decision_date,
-      historicalPercentile: Number(row.historical_percentile),
+      historicalPercentile: row.historical_percentile === null ? null : Number(row.historical_percentile),
       recommendation: row.recommendation,
       recommendationLabel: row.recommendation_label,
       decisionAction: row.decision_action,
@@ -421,8 +421,8 @@ export async function saveTimingDecisionRecord(
   const result = await client.query<{
     run_id: string;
     decision_date: string;
-    historical_percentile: number;
-    recommendation: "strong_buy" | "neutral" | "wait";
+    historical_percentile: number | null;
+    recommendation: "strong_buy" | "neutral" | "wait" | null;
     recommendation_label: string;
     decision_action: string;
     outcome: string;
@@ -469,7 +469,7 @@ export async function saveTimingDecisionRecord(
   return timingDecisionRecordSchema.parse({
     runId: row.run_id,
     decisionDate: row.decision_date,
-    historicalPercentile: Number(row.historical_percentile),
+    historicalPercentile: row.historical_percentile === null ? null : Number(row.historical_percentile),
     recommendation: row.recommendation,
     recommendationLabel: row.recommendation_label,
     decisionAction: row.decision_action,
@@ -480,7 +480,7 @@ export async function saveTimingDecisionRecord(
 
 export async function saveSellSideSnapshot(
   client: BondDatabaseClient,
-  run: FinancingModelSnapshot,
+  run: Pick<FinancingModelSnapshot, "run_id">,
   payload: SellSidePayload,
 ): Promise<SellSidePayload> {
   const validated = sellSidePayloadSchema.parse(payload);
@@ -508,7 +508,7 @@ export async function saveSellSideSnapshot(
 
 export async function saveSellSideSummaryRevision(
   client: BondDatabaseClient,
-  run: FinancingModelSnapshot,
+  run: Pick<FinancingModelSnapshot, "run_id">,
   current: SellSidePayload,
   input: SellSideSummaryUpdate,
   updatedAt = new Date().toISOString(),
