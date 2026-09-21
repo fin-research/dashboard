@@ -22,11 +22,9 @@
     "checkJs": true
   },
   "include": [
-    "worker/bond-ledger-workflow.ts",
     "worker-configuration.d.ts",
     "worker/credit-agent.ts",
     "worker/credit-assistant-http.ts",
-    "worker/financing-debt-import.ts",
     "worker/market-briefing-workflow.ts"
   ]
 }

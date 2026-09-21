@@ -1,8 +1,9 @@
-import type { BondLedgerImportParams } from "../bond-ledger/types.ts";
+import { parsedBondLedgerSchema } from "../bond-ledger/import-schema.ts";
+import type { PersistBondLedgerInput, PersistBondLedgerResult, FailedBondLedgerInput } from "./bond-ledger-repository.ts";
 import type { RemoteBondLedgerFile } from "./bond-ledger-repository.ts";
 
-const MAX_LEDGER_BYTES = 12 * 1024 * 1024;
-const PENDING_LEDGER_PREFIX = "bond-ledger/.pending/";
+import { MAX_LEDGER_BYTES, MAX_PARSED_LEDGER_BYTES, MAX_IMPORT_REQUEST_BYTES } from "../bond-ledger/import-limits.ts";
+const IMPORT_LEDGER_PREFIX = "bond-ledger/imports/";
 const LEDGER_PREFIX = "bond-ledger/";
 const XLSX_CONTENT_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -17,16 +18,6 @@ export class BondLedgerUploadError extends Error {
   }
 }
 
-export interface BondLedgerArchiveResponse {
-  accepted: true;
-  uploadId: string;
-  workflowId: string;
-  key: string;
-  size: number;
-  etag: string | null;
-  uploadedAt: string;
-}
-
 type StoredBondLedger = Exclude<
   Awaited<ReturnType<Env["EASTMONEY"]["get"]>>,
   null
@@ -35,77 +26,94 @@ type StoredBondLedger = Exclude<
 export async function archiveBondLedgerRequest(
   request: Request,
   bucket: Env["EASTMONEY"] | undefined,
-  workflow: Env["BOND_LEDGER_IMPORT"] | undefined,
-): Promise<BondLedgerArchiveResponse> {
-  const metadata = validateUploadRequest(request);
+  persist: (input: PersistBondLedgerInput) => Promise<PersistBondLedgerResult>,
+  recordFailure?: (input: FailedBondLedgerInput) => Promise<void>,
+): Promise<PersistBondLedgerResult> {
+  validateSameOrigin(request);
   const storage = requireBucket(bucket);
-  const importer = requireWorkflow(workflow);
-  if (!request.body) {
-    throw new BondLedgerUploadError(400, "台账文件内容为空");
+  if (!(request.headers.get("Content-Type") ?? "").startsWith("multipart/form-data;")) {
+    throw new BondLedgerUploadError(415, "请刷新页面后重新上传台账");
+  }
+  const bytes = await readUploadBody(request);
+  let form: FormData;
+  try { form = await new Response(bytes, { headers: { "Content-Type": request.headers.get("Content-Type")! } }).formData(); }
+  catch { throw new BondLedgerUploadError(400, "台账上传内容无效"); }
+  const file = form.get("file");
+  if (!file || typeof file === "string" || !file.size || file.size > MAX_LEDGER_BYTES) {
+    throw new BondLedgerUploadError(400, "台账文件必须为非空且不超过 12 MB 的 .xlsx");
+  }
+  const fileName = file.name.trim();
+  if (!fileName || fileName.length > 180 || !fileName.toLowerCase().endsWith(".xlsx") || /[\u0000-\u001f/\\]/.test(fileName)) {
+    throw new BondLedgerUploadError(400, "台账文件名无效，仅支持 .xlsx");
+  }
+  const rawParsed = form.get("parsed");
+  let decoded: unknown;
+  try {
+    if (typeof rawParsed !== "string" || new TextEncoder().encode(rawParsed).byteLength > MAX_PARSED_LEDGER_BYTES) throw new Error();
+    decoded = JSON.parse(rawParsed);
+  } catch { throw new BondLedgerUploadError(400, "台账解析数据无效"); }
+  const validated = parsedBondLedgerSchema.safeParse(decoded);
+  if (!validated.success) throw new BondLedgerUploadError(400, "台账解析数据不符合导入要求");
+  const parsed = validated.data;
+  const expectedValue = form.get("expectedDate");
+  if (expectedValue !== null && typeof expectedValue !== "string") throw new BondLedgerUploadError(400, "台账日期无效");
+  const expectedDate = expectedValue || null;
+  if (expectedDate) {
+    validateLedgerDate(expectedDate);
+    if (parsed.date !== expectedDate) throw new BondLedgerUploadError(400, `重新上传文件的报表日必须为 ${expectedDate}，实际为 ${parsed.date}`);
   }
   const uploadId = crypto.randomUUID();
   const uploadedAt = new Date().toISOString();
-  const key = `${PENDING_LEDGER_PREFIX}${uploadId}.xlsx`;
-  const object = await storage.put(key, request.body, {
+  // Immutable originals keep a concurrent replacement from changing the file of a committed import.
+  const key = `${IMPORT_LEDGER_PREFIX}${uploadId}.xlsx`;
+  const object = await storage.put(key, await file.arrayBuffer(), {
     httpMetadata: {
       contentType: XLSX_CONTENT_TYPE,
-      contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(metadata.fileName)}`,
+      contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
       cacheControl: "private, no-store",
     },
-    customMetadata: {
-      uploadId,
-      originalName: metadata.fileName,
-      uploadedAt,
-      ...(metadata.expectedDate
-        ? { expectedDate: metadata.expectedDate }
-        : {}),
-    },
+    customMetadata: { uploadId, originalName: fileName, uploadedAt, reportDate: parsed.date },
   });
-  if (!object) {
-    throw new BondLedgerUploadError(503, "Excel 写入 R2 失败");
+  if (!object) throw new BondLedgerUploadError(503, "Excel 写入 R2 失败");
+  // Keep the immutable original if COMMIT's response is lost; never delete a possibly committed file.
+  const input = { uploadId, r2Key: key, r2Etag: object.etag || null,
+    originalName: fileName, fileSize: file.size, expectedDate, uploadedAt, parsed };
+  try { return await persist(input); }
+  catch (error) {
+    try { await recordFailure?.({ ...input, errorMessage: "直接导入失败，请核对数据库状态后重试" }); }
+    catch { console.error(JSON.stringify({ event: "bond_ledger_failure_record_failed", uploadId, key })); }
+    throw error;
   }
-  const params: BondLedgerImportParams = {
-    uploadId,
-    r2Key: object.key,
-    r2Etag: object.etag || null,
-    originalName: metadata.fileName,
-    fileSize: object.size,
-    expectedDate: metadata.expectedDate,
-    uploadedAt,
-  };
+}
+
+async function readUploadBody(request: Request): Promise<ArrayBuffer> {
+  if (!request.body) throw new BondLedgerUploadError(400, "台账上传内容为空");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
   try {
-    const instance = await importer.create({
-      id: uploadId,
-      params,
-      retention: {
-        successRetention: "7 days",
-        errorRetention: "30 days",
-      },
-      locationHint: "apac",
-    });
-    return {
-      accepted: true,
-      uploadId,
-      workflowId: instance.id,
-      key: object.key,
-      size: object.size,
-      etag: object.etag || null,
-      uploadedAt,
-    };
-  } catch (error) {
-    await storage.delete(object.key).catch(() => undefined);
-    throw new BondLedgerUploadError(
-      503,
-      `启动导入工作流失败，已回滚本次 R2 文件：${errorMessage(error)}`,
-    );
-  }
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_IMPORT_REQUEST_BYTES) {
+        await reader.cancel();
+        throw new BondLedgerUploadError(413, "台账上传内容不能超过 21 MB");
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return bytes.buffer;
 }
 
 export async function getBondLedgerFile(
   bucket: Env["EASTMONEY"] | undefined,
   file: RemoteBondLedgerFile,
 ): Promise<StoredBondLedger> {
-  const object = await requireBucket(bucket).get(bondLedgerObjectKey(file.date));
+  const object = await requireBucket(bucket).get(file.key);
   if (!object) {
     throw new BondLedgerUploadError(404, `${file.date} 的 R2 原始台账不存在`);
   }
@@ -130,38 +138,6 @@ export function ledgerDownloadHeaders(
   return headers;
 }
 
-export async function workflowStatus(
-  workflow: Env["BOND_LEDGER_IMPORT"] | undefined,
-  id: string,
-): Promise<{
-  workflowId: string;
-  status: "processing" | "succeeded" | "failed";
-  error?: string;
-  result?: unknown;
-}> {
-  if (!isUuid(id)) {
-    throw new BondLedgerUploadError(400, "Workflow ID 无效");
-  }
-  let instance;
-  try {
-    instance = await requireWorkflow(workflow).get(id);
-  } catch {
-    throw new BondLedgerUploadError(404, "导入工作流不存在");
-  }
-  const current = await instance.status();
-  if (current.status === "complete") {
-    return { workflowId: id, status: "succeeded", result: current.output };
-  }
-  if (current.status === "errored" || current.status === "terminated") {
-    return {
-      workflowId: id,
-      status: "failed",
-      error: current.error?.message || "Excel 导入失败",
-    };
-  }
-  return { workflowId: id, status: "processing" };
-}
-
 export function validateSameOrigin(request: Request): void {
   const origin = request.headers.get("Origin");
   if (origin && origin !== new URL(request.url).origin) {
@@ -183,97 +159,6 @@ export function bondLedgerObjectKey(reportDate: string): string {
   return `${LEDGER_PREFIX}${reportDate}.xlsx`;
 }
 
-export async function finalizeBondLedgerObject(
-  bucket: Env["EASTMONEY"] | undefined,
-  pendingKey: string,
-  pendingEtag: string | null,
-  reportDate: string,
-): Promise<string> {
-  const storage = requireBucket(bucket);
-  if (!pendingKey.startsWith(PENDING_LEDGER_PREFIX)) {
-    throw new BondLedgerUploadError(400, "待归档台账路径无效");
-  }
-  const pending = await storage.get(pendingKey);
-  if (!pending) throw new BondLedgerUploadError(404, "待归档台账不存在");
-  if (pendingEtag && pending.etag !== pendingEtag) {
-    throw new BondLedgerUploadError(409, "待归档台账版本已变化");
-  }
-  const key = bondLedgerObjectKey(reportDate);
-  const stored = await storage.put(key, await pending.arrayBuffer(), {
-    httpMetadata: pending.httpMetadata,
-    customMetadata: {
-      ...pending.customMetadata,
-      reportDate,
-      archivedAt: new Date().toISOString(),
-    },
-  });
-  if (!stored) throw new BondLedgerUploadError(503, "台账定稿写入 R2 失败");
-  await storage.delete(pendingKey);
-  return key;
-}
-
-export async function deletePendingBondLedgerObject(
-  bucket: Env["EASTMONEY"] | undefined,
-  key: string,
-): Promise<void> {
-  if (!key.startsWith(PENDING_LEDGER_PREFIX)) return;
-  await requireBucket(bucket).delete(key);
-}
-
-function validateUploadRequest(request: Request): {
-  fileName: string;
-  size: number;
-  expectedDate: string | null;
-} {
-  validateSameOrigin(request);
-  const encodedName = request.headers.get("X-Ledger-Filename") ?? "";
-  let fileName = "";
-  try {
-    fileName = decodeURIComponent(encodedName).trim();
-  } catch {
-    throw new BondLedgerUploadError(400, "台账文件名编码无效");
-  }
-  if (
-    !fileName ||
-    fileName.length > 180 ||
-    !fileName.toLowerCase().endsWith(".xlsx") ||
-    /[\u0000-\u001f/\\]/.test(fileName)
-  ) {
-    throw new BondLedgerUploadError(400, "台账文件名无效，仅支持 .xlsx");
-  }
-  const size = Number(request.headers.get("X-Ledger-Size"));
-  if (!Number.isInteger(size) || size <= 0) {
-    throw new BondLedgerUploadError(400, "台账文件大小无效");
-  }
-  if (size > MAX_LEDGER_BYTES) {
-    throw new BondLedgerUploadError(413, "台账文件不能超过 12 MB");
-  }
-  const contentLengthHeader = request.headers.get("Content-Length");
-  const contentLength =
-    contentLengthHeader === null ? Number.NaN : Number(contentLengthHeader);
-  if (
-    !Number.isInteger(contentLength) ||
-    contentLength <= 0 ||
-    contentLength !== size
-  ) {
-    throw new BondLedgerUploadError(400, "台账文件大小与请求内容不一致");
-  }
-  const contentType = (request.headers.get("Content-Type") ?? "")
-    .split(";", 1)[0]
-    ?.trim()
-    .toLowerCase();
-  if (
-    contentType !== XLSX_CONTENT_TYPE &&
-    contentType !== "application/octet-stream"
-  ) {
-    throw new BondLedgerUploadError(415, "台账文件类型必须是 .xlsx");
-  }
-  const expectedDateHeader = request.headers.get("X-Ledger-Expected-Date");
-  const expectedDate = expectedDateHeader?.trim() || null;
-  if (expectedDate) validateLedgerDate(expectedDate);
-  return { fileName, size, expectedDate };
-}
-
 function requireBucket(
   bucket: Env["EASTMONEY"] | undefined,
 ): Env["EASTMONEY"] {
@@ -283,27 +168,8 @@ function requireBucket(
   return bucket;
 }
 
-function requireWorkflow(
-  workflow: Env["BOND_LEDGER_IMPORT"] | undefined,
-): Env["BOND_LEDGER_IMPORT"] {
-  if (!workflow) {
-    throw new BondLedgerUploadError(503, "台账导入 Workflow 未配置");
-  }
-  return workflow;
-}
-
 function isIsoDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().startsWith(value);
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

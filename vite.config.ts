@@ -18,6 +18,7 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [tailwindcss(), sveltekit()],
+    worker: { format: "es" },
     server: {
       host: "127.0.0.1",
       port: 8765,

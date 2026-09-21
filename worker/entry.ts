@@ -26,7 +26,6 @@ export class NotificationSource extends WorkerEntrypoint<Cloudflare.Env> {
 }
 
 export { MarketBriefingWorkflow } from "./market-briefing-workflow.ts";
-export { BondLedgerImportWorkflow } from "./bond-ledger-workflow.ts";
 export { CreditAgent } from "./credit-agent.ts";
 
 const worker: ExportedHandler<Cloudflare.Env> = {

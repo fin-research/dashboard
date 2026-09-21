@@ -55,7 +55,7 @@ export const mcpOperations: McpOperation[] = [
   api('credit_report', '读取授信报表与日历', '/api/credit', 'GET', query({ date: dateSchema.optional(), month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional() })),
   api('update_credit_institution', '修改授信机构', '/api/credit', 'PATCH', body(creditInstitutionUpdateSchema)),
   api('create_credit_institution', '新增授信机构', '/api/credit', 'POST', body(creditInstitutionUpdateSchema)),
-  api('bond_ledger', '读取二级池台账与周报', '/api/bond-ledger', 'GET', query({ start: dateSchema.optional(), end: dateSchema.optional(), workflow: id.optional() })),
+  api('bond_ledger', '读取二级池台账与周报', '/api/bond-ledger', 'GET', query({ start: dateSchema.optional(), end: dateSchema.optional() })),
   api('delete_bond_ledger', '删除指定日期二级池台账', '/api/bond-ledger', 'DELETE', z.object({ query: z.object({ date: dateSchema }) }).strict()),
   api('financing_model', '读取融资择时模型报告', '/api/financing-model', 'GET', query({ run: z.string().uuid().optional() })),
   api('update_model_conclusion', '修改融资模型结论', '/api/financing-model/conclusion', 'PATCH', body(conclusionUpdateSchema)),

@@ -26,7 +26,8 @@ export type LedgerUploadStatus =
 
 export interface PersistBondLedgerInput {
   uploadId: string;
-  workflowInstanceId: string;
+  /** Historical column retained for old imports; direct imports use a local audit identifier. */
+  workflowInstanceId?: string;
   r2Key: string;
   r2Etag: string | null;
   originalName: string;
@@ -45,7 +46,8 @@ export interface PersistBondLedgerResult {
 
 export interface FailedBondLedgerInput {
   uploadId: string;
-  workflowInstanceId: string;
+  /** Historical column retained for old imports; direct imports use a local audit identifier. */
+  workflowInstanceId?: string;
   r2Key: string;
   r2Etag: string | null;
   originalName: string;
@@ -138,7 +140,7 @@ export async function persistParsedBondLedger(
          updated_at = now()`,
       [
         input.uploadId,
-        input.workflowInstanceId,
+        input.workflowInstanceId ?? `direct-${input.uploadId}`,
         input.r2Key,
         input.r2Etag,
         input.originalName,
@@ -272,7 +274,7 @@ export async function recordFailedBondLedgerImport(
        updated_at = now()`,
     [
       input.uploadId,
-      input.workflowInstanceId,
+      input.workflowInstanceId ?? `direct-${input.uploadId}`,
       input.r2Key,
       input.r2Etag,
       input.originalName,
@@ -308,7 +310,7 @@ export async function listBondLedgerInventory(
   const files = filesResult.rows.map((row) => ({
     date: row.date,
     fileName: row.file_name,
-    key: bondLedgerObjectKey(row.date),
+    key: row.r2_key.startsWith("bond-ledger/imports/") ? row.r2_key : bondLedgerObjectKey(row.date),
     size: toFiniteNumber(row.file_size),
     etag: row.r2_etag,
     uploadedAt: row.uploaded_at,
@@ -343,7 +345,7 @@ export async function findBondLedgerFile(
   return {
     date: row.date,
     fileName: row.file_name,
-    key: bondLedgerObjectKey(row.date),
+    key: row.r2_key.startsWith("bond-ledger/imports/") ? row.r2_key : bondLedgerObjectKey(row.date),
     size: toFiniteNumber(row.file_size),
     etag: row.r2_etag,
     uploadedAt: row.uploaded_at,

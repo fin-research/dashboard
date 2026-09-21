@@ -91,11 +91,6 @@
   ],
   "workflows": [
     {
-      "binding": "BOND_LEDGER_IMPORT",
-      "name": "bond-ledger-import",
-      "class_name": "BondLedgerImportWorkflow"
-    },
-    {
       "binding": "MARKET_BRIEFING",
       "name": "market-briefing",
       "class_name": "MarketBriefingWorkflow"

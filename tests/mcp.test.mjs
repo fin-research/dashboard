@@ -44,6 +44,7 @@ test('MCP calls validate shared schemas, reject hidden tools, and keep identitie
 test('catalog operations map to registered Gateway methods and cannot inject named actions or paths',()=>{
   assert.equal(new Set(mcpOperations.map(t=>t.name)).size,mcpOperations.length);
   for(const operation of mcpOperations) assert.ok(clientRequestPermission(new URL(operationPath(operation,{}),'https://eastmoney.hasbai.xyz'),operation.method),operation.name);
+  assert.equal(mcpOperations.find(t=>t.name==='bond_ledger').input.safeParse({query:{workflow:'old-instance'}}).success,false);
   const op=mcpOperations.find(t=>t.name==='article');
   assert.equal(op.input.safeParse({id:'../../api/profile'}).success,false);
   assert.throws(()=>operationPath(op,{id:'a',query:{'/deleteProject':'1'}}));

@@ -29,13 +29,13 @@ import {
   archiveBondLedgerRequest,
   bondLedgerObjectKey,
   BondLedgerUploadError,
-  finalizeBondLedgerObject,
-  workflowStatus,
+  getBondLedgerFile,
 } from "../src/lib/server/bond-ledger.ts";
 import {
   listBondLedgerInventory,
   persistParsedBondLedger,
 } from "../src/lib/server/bond-ledger-repository.ts";
+import { parsedBondLedgerSchema } from "../src/lib/bond-ledger/import-schema.ts";
 import { GET as redirectLegacyBondLedger } from "../src/routes/bond-ledger/+server.ts";
 import {
   readPreferences,
@@ -232,6 +232,7 @@ test("按表名合并交易户和可供户并统一派生成交", async () => {
     "2026-08-27",
   );
 
+  assert.deepEqual(parsedBondLedgerSchema.parse(parsed), parsed);
   assert.equal(parsed.positions.length, 2);
   assert.deepEqual(parsed.positions.map((row) => row.rowNumber), [1, 2]);
   assert.deepEqual(parsed.positions.map((row) => row.account), [
@@ -477,147 +478,94 @@ test("规模收益走势按交易户和可供户拆分且收益贡献可加总",
   );
 });
 
-test("上传先写入 bond-ledger 临时 key，再启动 Workflow", async () => {
-  const body = new Blob(["xlsx-bytes"], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const request = uploadRequest(body);
-  await assert.rejects(
-    archiveBondLedgerRequest(request.clone(), undefined, undefined),
-    (error) =>
-      error instanceof BondLedgerUploadError && error.status === 503,
-  );
-
+test("本地解析结果校验后归档原件并等待数据库提交", async () => {
   const calls = [];
-  const workflows = [];
-  const bucket = {
-    async put(key, value, options) {
-      const bytes = await new Response(value).arrayBuffer();
-      calls.push({ key, value, bytes: bytes.byteLength, options });
-      return {
-        key,
-        size: bytes.byteLength,
-        etag: "etag-test",
-      };
-    },
-  };
-  const workflow = {
-    async create(options) {
-      workflows.push(options);
-      return { id: options.id };
-    },
-  };
-  const productionRequest = request.clone();
-  const requestBody = productionRequest.body;
-  const production = await archiveBondLedgerRequest(
-    productionRequest,
-    bucket,
-    workflow,
-  );
-  assert.equal(production.accepted, true);
-  assert.match(
-    production.key,
-    /^bond-ledger\/\.pending\/[0-9a-f-]{36}\.xlsx$/,
-  );
-  assert.equal(calls[0].value, requestBody);
-  assert.equal(calls[0].bytes, body.size);
-  assert.equal(calls[0].options.customMetadata.originalName, "二级资金池台账20260820.xlsx");
-  assert.equal(workflows[0].id, production.workflowId);
-  assert.equal(workflows[0].params.r2Key, production.key);
-  assert.equal(workflows[0].locationHint, "apac");
-});
-
-test("解析成功后按 YYYY-MM-DD 覆盖定稿并删除临时对象", async () => {
-  const deleted = [];
-  const stored = [];
-  const bucket = {
-    async get(key) {
-      assert.match(key, /^bond-ledger\/\.pending\//);
-      return {
-        etag: "pending-etag",
-        httpMetadata: { contentType: "application/octet-stream" },
-        customMetadata: { originalName: "台账.xlsx" },
-        async arrayBuffer() { return new TextEncoder().encode("xlsx").buffer; },
-      };
-    },
-    async put(key, value, options) {
-      stored.push({ key, bytes: value.byteLength, options });
-      return { key, etag: "final-etag" };
-    },
-    async delete(key) { deleted.push(key); },
-  };
-  const pendingKey = "bond-ledger/.pending/00000000-0000-4000-8000-000000000000.xlsx";
-  const key = await finalizeBondLedgerObject(bucket, pendingKey, "pending-etag", "2026-08-20");
-  assert.equal(key, "bond-ledger/2026-08-20.xlsx");
-  assert.equal(bondLedgerObjectKey("2026-08-20"), key);
-  assert.equal(stored[0].key, key);
-  assert.deepEqual(deleted, [pendingKey]);
-});
-
-test("上传接口要求可信的请求体长度", async () => {
-  const body = new Blob(["xlsx-bytes"], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  const bucket = { async put(key, body, options) {
+    calls.push("archive");
+    assert.match(key, /^bond-ledger\/imports\/[0-9a-f-]{36}\.xlsx$/);
+    assert.equal(await new Response(body).text(), "xlsx-bytes");
+    assert.equal(options.customMetadata.reportDate, "2026-08-20");
+    return { key, etag: "etag-test" };
+  } };
+  let finish;
+  const committing = new Promise(resolve => { finish = resolve; });
+  const result = { reportDate: "2026-08-20", statisticsCount: 1, positionCount: 0, transactionCount: 0 };
+  const pending = archiveBondLedgerRequest(uploadRequest(), bucket, async input => {
+    calls.push("persist");
+    assert.equal(input.parsed.performance[0].principal, 100);
+    assert.equal(input.originalName, "台账.xlsx");
+    await committing;
+    return result;
   });
-  await assert.rejects(
-    archiveBondLedgerRequest(
-      uploadRequest(body, { "Content-Length": "" }),
-      { put: async () => assert.fail("长度缺失时不应写入 R2") },
-      { create: async () => assert.fail("长度缺失时不应启动 Workflow") },
-    ),
-    (error) =>
-      error instanceof BondLedgerUploadError && error.status === 400,
-  );
-  await assert.rejects(
-    archiveBondLedgerRequest(
-      uploadRequest(body, { "Content-Length": String(body.size + 1) }),
-      { put: async () => assert.fail("长度不一致时不应写入 R2") },
-      { create: async () => assert.fail("长度不一致时不应启动 Workflow") },
-    ),
-    (error) =>
-      error instanceof BondLedgerUploadError && error.status === 400,
-  );
+  finish();
+  assert.deepEqual(await pending, result);
+  assert.deepEqual(calls, ["archive", "persist"]);
 });
 
-test("上传接口拒绝跨站请求", async () => {
-  const body = new Blob(["xlsx-bytes"], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const request = uploadRequest(body, { Origin: "https://attacker.example" });
-  await assert.rejects(
-    archiveBondLedgerRequest(request, undefined, undefined),
-    (error) =>
-      error instanceof BondLedgerUploadError && error.status === 403,
-  );
+test("无效结构、跨日持仓、重复统计与错误替换日期在写入前拒绝", async () => {
+  const valid = { date: "2026-08-20", performance: [performanceRow("2026-08-20", 1, 100)], positions: [] };
+  const invalid = [
+    {}, { ...valid, performance: [] },
+    { ...valid, positions: [{ ...positionRow(), reportDate: valid.date, currentQuantity: -1 }] },
+    { ...valid, positions: [positionRow()] },
+    { ...valid, performance: [...valid.performance, ...valid.performance] },
+    { ...valid, performance: [performanceRow("2026-08-20", "bad", 100)] },
+    { ...valid, positions: [{ ...positionRow(), reportDate: valid.date, pledgedQuantity: 2, availableQuantity: 1 }] },
+  ];
+  const bucket = { put: async () => assert.fail("不应写入") };
+  for (const parsed of invalid) {
+    await assert.rejects(archiveBondLedgerRequest(uploadRequest(parsed), bucket, async () => assert.fail("不应导入")),
+      error => error instanceof BondLedgerUploadError && error.status === 400);
+  }
+  await assert.rejects(archiveBondLedgerRequest(uploadRequest(valid, {}, "2026-08-21"), bucket, async () => assert.fail()),
+    /报表日必须为/);
 });
 
-test("Workflow 启动失败时回滚本次 R2 文件", async () => {
-  const body = new Blob(["xlsx-bytes"], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+test("请求体按实际字节限长，不能用伪造长度绕过", async () => {
+  const request = new Request("https://eastmoney.hasbai.xyz/api/bond-ledger", {
+    method: "POST", headers: { "Content-Type": "multipart/form-data; boundary=x", "Content-Length": "1" },
+    body: new Uint8Array(21 * 1024 * 1024 + 1),
   });
-  const calls = [];
-  const bucket = {
-    async put(key) {
-      calls.push(["put", key]);
-      return { key, size: body.size, etag: "etag-test" };
-    },
-    async delete(key) {
-      calls.push(["delete", key]);
-    },
-  };
-  const workflow = {
-    async create() {
-      calls.push(["workflow"]);
-      throw new Error("workflow unavailable");
-    },
-  };
+  await assert.rejects(archiveBondLedgerRequest(request, { put: async () => assert.fail() }, async () => assert.fail()),
+    error => error instanceof BondLedgerUploadError && error.status === 413);
+});
 
-  await assert.rejects(
-    archiveBondLedgerRequest(uploadRequest(body), bucket, workflow),
-    (error) =>
-      error instanceof BondLedgerUploadError &&
-      error.message.includes("已回滚本次 R2 文件"),
-  );
-  assert.deepEqual(calls.map(([action]) => action), ["put", "workflow", "delete"]);
+test("上传接口拒绝跨站请求及旧的原始Excel接口", async () => {
+  await assert.rejects(archiveBondLedgerRequest(uploadRequest(undefined, { Origin: "https://attacker.example" }), undefined, async () => assert.fail()),
+    error => error instanceof BondLedgerUploadError && error.status === 403);
+  await assert.rejects(archiveBondLedgerRequest(new Request("https://eastmoney.hasbai.xyz/api/bond-ledger", {
+    method: "POST", body: "xlsx-bytes",
+  }), {}, async () => assert.fail()), error => error instanceof BondLedgerUploadError && error.status === 415);
+});
+
+test("数据库失败不报告成功，也不删除可能已经提交的原始文件", async () => {
+  const bucket = { put: async key => ({ key, etag: "test" }), delete: async () => assert.fail("不能删除可能已提交的原件") };
+  const failures = [];
+  await assert.rejects(archiveBondLedgerRequest(uploadRequest(), bucket, async () => { throw new Error("commit connection lost"); },
+    async input => { failures.push(input); }), /commit connection lost/);
+  assert.equal(failures.length, 1);
+  assert.match(failures[0].r2Key, /^bond-ledger\/imports\//);
+  await assert.rejects(archiveBondLedgerRequest(uploadRequest(), { put: async () => null }, async () => assert.fail()), /写入 R2 失败/);
+});
+
+test("可导入超过旧3MB限制的有效持仓JSON并保留缺省数量", async () => {
+  const parsed = { date: "2026-08-20", performance: [performanceRow("2026-08-20", 1, 100)],
+    positions: Array.from({ length: 6000 }, (_, index) => ({ ...positionRow(), reportDate: "2026-08-20", rowNumber: index + 1 })) };
+  assert.ok(new TextEncoder().encode(JSON.stringify(parsed)).byteLength > 3 * 1024 * 1024);
+  const result = await archiveBondLedgerRequest(uploadRequest(parsed), { put: async key => ({ key, etag: "test" }) }, async input => {
+    assert.equal(input.parsed.positions[0].pledgedQuantity, null);
+    assert.equal(input.parsed.positions[0].availableQuantity, null);
+    return { reportDate: input.parsed.date, positionCount: input.parsed.positions.length };
+  });
+  assert.equal(result.positionCount, 6000);
+});
+
+test("下载使用数据库记录的版本路径，历史日期对象仍可下载", async () => {
+  for (const key of ["bond-ledger/imports/new.xlsx", bondLedgerObjectKey("2026-08-20")]) {
+    const file = { date: "2026-08-20", key };
+    const object = { key };
+    assert.equal(await getBondLedgerFile({ get: async path => { assert.equal(path, key); return object; } }, file), object);
+  }
 });
 
 test("数据库导入先获取全局锁再获取同日报表锁", async () => {
@@ -692,27 +640,6 @@ test("台账日状态从持仓数据库读取而不是按 R2 文件推断", asyn
   assert.equal(inventory.availableEndDate, "2026-08-21");
   assert.match(queries[0], /FROM bond\.ledger_upload/);
   assert.match(queries[1], /FROM bond\.daily_position/);
-});
-
-test("Workflow 状态统一映射为处理中、成功或失败", async () => {
-  const id = "00000000-0000-4000-8000-000000000001";
-  const binding = (status) => ({
-    async get() {
-      return { async status() { return status; } };
-    },
-  });
-  assert.equal(
-    (await workflowStatus(binding({ status: "running" }), id)).status,
-    "processing",
-  );
-  assert.equal(
-    (await workflowStatus(binding({ status: "complete", output: { reportDate: "2026-08-20" } }), id)).status,
-    "succeeded",
-  );
-  assert.equal(
-    (await workflowStatus(binding({ status: "errored", error: { message: "bad workbook" } }), id)).error,
-    "bad workbook",
-  );
 });
 
 test("默认范围无台账时回退到上周一至上周五", () => {
@@ -866,16 +793,10 @@ function ledger(date, performance, positions) {
   };
 }
 
-function uploadRequest(body, extraHeaders = {}) {
-  return new Request("https://eastmoney.hasbai.xyz/api/bond-ledger", {
-    method: "POST",
-    headers: {
-      "Content-Type": body.type,
-      "X-Ledger-Filename": encodeURIComponent("二级资金池台账20260820.xlsx"),
-      "X-Ledger-Size": String(body.size),
-      "Content-Length": String(body.size),
-      ...extraHeaders,
-    },
-    body,
-  });
+function uploadRequest(parsed = { date: "2026-08-20", performance: [performanceRow("2026-08-20", 1, 100)], positions: [] }, headers = {}, expectedDate) {
+  const body = new FormData();
+  body.set("file", new File(["xlsx-bytes"], "台账.xlsx"));
+  body.set("parsed", JSON.stringify(parsed));
+  if (expectedDate) body.set("expectedDate", expectedDate);
+  return new Request("https://eastmoney.hasbai.xyz/api/bond-ledger", { method: "POST", body, headers });
 }
