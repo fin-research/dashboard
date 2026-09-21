@@ -40,6 +40,8 @@ test('issuance publication rejects old models, unavailable labels, broken SHAP a
   await assert.rejects(publish(db,first,'quant-trial/runs/other/result.json'),/Invalid issuance/);
   for(const mutate of [v=>{v.schema_version=3;},v=>{v.online_run.runtime='node';},v=>{v.online_run.retrain_after='2026-08-01';},
     v=>{delete v.online_run.training_as_of;},v=>{v.online_run.model_version='invalid';},v=>{v.forecast[0].market_train_label_end=v.as_of_date;},
+    v=>{v.market_forecast[1].date=v.as_of_date;},v=>{v.forecast[0].effective_horizon=30;},
+    v=>{v.explanation.prediction_coupon_bp+=1;v.explanation.base_coupon_bp+=1;},v=>{v.explanation=null;},
     v=>{v.explanation.features=[];},v=>{v.explanation.features[0].shap_bp=99;},v=>{v.decision.action='';}]){
    const invalid=structuredClone(first);invalid.generated_at='2026-08-24T05:00:00Z';mutate(invalid);await assert.rejects(publish(db,invalid));
   }

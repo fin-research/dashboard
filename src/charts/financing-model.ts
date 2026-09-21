@@ -286,19 +286,22 @@ export function financingDriverRadarScale(
 export function renderFinancingDriverContributions(
   host: HTMLElement,
   rows: FinancingModelSnapshot["market_drivers"],
+  mode: "support" | "coupon" = "support",
 ): void {
   if (!rows.length) {
     setEmpty(host, "因子贡献暂缺");
     return;
   }
-  const values = rows.map((row) => -row.shap);
+  const contributionOf = (row: FinancingModelSnapshot["market_drivers"][number]) => mode === "coupon" ? row.shap : -row.shap;
+  const label = mode === "coupon" ? "票面贡献" : "发行贡献";
+  const values = rows.map(contributionOf);
   const maxAbs = Math.max(...values.map(Math.abs), 0.1);
   const bound = Math.ceil(maxAbs * 12) / 10;
   setChart(host, {
     animationDuration: 180,
     aria: {
       enabled: true,
-      description: "本次预测前五项 SHAP 因子贡献",
+      description: "本次预测 SHAP 因子贡献",
     },
     grid: { left: 12, right: 78, top: 8, bottom: 48, containLabel: true },
     tooltip: {
@@ -309,10 +312,10 @@ export function renderFinancingDriverContributions(
         const item = (params as Array<{ dataIndex: number }>)[0];
         const row = rows[item?.dataIndex ?? -1];
         if (!row) return "";
-        const contribution = -row.shap;
+        const contribution = contributionOf(row);
         return [
           `<strong>${escapeHtml(row.display_name)}</strong>`,
-          `发行贡献 ${signed(contribution, 3)} bp`,
+          `${label} ${signed(contribution, 3)} bp`,
           `因子值 ${row.value.toFixed(4)}`,
         ].join("<br>");
       },
@@ -321,7 +324,7 @@ export function renderFinancingDriverContributions(
       type: "value",
       min: -bound,
       max: bound,
-      name: "发行贡献（bp）",
+      name: `${label}（bp）`,
       nameLocation: "middle",
       nameGap: 32,
       axisLine: { lineStyle: { color: colors.line } },

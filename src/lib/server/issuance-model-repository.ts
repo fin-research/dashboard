@@ -1,6 +1,6 @@
-import { issuanceReportSchema, type IssuanceReport } from '../issuance-model';
+import { issuanceReportSchema, type IssuanceReport } from '../issuance-model.ts';
 import type { BondDatabaseClient } from './postgres';
-import { FinancingModelDatabaseError } from './financing-model-repository';
+import { FinancingModelDatabaseError } from './financing-model-repository.ts';
 
 export async function loadIssuanceModelReport(client:BondDatabaseClient,runId:string|null=null):Promise<IssuanceReport> {
   const result=await client.query<{report:unknown}>(`SELECT jsonb_build_object(
@@ -9,7 +9,7 @@ export async function loadIssuanceModelReport(client:BondDatabaseClient,runId:st
       'market_source_date',r.market_data_date,'deadline',i.deadline,'window_days',i.window_days,'market_model',i.market_model,
       'terms',jsonb_build_object('issuer',i.issuer,'rating',r.rating,'tenor',r.tenor_years,'bond_type',r.bond_type),
       'issue_size_yi',r.issue_size_billion_yuan,'waiting_cost_bp_day',i.waiting_cost_bp_day,
-      'decision',jsonb_build_object('action',i.action,'reason',i.reason,'first_issuance_date',i.first_issuance_date,'lowest_expected_cost_date',i.lowest_expected_cost_date,
+      'decision',jsonb_build_object('action',i.action,'reason',i.reason,'scope',i.decision_scope,'validation_status',i.validation_status,'first_issuance_date',i.first_issuance_date,'lowest_expected_cost_date',i.lowest_expected_cost_date,
         'expected_net_saving_bp',i.expected_net_saving_bp,'annual_saving_wan',i.annual_saving_wan,'saving_probability',i.saving_probability,'saving_p10_bp',i.saving_p10_bp,'joint_error_pairs',i.joint_error_pairs),
       'forecast',COALESCE((SELECT jsonb_agg(to_jsonb(f)-'run_id'-'ordinal' ORDER BY ordinal) FROM financing_model.issuance_forecast f WHERE f.run_id=r.id),'[]'::jsonb),
       'market_forecast',COALESCE((SELECT jsonb_agg(to_jsonb(f)-'run_id'-'ordinal' ORDER BY ordinal) FROM financing_model.issuance_market_path f WHERE f.run_id=r.id),'[]'::jsonb),

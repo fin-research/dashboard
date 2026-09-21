@@ -118,14 +118,26 @@ BEGIN
   THEN RAISE EXCEPTION 'Invalid issuance forecast publication'; END IF;
   IF EXISTS(SELECT 1 FROM jsonb_array_elements(payload->'forecast') r WHERE
     (r->>'date')::date NOT BETWEEN model_date AND deadline OR (r->>'lead_days')::integer IS DISTINCT FROM (r->>'date')::date-model_date
+    OR (r->>'forecast_origin')::date NOT BETWEEN model_date AND (r->>'date')::date
+    OR (r->>'effective_horizon')::integer IS DISTINCT FROM (r->>'date')::date-(r->>'forecast_origin')::date
     OR (r->>'market_source_date')::date>=model_date OR (r->>'market_train_label_end')::date>=model_date
     OR (r->>'primary_history_latest_date')::date>=model_date OR (r->>'calibration_latest_label')::date>=model_date)
   THEN RAISE EXCEPTION 'Unavailable forecast information'; END IF;
+  IF EXISTS(SELECT 1 FROM jsonb_array_elements(payload->'market_forecast') WITH ORDINALITY e(r,n) WHERE
+    (r->>'date')::date IS DISTINCT FROM model_date+(n-1)::integer
+    OR (r->>'value_date')::date>(r->>'date')::date)
+  THEN RAISE EXCEPTION 'Invalid market path dates'; END IF;
+  IF payload #>> '{forecast,0,coupon_percent}' IS NOT NULL AND
+    (payload->'explanation' IS NULL OR payload->'explanation'='null'::jsonb)
+  THEN RAISE EXCEPTION 'Missing coupon SHAP decomposition'; END IF;
   IF payload->'explanation' IS NOT NULL AND payload->'explanation' <> 'null'::jsonb AND (
     payload #>> '{explanation,method}' IS DISTINCT FROM 'tree_path_dependent'
     OR COALESCE(jsonb_array_length(payload #> '{explanation,features}'),0)=0
     OR payload #>> '{explanation,base_coupon_bp}' IS NULL
     OR payload #>> '{explanation,prediction_coupon_bp}' IS NULL
+    OR payload #>> '{forecast,0,coupon_percent}' IS NULL
+    OR abs((payload #>> '{explanation,prediction_coupon_bp}')::double precision
+      -100*(payload #>> '{forecast,0,coupon_percent}')::double precision)>1e-7
     OR abs((payload #>> '{explanation,base_coupon_bp}')::double precision +
       (SELECT sum((v->>'shap_bp')::double precision) FROM jsonb_array_elements(payload #> '{explanation,features}') v)
       -(payload #>> '{explanation,prediction_coupon_bp}')::double precision)>1e-7)
@@ -171,7 +183,7 @@ BEGIN
     'validation_status',COALESCE(payload #> '{decision,validation_status}','"insufficient history"'::jsonb),
     'sample_count',payload #> '{validation,sample_count}','prediction_start',payload #> '{validation,prediction_start}',
     'prediction_end',payload #> '{validation,prediction_end}','calendar_year',payload #> '{calendar_audit,calendar,year}',
-    'calendar_source',payload #> '{calendar_audit,calendar,issuance_source}') || payload->'decision' || COALESCE(NULLIF(payload->'explanation','null'::jsonb),'{}'::jsonb);
+    'calendar_source',payload #> '{calendar_audit,calendar,issuance_source}') || (payload->'decision') || COALESCE(NULLIF(payload->'explanation','null'::jsonb),'{}'::jsonb);
   DELETE FROM financing_model.issuance_run WHERE run_id=stored_id;
   INSERT INTO financing_model.issuance_run SELECT * FROM jsonb_populate_record(NULL::financing_model.issuance_run,row_value);
   DELETE FROM financing_model.issuance_forecast WHERE run_id=stored_id;

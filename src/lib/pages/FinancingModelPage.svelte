@@ -12,6 +12,7 @@
   } from "../../charts/financing-model";
   import ChartHost from "../../components/ChartHost.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
+  import MetricCard from "../../components/MetricCard.svelte";
   import InstitutionLogo from "$lib/components/InstitutionLogo.svelte";
   import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
   import {
@@ -337,7 +338,7 @@
 
   let snapshot = $derived(report?.snapshot ?? null);
   let versions = $derived(report?.versions ?? []);
-  let marketDrivers = $derived((snapshot?.explanation?.features ?? []).toSorted((a,b)=>Math.abs(b.shap_bp)-Math.abs(a.shap_bp)).slice(0,8).map(row=>({feature:row.feature,display_name:issuanceFeatureName(row.feature),shap:row.shap_bp,value:row.value ?? 0,impact:row.shap_bp>0 ? "推高成本" as const : "降低成本" as const})));
+  let marketDrivers = $derived([...(snapshot?.explanation?.features ?? [])].sort((a,b)=>Math.abs(b.shap_bp)-Math.abs(a.shap_bp)).slice(0,8).map(row=>({feature:row.feature,display_name:issuanceFeatureName(row.feature),shap:row.shap_bp,value:row.value ?? 0,impact:row.shap_bp>0 ? "推高成本" as const : "降低成本" as const})));
   let current = $derived(snapshot?.forecast[0]);
   let validationMetrics = $derived(snapshot ? [
     {label:"预测检验数",value:String(snapshot.validation.sample_count)},
@@ -422,8 +423,8 @@
             <div class="window-decision">
               <span class="recommendation-badge">{snapshot.decision.action}</span>
               <h3>{snapshot.terms.tenor}年期{snapshot.terms.rating} {snapshot.terms.bond_type}</h3>
+              <MetricCard label="预计票面" value={formatNullable(current?.coupon_percent,2)} unit="%" tone="blue" compact />
               <dl class="product-result-metrics">
-                <div><dt>预计票面</dt><dd>{formatNullable(current?.coupon_percent,2)}%</dd></div>
                 <div><dt>窗口净节约</dt><dd>{formatNullable(snapshot.decision.expected_net_saving_bp,2)} bp</dd></div>
                 <div><dt>等待省钱概率</dt><dd>{formatRatioPercent(snapshot.decision.saving_probability)}%</dd></div>
                 <div><dt>报价日</dt><dd>{snapshot.market_source_date}</dd></div>
@@ -474,7 +475,7 @@
           <PanelHeading id="factor-contribution-title" title="SHAP 因子贡献" />
           <ChartHost
             renderer={renderFinancingDriverContributions}
-            args={[marketDrivers]}
+            args={[marketDrivers, "coupon"]}
             ariaLabel="当前票面预测 SHAP 因子贡献"
             className="driver-contribution-chart"
           />
