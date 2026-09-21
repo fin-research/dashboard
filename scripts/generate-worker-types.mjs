@@ -26,9 +26,6 @@ const withoutBuildImport = generated.replace(
 ).replace(
   /\n\tinterface GlobalProps \{\n\t\tmainModule: typeof import\("[^"]+"\);\n\t\}\n/,
   "\n",
-).replace(
-  /Workflow<Parameters<import\("\.\/worker\/entry"\)\.BondLedgerImportWorkflow\['run'\]>\[0\]\['payload'\]>/,
-  'Workflow<import("./src/lib/bond-ledger/types").BondLedgerImportParams>',
 
 );
 await writeFile(declarationUrl, withoutBuildImport

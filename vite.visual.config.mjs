@@ -8,6 +8,7 @@ const local = path => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
   root: local('./tests/visual/harness/'),
   envDir: false,
+  worker: { format: "es" },
   plugins: [tailwindcss(), svelte({ configFile: false })],
   resolve: { alias: {
     $lib: local('./src/lib/'),

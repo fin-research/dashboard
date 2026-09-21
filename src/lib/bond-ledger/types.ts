@@ -83,16 +83,6 @@ export interface ParsedBondLedger {
   positions: LedgerPositionRow[];
 }
 
-export interface BondLedgerImportParams {
-  uploadId: string;
-  r2Key: string;
-  r2Etag: string | null;
-  originalName: string;
-  fileSize: number;
-  expectedDate: string | null;
-  uploadedAt: string;
-}
-
 export type BondLedgerSource = ParsedBondLedger;
 
 export type LedgerTransactionSide = "买入" | "卖出" | "到期";

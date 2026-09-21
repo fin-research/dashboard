@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button/index.js";
-  import { archiveBondLedgerFile, waitForBondLedgerImport } from "./upload";
+  import { archiveBondLedgerFile } from "./upload";
   import { globalMessages } from "$lib/global-messages";
 
   interface Props {
@@ -26,8 +26,7 @@
           key: "bond-ledger-operation", title: "台账处理中", duration: 120_000,
         });
         try {
-          const archived = await archiveBondLedgerFile(file);
-          const imported = await waitForBondLedgerImport(archived.workflowId);
+          const imported = await archiveBondLedgerFile(file);
           if (imported.reportDate > latestDate) latestDate = imported.reportDate;
           succeeded += 1;
         } catch (error) {

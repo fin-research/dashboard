@@ -2,7 +2,7 @@
 
 ## 运行单元
 
-项目由 SvelteKit 应用和自定义 Cloudflare Worker 入口组成。`worker/entry.ts` 承载构建后的 SvelteKit Worker，并注册台账导入与 `MarketBriefingWorkflow`。静态资源由 Worker Assets 提供。
+项目由 SvelteKit 应用和自定义 Cloudflare Worker 入口组成。`worker/entry.ts` 承载构建后的 SvelteKit Worker，并注册 `MarketBriefingWorkflow`。静态资源由 Worker Assets 提供。
 
 Worker Assets 只承载随应用版本一起构建、发布的前端资源。资金日报是每日独立上传且需要运行时立即生效的业务文件，因此存入 R2，不写入构建目录，也不触发 Worker 重新发布。
 
@@ -40,7 +40,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 - `src/lib/server/data-news.ts` 通过 `DATA` Service Binding 有界读取并校验单篇研报正文，供研报详情和政策点评生成复用。
 - `src/lib/server/ai-gateway.ts` 是生成式模型唯一适配器；传输契约见 [共享 AI](../../eastmoney/docs/AI.md)，业务 Prompt 和 Schema 留在调用模块。
 - `src/lib/server/ai-stream.ts` 在公开 reasoning summary 离开 Worker 前移除 Markdown 加粗标记；`src/lib/server/ai-sse.ts` 是前端交互式 AI 的统一 Worker 流边界，客户端只接收纯文本 `progress`、完整 JSON `result` 或纯文本 `error`，保活使用 SSE 注释帧。
-- `src/lib/server/bond-ledger.ts` 处理台账请求、R2、Workflow 与下载边界。
+- `src/lib/server/bond-ledger.ts` 处理台账直接导入、R2 原件与下载边界。
 - Gateway 拥有 Auth0 个人信息与角色权限服务；Dashboard `/profile` 保留界面，`/api/profile` 由 Gateway 直接处理，后端兼容转发使用 `IDENTITY` binding。
 - `src/lib/server/fund-report.ts` 校验并归档资金日报 HTML，枚举固定前缀生成历史列表，并按确定性的日期 key 从 R2 读取单期日报。
 - `src/lib/server/bond-ledger-repository.ts` 封装 `bond` schema SQL；`src/lib/server/postgres.ts` 管理短生命周期连接。
@@ -71,7 +71,7 @@ Dashboard 是唯一 UI/API Worker。融资领域位于 `src/lib/financing/`（�
 
 融资人员授权查询、提醒查询、报表生成和数据库连接均不能放进全站根 layout。仅融资业务导航执行融资授权与集合查询；重型导入解析器留在浏览器 Web Worker，报表动作客户端按路由加载。Finance 的 CSS 限定 `.financing-scope`，其颜色与表面映射 Dashboard 令牌，不能在导航后污染门户和报告。
 
-自定义 Worker 同时导出 DebtImportWorkflow，继续使用既有 Workflow 名称和台账原子导入。Dashboard 包含每小时融资提醒与北京时间交易日 17:00 市场点评两项 Cron；经济指标午夜 Cron 与 Workflow 由 Data 持有。从旧 Worker 切换时停止旧 cron，防止重复扫描。迁移不会改变 Quant、Data、Ingest 或其他上游接口。
+融资与二级池均由浏览器本地解析、线上直接执行原子导入，旧导入 Workflow 已退役。Dashboard 包含每小时融资提醒与北京时间交易日 17:00 市场点评两项 Cron；经济指标午夜 Cron 与 Workflow 由 Data 持有。从旧 Worker 切换时停止旧 cron，防止重复扫描。迁移不会改变 Quant、Data、Ingest 或其他上游接口。
 
 Gateway 在私有 `GatewayDashboard` 中传入唯一身份；hooks 设置 `locals.user` 及 `user.authorization`；融资领域只使用该统一身份与权限。`src/lib/identity.ts` 定义身份及客户端 DTO，基础 subject、邮箱和认证有效期不被业务缓存替换。
 

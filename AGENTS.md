@@ -16,7 +16,7 @@
 - `src/api.ts`、`src/report-view.ts`、`src/text-report.ts`：数据客户端与报告视图派生。
 - `src/lib/server/`：仅服务端运行的数据访问、AI、快照和台账逻辑。
 - `src/lib/bond-ledger/`：Excel 解析、校验、格式化与分析。
-- `worker/`：自定义 Worker 入口和二级池导入 Workflow。
+- `worker/`：自定义 Worker 入口和市场点评 Workflow。
 - `migrations/`：D1 migration；`postgres-migrations/`：Neon `bond` schema migration；`financing-model-migrations/`：Neon `financing_model` schema migration。
 - `authorization-migrations/`：旧跨 schema 迁移的历史快照；后续权限 migration、Auth0 与角色授权由 Gateway 维护。
 - `auth0/`：保留注册配置的历史来源；当前 Auth0 Actions、配置和发布由 Gateway 维护，见 [Gateway](../gateway/AGENTS.md)。
@@ -36,7 +36,7 @@
 - 身份只使用 Gateway 私有入口注入的 `locals.user`，权限只使用 `user.authorization`；应用不验证 JWT、不回查 Auth0，不另建授权系统。保留记录归属和业务规则。精确认证、路由豁免、失败关闭与模式规则见 [SECURITY](docs/SECURITY.md)。
 - 一级发行视觉与文字输出必须共用 `src/primary-issues.ts`；文字报告不得读取 Python 归档文本。
 - 热点首次访问只读最近成功快照；只有用户手动生成才调用模型并追加 `hotspot_snapshot`。旧快照的证据范围以快照自身为准。
-- 二级池原始 Excel 先写 R2，再由 Workflow 解析并通过 Hyperdrive 写入 Neon；页面和浏览器不得解析 Excel 或缓存完整台账。
+- 二级池 Excel 在浏览器 Web Worker 解析，线上校验结构后归档原件并通过 Hyperdrive 单事务直接写入 Neon；不使用导入 Workflow，浏览器不缓存完整台账。
 - D1/Neon/R2 所有权及跨仓库 migration 协同遵循 [共享数据库](../eastmoney/docs/DATABASE.md)；本地连接、日期和导入一致性遵循 [DATABASE](docs/DATABASE.md)。
 - 生成式 AI 仅通过 `src/lib/server/ai-gateway.ts`；传输、重试与检索遵循 [共享 AI](../eastmoney/docs/AI.md)，业务 Prompt、Schema 和例外留在目标模块。
 - 融资模型的 Quant / Dashboard 写入分工见 [共享数据库](../eastmoney/docs/DATABASE.md#融资模型跨仓库写入)，页面契约见 [融资模型模块](docs/modules/financing-model.md)。

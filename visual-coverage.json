@@ -670,7 +670,7 @@
       "id": "bond",
       "url": "/trading-research/bond",
       "kind": "screenshot",
-      "state": "60日历史、六类持仓、非空成交、账户切换和台账管理",
+      "state": "60日历史、六类持仓、非空成交、账户切换和台账管理；2026-09-21仅替换导入传输与解析逻辑，布局不变，直导入错误与提交行为由单元测试覆盖",
       "evidence": [
         {
           "spec": "tests/visual/bond-ledger-desktop.spec.mjs",

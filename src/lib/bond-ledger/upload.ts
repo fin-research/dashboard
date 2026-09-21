@@ -1,19 +1,8 @@
-import type { BondLedgerReport } from "./types";
+import type { BondLedgerReport, ParsedBondLedger } from "./types";
+
+import { MAX_LEDGER_BYTES, MAX_PARSED_LEDGER_BYTES } from "./import-limits";
 
 const LEDGER_ENDPOINT = "/api/bond-ledger";
-const XLSX_CONTENT_TYPE =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-
-export interface BondLedgerArchiveResult {
-  accepted: true;
-  uploadId: string;
-  workflowId: string;
-  key: string;
-  size: number;
-  etag: string | null;
-  uploadedAt: string;
-}
-
 export interface BondLedgerImportResult {
   reportDate: string;
   statisticsCount: number;
@@ -37,64 +26,42 @@ export interface BondLedgerInventory {
   availableEndDate: string | null;
 }
 
-interface WorkflowStatusPayload {
-  workflowId: string;
-  status: "processing" | "succeeded" | "failed";
-  error?: string;
-  result?: unknown;
-}
-
 export async function archiveBondLedgerFile(
   file: File,
   expectedDate?: string,
-): Promise<BondLedgerArchiveResult> {
-  const headers: Record<string, string> = {
-    "Content-Type": XLSX_CONTENT_TYPE,
-    "X-Ledger-Filename": encodeURIComponent(file.name),
-    "X-Ledger-Size": String(file.size),
-  };
-  if (expectedDate) headers["X-Ledger-Expected-Date"] = expectedDate;
-  const response = await fetch(LEDGER_ENDPOINT, {
-    method: "POST",
-    headers,
-    body: file,
-  });
+): Promise<BondLedgerImportResult> {
+  if (!file.name.toLowerCase().endsWith(".xlsx") || !file.size || file.size > MAX_LEDGER_BYTES) {
+    throw new Error("请选择不超过 12 MB 的 .xlsx 台账");
+  }
+  const parsed = await parseLocally(file);
+  if (expectedDate && parsed.date !== expectedDate) {
+    throw new Error(`重新上传文件的报表日必须为 ${expectedDate}，实际为 ${parsed.date}`);
+  }
+  const body = new FormData();
+  body.set("file", file);
+  const serialized = JSON.stringify(parsed);
+  if (new TextEncoder().encode(serialized).byteLength > MAX_PARSED_LEDGER_BYTES) throw new Error("台账解析数据不能超过 8 MB");
+  body.set("parsed", serialized);
+  if (expectedDate) body.set("expectedDate", expectedDate);
+  const response = await fetch(LEDGER_ENDPOINT, { method: "POST", body });
   const payload = await jsonPayload(response);
-  if (!response.ok || !isArchiveResult(payload)) {
-    throw new Error(errorFromPayload(payload, `台账上传失败（HTTP ${response.status}）`));
+  if (!response.ok || !isImportResult(payload)) {
+    throw new Error(errorFromPayload(payload, `台账导入失败（HTTP ${response.status}）`));
   }
   return payload;
 }
 
-export async function waitForBondLedgerImport(
-  workflowId: string,
-  onProcessing?: () => void,
-): Promise<BondLedgerImportResult> {
-  const deadline = Date.now() + 120_000;
-  while (Date.now() < deadline) {
-    const response = await fetch(
-      `${LEDGER_ENDPOINT}?workflow=${encodeURIComponent(workflowId)}`,
-      { cache: "no-store" },
-    );
-    const payload = await jsonPayload(response);
-    if (!response.ok || !isWorkflowStatus(payload)) {
-      throw new Error(
-        errorFromPayload(payload, `导入状态读取失败（HTTP ${response.status}）`),
-      );
-    }
-    if (payload.status === "failed") {
-      throw new Error(payload.error || "Excel 导入失败");
-    }
-    if (payload.status === "succeeded") {
-      if (!isImportResult(payload.result)) {
-        throw new Error("导入工作流已完成，但返回结果无效");
-      }
-      return payload.result;
-    }
-    onProcessing?.();
-    await delay(750);
-  }
-  throw new Error("Excel 仍在后台导入，请稍后刷新台账清单");
+function parseLocally(file: File): Promise<ParsedBondLedger> {
+  const worker = new Worker(new URL("./parse.worker.ts", import.meta.url), { type: "module" });
+  return new Promise((resolve, reject) => {
+    worker.onmessage = ({ data }) => {
+      worker.terminate();
+      if (data.error) reject(new Error(data.error));
+      else resolve(data.parsed);
+    };
+    worker.onerror = () => { worker.terminate(); reject(new Error("台账解析失败")); };
+    worker.postMessage(file);
+  });
 }
 
 export async function loadBondLedgerReport(
@@ -186,29 +153,6 @@ export async function deleteRemoteBondLedger(date: string): Promise<void> {
   }
 }
 
-function isArchiveResult(value: unknown): value is BondLedgerArchiveResult {
-  if (!isRecord(value)) return false;
-  return (
-    value.accepted === true &&
-    typeof value.uploadId === "string" &&
-    typeof value.workflowId === "string" &&
-    typeof value.key === "string" &&
-    typeof value.size === "number" &&
-    (typeof value.etag === "string" || value.etag === null) &&
-    typeof value.uploadedAt === "string"
-  );
-}
-
-function isWorkflowStatus(value: unknown): value is WorkflowStatusPayload {
-  if (!isRecord(value)) return false;
-  return (
-    typeof value.workflowId === "string" &&
-    (value.status === "processing" ||
-      value.status === "succeeded" ||
-      value.status === "failed")
-  );
-}
-
 function isImportResult(value: unknown): value is BondLedgerImportResult {
   if (!isRecord(value)) return false;
   return (
@@ -279,8 +223,4 @@ function errorFromPayload(value: unknown, fallback: string): string {
 
 async function jsonPayload(response: Response): Promise<unknown> {
   return response.json().catch(() => null);
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }

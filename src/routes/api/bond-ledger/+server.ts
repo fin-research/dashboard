@@ -5,7 +5,6 @@ import {
   ledgerDownloadHeaders,
   validateLedgerDate,
   validateSameOrigin,
-  workflowStatus,
 } from "$lib/server/bond-ledger";
 import {
   BondLedgerDatabaseError,
@@ -13,19 +12,14 @@ import {
   findBondLedgerFile,
   listBondLedgerInventory,
   loadBondLedgerReport,
+  persistParsedBondLedger,
+  recordFailedBondLedgerImport,
 } from "$lib/server/bond-ledger-repository";
 import { withPostgres } from "$lib/server/postgres";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform, url }) => {
   try {
-    const workflowId = url.searchParams.get("workflow");
-    if (workflowId) {
-      return Response.json(
-        await workflowStatus(platform?.env.BOND_LEDGER_IMPORT, workflowId),
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    }
     const startDate = url.searchParams.get("start");
     const endDate = url.searchParams.get("end");
     if (startDate || endDate) {
@@ -77,10 +71,13 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
     const result = await archiveBondLedgerRequest(
       request,
       platform?.env.EASTMONEY,
-      platform?.env.BOND_LEDGER_IMPORT,
+      (input) => withPostgres(platform?.env.HYPERDRIVE?.connectionString, "eastmoney-bond-import",
+        (client) => persistParsedBondLedger(client, input)),
+      (input) => withPostgres(platform?.env.HYPERDRIVE?.connectionString, "eastmoney-bond-import-failure",
+        (client) => recordFailedBondLedgerImport(client, input)),
     );
     return Response.json(result, {
-      status: 202,
+      status: 200,
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

@@ -6,7 +6,7 @@ Schema 和字段以 migration 与代码为事实来源。本文件只维护 Dash
 
 业务报告使用私有 `eastmoney` bucket；`EASTMONEY` 与 `LIABILITY_REPORT_SNAPSHOTS` 指向该桶，授信材料另用 `CREDIT` 指向 `credit` 桶。绑定事实以 [wrangler.jsonc](../wrangler.jsonc) 为准。报告对象使用固定前缀：
 
-- `bond-ledger/YYYY-MM-DD.xlsx`：二级池台账定稿。同日重新上传覆盖当天对象；上传解析阶段暂存于 `bond-ledger/.pending/<uuid>.xlsx`，Workflow 成功后归档并删除临时对象。页面统计不得通过下载 R2 文件重新计算。
+- `bond-ledger/imports/<uuid>.xlsx`：二级池原始 Excel 独立版本。浏览器解析后随结构化数据上传，服务端校验并归档，再单事务切换数据库成功导入记录。提交响应丢失时保留原件；失败归档不进入成功清单。历史 `bond-ledger/YYYY-MM-DD.xlsx` 继续可下载。页面统计只读数据库。
 - `market-briefing/YYYY-MM-DD.json`：市场点评定稿快照，只包含规范报告字段、今日聚焦和定稿时间，不含原始上游响应；由 market-briefing Workflow 汇总写入；所有日期页面都只读该日定稿，旧手动保存接口保留兼容。
 - `fund-reports/YYYY-MM-DD.html`：资金日报。同一天再次上传会替换该日报；读取路由不得接受任意对象 key。
 

@@ -45,7 +45,6 @@
     downloadRemoteBondLedger,
     listRemoteBondLedgers,
     loadBondLedgerReport,
-    waitForBondLedgerImport,
     type RemoteBondLedgerFile,
   } from "$lib/bond-ledger/upload";
   import { currentReportDate } from "../../report-date";
@@ -194,20 +193,7 @@
         },
       );
       try {
-        const archived = await archiveBondLedgerFile(file, target || undefined);
-        const imported = await waitForBondLedgerImport(
-          archived.workflowId,
-          () => {
-            globalMessages.info(
-              `正在导入 ${index + 1}/${files.length}：${file.name}`,
-              {
-                key: "bond-ledger-operation",
-                title: "台账处理中",
-                duration: 120_000,
-              },
-            );
-          },
-        );
+        const imported = await archiveBondLedgerFile(file, target || undefined);
         successCount += 1;
         if (imported.reportDate > latestUploadedDate) {
           latestUploadedDate = imported.reportDate;
