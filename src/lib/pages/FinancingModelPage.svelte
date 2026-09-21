@@ -977,7 +977,7 @@
   .window-card-body {
     display: grid;
     min-height: 220px;
-    grid-template-columns: minmax(210px, 0.85fr) minmax(0, 1.15fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
     gap: 18px;
   }
@@ -1100,6 +1100,7 @@
 
   .product-result-metrics {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     width: 100%;
     gap: 16px;
     margin: 0;
@@ -1550,8 +1551,8 @@
     }
 
     .window-decision {
-      justify-items: center;
-      text-align: center;
+      justify-items: start;
+      text-align: left;
     }
 
     .section-actions {

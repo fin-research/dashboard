@@ -545,11 +545,11 @@
       "id": "financing-model-online",
       "url": "/trading-research/financing-model",
       "kind": "screenshot",
-      "state": "online result and legacy history",
+      "state": "issuance results and date switching",
       "evidence": [
         {
           "spec": "tests/visual/reports.spec.mjs",
-          "test": "financing-model shows online results and switches to legacy history",
+          "test": "financing-model switches between issuance model dates",
           "projects": [
             "desktop",
             "mobile"
