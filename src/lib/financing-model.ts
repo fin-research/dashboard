@@ -198,8 +198,8 @@ export const timingDecisionRecordSchema = z
   .object({
     runId: z.string().uuid(),
     decisionDate: z.string().date(),
-    historicalPercentile: z.number().min(0).max(100),
-    recommendation: z.enum(["strong_buy", "neutral", "wait"]),
+    historicalPercentile: z.number().min(0).max(100).nullable(),
+    recommendation: z.enum(["strong_buy", "neutral", "wait"]).nullable(),
     recommendationLabel: z.string().min(1),
     decisionAction: z.string().min(1).max(1000),
     outcome: z.string().max(2000),

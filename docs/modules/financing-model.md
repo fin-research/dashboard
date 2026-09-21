@@ -1,59 +1,52 @@
 # 融资择时模型
 
-入口：`/trading-research/financing-model`，兼容 `/financing-model`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
+入口：`/trading-research/financing-model`，兼容 `/financing-model`。当前契约为 `issuance-forecast-v1`，模型为 `issuance-lgb-v1`。方法与选型由 [Quant](../../../quant/docs/RATE_RESEARCH.md) 维护。
 
 ## 接口
 
-- `GET /api/financing-model`：返回最新 quant 模型快照、当前有效整体结论、最近卖方观点和最近 100 个可选模型日期版本；模型快照包含实际 LCR/NSFR、六类 SHAP 驱动结构、Top 因子贡献、四种品种相对各自同类债中位数的预测偏离、完整训练样本区间与样本外验证指标；无模型运行返回 404。
-- `GET /api/financing-model?run=<uuid>`：读取指定运行并同时返回可选版本清单；模型基础字段保持不变，当前整体结论可由 PATCH 增量更新。
-- `PATCH /api/financing-model/conclusion`：增量更新目标 `model_run` 的当前整体结论；请求含 `runId`、`verdict`、`preferredWindow`、`narrative`，不修改模型基础结论。
-- `GET /api/financing-model/decisions`：读取历史择时决策记录；日期、历史分位和发行建议来自对应模型运行，按模型日期倒序返回。
-- `POST /api/financing-model/decisions`：按 `runId` 新增或覆盖一条人工记录；`decisionAction` 必填，`outcome` 可在结果形成后补录，不设置状态字段。
-- `POST /api/financing-model/sell-side`：按 `runId` 使用 AI Search 与 AI Gateway 生成并追加卖方逻辑汇总及 4–5 家逐机构观点；前端携带 `Accept: text/event-stream` 时返回统一 `progress/result/error` SSE，普通 JSON 请求成功为 201。
-- `PATCH /api/financing-model/sell-side`：追加人工卖方逻辑汇总修订；请求含 `runId`、`logicSummary`，保留原检索口径与来源证据。
+- `GET /api/financing-model`：最新新版模型快照、有效整体结论、卖方观点及最近100个新版模型日期。返回当前及未来发行日票面和区间、市场路径、净节约、等待概率与尾部风险、真实TreeSHAP和逐年逐期限验证；无新版数据返回404。
+- `GET /api/financing-model?run=<uuid>`：指定新版运行及版本清单；旧相对利差运行不被转换为票面预测。
+- `PATCH /api/financing-model/conclusion`：以`runId`增量更新人工`verdict/preferredWindow/narrative`，保留模型基础结论。
+- `GET /api/financing-model/decisions`：历史人工决策与结果；旧运行的历史分位可保留，新运行该字段为null，页面不展示旧分位。
+- `POST /api/financing-model/decisions`：按`runId`保存必填`decisionAction`及可后补的`outcome`。
+- `POST /api/financing-model/sell-side`：追加最近七日研究库逻辑汇总及4—5家机构观点；SSE遵循统一`progress/result/error`，普通JSON成功201。
+- `PATCH /api/financing-model/sell-side`：追加人工`logicSummary`修订，保留逐机构观点和来源证据。
+
+DTO位于`src/lib/issuance-model.ts`，读取在`src/lib/server/issuance-model-repository.ts`；人工编辑和历史记录复用既有repository。旧DTO仅供历史数据与兼容测试，不再作为当前模型API或页面入口。
 
 ## 业务规则
 
-- 页面默认展示最新 `model_run`，并允许按模型日期切换历史运行；同一模型日期只保留一条模型记录，重复上传覆盖模型字段和有序明细，保留当天稳定 runId、人工结论、决策记录和全部卖方快照；晚到的较早生成结果不会覆盖较新结果。
-- 人工编辑过的整体结论优先展示；未人工编辑时，整体结论标题跟随该运行的正式发行建议 `recommendation_label`，避免与融资窗口判断冲突，基础结论正文和模型原始字段保持不变。
-- 驱动结构雷达图围绕中性值 50 自适应显示范围以提高类别辨识度；图中和 tooltip 使用的支持度原值不做放大或重算。
+同一模型日期保留稳定runId；较新成功结果更新模型字段和明细，保留人工结论、择时记录及全部卖方快照。乱序旧结果不覆盖新结果，明细失败整次事务回滚。人工编辑结论优先展示，恢复模型内容使用基础结论。
 
-- 正式发行建议按各债券类型与期限组的历史预测分位三等分：P≤33⅓ 为“建议发行”，33⅓<P≤66⅔ 为“建议等待”，P>66⅔ 为“暂缓发行”；分组不足时沿用全局历史预测分布。该规则统一用于主结论、品种方案、未来窗口和仪表盘，不强制实际日期数量各占三分之一。
-- 新运行的模型验证按样本外预测最低三分之一评估推荐样本；旧运行保留当时实际验证指标，不据新分档虚构历史胜率或节约值。
-- 未来窗口展开、当前决策录入和卖方观点生成均为标题旁图标操作；分别采用展开箭头、加号及全站 AI 星芒图标，窄屏保持标题与按钮同排。
-- 页面前两行按 1:1 对齐；品种推荐/模型推荐与未来发行窗口/模型验证统一按 3:1 对齐。模型推荐拆为品种、建议和两项数值；样本区间以两行 `年/月` 展示。
-- 卖方检索直连研究库 `https://research.hasbai.xyz/mcp` 的 `search` 工具，保留最近七日、研报类型及最多 50 条的硬过滤。
+预计票面以百分数表示；净节约和SHAP为bp。净节约以首个可发行日为基准，扣除等待成本；金额为年化万元。SHAP直接使用真实树贡献，正值推高票面，负值降低票面；票面基准加全部贡献必须还原首个发行日票面。展示绝对值最大的八项，完整贡献保存并由API返回。不能将贡献改号为旧发行支持度。
 
-## 数据流
+发行建议由Quant的净节约、配对省钱概率、尾部风险和样本门槛共同形成。旧分位三等分、六维支持度、四品种相对中位数推荐及旧胜率不再用于当前结论。公司LCR/NSFR、资金缺口不属于新模型输入或页面。
 
-Quant 线上 Workflow → R2 校验归档 → `publish_online_result` 原子发布 → Neon `financing_model.model_run` 标量列、原生数组及有序明细表 → dashboard 重建最新运行。人工结论通过 PATCH 增量更新同一条 `model_run` 的当前结论列；卖方观点由页面手动触发，Worker 使用模型日期最近七个上海自然日的 AI Search 证据，经 AI Gateway 严格 Schema 归纳为单段逻辑汇总及 4–5 家逐机构观点后追加保存。人工编辑逻辑汇总时保留原逐机构观点和检索证据，并追加新快照。
+窗口判断/整体结论、市场路径/SHAP按等宽列展示；未来发行窗口/模型验证按3:1展示，窄屏保持顺序单列。窗口明细、决策录入和卖方生成仍使用标题旁操作。模型验证区分票面MAE与市场变化MAE；2026为已观察研究参考期，不标作新独立测试。
 
-## 存储：Neon：融资择时模型
+卖方检索沿用研究库`https://research.hasbai.xyz/mcp`，最近七日、研报类型、最多50条；模型上下文只包含票面、净节约、风险、市场路径和SHAP，不再混入旧分位驱动。
 
-Worker 通过同一 `HYPERDRIVE` 访问 `financing_model` schema：
+## 数据流与存储
 
-- `model_run`：quant pipeline 按模型日期覆盖的结构化模型记录；标量直接落列，完整训练样本量与起止发行日独立于样本外验证指标保存，校验迭代、分组均值和优选日期使用 PostgreSQL 原生数组，当前整体结论与模型基础结论分别落列。
-- `model_run_market_driver`：每次运行的有序市场驱动因子，主键 `(run_id, ordinal)`。
-- `model_run_driver_group`：六类正式特征组的局部 SHAP 发行支持度与权重，主键 `(run_id, ordinal)`。
-- `model_run_product_scenario`：3Y/5Y 公募债与次级债四种方案相对各自同类债中位数的同批预测、排序及推荐标记，主键 `(run_id, ordinal)`。
-- `model_run_forecast_window`：每次运行的有序未来发行窗口，主键 `(run_id, ordinal)`。
-- `timing_decision_record`：每次模型运行至多一条人工决策记录，只保存决策操作和结果；模型日期、历史分位与发行建议从 `model_run` 派生，不设状态列。
-- `sell_side_snapshot`：AI Search 检索与 AI Gateway 归纳后的卖方逻辑汇总及人工修订追加快照，读取最新一条。
+Data维护原始行情和真实定价字段 → Quant LightGBM推理 → R2冻结结果 → `financing_model.publish_online_result`原子发布 → Dashboard从结构化表重建新快照。页面GET只读，不触发训练、推理或写库。
 
-规则：
+| 表 | 归属内容 |
+|---|---|
+| `model_run` | schema_version=4的日期、方案、来源版本、基础/人工结论；旧模型行保留历史 |
+| `issuance_run` | 截止日、决策、风险、SHAP基准、验证及日历来源 |
+| `issuance_forecast` | 有序发行日票面、区间、净节约、成熟标签与样本数 |
+| `issuance_market_path` | 完整自然日市场路径、报价/发行日、carry来源日 |
+| `issuance_shap` | 全部特征值及原始SHAP，主键run_id/ordinal |
+| `issuance_validation` | 各年各期限样本数、MAE/RMSE、同口径不变基准 |
+| `timing_decision_record` | 人工操作与事后结果 |
+| `sell_side_snapshot` | 研究库观点与人工修订的追加快照 |
 
-- migration 只放 `financing-model-migrations/`，使用 `pnpm financing-model:db:migrate` 应用。
-- `model_run` 不保存原始 JSON；dashboard 从结构化列和有序明细表重建前端快照，quant 不写人工结论、历史决策记录和卖方观点。
-- 人工结论只增量更新目标 `model_run` 的 `conclusion_*` 与 `conclusion_updated_at`；模型基础结论列保持不变。生成的卖方观点和人工卖方逻辑汇总继续追加保存。
-- 历史择时决策记录按 `run_id` upsert；决策操作必填，结果允许后补，二者均由人工输入，不从模型预测自动生成。
-- 卖方快照只保存结构化观点、检索口径和源文档 key，不保存 AI Search 返回的完整正文。
+旧`model_run_market_driver/driver_group/product_scenario/forecast_window`仅保存历史。数据库不保存原始模型JSON；原始证据保存在R2。Quant不写人工结论、决策或卖方观点。
 
-资金缺口保留在模型输入与结构化快照中供内部判断，但报告指标卡及自动生成业务文字不展示其数值和状态。其来源为资金日报规范化历史，见 [Quant 输入](quant-inputs.md)。
+## 线上发布与验收
 
-## 线上自动结果
+`0008_issuance_forecast.sql`由Dashboard维护，通过`pnpm financing-model:db:migrate`应用。发布只接受真实`cloudflare-workflow`、`issuance-lgb-v1`来源与匹配的R2归档key；校验模型有效期、输入/标签日期、市场路径及SHAP加法与票面一致性。旧契约发布被拒绝。
 
-- Quant 工作日 08:30 自动运行，完成 R2 `quant-trial/runs/{date}/{instanceId}/result.json` 归档后，通过 Hyperdrive 调用 `financing_model.publish_online_result(jsonb, text)`。页面 GET 只读数据库，不触发推理或写入。
-- `0007_online_model_publication.sql` 维护发布函数和原生来源列；原始 JSON 只保留在 R2，模型字段继续使用现有标量、数组和四张有序明细表。API 的可选 `snapshot.online_run` 返回模型版本、特征版本、训练日、重训截止日、排除组和运行环境，不暴露原始输入。
-- 线上结果优先接管同日旧本地模型，保留稳定 runId、人工结论、决策与卖方快照；接管后只接受生成时间更晚的线上结果，旧本地上传不能覆盖。同日重试、乱序结果不重复新增明细；任何明细失败整次发布回滚。
-- 线上 `online-market-v1` 不包含公司业务输入，`company_metrics` 保持 null；前端不显示业务指标区域。历史记录有公司快照时继续显示，不借用旧日期公司数据。
-- 本次仅接入自动结果，不增加手动运行入口。先应用 Dashboard migration，再部署 Quant 发布步骤，最后通过受控 Workflow 参数 `publish_result_key` 补录已有成功归档；无需重新训练或推理。发布完成后核对 API 日期、版本、明细、历史和人工记录。
+Quant工作日08:30运行，归档`quant-trial/runs/{date}/{instanceId}/result.json`后发布。默认本地CLI不写生产；维护补发只能使用已验证的实际Workflow归档。迁移顺序为Data输入 → Dashboard表/API/页面 → Quant新包/Worker → 实际Workflow与生产API核验。模型发布和重训规则见 [线上推理](../../../quant/docs/ONLINE_INFERENCE.md)。
+
+测试包含PGlite真实migration/发布/回滚/人工内容保留、DTO/API及桌面/手机浏览器组件截图。组件夹具测试不等于生产鉴权E2E；生产链路以实际Workflow、数据库和程序化HTTP证据验收。

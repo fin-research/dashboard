@@ -88,7 +88,7 @@ pnpm visual:baseline:import <outside-checkout-directory> --reviewed
 - `financing-model`、`financing/network-efficiency`、`financing/form-state`、`financing/liability-report` 仍含源码守卫。其增量保存、服务端预取和报告口径并未被当前视觉场景完整替代，保留这些保障，后续随对应功能改动优先迁为 handler/DOM 行为测试，不再扩写同类正则。
 - 保留 happy-dom 的日期输入、请求竞争、草稿/失败恢复、portal 清理，以及权限/SQL/迁移测试；这些不是截图能够替代的验证。
 
-尚未纳入截图的页面包括管理/个人资料、完整融资项目与 SOP 路由、资金/负债报告、政策详情。热点弹层使用浏览器交互校验；融资模型非空报告的 Darwin 基线从迁移前提交 `d0b9672` 生成，禁止用迁移后截图替代。当前场景不是 62 个页面的全覆盖，不用空态代替这些业务验收。
+尚未纳入截图的页面包括管理/个人资料、完整融资项目与 SOP 路由、资金/负债报告、政策详情。热点弹层使用浏览器交互校验；融资模型的 Darwin 基线保留为迁移前历史；当前票面/净节约/SHAP页面按新契约生成并审阅macos-ci候选，由合并组严格比较。当前场景不是 62 个页面的全覆盖，不用空态代替这些业务验收。
 
 本轮浏览器回归捕获并修复 ScheduleFields 模式切换后原生重置的竞态：等待 Svelte 的默认值恢复结束后再还原配置。553 项 Node 测试、5 项 Python 测试及生产构建已通过；覆盖率观测行 84.46%、分支 80.17%。
 

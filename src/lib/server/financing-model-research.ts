@@ -1,3 +1,4 @@
+import type { IssuanceSnapshot } from "../issuance-model";
 import { z } from "zod";
 
 import {
@@ -16,7 +17,7 @@ const AI_SEARCH_MAX_RESULTS = 50 as const;
 const MAX_MCP_RESPONSE_BYTES = 6 * 1024 * 1024;
 const MAX_SOURCE_DOCUMENTS = 24;
 const MAX_DOCUMENT_TEXT = 2_400;
-const PROMPT_CACHE_KEY = "financing-model-sell-side:v6";
+const PROMPT_CACHE_KEY = "financing-model-sell-side:v7";
 
 const researchOutputSchema = z
   .object({
@@ -69,7 +70,7 @@ export class FinancingModelResearchError extends Error {
 }
 
 export async function generateFinancingModelResearch(
-  snapshot: FinancingModelSnapshot,
+  snapshot: FinancingModelSnapshot | IssuanceSnapshot,
   credentials: AiGatewayCredentials,
   fetcher: typeof fetch = fetch,
   options: { signal?: AbortSignal; onProgress?: (summary: string) => void } = {},
@@ -324,7 +325,7 @@ function resolveResearchViews(
 }
 
 function researchMessages(
-  snapshot: FinancingModelSnapshot,
+  snapshot: FinancingModelSnapshot | IssuanceSnapshot,
   documents: ResearchDocument[],
 ) {
   return [
@@ -341,7 +342,11 @@ function researchMessages(
     {
       role: "user" as const,
       content: JSON.stringify({
-        model: {
+        model: "forecast" in snapshot ? {
+          asOfDate:snapshot.as_of_date,marketDataDate:snapshot.market_source_date,
+          couponPercent:snapshot.forecast[0]?.coupon_percent, decision:snapshot.decision,
+          shap:snapshot.explanation, futureWindow:snapshot.forecast,
+        } : {
           asOfDate: snapshot.as_of_date,
           marketDataDate: snapshot.market_data_date,
           deviationBp: snapshot.prediction.deviation_bp,
@@ -360,8 +365,8 @@ function researchMessages(
   ];
 }
 
-function buildResearchQuery(snapshot: FinancingModelSnapshot): string {
-  const driverNames = snapshot.market_drivers
+function buildResearchQuery(snapshot: FinancingModelSnapshot | IssuanceSnapshot): string {
+  const driverNames = ("forecast" in snapshot ? [] : snapshot.market_drivers)
     .slice(0, 5)
     .map((driver) => driver.display_name)
     .join("、");

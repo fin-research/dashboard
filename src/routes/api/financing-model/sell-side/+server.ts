@@ -1,10 +1,10 @@
+import { loadIssuanceModelReport } from "$lib/server/issuance-model-repository";
 import { z } from "zod";
 
 import { sellSideSummaryUpdateSchema } from "$lib/financing-model";
 import { BondLedgerUploadError, validateSameOrigin } from "$lib/server/bond-ledger";
 import {
   FinancingModelDatabaseError,
-  loadFinancingModelReport,
   saveSellSideSnapshot,
   saveSellSideSummaryRevision,
 } from "$lib/server/financing-model-repository";
@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
     const report = await withPostgres(
       env.HYPERDRIVE?.connectionString,
       "eastmoney-financing-model-research-read",
-      (client) => loadFinancingModelReport(client, runId),
+      (client) => loadIssuanceModelReport(client, runId),
     );
     if (request.headers.get("accept")?.includes("text/event-stream")) {
       return createAiSseResponse(
@@ -127,7 +127,7 @@ export const PATCH: RequestHandler = async ({ request, platform, url }) => {
       platform?.env.HYPERDRIVE?.connectionString,
       "eastmoney-financing-model-research-revision",
       async (client) => {
-        const report = await loadFinancingModelReport(client, input.runId);
+        const report = await loadIssuanceModelReport(client, input.runId);
         if (!report.sellSide) {
           throw new FinancingModelDatabaseError(404, "尚未生成卖方观点");
         }

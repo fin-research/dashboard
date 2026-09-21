@@ -9,32 +9,26 @@
 
   import {
     renderFinancingDriverContributions,
-    renderFinancingDriverRadar,
-    renderFinancingForecast,
-    renderFinancingGauge,
-    renderFinancingProductComparison,
   } from "../../charts/financing-model";
   import ChartHost from "../../components/ChartHost.svelte";
-  import MetricCard from "../../components/MetricCard.svelte";
-  import MetricIcon from "../../components/MetricIcon.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
+  import MetricCard from "../../components/MetricCard.svelte";
   import InstitutionLogo from "$lib/components/InstitutionLogo.svelte";
   import PanelHeading from "$lib/trading-research/PanelHeading.svelte";
   import {
     conclusionSchema,
-    parseFinancingModelReport,
     sellSideSummaryBody,
     sellSidePayloadSchema,
     timingDecisionHistorySchema,
     timingDecisionRecordSchema,
     type FinancingModelConclusion,
-    type FinancingModelReport,
     type TimingDecisionRecord,
   } from "$lib/financing-model";
   import { globalMessages } from "$lib/global-messages";
   import { isAiRequestCancelled, useAiClient } from "$lib/ai-client.svelte";
   import { portal } from "$lib/portal";
-  import type { MetricIconName } from "../../view-model";
+  import { parseIssuanceReport as parseFinancingModelReport, type IssuanceReport as FinancingModelReport } from "$lib/issuance-model";
+  import { issuanceFeatureName, renderIssuanceForecast, renderIssuanceMarket } from "../../charts/issuance-model";
   interface Props {
     embedded?: boolean;
   }
@@ -149,7 +143,7 @@
 
   function useBaseConclusion(): void {
     if (!snapshot) return;
-    editVerdict = snapshot.prediction.recommendation_label;
+    editVerdict = snapshot.decision.action;
     editNarrative = snapshot.base_conclusion.narrative;
   }
 
@@ -213,19 +207,6 @@
     } finally {
       savingDecision = false;
     }
-  }
-
-  function financingMetricTone(
-    tone: string,
-  ): "primary" | "teal" | "blue" | "orange" | "purple" {
-    if (
-      tone === "teal" ||
-      tone === "blue" ||
-      tone === "orange" ||
-      tone === "purple"
-    )
-      return tone;
-    return "primary";
   }
 
   async function saveConclusion(): Promise<void> {
@@ -356,73 +337,16 @@
 
 
   let snapshot = $derived(report?.snapshot ?? null);
-  let company = $derived(snapshot?.company_metrics ?? null);
-  let validation = $derived(snapshot?.validation ?? null);
-  let marketDrivers = $derived(snapshot?.market_drivers.slice(0, 5) ?? []);
-  let productRecommendation = $derived(snapshot?.product_recommendation ?? null);
-  let recommendedScenario =
-    $derived(productRecommendation?.scenarios.find((scenario) => scenario.is_recommended) ??
-    null);
   let versions = $derived(report?.versions ?? []);
-  let businessMetrics = $derived(snapshot
-    ? [
-        {
-          label: "LCR",
-          value: formatRatioPercent(company?.ef_lcr),
-          unit: "%",
-          tone: "teal",
-          icon: "liquidity" as MetricIconName,
-        },
-        {
-          label: "NSFR",
-          value: formatRatioPercent(company?.ef_nsfr),
-          unit: "%",
-          tone: "blue",
-          icon: "leverage" as MetricIconName,
-        },
-        {
-          label: "主体利差",
-          value: formatNullable(company?.ef_subject_spread_bp, 2),
-          unit: "bp",
-          tone: "purple",
-          icon: "issuance" as MetricIconName,
-        },
-      ]
-    : []);
-  let validationMetrics = $derived(validation
-    ? [
-        {
-          label: "样本量",
-          value: `${validation.tscv.sample_count ?? validation.tscv.validation_samples} 笔`,
-        },
-        {
-          label: "样本区间",
-          value: formatDateRange(
-            validation.tscv.sample_start_date,
-            validation.tscv.sample_end_date,
-          ),
-        },
-        {
-          label: "胜率",
-          value: `${(validation.timing_value.win_rate * 100).toFixed(1)}%`,
-        },
-        {
-          label: "历史节约",
-          value: `${formatSigned(validation.timing_value.cost_saving_bp, 2)} bp`,
-        },
-        {
-          label: "信息系数",
-          value: validation.tscv.ic.toFixed(3),
-        },
-        {
-          label: "平均误差",
-          value:
-            validation.tscv.mae === null
-              ? "—"
-              : `${validation.tscv.mae.toFixed(2)} bp`,
-        },
-      ]
-    : []);
+  let marketDrivers = $derived([...(snapshot?.explanation?.features ?? [])].sort((a,b)=>Math.abs(b.shap_bp)-Math.abs(a.shap_bp)).slice(0,8).map(row=>({feature:row.feature,display_name:issuanceFeatureName(row.feature),shap:row.shap_bp,value:row.value ?? 0,impact:row.shap_bp>0 ? "推高成本" as const : "降低成本" as const})));
+  let current = $derived(snapshot?.forecast[0]);
+  let validationMetrics = $derived(snapshot ? [
+    {label:"预测检验数",value:String(snapshot.validation.sample_count)},
+    {label:"检验区间",value:formatDateRange(snapshot.validation.prediction_start,snapshot.validation.prediction_end)},
+    {label:"2026当日MAE",value:formatNullable(snapshot.validation.metrics.find(r=>r.year===2026&&r.lead_days===0)?.mae_bp,2)+" bp"},
+    {label:"2026末日MAE",value:formatNullable(snapshot.validation.metrics.find(r=>r.year===2026&&r.lead_days===30)?.mae_bp,2)+" bp"},
+    {label:"末日基准MAE",value:formatNullable(snapshot.validation.metrics.find(r=>r.year===2026&&r.lead_days===30)?.flat_market_mae_bp,2)+" bp"},
+  ] : []);
 </script>
 
 <svelte:head>
@@ -496,22 +420,15 @@
         <ModuleCard class="window-card" labelledBy="financing-window-title">
           <PanelHeading id="financing-window-title" title="融资窗口" />
           <div class="window-card-body">
-            <ChartHost
-              renderer={renderFinancingGauge}
-              args={[snapshot.prediction]}
-              ariaLabel={`融资窗口历史分位 P${snapshot.prediction.historical_percentile.toFixed(0)}`}
-              className="window-gauge"
-            />
             <div class="window-decision">
-              <span class={`recommendation-badge recommendation-badge--${snapshot.prediction.recommendation}`}>
-                {snapshot.prediction.recommendation_label}
-              </span>
-              <h3>窗口处于{snapshot.prediction.window_zone}区间</h3>
-              <p>
-                模型预测发行利差相对偏离
-                <strong>{formatSigned(snapshot.prediction.deviation_bp, 2)} bp</strong>，处于历史
-                <strong>P{snapshot.prediction.historical_percentile.toFixed(0)}</strong>
-              </p>
+              <span class="recommendation-badge">{snapshot.decision.action}</span>
+              <h3>{snapshot.terms.tenor}年期{snapshot.terms.rating} {snapshot.terms.bond_type}</h3>
+              <MetricCard label="预计票面" value={formatNullable(current?.coupon_percent,2)} unit="%" tone="blue" compact />
+              <dl class="product-result-metrics">
+                <div><dt>窗口净节约</dt><dd>{formatNullable(snapshot.decision.expected_net_saving_bp,2)} bp</dd></div>
+                <div><dt>等待省钱概率</dt><dd>{formatRatioPercent(snapshot.decision.saving_probability)}%</dd></div>
+                <div><dt>报价日</dt><dd>{snapshot.market_source_date}</dd></div>
+              </dl>
             </div>
           </div>
         </ModuleCard>
@@ -551,74 +468,19 @@
 
       <section class="driver-grid" aria-label="模型驱动">
         <ModuleCard class="chart-card" labelledBy="driver-structure-title">
-          <PanelHeading id="driver-structure-title" title="驱动结构" />
-          <ChartHost
-            renderer={renderFinancingDriverRadar}
-            args={[snapshot.driver_structure]}
-            ariaLabel="六类因子 SHAP 发行支持度雷达图"
-            className="driver-radar-chart"
-          />
+          <PanelHeading id="driver-structure-title" title="市场利率路径" />
+          <ChartHost renderer={renderIssuanceMarket} args={[snapshot.market_forecast]} ariaLabel="AAA三年期市场利率预测" className="driver-radar-chart" />
         </ModuleCard>
         <ModuleCard class="chart-card" labelledBy="factor-contribution-title">
-          <PanelHeading id="factor-contribution-title" title="因子贡献" />
+          <PanelHeading id="factor-contribution-title" title="SHAP 因子贡献" />
           <ChartHost
             renderer={renderFinancingDriverContributions}
-            args={[marketDrivers]}
-            ariaLabel="当前预测 Top 5 因子贡献"
+            args={[marketDrivers, "coupon"]}
+            ariaLabel="当前票面预测 SHAP 因子贡献"
             className="driver-contribution-chart"
           />
         </ModuleCard>
       </section>
-
-      {#if company}
-      <section class="business-section" aria-labelledby="business-title">
-        <PanelHeading id="business-title" title="业务指标" />
-        <div class="business-metric-grid">
-          {#each businessMetrics as metric}
-            <MetricCard
-              label={metric.label}
-              value={metric.value}
-              unit={metric.unit}
-              tone={financingMetricTone(metric.tone)}
-              iconComponent={MetricIcon}
-              iconProps={{ icon: metric.icon }}
-              compact
-            />
-          {/each}
-        </div>
-      </section>
-
-      {/if}
-      {#if productRecommendation}
-        <section class="product-section" aria-labelledby="product-title">
-          <div class="product-layout">
-            <ModuleCard class="chart-card" labelledBy="product-title">
-              <PanelHeading id="product-title" title="品种推荐" />
-              <ChartHost
-                renderer={renderFinancingProductComparison}
-                args={[productRecommendation]}
-                ariaLabel="3年与5年公募债和次级债预测偏离对比"
-                className="product-comparison-chart"
-              />
-            </ModuleCard>
-            <ModuleCard class="product-result" labelledBy="product-result-title">
-              <PanelHeading id="product-result-title" title="模型推荐" />
-              <div class="product-result-body">
-                <strong class="product-result-name">{productRecommendation.recommended_product}</strong>
-                {#if recommendedScenario}
-                  <span class={`recommendation-badge recommendation-badge--${recommendedScenario.recommendation}`}>
-                    {recommendedScenario.recommendation_label}
-                  </span>
-                  <dl class="product-result-metrics">
-                    <div><dt>相对同类债中位数</dt><dd>{formatSigned(recommendedScenario.pred_bp, 2)} <span>bp</span></dd></div>
-                    <div><dt>历史分位</dt><dd>P{recommendedScenario.historical_percentile.toFixed(0)}</dd></div>
-                  </dl>
-                {/if}
-              </div>
-            </ModuleCard>
-          </div>
-        </section>
-      {/if}
 
       <section class="supporting-grid" aria-label="未来发行窗口与模型验证">
         <ModuleCard class="forecast-panel" labelledBy="window-title">
@@ -635,9 +497,9 @@
             </Button>
           </PanelHeading>
             <ChartHost
-              renderer={renderFinancingForecast}
-              args={[snapshot.forecast_window]}
-              ariaLabel="未来发行窗口预测偏离和相对成本变化图"
+              renderer={renderIssuanceForecast}
+              args={[snapshot.forecast]}
+              ariaLabel="未来发行票面区间与净节约"
               className="forecast-chart"
             />
             <div
@@ -650,20 +512,20 @@
                 <thead>
                   <tr>
                     <th scope="col">日期</th>
-                    <th scope="col">窗口判断</th>
-                    <th scope="col">预测偏离</th>
-                    <th scope="col">历史分位</th>
-                    <th scope="col">相对窗口中位数</th>
+                    <th scope="col">预计票面</th>
+                    <th scope="col">90%区间</th>
+                    <th scope="col">净节约</th>
+                    <th scope="col">省钱概率</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {#each snapshot.forecast_window as point}
+                  {#each snapshot.forecast as point}
                     <tr>
-                      <th scope="row">{displayDate(point.date)} · {point.weekday}</th>
-                      <td>{point.label}</td>
-                      <td>{formatSigned(point.pred_bp, 2)} bp</td>
-                      <td>P{point.percentile.toFixed(0)}</td>
-                      <td>{formatSigned(point.savings_bp_vs_window_median, 2)} bp</td>
+                      <th scope="row">{displayDate(point.date)}</th>
+                      <td>{formatNullable(point.coupon_percent,2)}%</td>
+                      <td>{formatNullable(point.coupon_low_percent,2)}—{formatNullable(point.coupon_high_percent,2)}%</td>
+                      <td>{formatNullable(point.net_saving_bp,2)} bp</td>
+                      <td>{formatRatioPercent(point.saving_probability)}%</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -716,7 +578,6 @@
             <thead>
               <tr>
                 <th scope="col">日期</th>
-                <th scope="col">历史分位</th>
                 <th scope="col">发行建议</th>
                 <th scope="col">决策操作</th>
                 <th scope="col">结果</th>
@@ -726,7 +587,6 @@
               {#each decisionHistory as record}
                 <tr>
                   <th scope="row">{displayDate(record.decisionDate)}</th>
-                  <td>P{record.historicalPercentile.toFixed(0)}</td>
                   <td>
                     <span class={`recommendation-badge recommendation-badge--${record.recommendation}`}>
                       {record.recommendationLabel}
@@ -746,7 +606,7 @@
                 </tr>
               {:else}
                 <tr>
-                  <td class="decision-empty" colspan="5">暂无决策记录</td>
+                  <td class="decision-empty" colspan="4">暂无决策记录</td>
                 </tr>
               {/each}
             </tbody>
@@ -1117,7 +977,7 @@
   .window-card-body {
     display: grid;
     min-height: 220px;
-    grid-template-columns: minmax(210px, 0.85fr) minmax(0, 1.15fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
     gap: 18px;
   }
@@ -1240,6 +1100,7 @@
 
   .product-result-metrics {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     width: 100%;
     gap: 16px;
     margin: 0;
@@ -1690,8 +1551,8 @@
     }
 
     .window-decision {
-      justify-items: center;
-      text-align: center;
+      justify-items: start;
+      text-align: left;
     }
 
     .section-actions {
