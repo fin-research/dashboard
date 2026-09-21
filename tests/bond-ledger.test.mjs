@@ -503,9 +503,10 @@ test("本地解析结果校验后归档原件并等待数据库提交", async ()
 });
 
 test("无效结构、跨日持仓、重复统计与错误替换日期在写入前拒绝", async () => {
-  const valid = { date: "2026-08-20", performance: [performanceRow("2026-08-20", 1, 100)], positions: [] };
+  const valid = { date: "2026-08-20", performance: [performanceRow("2026-08-20", 1, 100)], positions: [{ ...positionRow(), reportDate: "2026-08-20" }] };
   const invalid = [
-    {}, { ...valid, performance: [] },
+    {}, { ...valid, performance: [] }, { ...valid, positions: [] },
+    { ...valid, positions: [{ ...positionRow(), reportDate: valid.date, code: "", name: "" }] },
     { ...valid, positions: [{ ...positionRow(), reportDate: valid.date, currentQuantity: -1 }] },
     { ...valid, positions: [positionRow()] },
     { ...valid, performance: [...valid.performance, ...valid.performance] },
@@ -558,6 +559,12 @@ test("可导入超过旧3MB限制的有效持仓JSON并保留缺省数量", asyn
     return { reportDate: input.parsed.date, positionCount: input.parsed.positions.length };
   });
   assert.equal(result.positionCount, 6000);
+});
+
+test("服务端保留解析器允许的有名称无代码行", () => {
+  const parsed = { date: "2026-08-20", performance: [performanceRow("2026-08-20", 1, 100)],
+    positions: [{ ...positionRow(), reportDate: "2026-08-20", code: "", name: "待补代码债券" }] };
+  assert.equal(parsedBondLedgerSchema.parse(parsed).positions[0].name, "待补代码债券");
 });
 
 test("下载使用数据库记录的版本路径，历史日期对象仍可下载", async () => {
@@ -793,7 +800,7 @@ function ledger(date, performance, positions) {
   };
 }
 
-function uploadRequest(parsed = { date: "2026-08-20", performance: [performanceRow("2026-08-20", 1, 100)], positions: [] }, headers = {}, expectedDate) {
+function uploadRequest(parsed = { date: "2026-08-20", performance: [performanceRow("2026-08-20", 1, 100)], positions: [{ ...positionRow(), reportDate: "2026-08-20" }] }, headers = {}, expectedDate) {
   const body = new FormData();
   body.set("file", new File(["xlsx-bytes"], "台账.xlsx"));
   body.set("parsed", JSON.stringify(parsed));

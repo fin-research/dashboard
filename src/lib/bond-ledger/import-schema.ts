@@ -12,7 +12,7 @@ const performance = z.object({
 });
 const position = z.object({
   reportDate: z.string().date(), rowNumber: z.number().int().positive(),
-  team: text, investmentManager: text, account: text, code: text.min(1),
+  team: text, investmentManager: text, account: text, code: text,
   market: text, name: text, category: text,
   yieldChangeBp: optionalAmount, remainingYears: optionalAmount,
   interestStartDate: z.string().date().nullable(), maturityDate: z.string().date().nullable(),
@@ -24,7 +24,7 @@ const position = z.object({
   fullPrice: optionalAmount, dv01: amount, marketValue: amount, couponIncome: amount,
   taxExemptIncome: amount, realizedProfit: optionalAmount, dailyProfit: amount,
   ytdProfit: amount, fullPriceCost: amount,
-}).refine(row => {
+}).refine(row => Boolean(row.code.trim() || row.name.trim()), "债券代码和名称不能同时为空").refine(row => {
   const pledged = row.pledgedQuantity ?? null, available = row.availableQuantity ?? null;
   return pledged === null && available === null || pledged !== null && available !== null
     && Math.abs(pledged + available - row.currentQuantity) <= 0.000001;
@@ -32,7 +32,7 @@ const position = z.object({
 
 export const parsedBondLedgerSchema: z.ZodType<ParsedBondLedger> = z.object({
   date: z.string().date(), performance: z.array(performance).min(1).max(10000),
-  positions: z.array(position).max(10000),
+  positions: z.array(position).min(1).max(10000),
 }).superRefine((ledger, context) => {
   const dates = new Set<string>(), rows = new Set<number>();
   for (const item of ledger.performance) {

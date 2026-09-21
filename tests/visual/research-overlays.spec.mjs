@@ -26,7 +26,8 @@ test('desktop hotspot scope selection is visible and details use readable width'
   await keyword.click();
   const detail=page.getByRole('dialog',{name:'资金面热点详情',exact:true});
   await expect(detail).toBeVisible();
-  expect((await detail.boundingBox()).width).toBeGreaterThanOrEqual(640);
+  // Visibility precedes the 100ms zoom-in: 672px initially renders at 95% (638.4px).
+  await expect.poll(async () => (await detail.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(640);
   await expect(detail.getByText(hotspotAudit.hotspots[0].evidence[0].evidence,{exact:true})).toBeInViewport();
   await expect(detail).toHaveScreenshot('hotspot-detail-desktop.png');
   await page.keyboard.press('Escape');
