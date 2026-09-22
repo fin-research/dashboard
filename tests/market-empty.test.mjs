@@ -62,6 +62,32 @@ test('发行规模缺失仍保留债券明细，汇总及文字版不误报为�
   assert.equal(coreMetricCards(report, deriveReport(report)).find(row => row.label === '同业发行').value, '—');
 });
 
+test('含权或缺失期限不阻断完整发行规模，金额缺失仍只阻断对应日期汇总', () => {
+  const resources = raw();
+  resources.primary = primaryIssuesSchema.parse([
+    ...['5+2', '3+2', '1+1', null].map((issueTenor, index) => ({
+      bidStartDate: resources.reportDate, comShortName: '测试证券',
+      bondShortName: `26测试0${index + 1}`, issueTenor, planIssueAmount: 30,
+    })),
+    { bidStartDate: resources.reportDate, comShortName: '其他证券', bondShortName: '26其他01', issueTenor: '180D', planIssueAmount: 60 },
+    { bidStartDate: resources.previousPrimaryDate, comShortName: '测试证券', bondShortName: '26测试前日', issueTenor: '3+2', planIssueAmount: 30 },
+    { bidStartDate: resources.reportDate, comShortName: '东方财富证券', bondShortName: '26东财01', issueTenor: null, planIssueAmount: null },
+    { bidStartDate: '2026-09-08', comShortName: '测试证券', bondShortName: '26测试旧券', issueTenor: null, planIssueAmount: null },
+  ]);
+  const report = reportDataSchema.parse(buildReportData(resources));
+  assert.deepEqual(report.primary_summary, { current_amount: 180, change_amount: 150 });
+  assert.equal(report.primary_issues.filter(row => row.issue_date_key === resources.reportDate)
+    .reduce((sum, row) => sum + row.amount, 0), 180);
+  const card = coreMetricCards(report, deriveReport(report)).find(row => row.label === '同业发行');
+  assert.equal(card.value, '180 亿');
+  assert.equal(card.detail, '+150 亿');
+
+  resources.primary[5].planIssueAmount = null;
+  assert.deepEqual(buildReportData(resources).primary_summary, { current_amount: 180, change_amount: null });
+  resources.primary[0].planIssueAmount = null;
+  assert.deepEqual(buildReportData(resources).primary_summary, { current_amount: null, change_amount: null });
+});
+
 test('未知交易日不阻止当日发行，但不推测环比；缺少科创标志不误入普通公募公司债', () => {
   const resources = raw();
   resources.previousPrimaryDate = '';
