@@ -21,7 +21,7 @@ test('路由立即建立 SSE，透传公开摘要，终帧返回经校验的股�
   const frame = value => `data: ${JSON.stringify(value)}\n\n`;
   globalThis.fetch = async () => new Response(
     frame({ type: 'response.reasoning_summary_text.done', output_index: 0, summary_index: 0, text: '分析股市催化' }) +
-    frame({ type: 'response.completed', response: { status: 'completed', output: [{ type: 'message', phase: 'final_answer', content: [{ type: 'output_text', text: JSON.stringify({ stock: '股市正文', bond: '债市正文' }) }] }] } }),
+    frame({ type: 'response.completed', response: { status: 'completed', output: [{ type: 'message', phase: 'final_answer', content: [{ type: 'output_text', text: JSON.stringify({ stock: '股市正文。', bond: '债市正文。' }) }] }] } }),
     { headers: { 'content-type': 'text/event-stream' } });
   try {
     const response = await POST(event());
@@ -29,7 +29,7 @@ test('路由立即建立 SSE，透传公开摘要，终帧返回经校验的股�
     const received = [];
     await readSse(response.body, e => received.push({ event: e.event, data: e.event === 'result' ? JSON.parse(e.data) : e.data }), 10000);
     assert.deepEqual(received[0], { event: 'progress', data: '分析股市催化' });
-    assert.deepEqual(received.at(-1), { event: 'result', data: { report_date: '2026-09-11', stock: '股市正文', bond: '债市正文', news_count: 1 } });
+    assert.deepEqual(received.at(-1), { event: 'result', data: { report_date: '2026-09-11', stock: '股市正文。', bond: '债市正文。', news_count: 1 } });
   } finally { globalThis.fetch = original; }
 });
 

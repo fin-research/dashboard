@@ -7,12 +7,13 @@ import {
   generateMarketBriefing,
   generateMarketBriefingFromNews,
   MARKET_BRIEFING_SYSTEM,
+  MARKET_BRIEFING_PROMPT_VERSION,
 } from "../src/lib/server/market-briefing.ts";
 
 test("用户提示词只包含新闻，稳定 instructions 不含日期或 skill 包装", () => {
   assert.equal(buildMarketBriefingPrompt("【1】正文"), "【1】正文");
   assert.doesNotMatch(MARKET_BRIEFING_SYSTEM, /skill|技能|name:|输出格式|JSON|1、|2、|\d{4}-\d{2}-\d{2}/);
-  assert.match(MARKET_BRIEFING_SYSTEM, /120—200字/);
+  assert.match(MARKET_BRIEFING_SYSTEM, /100—140字/);
   assert.match(MARKET_BRIEFING_SYSTEM, /联网搜索必须少用、慎用/);
   assert.match(MARKET_BRIEFING_SYSTEM, /不为核验给定材料/);
   assert.match(MARKET_BRIEFING_SYSTEM, /搜索获得必要信息后立即停止/);
@@ -142,7 +143,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(headers.get("cf-aig-request-timeout"), "300000");
     assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
       report_date: "2026-08-10",
-      prompt_version: "market-briefing-v7-structured-stream",
+      prompt_version: MARKET_BRIEFING_PROMPT_VERSION,
       tags: "market-briefing,manual-generation,web-search",
       ai_model: "gpt-5.6-luna",
       ai_provider: "custom-codex",
@@ -153,7 +154,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     assert.equal(Object.hasOwn(query, "store"), false);
     assert.equal(
       query.prompt_cache_key,
-      "market-briefing:market-briefing-v7-structured-stream",
+      `market-briefing:${MARKET_BRIEFING_PROMPT_VERSION}`,
     );
     assert.deepEqual(query.reasoning, {
       effort: "xhigh",

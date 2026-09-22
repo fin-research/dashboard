@@ -53,6 +53,9 @@ test('七模块并发且互不等待，step内完成解析，之后仅AI和归�
   h.dependencies.generateMarketBriefingFromNews = async (_env, _date, news, options) => {
     assert.ok(moduleSteps.every(name => h.checkpoints.has(name)));
     assert.equal(options.retry, false);
+    assert.equal(options.report.report_date, date);
+    assert.deepEqual(options.report.equities, h.checkpoints.get("collect-equity").equities);
+    assert.deepEqual(options.report.funding_rates, h.checkpoints.get("collect-fixed-income").funding_rates);
     assert.match(news.news_text, /新闻正文/);
     assert.doesNotMatch(news.news_text, /A股主要指数收涨/);
     assert.equal(news.news_count, 1);
