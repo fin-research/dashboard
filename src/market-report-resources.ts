@@ -288,7 +288,8 @@ function primaryReport(
     let total = 0;
     for (const row of candidates) {
       const value = toFloat(row.planIssueAmount);
-      if (value === null || parseTenorYears(row.issueTenor) === null) return null;
+      // Issuance volume does not depend on parsing the bond's tenor.
+      if (value === null) return null;
       total += value;
     }
     return total;
