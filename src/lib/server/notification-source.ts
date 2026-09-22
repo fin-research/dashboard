@@ -6,7 +6,13 @@ import { messengerJson } from './messenger.ts';
 import { runScheduledReminderCheck } from './financing/reminder-scheduler.js';
 export async function notificationSource(request:Request,env:Env) {
  const path=new URL(request.url).pathname;
- if(path==='/eligible'&&request.method==='GET')return Response.json(await identityJson(env,'/directory/notification-users'));
+ if(path==='/eligible'&&request.method==='GET'){
+  const userIds=new URL(request.url).searchParams.getAll('userId');
+  if(userIds.length>100||userIds.some(id=>!/^auth0\|[^\s]{1,249}$/.test(id)))return new Response('Invalid notification users',{status:400});
+  const query=new URLSearchParams();
+  for(const id of new Set(userIds))query.append('userId',id);
+  return Response.json(await identityJson(env,'/directory/notification-users'+(query.size?'?'+query:'')));
+ }
  if(path!=='/scan'||request.method!=='POST')return new Response('Not Found',{status:404});
  const body=await request.json() as {scheduledTime:number};
  if(!Number.isFinite(body.scheduledTime)||Math.abs(Date.now()-body.scheduledTime)>3600000)return new Response('Invalid schedule',{status:400});
