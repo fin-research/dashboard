@@ -63,7 +63,7 @@ export async function runMarketBriefing(
     };
     const focus = await step.do("generate-focus", {
       retries: { limit: 2, delay: "1 minute", backoff: "exponential" }, timeout: "15 minutes",
-    }, () => dependencies.generateMarketBriefingFromNews(env, reportDate, news, { retry: false }));
+    }, () => dependencies.generateMarketBriefingFromNews(env, reportDate, news, { retry: false, report }));
 
     const saved = await step.do("archive-report", DATA_STEP_OPTIONS, async () => {
       const snapshot = await dependencies.saveMarketReport(env.EASTMONEY, reportDate,
