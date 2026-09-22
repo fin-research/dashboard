@@ -48,6 +48,6 @@ Dashboard 的 `1020_financing_reminder_checkpoint.sql` 在 D1 保存单行调度
 
 `/financing` 下所有写请求在动作前后同步失效检查点；generation 条件更新防止并发扫描重新写入旧空结果。数据库错误直接返回失败，不把失败缓存为空。直接 SQL / CLI 修改不经过 HTTP hooks，下一整点自动重查；需要下一分钟生效的维护操作应在修改前后运行 `UPDATE financing_reminder_checkpoint SET generation=generation+1,next_scan_at=0 WHERE id=1`（D1），不得修改 Neon 业务内容来刷新检查点。
 
-部署必须先应用 Dashboard 的 D1 migration；无业务变更时回滚 Worker 即恢复分钟扫描，检查点表可保留。交易提醒先检查工作日及节点起止时间的五分钟窗口，仅在可能到期时调用 Gateway 的实时资格目录；实际投递的 `/eligible` 仍每次实时查询，未缓存权限。
+部署必须先应用 Dashboard 的 D1 migration；无业务变更时回滚 Worker 即恢复分钟扫描，检查点表可保留。交易提醒先检查工作日及节点起止时间的五分钟窗口，仅在可能到期时扫描 Messenger 提供的 D1 trading 订阅用户名单。
 
-私有 `/eligible` 支持重复 `userId` 参数（每次最多 100 个 Auth0 subject），校验、去重后转发 Gateway `/directory/notification-users`；无参数保留全量扫描兼容。Messenger 先按订阅和业务目标缩小候选名单，发送前仅实时复核当前收件人。无效参数拒绝，不能回退为全量目录；账号状态、组织成员、角色及类别判断仍归 Gateway。
+私有 `/scan` 请求包含 scheduledTime 和 userIds，交易扫描直接使用去重名单；通知发送仅依据 Messenger D1 的订阅、联系方式和设备，不查询 Auth0。`/eligible` 及 Gateway 通知资格接口已删除。先部署携带 userIds 的 Messenger，再部署 Dashboard；融资业务责任人映射不属于投递权限查询，继续由融资模块维护。
