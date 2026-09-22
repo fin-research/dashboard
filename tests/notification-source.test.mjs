@@ -49,3 +49,16 @@ test('delivery eligibility remains fresh on every request and failures stay clos
   env.IDENTITY.fetch = async () => Response.json({ detail: 'unavailable' }, { status: 503 });
   await assert.rejects(notificationSource(request(), env), /unavailable/);
 });
+
+test('delivery eligibility forwards only validated recipient filters, preserving unfiltered scans', async () => {
+  const { env } = environment(Date.now()), paths = [];
+  env.IDENTITY.fetch = async request => { paths.push(new URL(request.url)); return Response.json([]); };
+  const query = new URLSearchParams([['userId', 'auth0|test'], ['userId', 'auth0|test']]);
+  await notificationSource(new Request('https://notifications.internal/eligible?' + query), env);
+  assert.equal(paths[0].pathname, '/directory/notification-users');
+  assert.deepEqual(paths[0].searchParams.getAll('userId'), ['auth0|test']);
+  for (const invalid of ['userId=', 'userId=invalid', new URLSearchParams(Array.from({length:101}, () => ['userId','auth0|test'])).toString()]) {
+    assert.equal((await notificationSource(new Request('https://notifications.internal/eligible?' + invalid), env)).status, 400);
+  }
+  assert.equal(paths.length, 1);
+});
