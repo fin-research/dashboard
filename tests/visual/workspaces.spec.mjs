@@ -68,6 +68,26 @@ test('desktop trading keeps the status column visible while filtering and sortin
   expect(status.x + status.width).toBeLessThanOrEqual(rightEdge + 1);
 });
 
+test('trading management tabs switch between records and workflow', async ({ page }) => {
+  await page.goto('/trading-research/trading');
+  const tabs = page.getByRole('navigation', { name: '标签页' });
+  const records = tabs.getByRole('link', { name: '交易记录' });
+  const workflowTab = tabs.getByRole('link', { name: '交易流程' });
+  const tradingNav = page.locator('#tr-workbench-drawer a[href="/trading-research/trading"]');
+
+  await expect(records).toHaveAttribute('aria-current', 'page');
+  await workflowTab.click();
+  await expect(page).toHaveURL('/trading-research/workflow');
+  await expect(workflowTab).toHaveAttribute('aria-current', 'page');
+  await expect(tradingNav).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('checkbox', { name: '编辑模式' })).toBeVisible();
+
+  await records.click();
+  await expect(page).toHaveURL('/trading-research/trading');
+  await expect(records).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('region', { name: '交易记录', exact: true })).toBeVisible();
+});
+
 test('workflow expands a branch and opens the real editor', async ({ page }) => {
   await page.goto('/trading-research/workflow');
   const collapse = page.getByRole('button', { name: '折叠拆借', exact: true });

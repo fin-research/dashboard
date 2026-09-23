@@ -15,6 +15,12 @@
   let { viewId = "overview" }: { viewId?: string | null } = $props();
   const activeViewId = $derived(normalizeWorkbenchView(viewId));
   const views = workbenchViews.map(view => ({ ...view, href: workbenchViewPath(view.id) }));
+  const tradingTabs = [
+    { id: "trading", label: "交易记录", href: workbenchViewPath("trading") },
+    { id: "workflow", label: "交易流程", href: workbenchViewPath("workflow") },
+  ];
+  const isTradingView = $derived(activeViewId === "trading" || activeViewId === "workflow");
+  const shellViewId = $derived(activeViewId === "workflow" ? "trading" : activeViewId);
   function isIntegratedView(value: WorkbenchViewId) {
     return value === "bond" || value === "secondary-bond-pool" || value === "financing-model";
   }
@@ -23,9 +29,10 @@
   }
 </script>
 
-<WorkbenchShell title="交易研究工作台" homeHref="/trading-research" {views} {activeViewId}
-  activeHref={workbenchViewPath(activeViewId)}
-  activeLabel={workbenchRoutes.find(view => view.id === activeViewId)?.label}
+<WorkbenchShell title="交易研究工作台" homeHref="/trading-research" {views} activeViewId={shellViewId}
+  activeHref={workbenchViewPath(shellViewId)}
+  activeLabel={workbenchRoutes.find(view => view.id === shellViewId)?.label}
+  tabs={isTradingView ? tradingTabs : []} activeTabId={isTradingView ? activeViewId : ""}
   integrated={isIntegratedView(activeViewId)} layoutReport={isLayoutReport(activeViewId)}
   canvas={activeViewId === "market-hotspots"}
   reportKind={activeViewId === "secondary-bond-pool" ? "secondary" : activeViewId === "financing-model" ? "financing" : null}>

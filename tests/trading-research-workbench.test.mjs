@@ -24,7 +24,7 @@ import {
   mapLiquidityRateRows,
 } from "../src/lib/trading-research/economic-indicators.ts";
 
-test("交易研究工作台以新二级池周报替换导航入口并保留旧深链", () => {
+test("交易研究工作台将交易流程归入交易管理并保留流程深链", () => {
   assert.deepEqual(
     workbenchViews.map((view) => view.label),
     [
@@ -34,7 +34,6 @@ test("交易研究工作台以新二级池周报替换导航入口并保留旧�
       "政策跟踪",
       "跟踪点评",
       "研究辅助",
-      "交易流程",
       "二级池周报",
       "融资择时模型",
     ],
@@ -49,12 +48,15 @@ test("交易研究工作台以新二级池周报替换导航入口并保留旧�
   assert.equal(normalizeWorkbenchView(null), "overview");
   assert.equal(workbenchViewPath("overview"), "/trading-research");
   assert.equal(workbenchViewPath("bond"), "/trading-research/bond");
+  assert.equal(workbenchViewPath("workflow"), "/trading-research/workflow");
   assert.equal(
     workbenchViewPath("secondary-bond-pool"),
     "/trading-research/secondary-bond-pool",
   );
   assert.ok(workbenchRoutes.some((view) => view.id === "bond"));
+  assert.ok(workbenchRoutes.some((view) => view.id === "workflow"));
   assert.ok(!workbenchViews.some((view) => view.id === "bond"));
+  assert.ok(!workbenchViews.some((view) => view.id === "workflow"));
   assert.equal(
     workbenchViewPath("financing-model"),
     "/trading-research/financing-model",
