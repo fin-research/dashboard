@@ -73,7 +73,7 @@ test('trading management tabs switch between records and workflow', async ({ pag
   const tabs = page.getByRole('navigation', { name: '标签页' });
   const records = tabs.getByRole('link', { name: '交易记录' });
   const workflowTab = tabs.getByRole('link', { name: '交易流程' });
-  const tradingNav = page.getByRole('navigation', { name: '业务模块' }).getByRole('link', { name: '交易管理' });
+  const tradingNav = page.locator('#tr-workbench-drawer a[href="/trading-research/trading"]');
 
   await expect(records).toHaveAttribute('aria-current', 'page');
   await workflowTab.click();
