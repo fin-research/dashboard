@@ -292,7 +292,7 @@
       "id": "trading",
       "url": "/trading-research/trading",
       "kind": "screenshot",
-      "state": "正常态；桌面1280宽筛选排序后末列可见",
+      "state": "交易管理的交易记录标签选中；桌面1280宽筛选排序后末列可见",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -311,7 +311,7 @@
       "id": "workflow",
       "url": "/trading-research/workflow",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "交易管理的交易流程标签选中，侧栏仍选中交易管理",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",

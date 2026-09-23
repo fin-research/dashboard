@@ -109,7 +109,7 @@ export const workbenchRoutes: Array<{
 ];
 
 export const workbenchViews = workbenchRoutes.filter(
-  (view) => view.id !== "bond",
+  (view) => view.id !== "bond" && view.id !== "workflow",
 );
 
 export function normalizeWorkbenchView(
