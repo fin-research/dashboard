@@ -551,17 +551,6 @@ export function referencedBondCodes(
   ];
 }
 
-export function previousTradingDate(
-  industryPayload: Pick<IndustrySnapshot, "tradingDates">,
-  reportDate: string,
-): string | null {
-  const previousDate = industryPayload.tradingDates
-    .filter((date) => date < reportDate)
-    .sort()
-    .at(-1);
-  return previousDate ?? null;
-}
-
 export function buildOpenMarketModule(rows: OmoOperation[]): Pick<ReportData, "omo_operations"> {
   return { omo_operations: omoOperations(rows) };
 }

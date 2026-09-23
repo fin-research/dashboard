@@ -1,4 +1,4 @@
-import { defaultReportDate } from "$lib/server/market-report-date";
+import { resolveDefaultReportDate } from "$lib/server/market-report-date";
 import {
   MarketReportStoreError,
   readMarketReport,
@@ -9,7 +9,7 @@ import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform, url }) => {
   try {
-    const reportDate = url.searchParams.has("date") ? requiredDate(url) : defaultReportDate();
+    const reportDate = url.searchParams.has("date") ? requiredDate(url) : await resolveDefaultReportDate(platform?.env);
     const snapshot = await readMarketReport(platform?.env.EASTMONEY, reportDate);
     return Response.json(snapshot, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

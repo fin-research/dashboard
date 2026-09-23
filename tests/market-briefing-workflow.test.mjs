@@ -45,7 +45,7 @@ test('七模块并发且互不等待，step内完成解析，之后仅AI和归�
   const equityGate = deferred();
   const h = harness(url => {
     const target = new URL(url);
-    if (target.pathname === '/data/industry' && target.searchParams.get('fields') !== 'tradingDates') {
+    if (target.pathname === '/data/industry') {
       return equityGate.promise.then(() => directResponse(url));
     }
   });
@@ -79,7 +79,8 @@ test('七模块并发且互不等待，step内完成解析，之后仅AI和归�
   assert.deepEqual(events, ['ai', 'r2']);
   assert.deepEqual(h.steps.map(row => row.name), [...moduleSteps, 'generate-focus', 'archive-report']);
   assert.equal(h.calls.filter(url => url.includes('/stock-summary?')).length, 1);
-  assert.equal(h.calls.filter(url => url.includes('/industry?')).length, 2);
+  assert.equal(h.calls.filter(url => url.includes('/industry?')).length, 1);
+  assert.equal(h.calls.filter(url => url.includes('/trading-days?')).length, 2);
   assert.equal(h.calls.filter(url => url.includes('/bond-infos?')).length, 2);
   assert.ok(h.calls.every(url => url.includes('fields=')));
   assert.ok(h.steps.slice(0, 7).every(({ config }) => config.retries.limit === 3));
@@ -206,9 +207,17 @@ test('重复Cron使用上海日确定性ID且只确认真实存在的实例', as
 test('工作日行情滞后不能被误判休市跳过', async t => {
   clock(t);
   const h = harness(async url => url.includes('/industry?')
-    ? Response.json({ ...await directResponse(url).json(), tradingDates: ['2026-08-24'] }) : undefined);
+    ? Response.json({ ...await directResponse(url).json(), dataDate: '2026-08-24' }) : undefined);
   await assert.rejects(h.run(), /行情尚未更新/);
   assert.equal(h.objects.size, 0);
+});
+
+test('一级发行只读取独立交易日接口，不依赖股票行情', async t => {
+  clock(t);
+  const h = harness(url => url.includes('/industry?') ? Response.json({ detail: '股票源不可用' }, { status: 503 }) : undefined);
+  await assert.rejects(h.run());
+  assert.equal(h.checkpoints.get('collect-primary').primary_summary.current_amount, 0);
+  assert.equal(h.calls.filter(url => url.includes('/trading-days?')).length, 2);
 });
 
 
