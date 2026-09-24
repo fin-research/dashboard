@@ -21,11 +21,11 @@ body:has(.tr-workbench) {
 }
 
 .tr-workbench {
-  --tr-page: var(--bg-card);
-  --tr-header: #edf0f3;
+  --tr-page: var(--bg-page);
+  --tr-header: var(--bg-card);
   --tr-sidebar: #202a38;
   --tr-nav-hover: #344052;
-  --tr-nav-active: var(--tr-primary);
+  --tr-nav-active: #2d4059;
   --tr-sidebar-divider: rgba(255, 255, 255, 0.12);
   --tr-surface: var(--bg-card);
   --tr-surface-muted: var(--panel);
@@ -199,9 +199,17 @@ body:has(.tr-workbench) {
 
 .tr-workbench .tr-drawer__nav a.active {
   color: #ffffff;
-  border-color: var(--tr-nav-active);
   background: var(--tr-nav-active);
   font-weight: bold;
+}
+
+.tr-workbench .tr-drawer__nav a.active::before {
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--tr-primary);
+  content: '';
 }
 
 .tr-nav-icon {
@@ -250,7 +258,7 @@ body:has(.tr-workbench) {
 
 .tr-workspace {
   grid-area: workspace;
-  background: var(--tr-surface);
+  background: var(--tr-page);
   height: 100%;
   min-width: 0;
   min-height: 0;

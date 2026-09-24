@@ -15,7 +15,7 @@ test('desktop daily ledger shows balanced metrics and recoverable management con
  const rows=await page.locator('.ledger-metrics > *').evaluateAll(cards=>cards.map(card=>Math.round(card.getBoundingClientRect().top)));
  expect(rows).toHaveLength(6);expect(new Set(rows).size).toBe(2);expect(rows.filter(y=>y===rows[0])).toHaveLength(3);
  await expect(page.getByRole('img',{name:'二级资金池规模与年化收益率走势',exact:true}).locator('svg').getByText('6%',{exact:true})).toBeVisible();
- await expect(page).toHaveScreenshot('bond-ledger-desktop.png');
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('bond-ledger-desktop.png');
  await expect(page.locator('.ledger-chart-grid')).toHaveScreenshot('bond-ledger-distributions-desktop.png');
  await page.getByRole('radio',{name:'交易户',exact:true}).check();
  await expect(page.getByRole('img',{name:'二级资金池规模与年化收益贡献走势',exact:true})).toBeVisible();

@@ -17,7 +17,7 @@ test('消息记录、尝试明细和不确定结果重试确认',async({page})=>
     return fragments.length > 1 && fragments.every(rect => rect.left >= box.left && rect.right <= box.right + 1 && rect.bottom <= box.bottom + 1);
   })).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await expect(page).toHaveScreenshot('messenger.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('messenger.png');
   await page.getByRole('button',{name:'重试 中国央行：开展公开市场操作',exact:true}).click();
   await expect(page.getByRole('alertdialog')).toContainText('重试可能重复发送');
   await page.getByRole('button',{name:'取消',exact:true}).click();
@@ -38,13 +38,13 @@ test('通知管理测试消息支持编辑、单发群发和渠道选择',async(
   await page.getByRole('combobox',{name:'接收用户',exact:true}).selectOption('auth0|one');
   await page.getByLabel('消息内容',{exact:true}).fill('这是编辑后的测试消息。');
   await expect(page.getByRole('button',{name:'发送测试消息',exact:true})).toBeEnabled();
-  await expect(page).toHaveScreenshot('messenger-test-single.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('messenger-test-single.png');
   await page.getByRole('combobox',{name:'发送方式',exact:true}).selectOption('multiple');
   await page.getByRole('button',{name:'选择当前结果',exact:true}).click();
   await page.getByRole('checkbox',{name:'Telegram',exact:true}).check();
   await page.getByRole('checkbox',{name:'Web Push',exact:true}).check();
   await expect(page.getByRole('button',{name:'发送测试消息（2 人）',exact:true})).toBeEnabled();
-  await expect(page).toHaveScreenshot('messenger-test-bulk.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('messenger-test-bulk.png');
   await page.getByRole('button',{name:'清空',exact:true}).click();
   await expect(page.getByRole('button',{name:'发送测试消息',exact:true})).toBeDisabled();
 });

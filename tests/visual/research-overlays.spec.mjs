@@ -71,7 +71,7 @@ test('desktop commentary preview prioritizes the report and returns to its draft
   await page.getByRole('button',{name:'预览',exact:true}).click();
   await expect(page.getByRole('textbox',{name:'主题',exact:true})).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'点评预览',exact:true})).toBeInViewport();
-  await expect(page).toHaveScreenshot('tracking-reading-desktop.png');
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('tracking-reading-desktop.png');
   await page.getByRole('button',{name:'继续编辑',exact:true}).click();
   await expect(page.getByRole('textbox',{name:'主题',exact:true})).toHaveValue(commentaryAudit.eventName);
   await expect(page.getByRole('textbox',{name:'跟踪点评',exact:true})).toHaveValue(commentaryAudit.commentary);

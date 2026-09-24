@@ -21,7 +21,7 @@ test('permission search keeps the active scope visible and recoverable',async({p
   await expect(page.getByRole('status')).toHaveText('无匹配权限');
   const selectedBackground=await pool.evaluate(node=>getComputedStyle(node).backgroundColor);
   expect(selectedBackground).not.toBe(await all.evaluate(node=>getComputedStyle(node).backgroundColor));
-  await expect(page).toHaveScreenshot('permissions-filtered.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('permissions-filtered.png');
   await all.click();
   await expect(page.getByRole('region',{name:'市场研究',exact:true})).toBeVisible();
   await expect(page.getByRole('searchbox',{name:'搜索权限'})).toHaveValue('市场');

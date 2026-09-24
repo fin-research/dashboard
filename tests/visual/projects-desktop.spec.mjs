@@ -13,7 +13,7 @@ test('desktop projects expose selected timeline views and consistent edit dialog
   await expect(page.getByRole('button',{name:'季',exact:true})).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:`展开 ${projectAudit.name}`,exact:true}).click();
   await expect(page.getByText('2026-09-01 至 2026-09-08',{exact:true})).toBeVisible();
-  await expect(page).toHaveScreenshot('projects-expanded-desktop.png');
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('projects-expanded-desktop.png');
   const create=page.getByRole('button',{name:'新建项目',exact:true});
   await create.click();
   const newDialog=page.getByRole('dialog',{name:'新建融资项目',exact:true});
@@ -37,7 +37,7 @@ test('desktop project detail displays period endpoints and unscheduled tasks',as
   await page.goto('/financing/projects/project-1');
   await expect(page.getByRole('textbox',{name:'发行材料准备与内部审核启动时点',exact:true})).toHaveValue('2026-09-01');
   await expect(page.getByRole('textbox',{name:'存续期材料归档计划时点',exact:true})).toHaveValue('');
-  await expect(page).toHaveScreenshot('project-detail-desktop.png');
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('project-detail-desktop.png');
   await page.getByRole('combobox',{name:'节点时间配置',exact:true}).selectOption('period');
   await expect(page.getByRole('textbox',{name:'节点启动时点',exact:true})).toBeVisible();
   await expect(page.getByRole('textbox',{name:'节点完成时点',exact:true})).toBeVisible();

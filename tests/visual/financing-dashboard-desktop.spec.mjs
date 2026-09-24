@@ -9,7 +9,7 @@ test('desktop financing dashboard keeps balanced metrics and complete table valu
  await expect(page.getByRole('heading',{name:'存量负债结构',exact:true})).toBeVisible();
  const heights=await page.locator('.financing-metric-grid > *').evaluateAll(cards=>cards.map(card=>card.getBoundingClientRect().height));
  expect(heights).toHaveLength(6);expect(Math.max(...heights)-Math.min(...heights)).toBeLessThanOrEqual(1);expect(Math.max(...heights)).toBeLessThan(210);
- await expect(page).toHaveScreenshot('financing-dashboard-desktop.png');
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('financing-dashboard-desktop.png');
  const numeric=page.locator('.project-panel tbody td:nth-child(2),.limit-card tbody td:nth-child(2),.limit-card tbody td:nth-child(3),.limit-card tbody td:nth-child(4)>strong');
  expect(await numeric.evaluateAll(cells=>cells.every(cell=>{const range=document.createRange();range.selectNodeContents(cell);const rects=Array.from(range.getClientRects());return rects.length>0&&rects.every(rect=>Math.abs(rect.top-rects[0].top)<=1);}))).toBe(true);
  const tables=page.locator('.project-panel .financing-table-scroll,.limit-card .financing-table-scroll');

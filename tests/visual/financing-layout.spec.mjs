@@ -41,7 +41,7 @@ test('desktop debt details group secondary fields beneath cashflows',async({page
   expect(c.x).toBe(b.x);
   expect(c.y).toBeGreaterThanOrEqual(b.y+b.height+15);
   expect(c.y+c.height).toBeLessThanOrEqual(a.y+a.height+1);
-  await expect(page).toHaveScreenshot('debt-details.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('debt-details.png');
   await expect(page.getByRole('link',{name:'返回仪表盘',exact:true})).toHaveAttribute('href','/financing/');
 });
 

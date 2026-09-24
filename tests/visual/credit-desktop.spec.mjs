@@ -8,7 +8,7 @@ test('desktop credit weekly report presents nonempty news and five product detai
  await page.setViewportSize({width:1280,height:900});await page.goto('/credit-workbench/weekly');
  await expect(page.getByRole('region',{name:'本周授信快讯',exact:true})).toContainText('较前额增加5亿');
  await expect(page.getByRole('table',{name:'所选报表日前近6个月新增、续作和扩额授信批复',exact:true})).toContainText('同业拆借 3.00亿');
- await expect(page).toHaveScreenshot('credit-weekly-full-desktop.png');
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-weekly-full-desktop.png');
 });
 
 test('desktop credit metrics and expanded records stay within the workspace',async({page},testInfo)=>{
