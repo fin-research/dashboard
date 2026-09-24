@@ -23,7 +23,7 @@ test('跨日到期无需写入即可退出汇总，续作日期恢复有效并�
   assert.equal(after.institutions[0].status,'approved');assert.equal(after.institutions[0].effectiveStatus,'expired');
   assert.ok(after.calendarEvents.some(e=>e.date==='2026-09-10'&&e.kind==='expiry'));
   assert.equal((await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n,count);
-  const renewed=await saveCreditInstitution(db,{reportDate:'2026-09-12',institutionName:'甲银行',changes:{institution:{effectiveDate:'2026-09-12',expiryDate:'2027-09-11'}}},'auth0|test');
+  const renewed=await saveCreditInstitution(db,{operation:'renewal',reportDate:'2026-09-12',institutionName:'甲银行',changes:{institution:{effectiveDate:'2026-09-12',expiryDate:'2027-09-11'}}},'auth0|test');
   assert.equal(renewed.institution.effectiveStatus,'approved');assert.equal(renewed.summary.totalLimit,10);
   assert.equal((await loadCreditReport(db,'2026-09-11')).summary.totalLimit,0);
   assert.equal((await loadCreditReport(db,'2026-09-12')).weeklyNews.filter(e=>e.eventType==='renewal').length,1);
@@ -38,10 +38,10 @@ test('未来生效的已获批授信在开始日纳入汇总，未经审批的�
 
 test('提前登记续期在旧期限内持续有效，期限间存在空档时不提前恢复',async t=>{
   const db=await creditDatabase(t);await seedCredit(db,'2026-08-21','甲银行',{effective_date:'2025-09-21',expiry_date:'2026-09-21'});
-  await saveCreditInstitution(db,{reportDate:'2026-09-04',institutionName:'甲银行',changes:{institution:{effectiveDate:'2026-09-21',expiryDate:'2027-09-21'}}},'auth0|test');
+  await saveCreditInstitution(db,{operation:'renewal',reportDate:'2026-09-04',institutionName:'甲银行',changes:{institution:{effectiveDate:'2026-09-21',expiryDate:'2027-09-21'}}},'auth0|test');
   for(const date of ['2026-09-11','2026-09-21'])assert.equal((await loadCreditReport(db,date)).summary.approvedCount,1);
   assert.equal((await loadCreditReport(db,'2026-09-11')).institutions[0].previousPeriod.expiryDate,'2026-09-21');
-  await saveCreditInstitution(db,{reportDate:'2026-09-12',institutionName:'甲银行',changes:{institution:{effectiveDate:'2027-10-01',expiryDate:'2028-10-01'}}},'auth0|test');
+  await saveCreditInstitution(db,{operation:'renewal',reportDate:'2026-09-12',institutionName:'甲银行',changes:{institution:{effectiveDate:'2027-10-01',expiryDate:'2028-10-01'}}},'auth0|test');
   assert.equal((await loadCreditReport(db,'2027-09-22')).summary.approvedCount,0);
   assert.equal((await loadCreditReport(db,'2027-10-01')).summary.approvedCount,1);
 });

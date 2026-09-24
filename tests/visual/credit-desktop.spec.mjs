@@ -41,3 +41,30 @@ test('desktop credit metrics and expanded records stay within the workspace',asy
   await page.getByRole('combobox',{name:'授信风险',exact:true}).selectOption('all');
   await expect(region.getByRole('rowheader',{name:'银行乙',exact:true})).toBeVisible();
 });
+
+test('credit application presents distinct operations while the overview stays read only',async({page},testInfo)=>{
+  test.skip(testInfo.project.name!=='desktop','Desktop credit application');
+  await mockResources(page);
+  await page.route('**/api/credit**',route=>route.fulfill({json:creditFull}));
+  await page.setViewportSize({width:1280,height:900});
+  await page.goto('/credit-workbench');
+  const region=page.getByRole('region',{name:'授信机构记录',exact:true});
+  await region.getByRole('button',{name:'详情',exact:true}).first().click();
+  await expect(region.getByRole('textbox',{name:'机构性质',exact:true})).toHaveAttribute('readonly');
+  await page.getByRole('button',{name:'授信申请',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'授信申请'});
+  await expect(dialog.getByRole('textbox',{name:'机构名称'})).toBeVisible();
+  await dialog.getByRole('button',{name:'续期',exact:true}).click();
+  await expect(dialog.getByLabel('新到期日')).toBeVisible();
+  await expect(dialog.getByRole('textbox',{name:'机构名称'})).toHaveCount(0);
+  await dialog.getByRole('button',{name:'扩额',exact:true}).click();
+  await expect(dialog.getByRole('spinbutton',{name:'扩额后总额（亿元）'})).toBeVisible();
+  await dialog.getByRole('button',{name:'撤销',exact:true}).click();
+  await expect(dialog.getByRole('checkbox',{name:'确认撤销该机构授信'})).toBeVisible();
+  await dialog.getByRole('button',{name:'维护',exact:true}).click();
+  await expect(dialog.getByRole('spinbutton',{name:'二级买卖净余额（亿元）'})).toBeVisible();
+  await dialog.getByRole('button',{name:'新增',exact:true}).click();
+  await expect(dialog.getByRole('textbox',{name:'机构名称'})).toBeVisible();
+  await expect(dialog).toHaveCSS('opacity','1');
+  await expect(dialog).toHaveScreenshot('credit-application-new.png');
+});

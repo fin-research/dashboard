@@ -1225,6 +1225,14 @@ body:has(.tr-workbench) {
   padding-inline: 10px;
 }
 
+.credit-application-dialog .dialog-body form { display: grid; gap: 16px; }
+.tr-credit-application-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tr-credit-application-current { color: var(--tr-text-2); font-size: 0.875rem; }
+.tr-credit-application-current strong { color: var(--tr-text); }
+.tr-credit-application-confirm, .tr-credit-application-notes { display: flex; gap: 8px; align-items: center; }
+.tr-credit-application-notes { display: grid; align-items: stretch; color: var(--tr-muted); font-size: 0.875rem; }
+.tr-credit-application-error { color: var(--tr-red); font-size: 0.875rem; }
+
 .tr-credit-table {
   min-width: 0;
 }
