@@ -37,6 +37,34 @@ test('共享顶栏保持紧凑且标签贴合底边', async ({ page }, testInfo)
   }
 });
 
+test('交易管理标签悬浮时保持连续的蓝色顶栏', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Hover state is for pointer devices');
+  await mockResources(page);
+  await page.goto('/trading-research/trading');
+  const header = page.locator('.page-header');
+  const sidebar = page.locator('.tr-drawer');
+  const workspace = page.locator('.tr-workspace');
+  const active = header.getByRole('link', { name: '交易记录' });
+  const inactive = header.getByRole('link', { name: '交易流程' });
+  const beforeHover = await active.evaluate(element => ({
+    header: getComputedStyle(element.closest('.page-header')).backgroundColor,
+    tab: getComputedStyle(element).backgroundColor,
+    shoulderBefore: getComputedStyle(element, '::before').content,
+    shoulderAfter: getComputedStyle(element, '::after').content,
+  }));
+  expect(beforeHover.tab).toBe('rgb(255, 255, 255)');
+  expect(beforeHover.shoulderBefore).toBe('none');
+  expect(beforeHover.shoulderAfter).toBe('none');
+  await expect(workspace).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  expect(await sidebar.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(beforeHover.tab);
+  expect(beforeHover.header).not.toBe(beforeHover.tab);
+  await inactive.hover();
+  const hoverColor = await inactive.evaluate(element => getComputedStyle(element).backgroundColor);
+  expect(hoverColor).not.toBe(beforeHover.header);
+  expect(hoverColor).not.toBe(beforeHover.tab);
+  await expect(page).toHaveScreenshot('trading-tabs-hover.png', { fullPage: true });
+});
+
 test('普通页与报告页共用主题蓝导航和页头控件', async ({ page }, testInfo) => {
   await mockResources(page);
   let reference;
@@ -49,11 +77,12 @@ test('普通页与报告页共用主题蓝导航和页头控件', async ({ page 
       header: getComputedStyle(header).backgroundColor,
       headerImage: getComputedStyle(header).backgroundImage,
       workspace: getComputedStyle(document.querySelector('.tr-workspace')).backgroundColor,
+      sidebar: getComputedStyle(document.querySelector('.tr-drawer')).backgroundColor,
     }));
-    if (surfaces.headerImage === 'none') {
-      expect(surfaces.header, `${url}: header must remain distinct from workspace`).not.toBe(surfaces.workspace);
-      expect(surfaces.header).not.toBe('rgba(0, 0, 0, 0)');
-    }
+    expect(surfaces.headerImage, url).toBe('none');
+    expect(surfaces.workspace, url).toBe('rgb(255, 255, 255)');
+    expect(surfaces.header, `${url}: header must remain distinct from workspace`).not.toBe(surfaces.workspace);
+    expect(surfaces.sidebar, `${url}: sidebar must remain distinct from workspace`).not.toBe(surfaces.workspace);
     if (mobile) await toggle.click();
     const active = page.locator('.tr-drawer__nav [aria-current="page"]');
     await expect(active).toHaveCount(1);
@@ -80,7 +109,7 @@ test('普通页与报告页共用主题蓝导航和页头控件', async ({ page 
       };
     });
     expect(appearance.link.color, url).toBe('rgb(36, 91, 178)');
-    expect(appearance.link.backgroundColor, url).toBe('rgb(234, 241, 253)');
+    expect(appearance.link.backgroundColor, url).not.toBe(surfaces.sidebar);
     expect(appearance.marker, url).toBe('none');
     if (reference) expect(appearance, url).toEqual(reference);
     else reference = appearance;

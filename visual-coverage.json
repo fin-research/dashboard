@@ -292,7 +292,7 @@
       "id": "trading",
       "url": "/trading-research/trading",
       "kind": "screenshot",
-      "state": "交易管理的交易记录标签选中；桌面1280宽筛选排序后末列可见",
+      "state": "交易管理的交易记录标签选中，标签间无白缝，悬浮标签融入浅蓝顶栏；桌面1280宽筛选排序后末列可见",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -303,6 +303,16 @@
           ],
           "snapshots": [
             "trading.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "交易管理标签悬浮时保持连续的蓝色顶栏",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "trading-tabs-hover.png"
           ]
         }
       ]
@@ -914,7 +924,7 @@
       "id": "workbench-navigation",
       "url": "/management/messenger",
       "kind": "screenshot",
-      "state": "普通页与报告页共享浅蓝标题栏，与工作区区分；导航折叠和标签切换",
+      "state": "普通页与报告页共享浅蓝顶栏及侧栏、白色工作区；导航折叠和标签切换",
       "evidence": [
         {
           "spec": "tests/visual/page-layout.spec.mjs",
