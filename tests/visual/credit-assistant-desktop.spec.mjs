@@ -25,7 +25,7 @@ test('desktop assistant processing records remain readable above the composer',a
   await expect(page.getByRole('button',{name:'正在处理消息',exact:true})).toBeDisabled();
   const geometry=await page.locator('.composer-dock').evaluate(el=>({bottom:el.getBoundingClientRect().bottom,viewport:innerHeight}));
   expect(Math.abs(geometry.bottom-geometry.viewport)).toBeLessThanOrEqual(1);
-  await expect(page).toHaveScreenshot('credit-assistant-processing.png');
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-assistant-processing.png');
  }finally{releaseStream();}
 });
 
@@ -41,7 +41,7 @@ test('desktop assistant failed answer can be retried without losing the question
  });
  await page.goto('/credit-workbench/assistant');await chooseCustomer(page);
  await expect(page.getByRole('alert')).toContainText(assistantFailed.error);
- await expect(page).toHaveScreenshot('credit-assistant-failed.png');
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-assistant-failed.png');
  await page.getByRole('button',{name:'重新发送',exact:true}).click();
  await expect(page.getByRole('region',{name:'结果',exact:true})).toContainText(assistantSession.turns[0].answer.paragraphs[0].text);
  await expect(page.getByRole('region',{name:'结果',exact:true})).not.toContainText('corpusVersion');
@@ -69,7 +69,7 @@ test('desktop credit assistant supports customer selection and readable cited re
   await customer.fill('测试');
   await customer.press('ArrowDown');
   await expect(page.getByRole('option',{name:'测试银行甲 已签署保密协议',exact:true})).toHaveAttribute('aria-selected','true');
-  await expect(page).toHaveScreenshot('credit-assistant-picker.png');
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-assistant-picker.png');
   await customer.press('Enter');
   await expect(input).toBeFocused();
   await expect(page.getByRole('alert')).toContainText('历史对话未能加载');
@@ -78,7 +78,7 @@ test('desktop credit assistant supports customer selection and readable cited re
   await page.getByRole('link',{name:'查看资料来源1',exact:true}).click();
   await expect(page.locator('#source-audit-turn-audit-source')).toBeFocused();
   await expect(page.getByText('测试公司2026年半年度报告 · 第12页',{exact:true})).toBeVisible();
-  await expect(page).toHaveScreenshot('credit-assistant-citation.png');
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-assistant-citation.png');
   await input.fill('请进一步核实最新月份指标。');
   await expect(page.getByRole('button',{name:'发送消息',exact:true})).toBeEnabled();
   await expect(input).toHaveCSS('background-color','rgba(0, 0, 0, 0)');

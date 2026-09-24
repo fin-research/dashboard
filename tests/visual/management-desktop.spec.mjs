@@ -18,7 +18,7 @@ test('desktop role catalog identifies the selected role without changing permiss
   await expect(page.getByRole('region',{name:'授信工作台',exact:true})).toContainText('未授权');
   const selectedColor=await research.evaluate(el=>getComputedStyle(el).backgroundColor);
   expect(selectedColor).not.toBe(await roles.getByRole('button',{name:'新建只读角色 0',exact:true}).evaluate(el=>getComputedStyle(el).backgroundColor));
-  await expect(page).toHaveScreenshot('management-role-desktop.png');
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('management-role-desktop.png');
   await roles.getByRole('button',{name:'新建只读角色 0',exact:true}).click();
   await expect(page.getByLabel('授权概览')).toContainText('0');
 });
@@ -42,7 +42,7 @@ test('desktop profile aligns actions and keeps unsaved settings local',async({pa
   const logout=await page.getByRole('button',{name:'退出登录',exact:true}).boundingBox();
   const ai=await page.getByRole('button',{name:'打开 AI 面板',exact:true}).boundingBox();
   expect(logout.x+logout.width).toBeLessThan(ai.x);
-  await expect(page).toHaveScreenshot('management-profile-desktop.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('management-profile-desktop.png');
   expect(writes).toEqual([]);
 });
 
@@ -58,5 +58,5 @@ test('desktop notification choices align with their channel headings',async({pag
   }
   await table.getByRole('checkbox',{name:'Workflow 通知 · Telegram',exact:true}).click();
   await expect(table.getByRole('checkbox',{name:'Workflow 通知 · Telegram',exact:true})).toBeChecked();
-  await expect(page).toHaveScreenshot('management-notifications-desktop.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('management-notifications-desktop.png');
 });

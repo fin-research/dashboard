@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as XLSX from 'xlsx/xlsx.mjs';
 import { parseDebtWorkbookData } from '../../scripts/financing/lib/excel-import.mjs';
 import { transformWorkbook } from '../../scripts/financing/lib/debt-transform.mjs';
-import { validateWorkbook, validateIncrement, incrementForPlan, balanceKey } from '../../src/lib/financing/debt-import-json.ts';
+import { validateWorkbook, validateIncrement, incrementForIndex, balanceKey } from '../../src/lib/financing/debt-import-json.ts';
 
 function workbookFixture() {
 	const workbook = XLSX.utils.book_new();
@@ -74,15 +74,69 @@ test('derived movement summary is allowed but a business row without money is re
  assert.throws(()=>transformWorkbook(read()),/缺少金额/);
 });
 
+test('text in swap repo average balance is retained as a description and reported without blocking import', () => {
+ const workbook=XLSX.read(workbookFixture(),{type:'array'});
+ const description='滚动续作，隔夜和7天为主，余额每日波动，互换到期后统计日均余额';
+ XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([
+  ['互换开始日','互换规模（元）','正回购日均余额（元）','互换到期日'],
+  ['2026-09-01',2000000000,description,'2027-09-01']
+ ]),'互换便利');
+ const parsed=parseDebtWorkbookData(XLSX.write(workbook,{type:'array',bookType:'xlsx'}),'借入资金汇总表20260903.xlsx');
+ const transformed=validateWorkbook(transformWorkbook(parsed));
+ const swap=transformed.debts.find(debt=>debt.debtType==='互换便利');
+ assert.equal(swap?.amount,2000000000);
+ assert.equal(swap?.extension.averageRepoBalanceDescription,description);
+ assert.match(parsed.warnings[0],/互换便利 第 2 行.*跳过数值校验/);
+ assert.equal(parsed.warnings.length,1);
+});
 
-test('browser increment excludes stored business records while retaining the complete identity manifest',()=>{
+test('a genuine outstanding balance column still rejects text', () => {
+ const workbook=XLSX.read(workbookFixture(),{type:'array'});
+ workbook.Sheets['集团借款']=XLSX.utils.aoa_to_sheet([
+  ['名称','借款对象','借入金额','余额','起息日','到期日'],
+  ['测试集团借款','集团公司',100000000,'滚动续作','2026-09-01','2027-09-01']
+ ]);
+ assert.throws(()=>parseDebtWorkbookData(XLSX.write(workbook,{type:'array',bookType:'xlsx'}),'借入资金汇总表20260903.xlsx'),/余额 无效/);
+});
+
+test('failed issues and recognized narrative rows are skipped with counts', () => {
+ const workbook=XLSX.read(workbookFixture(),{type:'array'});
+ XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([
+  ['名称','发行状态','清盘金额','发行日期'],
+  ['未发行产品','发行失败','-', '2026-09-01']
+ ]),'收益凭证');
+ XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([
+  ['债券简称','发行金额','发行日期'],
+  ['发行阶段：说明',null,null],
+  ['1、办理手续',null,null]
+ ]),'小公募');
+ const parsed=parseDebtWorkbookData(XLSX.write(workbook,{type:'array',bookType:'xlsx'}),'借入资金汇总表20260903.xlsx');
+ const transformed=validateWorkbook(transformWorkbook(parsed));
+ assert.equal(transformed.debts.length,1);
+ assert.equal(parsed.skipped,3);
+ assert.deepEqual(parsed.warnings,[
+  '已跳过 1 条发行失败且无金额的收益凭证记录',
+  '已跳过 2 行债券及集团借款说明文字'
+ ]);
+});
+
+
+test('browser compares the downloaded index and uploads only candidate additions',()=>{
  const workbook=validateWorkbook(transformWorkbook(parseDebtWorkbookData(workbookFixture(),'借入资金汇总表20260903.xlsx')));
  const old=workbook.debts[0];
  const newDebt={...old,sourceKey:'new-debt',name:'新增借款',amount:20};
  const parsed=validateWorkbook({...workbook,debts:[old,newDebt],cashflows:[{sourceKey:old.sourceKey,cashflowType:'principal',dueDate:'2026-09-03',amount:100},{sourceKey:newDebt.sourceKey,cashflowType:'principal',dueDate:'2026-09-03',amount:20}]});
- const increment=incrementForPlan(parsed,{version:'verified',newKeys:['new-debt'],balanceKeys:parsed.balances.map(balanceKey)});
- assert.equal(increment.identities.length,2);assert.deepEqual(increment.debts,[newDebt]);
+ const index={version:'verified',debts:[old],balanceKeys:parsed.balances.map(balanceKey)};
+ const increment=incrementForIndex(parsed,index);
+ assert.deepEqual(increment.debts,[newDebt]);assert.equal('identities' in increment,false);
  assert.deepEqual(increment.cashflows.map(c=>c.sourceKey),['new-debt']);assert.equal(increment.balances.length,0);
  assert.equal(increment.snapshotBalances.length,10);
- assert.throws(()=>incrementForPlan(parsed,{version:'verified',newKeys:['unknown'],balanceKeys:[]}),/无效负债/);
+ assert.throws(()=>incrementForIndex(parsed,{...index,version:''}));
+ const corrected={...old,sourceKey:'corrected',maturityDate:'2027-09-02'};
+ const related=validateWorkbook({...parsed,debts:[old,corrected],cashflows:[]});
+ assert.deepEqual(incrementForIndex(related,index).debts.map(d=>d.sourceKey),[old.sourceKey,'corrected']);
+ const swap={...old,sourceKey:'swap',table:'swap_facility',debtType:'互换便利',name:'互换便利·2026-09-01',legacyName:'互换便利·2026-09-01',subtype:null};
+ const withSwap=validateWorkbook({...parsed,debts:[old,swap],cashflows:[]});
+ assert.deepEqual(incrementForIndex(withSwap,{...index,debts:[old,swap]}).debts,[]);
+ assert.deepEqual(incrementForIndex(withSwap,{...index,debts:[old,{...swap,issueDate:'2026-08-31'}]}).debts.map(d=>d.sourceKey),['swap']);
 });

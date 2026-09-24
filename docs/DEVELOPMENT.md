@@ -78,7 +78,7 @@ pnpm 下载缓存和按 OS/架构/Playwright 版本固定的 Chromium 缓存由 
 
 - UI 规则变化更新 `DESIGN.md`。
 - 业务公式、状态与页面契约更新目标模块文档；跨模块不变量才更新 `docs/DOMAIN.md`。
-- 数据、接口或安全边界变化更新对应专题；跨项目架构/存储/AI 更新 [项目组所有方](../../eastmoney/docs/INDEX.md#维护约定)。新增页面或模块更新 `docs/INDEX.md`，不把细节重新堆回 `AGENTS.md`。
+- 数据、接口或安全边界变化更新对应专题；跨项目架构/存储/AI 更新 [项目组共享专题](../../eastmoney/AGENTS.md#context-routing)。新增页面或模块在 `AGENTS.md` 登记文档入口，模块细节仍归模块文档。
 
 ## 融资模块维护
 

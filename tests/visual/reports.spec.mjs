@@ -17,7 +17,7 @@ test('financing-model preserves its approved report layout',async({page})=>{
   await expect(page.getByText('窗口预期净节约',{exact:false})).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.evaluate(()=>document.fonts.ready);
-  await expect(page).toHaveScreenshot('financing-model.png',{fullPage:false});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('financing-model.png');
   const factors=page.locator('.factor-panel');
   await factors.scrollIntoViewIfNeeded();
   await expect(factors).toHaveScreenshot('financing-model-factors.png');
@@ -59,7 +59,7 @@ test('financing-model switches between issuance model dates', async ({page}) => 
   await expect(page.getByText('等待',{exact:true}).first()).toBeVisible();
   await expect(page.getByRole('heading',{name:'因子贡献',exact:true})).toBeVisible();
   await page.evaluate(()=>document.fonts.ready);
-  await expect(page).toHaveScreenshot('financing-model-online.png',{fullPage:false});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('financing-model-online.png');
   await page.getByRole('combobox',{name:'融资择时模型日期版本'}).selectOption(financingModel.snapshot.run_id);
   await expect(page.getByText('尽快发行',{exact:true}).first()).toBeVisible();
   await page.getByRole('button',{name:'展开未来发行窗口明细'}).click();

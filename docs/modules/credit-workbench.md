@@ -1,6 +1,6 @@
 # 授信工作台
 
-入口：`/credit-workbench`。公共规则见 [文档分流](../INDEX.md)。
+入口：`/credit-workbench`。公共规则见 [文档分流](../../AGENTS.md#context-routing)。
 
 ## 按日截面与存储
 

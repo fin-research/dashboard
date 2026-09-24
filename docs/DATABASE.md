@@ -1,6 +1,6 @@
 # 数据与存储
 
-Schema 和字段以 migration 与代码为事实来源。本文件只维护 Dashboard 的连接、事务、日期与导入规则；D1 共享读写、Neon schema/migration 所有方和 R2 桶归属只读 [共享数据库](../../eastmoney/docs/DATABASE.md)。具体表和业务对象见 [模块索引](INDEX.md)。
+Schema 和字段以 migration 与代码为事实来源。本文件只维护 Dashboard 的连接、事务、日期与导入规则；D1 共享读写、Neon schema/migration 所有方和 R2 桶归属只读 [共享数据库](../../eastmoney/docs/DATABASE.md)。具体表和业务对象见 [模块分流](../AGENTS.md#context-routing)。
 
 ## R2
 

@@ -227,10 +227,10 @@ export function transformWorkbook(parsed) {
 	const rawDebts=new Map(parsed.debts.map(row=>[row[1],row]));
   for (const debt of debts) {
     const raw=rawDebts.get(debt.sourceKey);
-    if(raw[9]==null && raw[10]==null)throw new Error(`负债 ${debt.name} 缺少金额，整个导入已拒绝`);
+    if(raw[9]==null && raw[10]==null)throw new Error(`负债 ${debt.name} 缺少金额`);
   }
 	const debtKeys = new Set(debts.map((debt) => debt.sourceKey));
-	if(parsed.cashflows.some(flow=>!debtKeys.has(flow[1])))throw new Error('现金流没有对应负债，整个导入已拒绝');
+	if(parsed.cashflows.some(flow=>!debtKeys.has(flow[1])))throw new Error('现金流没有对应负债');
 	const cashflows = parsed.cashflows.map(([_eventKey, sourceKey, eventType, eventDate, amount, sourceSequence]) => ({
 		sourceKey,
 		cashflowType: eventType,

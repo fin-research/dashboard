@@ -5,7 +5,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { globalMessages } from '$lib/global-messages';
-  import { incrementForPlan, type ImportCommit } from './debt-import-json';
+  import { incrementForIndex, type ImportWorkbook } from './debt-import-json';
   import { withBase } from './app-paths';
   let file = $state<File | null>(null);
   let busy = $state(false);
@@ -25,22 +25,23 @@
     try {
       if(!file.name.toLowerCase().endsWith('.xlsx')||file.size>10*1024*1024)throw new Error('请选择不超过 10 MB 的 .xlsx 文件');
       const data=await file.arrayBuffer();
-      const parsed=await new Promise<ImportCommit>((resolve,reject)=>{
+      const {parsed,warnings}=await new Promise<{parsed:ImportWorkbook;warnings:string[]}>((resolve,reject)=>{
         worker=new Worker(new URL('./debt-import.worker.js',import.meta.url),{type:'module'});
-        worker.onmessage=({data})=>{worker?.terminate();worker=null;data.type==='complete'?resolve(data.transformed):reject(new Error(data.message));};
+        worker.onmessage=({data})=>{worker?.terminate();worker=null;data.type==='complete'?resolve({parsed:data.transformed,warnings:data.warnings??[]}):reject(new Error(data.message));};
         worker.onerror=(event)=>{worker?.terminate();worker=null;reject(new Error(event.message||'工作簿解析失败'));};
         worker.postMessage({workbookData:data,fileName:file!.name},[data]);
       });
       phase='核对中';
-      const plan=await post({action:'plan',snapshot:parsed.snapshot,identities:parsed.identities});
-      const increment=incrementForPlan(parsed,plan);
+      const index=await post({action:'index'});
+      const increment=incrementForIndex(parsed,index);
       phase='提交中';
       const result=await post(increment);
-      globalMessages.success(`新增 ${result.insertedDebtCount} 笔负债、${result.insertedCashflowCount} 笔现金流；保留 ${result.skippedDebtCount} 笔历史负债`,{title:'导入完成',duration:0});
-      for(const warning of result.warnings??[])globalMessages.warning(warning,{title:'历史数据待核对',duration:0});
+      globalMessages.success(`新增 ${result.insertedDebtCount} 笔负债、${result.insertedCashflowCount} 笔现金流${result.createdClientCount?`、${result.createdClientCount} 个客户`:''}；保留 ${parsed.debts.length-result.insertedDebtCount} 笔历史负债`,{title:'导入完成',duration:0});
+      for(const warning of warnings)globalMessages.warning(warning,{title:'导入提示',duration:0});
+      for(const warning of result.warnings??[])globalMessages.warning(warning,{title:'导入提示',duration:0});
       file=null;if(input)input.value='';
     } catch(error) {
-      globalMessages.error(error instanceof Error?error.message:String(error),{title:'整个导入未完成',duration:0});
+      globalMessages.error(error instanceof Error?error.message:String(error),{title:'导入失败',duration:0});
     } finally {busy=false;phase='导入';}
   }
 </script>

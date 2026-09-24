@@ -42,7 +42,8 @@ function findHeaderRow(rows) {
 		for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
 			const column = rows[index].findIndex((value) => {
 				const header = normaliseHeader(value);
-				return header && aliases.some((alias) => header.includes(normaliseHeader(alias)));
+				return header && !(field === 'outstandingAmount' && header.includes('日均余额'))
+					&& aliases.some((alias) => header.includes(normaliseHeader(alias)));
 			});
 			if (column >= 0) fields[field] = column;
 		}
@@ -230,6 +231,17 @@ function isMeaningfulRow(row) {
 	return row.some((value) => text(value) !== null);
 }
 
+function isNarrativeRow(row, sheetName) {
+	if (!['小公募', '私募债', '短期融资券', '集团借款'].includes(sheetName)) return false;
+	const values = row.map(text).filter(Boolean);
+	return values.length === 1 && /^(?:发行阶段[：:]|兑付阶段[：:]|注[：:]|截至目前集团共发行|[123]、)/u.test(values[0]);
+}
+
+function isZeroOrMissingAmount(value, header) {
+	const amount = amountValue(value, header);
+	return amount === null || amount === 0;
+}
+
 function meaningfulSheetBounds(sheet) {
 	let maxRow = -1;
 	let maxColumn = -1;
@@ -377,6 +389,9 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 	let sheetCount = 0;
 	let skipped = 0;
 	let fieldValueCount = 0;
+	const warnings = [];
+	let skippedFailedIssues = 0;
+	let skippedNarrativeRows = 0;
 
 	for (const sheetName of workbook.SheetNames) {
 		if (SUMMARY_SHEET_NAMES.has(sheetName)) continue;
@@ -397,15 +412,33 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 			blankrows: true
 		});
 		const header = findHeaderRow(rows);
-		if (!header) throw new Error(`工作表 ${sheetName} 无法识别表头，整个导入已拒绝`);
+		if (!header) throw new Error(`工作表 ${sheetName} 无法识别表头`);
 		sheetCount += 1;
 		const headers = rows[header.index];
+		const averageRepoBalanceColumn = sheetName === '互换便利'
+			? headers.findIndex((value) => normaliseHeader(value).includes('正回购日均余额'))
+			: -1;
+		const issueStatusColumn = sheetName === '收益凭证'
+			? headers.findIndex((value) => normaliseHeader(value) === '发行状态')
+			: -1;
 		let parent = null;
 
 		for (let index = header.index + 1; index < rows.length; index += 1) {
 			const row = rows[index];
 			if (!isMeaningfulRow(row)) continue;
 			const sourceRow = index + 1;
+			if (isNarrativeRow(row, sheetName)) {
+				skippedNarrativeRows += 1;
+				skipped += 1;
+				continue;
+			}
+			if (issueStatusColumn >= 0 && text(row[issueStatusColumn]) === '发行失败'
+				&& isZeroOrMissingAmount(valueAt(row, header.fields, 'principalAmount'), headers[header.fields.principalAmount])
+				&& isZeroOrMissingAmount(valueAt(row, header.fields, 'outstandingAmount'), headers[header.fields.outstandingAmount])) {
+				skippedFailedIssues += 1;
+				skipped += 1;
+				continue;
+			}
 			if (isUsableRow(row, header.fields)) {
 				const candidate = rowToDebt(row, header.fields, sheetName, headers);
 				if (
@@ -414,6 +447,10 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 					|| candidate.counterparty
 					|| candidate.principalAmount !== null
 				) {
+					if (averageRepoBalanceColumn >= 0 && text(row[averageRepoBalanceColumn]) !== null
+						&& numericValue(row[averageRepoBalanceColumn]) === null) {
+						warnings.push(`工作表 ${sheetName} 第 ${sourceRow} 行的正回购日均余额为文字说明，已跳过数值校验并保留说明`);
+					}
 					const occurrenceBase = stableDebtKey(candidate, 0);
 					const occurrence = keyOccurrences.get(occurrenceBase) ?? 0;
 					keyOccurrences.set(occurrenceBase, occurrence + 1);
@@ -450,7 +487,7 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 
 			if (!parent) {
 				if(row.filter(value=>text(value)!==null).every(value=>/^(合计|总计|小计|备注|说明)([：:].*)?$/u.test(String(value)))){skipped+=1;continue;}
-				throw new Error(`工作表 ${sheetName} 第 ${sourceRow} 行无法关联负债，整个导入已拒绝`);
+				throw new Error(`工作表 ${sheetName} 第 ${sourceRow} 行无法关联负债`);
 			}
 			const values = Array(DEBT_FIELD_COLUMNS.length).fill(null);
 			for (const field of fieldValuesForRow(sheet, sourceRow, headers, bounds.maxColumn)) {
@@ -498,6 +535,11 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 		balance.debtType,
 		balance.balanceYi
 	]));
+	if (skippedFailedIssues) warnings.push(`已跳过 ${skippedFailedIssues} 条发行失败且无金额的收益凭证记录`);
+	if (skippedNarrativeRows) warnings.push(`已跳过 ${skippedNarrativeRows} 行债券及集团借款说明文字`);
+	if (skipped > skippedFailedIssues + skippedNarrativeRows) {
+		warnings.push(`已跳过 ${skipped - skippedFailedIssues - skippedNarrativeRows} 行无独立负债的汇总说明`);
+	}
 	return {
 		debts,
 		definitions: [...definitions.values()],
@@ -508,6 +550,7 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 		fieldValueCount,
 		sheetCount,
 		skipped,
+		warnings,
 		historyDateCount: new Set(history.snapshots.map((snapshot) => snapshot.asOfDate)).size,
 		historyStartDate: history.snapshots[0]?.asOfDate ?? null,
 		historyEndDate: history.snapshots.at(-1)?.asOfDate ?? null,

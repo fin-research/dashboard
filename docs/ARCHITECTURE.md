@@ -6,7 +6,7 @@
 
 Worker Assets 只承载随应用版本一起构建、发布的前端资源。资金日报是每日独立上传且需要运行时立即生效的业务文件，因此存入 R2，不写入构建目录，也不触发 Worker 重新发布。
 
-跨服务拓扑、生产路由、上游访问和身份所有权只在 [共享架构](../../eastmoney/docs/ARCHITECTURE.md) 维护。这里仅描述 Dashboard 内部结构；页面按 [模块索引](INDEX.md) 读取。
+跨服务拓扑、生产路由、上游访问和身份所有权只在 [共享架构](../../eastmoney/docs/ARCHITECTURE.md) 维护。这里仅描述 Dashboard 内部结构；页面按 [模块分流](../AGENTS.md#context-routing) 读取。
 
 ```text
 页面组件 → 浏览器安全的派生层 / 图表
@@ -63,7 +63,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 - Workflow 代码留在 `worker/`，避免 Cloudflare runtime 类型污染浏览器 TypeScript 环境。
 - 新增报告口径先扩展共享派生层和测试，再接入视觉或文字消费者。
 
-具体页面规则和接口见 [模块索引](INDEX.md)，不在公共文档重复维护。
+具体页面规则和接口见 [模块分流](../AGENTS.md#context-routing)，不在公共文档重复维护。
 
 ## 融资模块合并
 

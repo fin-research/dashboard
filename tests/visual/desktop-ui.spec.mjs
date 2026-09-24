@@ -16,12 +16,12 @@ test('desktop client search stays on one row and edit dialog restores focus', as
     expect(Math.abs(a.y-c.y)).toBeLessThanOrEqual(1);
     expect(a.width).toBeGreaterThan(200);
   }
-  await expect(page).toHaveScreenshot('clients-toolbar.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('clients-toolbar.png');
   const edit=page.getByRole('button',{name:'编辑银行甲',exact:true});
   await edit.click();
   const dialog=page.getByRole('dialog',{name:'编辑客户',exact:true});
   await expect(dialog.getByRole('textbox',{name:'客户名称',exact:true})).toHaveValue('银行甲');
-  await expect(page).toHaveScreenshot('clients-edit.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('clients-edit.png');
   await dialog.getByRole('button',{name:'取消',exact:true}).click();
   await expect(dialog).not.toBeVisible();
   await expect(edit).toBeFocused();
@@ -39,11 +39,11 @@ test('desktop SOP create action remains clear of AI and opens a dismissible dial
   const ai = page.getByRole('button', { name: '打开 AI 面板', exact: true });
   const a = await create.boundingBox(), b = await ai.boundingBox();
   expect(a.y + a.height + 12).toBeLessThanOrEqual(b.y);
-  await expect(page).toHaveScreenshot('sop-actions.png', { fullPage: true });
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('sop-actions.png');
   await create.click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  await expect(page).toHaveScreenshot('sop-create.png', { fullPage: true });
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('sop-create.png');
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
   await expect(create).toBeFocused();
@@ -73,7 +73,7 @@ test('desktop market report retains full names and table cells at 1280 pixels', 
     ).map(node => node.textContent));
     expect(clipped, selector).toEqual([]);
   }
-  await expect(page).toHaveScreenshot('market-report-readable.png', { fullPage: true });
+  await expect(page.locator('#visual-report-panel')).toHaveScreenshot('market-report-readable.png');
 });
 
 
@@ -95,7 +95,7 @@ test('desktop financing data has balanced metrics and a compact financial editor
     expect(last.y).toBeGreaterThan(first.y);
     expect(await page.locator('.parameter-card').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth+1))).toBe(true);
   }
-  await expect(page).toHaveScreenshot('financing-data.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('financing-data.png');
   await page.getByRole('combobox',{name:'数据月份',exact:true}).selectOption('2025-12-31');
   await expect(financial.getByText('800',{exact:false})).toBeVisible();
   const edit=page.getByRole('button',{name:'编辑本月',exact:true});
@@ -107,7 +107,7 @@ test('desktop financing data has balanced metrics and a compact financial editor
   const rowDelta=await dialog.getByRole('spinbutton').evaluateAll(inputs=>
     Math.abs(inputs[0].getBoundingClientRect().y-inputs[1].getBoundingClientRect().y));
   expect(rowDelta).toBeLessThanOrEqual(1);
-  await expect(page).toHaveScreenshot('financing-data-edit.png',{fullPage:true});
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('financing-data-edit.png');
   await dialog.getByRole('button',{name:'取消',exact:true}).click();
   await expect(dialog).not.toBeVisible();
   await expect(edit).toBeFocused();

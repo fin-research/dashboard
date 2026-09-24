@@ -28,12 +28,15 @@ test('报告只读取归档，控件的选择悬浮按下及焦点状态可辨�
   await expect(page.getByRole('textbox',{name:'输入今日聚焦'})).toBeEditable();
   expect(requests.map(request=>new URL(request.url()).pathname)).toEqual(['/api/market-report']);
   expect(requests.every(request=>request.method()==='GET')).toBe(true);
-  const background=button=>button.evaluate(el=>getComputedStyle(el).backgroundColor);
-  expect(await background(visual)).not.toBe(await background(text));
+  const tabStyle=button=>button.evaluate(el=>{
+    const style=getComputedStyle(el);
+    return {background:style.backgroundColor,underline:style.borderBottomColor};
+  });
+  expect((await tabStyle(visual)).underline).not.toBe((await tabStyle(text)).underline);
   if (!isMobile) {
-    const before=await background(text);
+    const before=(await tabStyle(text)).background;
     await text.hover();
-    await expect.poll(()=>background(text)).not.toBe(before);
+    await expect.poll(async()=>(await tabStyle(text)).background).not.toBe(before);
     await page.mouse.down();
     expect(await text.evaluate(el=>getComputedStyle(el).filter)).not.toBe('none');
     await page.mouse.up();
@@ -128,12 +131,12 @@ test('AI 生成自动展开任务详情、轮替模型摘要并保留完成结�
   const liveProgress = panel.getByRole('status');
   await expect(liveProgress.getByText('正在核对股债市场驱动', { exact: true })).toBeVisible();
   await expect(liveProgress).not.toContainText('正在读取市场材料');
-  await expect(page).toHaveScreenshot('ai-panel-progress.png');
+  await expect(panel).toHaveScreenshot('ai-panel-progress.png');
   await page.evaluate(() => window.__finishAiPanelVisual());
   await expect(panel.getByRole('heading', { name: '结果' })).toBeVisible();
   await expect(panel).toContainText('股票结论');
   await expect(page.getByText('生成完成', { exact: true })).toBeVisible();
-  await expect(page).toHaveScreenshot('ai-panel-complete.png');
+  await expect(panel).toHaveScreenshot('ai-panel-complete.png');
   expect(unexpected).toEqual([]);
 });
 
