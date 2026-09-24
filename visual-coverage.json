@@ -292,7 +292,7 @@
       "id": "trading",
       "url": "/trading-research/trading",
       "kind": "screenshot",
-      "state": "交易管理的交易记录标签选中，标签间无白缝，悬浮标签融入浅蓝顶栏；桌面1280宽筛选排序后末列可见",
+      "state": "交易管理的交易记录标签选中，标签间无白缝，悬浮标签融入冷灰顶栏；桌面1280宽筛选排序后末列可见",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -307,7 +307,7 @@
         },
         {
           "spec": "tests/visual/page-layout.spec.mjs",
-          "test": "交易管理标签悬浮时保持连续的蓝色顶栏",
+          "test": "交易管理标签悬浮时保持连续的冷灰顶栏",
           "projects": [
             "desktop"
           ],
@@ -924,11 +924,11 @@
       "id": "workbench-navigation",
       "url": "/management/messenger",
       "kind": "screenshot",
-      "state": "普通页与报告页共享浅蓝顶栏及侧栏、白色工作区；导航折叠和标签切换",
+      "state": "普通页与报告页共享冷灰顶栏、深色侧栏及白色工作区；导航折叠和标签切换",
       "evidence": [
         {
           "spec": "tests/visual/page-layout.spec.mjs",
-          "test": "普通页与报告页共用主题蓝导航和页头控件",
+          "test": "普通页与报告页共用冷灰顶栏和深色导航",
           "projects": [
             "desktop",
             "mobile"

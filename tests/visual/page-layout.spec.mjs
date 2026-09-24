@@ -37,7 +37,7 @@ test('共享顶栏保持紧凑且标签贴合底边', async ({ page }, testInfo)
   }
 });
 
-test('交易管理标签悬浮时保持连续的蓝色顶栏', async ({ page }, testInfo) => {
+test('交易管理标签悬浮时保持连续的冷灰顶栏', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Hover state is for pointer devices');
   await mockResources(page);
   await page.goto('/trading-research/trading');
@@ -62,10 +62,12 @@ test('交易管理标签悬浮时保持连续的蓝色顶栏', async ({ page }, 
   const hoverColor = await inactive.evaluate(element => getComputedStyle(element).backgroundColor);
   expect(hoverColor).not.toBe(beforeHover.header);
   expect(hoverColor).not.toBe(beforeHover.tab);
+  const hoverChannels = hoverColor.match(/\d+/g).map(Number);
+  expect(Math.max(...hoverChannels) - Math.min(...hoverChannels)).toBeLessThan(16);
   await expect(page).toHaveScreenshot('trading-tabs-hover.png', { fullPage: true });
 });
 
-test('普通页与报告页共用主题蓝导航和页头控件', async ({ page }, testInfo) => {
+test('普通页与报告页共用冷灰顶栏和深色导航', async ({ page }, testInfo) => {
   await mockResources(page);
   let reference;
   for (const url of ['/trading-research', '/credit-workbench', '/credit-workbench/weekly', '/trading-research/financing-model', '/financing/schedule', '/management/messenger']) {
@@ -104,12 +106,12 @@ test('普通页与报告页共用主题蓝导航和页头控件', async ({ page 
         title: style(header.querySelector('h1 a'), ['fontFamily', 'fontSize', 'fontWeight', 'color']),
         toggle: style(toggle, ['width', 'height', 'borderRadius', 'paddingLeft', 'paddingRight', 'backgroundColor', 'color']),
         marker: getComputedStyle(el, '::before').content,
-        brand: root.getPropertyValue('--brand-deep').trim(),
-        soft: root.getPropertyValue('--brand-soft').trim(),
+        accent: root.getPropertyValue('--color-primary').trim(),
       };
     });
-    expect(appearance.link.color, url).toBe('rgb(36, 91, 178)');
-    expect(appearance.link.backgroundColor, url).not.toBe(surfaces.sidebar);
+    expect(appearance.link.color, url).toBe('rgb(255, 255, 255)');
+    expect(appearance.icon.color, url).toBe('rgb(255, 255, 255)');
+    expect(appearance.link.backgroundColor, url).toBe('rgb(47, 111, 214)');
     expect(appearance.marker, url).toBe('none');
     if (reference) expect(appearance, url).toEqual(reference);
     else reference = appearance;
