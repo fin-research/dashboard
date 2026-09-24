@@ -17,7 +17,10 @@ test('financing-model preserves its approved report layout',async({page})=>{
   await expect(page.getByText('窗口预期净节约',{exact:false})).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.evaluate(()=>document.fonts.ready);
-  await expect(page.locator('#financing-model-report')).toHaveScreenshot('financing-model.png');
+  await expect(page).toHaveScreenshot('financing-model.png',{fullPage:false});
+  const factors=page.locator('.factor-panel');
+  await factors.scrollIntoViewIfNeeded();
+  await expect(factors).toHaveScreenshot('financing-model-factors.png');
   expect(errors).toEqual([]);expect(requests).toEqual([]);
 });
 
