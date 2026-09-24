@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { balanceWeightedIssuerSpread, loadIssuanceBusinessMetrics } from '../src/lib/server/issuance-business-metrics.ts';
-import { groupIssuanceShap, issuanceDecisionLabel, issuanceDecisionNarrative } from '../src/lib/issuance-presentation.ts';
+import { groupIssuanceShap, selectIssuanceShapDrivers, issuanceDecisionLabel, issuanceDecisionNarrative } from '../src/lib/issuance-presentation.ts';
 
 test('published actions have one explicit business label', () => {
   assert.equal(issuanceDecisionLabel('可按资金计划发行'), '尽快发行');
   assert.equal(issuanceDecisionLabel('可择机等待'), '等待');
+  assert.equal(issuanceDecisionLabel('尽快发行'), '尽快发行');
+  assert.equal(issuanceDecisionLabel('等待'), '等待');
   assert.equal(issuanceDecisionLabel('暂缓发行'), '暂缓发行');
   assert.equal(issuanceDecisionLabel('unrecognized'), null);
   assert.match(issuanceDecisionNarrative('可按资金计划发行'), /建议尽快发行/);
@@ -21,12 +23,20 @@ test('radar groups all actual tree contributions while retaining signs', () => {
     { feature: 'rate_gov_10y_change_5', value: -0.6, shap_bp: -0.1 },
     { feature: 'credit_spread', value: 0.4, shap_bp: 0.05 },
   ]);
-  assert.deepEqual(groups.find(row => row.display_name === '国债与期限'), {
-    display_name: '国债与期限', absolute_bp: 0.30000000000000004, net_bp: -0.30000000000000004,
+  assert.deepEqual(groups.find(row => row.display_name === '利率与期限'), {
+    display_name: '利率与期限', absolute_bp: 0.30000000000000004, net_bp: -0.30000000000000004,
   });
   assert.equal(groups.find(row => row.display_name === '信用债').absolute_bp, 0.05);
   assert.equal(groupIssuanceShap([{ feature: 'dr007_vs_policy', value: 0.1, shap_bp: 0.02 }])
     .find(row => row.display_name === '资金面').absolute_bp, 0.02);
+  const expanded = [
+    ...Array.from({length: 8}, (_, index) => ({feature: `rate_gov_3y_change_${index}`, value: index, shap_bp: .2-index*.01})),
+    {feature:'macro_PMI_change_1m',value:.6,shap_bp:-.006},
+    {feature:'net_financing_zscore',value:1.2,shap_bp:.004},
+    {feature:'credit_bond_volume_ratio',value:null,shap_bp:.002},
+  ];
+  assert.deepEqual(groupIssuanceShap(expanded).filter(row => ['宏观经济','一级发行','二级成交'].includes(row.display_name)).map(row=>row.display_name), ['宏观经济','一级发行','二级成交']);
+  assert.deepEqual(selectIssuanceShapDrivers(expanded).filter(row => ['macro_PMI_change_1m','net_financing_zscore','credit_bond_volume_ratio'].includes(row.feature)).map(row=>row.feature), ['macro_PMI_change_1m','net_financing_zscore','credit_bond_volume_ratio']);
 });
 
 test('issuer spread requires every active bond valuation and matched tenor', () => {

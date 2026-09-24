@@ -50,3 +50,14 @@ test('issuance publication rejects old models, unavailable labels, broken SHAP a
   const after=await loadIssuanceModelReport(db);assert.equal(after.snapshot.decision.expected_net_saving_bp,3);assert.equal(after.snapshot.forecast[1].saving_probability,.7);
  }finally{await db.close();}
 });
+
+test('full-input v2 bundle publishes with a direct three-way decision and no savings copy',async()=>{
+ const db=await database();try{
+  const value=snapshot();value.online_run.feature_version='issuance-lgb-v2';value.decision.action='等待';
+  const id=await publish(db,value);
+  const report=await loadIssuanceModelReport(db,id);
+  assert.equal(report.snapshot.decision.action,'等待');
+  assert.equal(report.conclusion.narrative,'等待');
+  assert.equal((await db.query('SELECT model_name,online_feature_version FROM financing_model.model_run WHERE id=$1',[id])).rows[0].model_name,'issuance-lgb-v2');
+ }finally{await db.close();}
+});

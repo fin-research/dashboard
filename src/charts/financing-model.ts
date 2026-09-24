@@ -308,7 +308,7 @@ export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): v
       ).join("<br>"),
     },
     radar: {
-      center: [compact ? "54%" : "50%", "55%"], radius: compact ? "54%" : "68%", startAngle: 90,
+      center: ["50%", "55%"], radius: compact ? "54%" : "68%", startAngle: 90,
       shape: "polygon", splitNumber: 4,
       indicator: rows.map(row => ({ name: row.display_name, min: 0, max: maximum * 1.12 })),
       axisName: { ...forecastAxisLabel, color: colors.ink },
@@ -330,14 +330,14 @@ export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): v
 
 export function renderFinancingDriverContributions(
   host: HTMLElement,
-  rows: FinancingModelSnapshot["market_drivers"],
+  rows: Array<{ display_name: string; shap: number; value: number | null }>,
   mode: "support" | "coupon" = "support",
 ): void {
   if (!rows.length) {
     setEmpty(host, "因子贡献暂缺");
     return;
   }
-  const contributionOf = (row: FinancingModelSnapshot["market_drivers"][number]) => mode === "coupon" ? row.shap : -row.shap;
+  const contributionOf = (row: { shap: number }) => mode === "coupon" ? row.shap : -row.shap;
   const compact = host.clientWidth < 400;
   const label = mode === "coupon" ? "票面贡献" : "发行贡献";
   const values = rows.map(contributionOf);
@@ -362,7 +362,7 @@ export function renderFinancingDriverContributions(
         return [
           `<strong>${escapeHtml(row.display_name)}</strong>`,
           `${label} ${signed(contribution, 3)} bp`,
-          `因子值 ${row.value.toFixed(4)}`,
+          `因子值 ${row.value === null ? '暂缺' : row.value.toFixed(4)}`,
         ].join("<br>");
       },
     },
@@ -387,7 +387,7 @@ export function renderFinancingDriverContributions(
       data: rows.map((row) => row.display_name),
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { ...forecastAxisLabel, color: colors.ink, width: compact ? 95 : 150, overflow: "truncate" },
+      axisLabel: { ...forecastAxisLabel, color: colors.ink, width: compact ? 140 : 150, overflow: "truncate" },
     },
     series: [
       {

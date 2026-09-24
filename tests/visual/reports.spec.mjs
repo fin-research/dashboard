@@ -12,7 +12,7 @@ test('financing-model preserves its approved report layout',async({page})=>{
   await expect(page.getByText('123.00',{exact:true})).toBeVisible();
   await expect(page.getByText('历史P45.0',{exact:false})).toBeVisible();
   await expect(page.getByRole('heading',{name:'因子贡献',exact:true})).toBeVisible();
-  await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue('当前没有可信的等待优势，建议尽快发行。');
+  await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue('未来窗口没有明显更低的预测票面，建议尽快发行。');
   await expect(page.getByRole('button',{name:'编辑整体结论'})).toHaveCount(0);
   await expect(page.getByText('窗口预期净节约',{exact:false})).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);

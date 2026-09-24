@@ -29,7 +29,7 @@
   import { portal } from "$lib/portal";
   import { permissionVisibility } from "$lib/permission-visibility";
   import { parseIssuanceReport as parseFinancingModelReport, type IssuanceReport as FinancingModelReport } from "$lib/issuance-model";
-  import { groupIssuanceShap, issuanceDecisionLabel, issuanceDecisionNarrative } from "$lib/issuance-presentation";
+  import { groupIssuanceShap, selectIssuanceShapDrivers, issuanceDecisionLabel, issuanceDecisionNarrative } from "$lib/issuance-presentation";
   import { issuanceFeatureName, renderIssuanceForecast } from "../../charts/issuance-model";
   interface Props {
     embedded?: boolean;
@@ -368,7 +368,7 @@
   let recommendation = $derived(snapshot ? issuanceDecisionLabel(snapshot.decision.action) : null);
   let recommendationTone = $derived(recommendation === "尽快发行" ? "strong_buy" : recommendation === "等待" ? "neutral" : "wait");
   let driverGroups = $derived(groupIssuanceShap(snapshot?.explanation?.features ?? []));
-  let marketDrivers = $derived([...(snapshot?.explanation?.features ?? [])].sort((a,b)=>Math.abs(b.shap_bp)-Math.abs(a.shap_bp)).slice(0,8).map(row=>({feature:row.feature,display_name:issuanceFeatureName(row.feature),shap:row.shap_bp,value:row.value ?? 0,impact:row.shap_bp>0 ? "推高成本" as const : "降低成本" as const})));
+  let marketDrivers = $derived(selectIssuanceShapDrivers(snapshot?.explanation?.features ?? []).map(row=>({feature:row.feature,display_name:issuanceFeatureName(row.feature),shap:row.shap_bp,value:row.value,impact:row.shap_bp>0 ? "推高成本" as const : "降低成本" as const})));
   let current = $derived(snapshot?.forecast[0]);
   let validationMetrics = $derived(snapshot ? [
     {label:"预测检验数",value:String(snapshot.validation.sample_count)},
