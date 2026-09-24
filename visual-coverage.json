@@ -584,7 +584,8 @@
             "mobile"
           ],
           "snapshots": [
-            "financing-model.png"
+            "financing-model.png",
+            "financing-model-factors.png"
           ]
         },
         {
@@ -603,7 +604,7 @@
       "id": "financing-model-online",
       "url": "/trading-research/financing-model",
       "kind": "screenshot",
-      "state": "issuance results and date switching",
+      "state": "three-state conclusion, business metrics, radar and SHAP, date switching",
       "evidence": [
         {
           "spec": "tests/visual/reports.spec.mjs",

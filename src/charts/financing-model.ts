@@ -1,4 +1,5 @@
 import type { FinancingModelSnapshot } from "../lib/financing-model";
+import type { ShapGroup } from "../lib/issuance-presentation";
 import {
   axisLabel,
   colors,
@@ -283,16 +284,61 @@ export function financingDriverRadarScale(
   return { min: 50 - halfSpan, max: 50 + halfSpan };
 }
 
+/** Restores the existing radar visual with actual, unsigned group SHAP magnitudes. */
+export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): void {
+  if (!rows.length || rows.every(row => row.absolute_bp === 0)) {
+    setEmpty(host, "因子贡献暂缺");
+    return;
+  }
+  const compact = host.clientWidth < 400;
+  const maximum = Math.max(0.1, ...rows.map(row => row.absolute_bp));
+  setChart(host, {
+    animationDuration: 180,
+    aria: { enabled: true, description: "本次票面预测各类因子的 SHAP 绝对贡献雷达图" },
+    color: [chartBlue],
+    legend: {
+      top: 0, right: 0, itemWidth: 16, itemHeight: 10,
+      textStyle: forecastAxisLabel, data: ["贡献强度"],
+    },
+    tooltip: {
+      ...tooltip,
+      trigger: "item",
+      formatter: () => rows.map(row =>
+        `${escapeHtml(row.display_name)} · 绝对贡献 ${row.absolute_bp.toFixed(3)} bp · 净贡献 ${signed(row.net_bp, 3)} bp`,
+      ).join("<br>"),
+    },
+    radar: {
+      center: ["50%", "55%"], radius: compact ? "54%" : "68%", startAngle: 90,
+      shape: "polygon", splitNumber: 4,
+      indicator: rows.map(row => ({ name: row.display_name, min: 0, max: maximum * 1.12 })),
+      axisName: { ...forecastAxisLabel, color: colors.ink },
+      axisLine: { lineStyle: { color: colors.line } },
+      splitLine: { lineStyle: { color: "rgba(128, 148, 177, 0.24)" } },
+      splitArea: { show: false },
+    },
+    series: [{
+      type: "radar", symbol: "circle", symbolSize: 6,
+      data: [{
+        name: "贡献强度", value: rows.map(row => row.absolute_bp),
+        lineStyle: { color: chartBlue, width: 2.2 },
+        itemStyle: { color: colors.paper, borderColor: chartBlue, borderWidth: 2 },
+        areaStyle: { color: "rgba(47,111,214,0.13)" },
+      }],
+    }],
+  });
+}
+
 export function renderFinancingDriverContributions(
   host: HTMLElement,
-  rows: FinancingModelSnapshot["market_drivers"],
+  rows: Array<{ display_name: string; shap: number; value: number | null }>,
   mode: "support" | "coupon" = "support",
 ): void {
   if (!rows.length) {
     setEmpty(host, "因子贡献暂缺");
     return;
   }
-  const contributionOf = (row: FinancingModelSnapshot["market_drivers"][number]) => mode === "coupon" ? row.shap : -row.shap;
+  const contributionOf = (row: { shap: number }) => mode === "coupon" ? row.shap : -row.shap;
+  const compact = host.clientWidth < 400;
   const label = mode === "coupon" ? "票面贡献" : "发行贡献";
   const values = rows.map(contributionOf);
   const maxAbs = Math.max(...values.map(Math.abs), 0.1);
@@ -303,7 +349,7 @@ export function renderFinancingDriverContributions(
       enabled: true,
       description: "本次预测 SHAP 因子贡献",
     },
-    grid: { left: 12, right: 78, top: 8, bottom: 48, containLabel: true },
+    grid: { left: compact ? 8 : 12, right: compact ? 55 : 78, top: 8, bottom: compact ? 55 : 48, containLabel: true },
     tooltip: {
       ...tooltip,
       trigger: "axis",
@@ -316,7 +362,7 @@ export function renderFinancingDriverContributions(
         return [
           `<strong>${escapeHtml(row.display_name)}</strong>`,
           `${label} ${signed(contribution, 3)} bp`,
-          `因子值 ${row.value.toFixed(4)}`,
+          `因子值 ${row.value === null ? '暂缺' : row.value.toFixed(4)}`,
         ].join("<br>");
       },
     },
@@ -329,7 +375,9 @@ export function renderFinancingDriverContributions(
       nameGap: 32,
       axisLine: { lineStyle: { color: colors.line } },
       axisTick: { show: false },
-      axisLabel: forecastAxisLabel,
+      axisLabel: { ...forecastAxisLabel,
+        formatter: (value: number) => compact && value !== 0 && Math.abs(value) < bound - 1e-9 ? "" : String(value),
+      },
       nameTextStyle: { ...forecastAxisLabel, color: colors.muted },
       splitLine: { show: false },
     },
@@ -339,7 +387,7 @@ export function renderFinancingDriverContributions(
       data: rows.map((row) => row.display_name),
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { ...forecastAxisLabel, color: colors.ink, width: 150, overflow: "truncate" },
+      axisLabel: { ...forecastAxisLabel, color: colors.ink, width: compact ? 140 : 150, overflow: "truncate" },
     },
     series: [
       {
