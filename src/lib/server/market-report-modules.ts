@@ -2,11 +2,11 @@ import type { z } from "zod";
 import {
   bondInfosSchema, cfetsRatesSchema, favoriteQuotesSchema, futuresQuotesSchema,
   governmentBondsSchema, industrySnapshotSchema, marginBalancesSchema, omoOperationsSchema,
-  primaryIssuesSchema, stockSummarySchema, todayTradesSchema,
+  primaryIssuesSchema, stockSummarySchema, todayTradesSchema, tradingDaySchema,
 } from "../../data-contracts.ts";
 import {
   buildOpenMarketModule, buildFixedIncomeModule, buildEquityModule, buildPrimaryModule,
-  buildSecondaryModule, buildInventoryModule, dayOffset, previousTradingDate, referencedBondCodes,
+  buildSecondaryModule, buildInventoryModule, dayOffset, referencedBondCodes,
 } from "../../market-report-resources.ts";
 import { reportDataSchema } from "../../market-report.ts";
 import { currentReportDate } from "../../report-date.ts";
@@ -41,13 +41,15 @@ export async function collectFixedIncome(env: Env, reportDate: string) {
 }
 
 export async function collectEquity(env: Env, reportDate: string) {
-  const [industry, stock, margin] = await completeAll([
+  const [industry, stock, margin, calendar] = await completeAll([
     fetchModuleData(env, reportDate,
-      `industry?date=${reportDate}&fields=dataDate,equities,industries,turnoverYi,turnoverChangeYi,tradingDates`, industrySnapshotSchema),
+      `industry?date=${reportDate}&fields=dataDate,equities,industries,turnoverYi,turnoverChangeYi`, industrySnapshotSchema),
     fetchModuleData(env, reportDate, `stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema),
     fetchModuleData(env, reportDate, `margin?date=${reportDate}&fields=DIM_DATE,TOTAL_RZRQYE,TOTAL_RZYE,TOTAL_RQYE`, marginBalancesSchema),
+    fetchModuleData(env, reportDate, `trading-days?date=${reportDate}&fields=date,isTradingDay,previousTradingDate`, tradingDaySchema),
   ]);
-  assertTradingDate(industry.tradingDates, reportDate);
+  assertTradingDate(calendar, reportDate);
+  if (industry.dataDate !== reportDate) throw new Error("当日股票行情尚未更新，请重试");
   return checkpoint(reportDate, reportDataSchema.pick({
     stock_paragraphs: true, margin: true, equities: true, equity_data_time: true,
     turnover_yi: true, turnover_change_yi: true, industries: true, industry_data_date: true,
@@ -56,10 +58,9 @@ export async function collectEquity(env: Env, reportDate: string) {
 
 export async function collectPrimary(env: Env, reportDate: string) {
   const calendar = await fetchModuleData(env, reportDate,
-    `industry?date=${reportDate}&fields=tradingDates`, industrySnapshotSchema.pick({ tradingDates: true }));
-  assertTradingDate(calendar.tradingDates, reportDate);
-  const previousDate = previousTradingDate(calendar, reportDate);
-  if (!previousDate) throw new Error("上一交易日数据缺失");
+    `trading-days?date=${reportDate}&fields=date,isTradingDay,previousTradingDate`, tradingDaySchema);
+  assertTradingDate(calendar, reportDate);
+  const previousDate = calendar.previousTradingDate;
   const query = new URLSearchParams({
     date: reportDate, startDate: previousDate,
     fields: ["bidStartDate", "issueStartDate", "biddingTime", "comShortName", "issuerShortName", "issuerShortNameCn",
@@ -92,8 +93,8 @@ function fetchBondInfos(env: Env, reportDate: string, codes: string[]) {
   return fetchModuleData(env, reportDate, `bond-infos?${query}`, bondInfosSchema);
 }
 
-function assertTradingDate(dates: string[], reportDate: string) {
-  if (!dates.includes(reportDate)) throw new Error("当日行情尚未更新或交易日历未确认，请重试");
+function assertTradingDate(calendar: { date: string; isTradingDay: boolean }, reportDate: string) {
+  if (calendar.date !== reportDate || !calendar.isTradingDay) throw new Error("交易日历未确认当日为交易日，请重试");
 }
 
 function assertCurrentDate(reportDate: string) {

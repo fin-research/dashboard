@@ -52,6 +52,10 @@ function marginRows() {
 
 export function directResponse(target) {
   const url = new URL(String(target), "https://example.test");
+  if (url.pathname === "/data/trading-days") {
+    return Response.json({ date: url.searchParams.get("date") ?? "2026-08-25", isTradingDay: true,
+      previousTradingDate: url.searchParams.get("date") === "2026-08-31" ? "2026-08-28" : "2026-08-24" });
+  }
   if (url.pathname === "/data/industry") {
     return Response.json({
       dataDate: "2026-08-25",
@@ -59,7 +63,7 @@ export function directResponse(target) {
       industries: snapshot().industries,
       turnoverYi: 15000,
       turnoverChangeYi: 200,
-      tradingDates: ["2026-08-22", "2026-08-25"],
+      tradingDates: ["2026-08-24", "2026-08-25"],
     });
   }
   if (url.pathname === "/data/stock-summary") {
@@ -100,8 +104,8 @@ export function directResponse(target) {
     assert.equal(
       url.searchParams.get("startDate"),
       url.searchParams.get("date") === "2026-08-31"
-        ? "2026-08-25"
-        : "2026-08-22",
+        ? "2026-08-28"
+        : "2026-08-24",
     );
     return Response.json([]);
   }
@@ -144,4 +148,3 @@ export function directResponse(target) {
   }
   throw new Error(`unexpected request: ${target}`);
 }
-

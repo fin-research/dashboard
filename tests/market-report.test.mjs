@@ -160,7 +160,7 @@ test('默认 GET 在 Choice 不可达、返回503或日历异常时仍读取准�
     const snapshot = await response.json();
     assert.equal(snapshot.report_date, '2026-09-16');
     assert.equal(snapshot.focus_text, '已归档');
-    assert.equal(dataFetch.mock.calls.length, 0);
+    assert.equal(dataFetch.mock.calls.length, 1);
   }
 });
 
@@ -188,7 +188,7 @@ test('默认 GET 只读所选日期：上一交易日报告缺失及17点后当�
   assert.equal((await response.json()).report_date, '2026-09-16');
 });
 
-test('未来年度默认 GET 在 Choice 不可达时仍读取上一工作日，不需要年度日历配置', async (context) => {
+test('未来年度默认 GET 在交易日接口不可达时仍读取上一工作日', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: new Date('2027-01-05T09:00:00+08:00') });
   const bucket = memoryBucket();
   await saveMarketReport(bucket, '2027-01-04', { ...reportData(), report_date: '2027-01-04' }, '已归档');
@@ -199,16 +199,19 @@ test('未来年度默认 GET 在 Choice 不可达时仍读取上一工作日，�
   });
   assert.equal(response.status, 200);
   assert.equal((await response.json()).report_date, '2027-01-04');
-  assert.equal(dataFetch.mock.calls.length, 0);
+  assert.equal(dataFetch.mock.calls.length, 1);
+  assert.match(dataFetch.mock.calls[0].arguments[0].url, /\/data\/trading-days\?date=2027-01-04/);
 });
 
-test('节假日仍按工作日选日，缺少该日报告返回404而非日历503或更早定稿', async (context) => {
+test('节假日默认 GET 使用独立交易日接口选择上一交易日报告', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-08T09:00:00+08:00') });
   const bucket = memoryBucket();
   await saveMarketReport(bucket, '2026-09-30', { ...reportData(), report_date: '2026-09-30' }, '更早定稿');
   const reads = context.mock.method(bucket, 'get');
-  const response = await GET({ url: new URL('https://example.test/api/market-report'), platform: { env: { EASTMONEY: bucket } } });
-  assert.equal(response.status, 404);
-  assert.equal((await response.json()).error.code, 'REPORT_NOT_FINALIZED');
-  assert.deepEqual(reads.mock.calls.map(call => call.arguments[0]), ['market-briefing/2026-10-07.json']);
+  const dataFetch = context.mock.fn(async () => Response.json({ date: '2026-10-07', isTradingDay: false, previousTradingDate: '2026-09-30' }));
+  const response = await GET({ url: new URL('https://example.test/api/market-report'), platform: { env: { EASTMONEY: bucket, DATA: { fetch: dataFetch } } } });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).report_date, '2026-09-30');
+  assert.deepEqual(reads.mock.calls.map(call => call.arguments[0]), ['market-briefing/2026-09-30.json']);
+  assert.equal(dataFetch.mock.calls.length, 1);
 });

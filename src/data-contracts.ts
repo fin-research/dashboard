@@ -220,7 +220,12 @@ export const industrySnapshotSchema = z.object({
   industries: z.array(industrySchema),
   turnoverYi: finiteNumber.nullable(),
   turnoverChangeYi: finiteNumber.nullable(),
-  tradingDates: z.array(z.string()),
+});
+
+export const tradingDaySchema = z.object({
+  date: z.string(),
+  isTradingDay: z.boolean(),
+  previousTradingDate: z.string(),
 });
 
 export const stockSummarySchema = z.object({
