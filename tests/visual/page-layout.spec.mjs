@@ -139,6 +139,7 @@ test('普通页与报告页共用白色顶栏和深色导航', async ({ page }, 
 });
 
 test('带标签或附加操作的顶栏分别截图', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-09-15T11:00:00+08:00'));
   await mockResources(page);
   for (const [url, snapshot] of [
     ['/trading-research/trading', 'header-trading-tabs.png'],
