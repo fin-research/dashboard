@@ -290,7 +290,7 @@ export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): v
     setEmpty(host, "因子贡献暂缺");
     return;
   }
-  const compact = host.clientWidth < 520;
+  const compact = host.clientWidth < 400;
   const maximum = Math.max(0.1, ...rows.map(row => row.absolute_bp));
   setChart(host, {
     animationDuration: 180,
@@ -338,7 +338,7 @@ export function renderFinancingDriverContributions(
     return;
   }
   const contributionOf = (row: FinancingModelSnapshot["market_drivers"][number]) => mode === "coupon" ? row.shap : -row.shap;
-  const compact = host.clientWidth < 520;
+  const compact = host.clientWidth < 400;
   const label = mode === "coupon" ? "票面贡献" : "发行贡献";
   const values = rows.map(contributionOf);
   const maxAbs = Math.max(...values.map(Math.abs), 0.1);
