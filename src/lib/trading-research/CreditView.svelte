@@ -1,45 +1,30 @@
 <script lang="ts">
-  import { permissionVisibility } from "$lib/permission-visibility";
-  const allowed=permissionVisibility();
-  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
-  import Modal from "$lib/components/Modal.svelte";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { NativeSelect } from "$lib/components/ui/native-select/index.js";
-  import { Textarea } from "$lib/components/ui/textarea/index.js";
-  import { onDestroy, onMount } from "svelte";
+  import { onMount } from "svelte";
 
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
-  import { globalMessages } from "../global-messages.ts";
   import MultiSelectFilter from "../financing/MultiSelectFilter.svelte";
   import { creditLimitFilterLabels, matchesCreditCalendarEvent } from "../credit/calendar.ts";
   import { portal } from "../portal.ts";
   import { scrollableRegion } from "../scrollable-region";
-  import {
-    fetchCreditReport,
-    updateCreditInstitution,
-  } from "../credit/client.ts";
+  import { fetchCreditReport } from "../credit/client.ts";
   import {
     creditItemLabels,
     creditItemTypes,
     type CreditInstitutionView,
     type CreditItemType,
     type CreditReportResponse,
-    type CreditStatus,
     type CreditWeeklyNewsItem,
   } from "../credit/types.ts";
   import { compareCreditInstitutionOrder, matchesCreditStatus } from "../credit/presentation.ts";
   import { creditEffectiveStatus, isCreditEffective, type CreditEffectiveStatus } from "../credit/validity.ts";
   import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
-  import { creditInstitutionUpdateSchema } from "../credit/update.ts";
-  import type {
-    CreditInstitutionChanges,
-    CreditInstitutionUpdateInput,
-    CreditItemChanges,
-  } from "../credit/update.ts";
+  import CreditApplicationDialog from "./CreditApplicationDialog.svelte";
   import Badge from "./Badge.svelte";
   import PanelHeading from "./PanelHeading.svelte";
   import SectionHeading from "./SectionHeading.svelte";
@@ -76,51 +61,13 @@
   let statusFilter = $state<CreditEffectiveStatus | "active" | "all">("active");
   let riskFilter = $state("all");
   let expandedInstitution = $state<string | null>(null);
-  let editor = $state<CreditInstitutionView | null>(null);
-  let editorVersion = $state(0);
-  let savedEditorVersion = $state(0);
-  let editorSession = 0;
-  let saveState = $state<"idle" | "pending" | "saving" | "saved" | "error">("idle");
-  let saveMessage = $state("");
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  let saveInFlight = false;
-  let pendingInstitutionChanges: CreditInstitutionChanges = {};
-  let pendingItemChanges = new Map<CreditItemType, CreditItemChanges>();
   let sortKey = $state<SortKey>("institutionType");
   let sortDirection = $state<"ascending" | "descending">("ascending");
   let calendarLimitFilters = $state<string[]>([]);
   let calendarUsageFilters = $state<string[]>([]);
   let calendarMonth = $state("");
-  let createDialog: Modal;
-  let creating = $state(false);
-  let newName = $state("");
-  let newType = $state("股份行");
-  let newStatus = $state<CreditStatus>("applying");
-  let newTotal = $state<number | undefined>(undefined);
-  let newDate = $state(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
+  let applicationDialog = $state<CreditApplicationDialog | null>(null);
   let loadSequence = 0;
-
-  function openCreate(): void {
-    newName = "";
-    newDate = report?.summary.reportDate ?? newDate;
-    createDialog.showModal();
-  }
-
-  async function createInstitution(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    if (creating) return;
-    creating = true;
-    try {
-      const result = await updateCreditInstitution({reportDate:newDate,institutionName:newName,changes:{institution:{
-        institutionType:newType,status:newStatus,confidentialityStatus:false,totalLimit:newTotal ?? null,
-      }}},fetch,true);
-      createDialog.close();
-      await loadReport(newDate);
-      if (report) toggleInstitution(result.institution);
-      globalMessages.success("授信机构已新增");
-    } catch(error) { globalMessages.error(error instanceof Error ? error.message : "新增失败"); }
-    finally { creating = false; }
-  }
 
   const filteredInstitutions = $derived.by(() => {
     const currentReport = report;
@@ -267,19 +214,11 @@
     void loadReport();
   });
 
-  onDestroy(() => {
-    if (saveTimer) clearTimeout(saveTimer);
-  });
-
   async function loadReport(reportDate: string | null = null, month?: string): Promise<void> {
     const sequence = ++loadSequence;
-    if (hasPendingChanges()) {
-      await flushEditor();
-      if (hasPendingChanges()) return;
-    }
     loading = true;
     errorMessage = "";
-    clearEditor();
+    expandedInstitution = null;
     try {
       const result = await fetchCreditReport(reportDate,fetch,month);
       if (sequence !== loadSequence) return;
@@ -297,280 +236,7 @@
   }
 
   function toggleInstitution(institution: CreditInstitutionView): void {
-    if (expandedInstitution === institution.institutionName) {
-      if (editorVersion > savedEditorVersion) void flushEditor();
-      editorSession += 1;
-      expandedInstitution = null;
-      editor = null;
-      resetPendingChanges();
-      return;
-    }
-    if (editor && editorVersion > savedEditorVersion) void flushEditor();
-    if (saveTimer) clearTimeout(saveTimer);
-    editorSession += 1;
-    expandedInstitution = institution.institutionName;
-    editor = cloneInstitution(institution);
-    editorVersion = 0;
-    savedEditorVersion = 0;
-    saveState = "idle";
-    saveMessage = "";
-    resetPendingChanges();
-  }
-
-  function clearEditor(): void {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = null;
-    editorSession += 1;
-    expandedInstitution = null;
-    editor = null;
-    editorVersion = 0;
-    savedEditorVersion = 0;
-    saveState = "idle";
-    saveMessage = "";
-    resetPendingChanges();
-  }
-
-  function scheduleEditorSave(immediate = false): void {
-    if (!editor) return;
-    editorVersion += 1;
-    saveState = "pending";
-    saveMessage = "待保存";
-    if (saveTimer) clearTimeout(saveTimer);
-    if (immediate) {
-      saveTimer = null;
-      void flushEditor();
-      return;
-    }
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      void flushEditor();
-    }, 650);
-  }
-
-  async function flushEditor(): Promise<void> {
-    if (saveInFlight || !editor || !hasPendingChanges()) return;
-    // Native date inputs emit change while the year/month/day is still being typed.
-    if (document.activeElement?.matches('[data-credit-date]')) return;
-    const validation = creditInstitutionUpdateSchema.safeParse({
-      reportDate: editor.reportDate, institutionName: editor.institutionName,
-      changes: { institution: pendingInstitutionChanges, items: [...pendingItemChanges.values()] },
-    });
-    if (!validation.success || editor.effectiveDate && editor.expiryDate && editor.effectiveDate > editor.expiryDate) {
-      saveState = "error";
-      saveMessage = !validation.success ? "请填写完整有效的授信日期或金额" : "授信到期日不能早于生效日，请继续调整起止日期";
-      return;
-    }
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = null;
-    const target = {
-      reportDate: editor.reportDate,
-      institutionName: editor.institutionName,
-    };
-    const changes = takePendingChanges();
-    const version = editorVersion;
-    const session = editorSession;
-    saveInFlight = true;
-    saveState = "saving";
-    saveMessage = "保存中";
-    let failed = false;
-    try {
-      const input: CreditInstitutionUpdateInput = {
-        ...target,
-        changes,
-      };
-      const result = await updateCreditInstitution(input);
-      if (report) {
-        report = {
-          ...report,
-          summary: result.summary,
-          weeklySummary: result.weeklySummary,
-          weeklyNews: result.weeklyNews,
-          recentApprovals: result.recentApprovals,
-          limitChanges: result.limitChanges,
-          usageChanges: result.usageChanges,
-          calendarEvents: result.calendarEvents,
-          institutions: report.institutions.map((institution) =>
-            institution.institutionName === result.institution.institutionName
-              ? result.institution
-              : institution,
-          ),
-        };
-      }
-      if (editorSession === session) {
-        savedEditorVersion = version;
-      }
-      if (
-        editorSession === session &&
-        editor?.institutionName === result.institution.institutionName
-      ) {
-        if (editorVersion === version) editor = cloneInstitution(result.institution);
-        else editor.updatedAt = result.institution.updatedAt;
-        saveState = editorVersion === version ? "saved" : "pending";
-        saveMessage = editorVersion === version ? "已保存" : "待保存";
-      }
-    } catch (error) {
-      failed = true;
-      if (editorSession === session) {
-        requeueChanges(changes);
-        saveState = "error";
-        saveMessage = error instanceof Error ? error.message : "保存失败";
-        globalMessages.error(saveMessage);
-      }
-    } finally {
-      saveInFlight = false;
-      if (
-        editor &&
-        hasPendingChanges() &&
-        (!failed || editorSession !== session)
-      ) {
-        void flushEditor();
-      }
-    }
-  }
-
-  function setEditorText(
-    field: "institutionType" | "bankOffice" | "applyingDepartment" | "handler" | "detail" | "bondPreference" | "notes",
-    event: Event,
-  ): void {
-    if (!editor) return;
-    const value = (event.currentTarget as HTMLInputElement | HTMLTextAreaElement).value;
-    if (field === "institutionType") editor[field] = value;
-    else editor[field] = value;
-    queueInstitutionChange(field, editor[field]);
-    scheduleEditorSave();
-  }
-
-  function setEditorAmount(
-    field: "totalLimit",
-    event: Event,
-  ): void {
-    if (!editor) return;
-    editor[field] = inputAmount(event);
-    queueInstitutionChange(field, editor[field]);
-    scheduleEditorSave();
-  }
-
-  function editDate(): void {
-    // Preserve the in-progress input if an earlier save completes while typing.
-    editorVersion += 1;
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = null;
-  }
-
-  function setEditorDate(field: "effectiveDate" | "expiryDate", event: Event): void {
-    if (!editor) return;
-    const input = event.currentTarget as HTMLInputElement;
-    const value = input.value;
-    if (!value || !input.validity.valid) {
-      input.value = editor[field] ?? "";
-      saveState = "error";
-      saveMessage = "请填写完整有效的日期；已登记日期只能修改";
-      return;
-    }
-    editor[field] = value;
-    queueInstitutionChange(field, value);
-    scheduleEditorSave();
-  }
-
-  function setEditorStatus(event: Event): void {
-    if (!editor) return;
-    editor.status = (event.currentTarget as HTMLSelectElement).value as CreditStatus;
-    queueInstitutionChange("status", editor.status);
-    scheduleEditorSave(true);
-  }
-
-  function setEditorConfidentiality(checked: boolean): void {
-    if (!editor) return;
-    editor.confidentialityStatus = checked;
-    queueInstitutionChange("confidentialityStatus", editor.confidentialityStatus);
-    scheduleEditorSave(true);
-  }
-
-  function setItemAmount(
-    index: number,
-    field: "limitAmount" | "usedAmount" | "secondaryUsedAmount",
-    event: Event,
-  ): void {
-    if (!editor?.items[index]) return;
-    if (field === "usedAmount" && ["bond_investment", "yield_certificate", "interbank_lending"].includes(editor.items[index].type)) return;
-    editor.items[index][field] = inputAmount(event);
-    queueItemChange(index, field);
-    scheduleEditorSave();
-  }
-
-  function setItemDetails(index: number, event: Event): void {
-    if (!editor?.items[index]) return;
-    const value = (event.currentTarget as HTMLInputElement).value;
-    editor.items[index].details = value;
-    queueItemChange(index, "details");
-    scheduleEditorSave();
-  }
-
-  function queueInstitutionChange<K extends keyof CreditInstitutionChanges>(
-    field: K,
-    value: CreditInstitutionChanges[K],
-  ): void {
-    pendingInstitutionChanges = {
-      ...pendingInstitutionChanges,
-      [field]: value,
-    };
-  }
-
-  function queueItemChange(
-    index: number,
-    field: "limitAmount" | "usedAmount" | "secondaryUsedAmount" | "details",
-  ): void {
-    const item = editor?.items[index];
-    if (!item) return;
-    pendingItemChanges.set(item.type, {
-      ...pendingItemChanges.get(item.type),
-      type: item.type,
-      [field]: item[field],
-    });
-  }
-
-  function hasPendingChanges(): boolean {
-    return (
-      Object.keys(pendingInstitutionChanges).length > 0 ||
-      pendingItemChanges.size > 0
-    );
-  }
-
-  function takePendingChanges(): CreditInstitutionUpdateInput["changes"] {
-    const institution = { ...pendingInstitutionChanges };
-    const items = [...pendingItemChanges.values()].map((item) => ({ ...item }));
-    resetPendingChanges();
-    return {
-      ...(Object.keys(institution).length ? { institution } : {}),
-      ...(items.length ? { items } : {}),
-    };
-  }
-
-  function requeueChanges(
-    changes: CreditInstitutionUpdateInput["changes"],
-  ): void {
-    pendingInstitutionChanges = {
-      ...(changes.institution ?? {}),
-      ...pendingInstitutionChanges,
-    };
-    for (const item of changes.items ?? []) {
-      const current = pendingItemChanges.get(item.type);
-      pendingItemChanges.set(item.type, {
-        ...item,
-        ...current,
-        type: item.type,
-      });
-    }
-  }
-
-  function resetPendingChanges(): void {
-    pendingInstitutionChanges = {};
-    pendingItemChanges = new Map();
-  }
-
-  function inputAmount(event: Event): number | null {
-    const value = (event.currentTarget as HTMLInputElement).value;
-    return value === "" ? null : Number(value);
+    expandedInstitution = expandedInstitution === institution.institutionName ? null : institution.institutionName;
   }
 
   function toggleSort(key: SortKey): void {
@@ -655,19 +321,11 @@
     return value == null ? "—" : value.toFixed(2);
   }
 
-  function cloneInstitution(
-    institution: CreditInstitutionView,
-  ): CreditInstitutionView {
-    return {
-      ...institution,
-      items: institution.items.map((item) => ({ ...item })),
-    };
-  }
-
   function creditEventLabel(eventType: CreditWeeklyNewsItem["eventType"]): string {
     return {
       new: "新增",
       renewal: "续作",
+      renewal_increase: "续作及扩额",
       increase: "扩额",
       expiry: "到期",
       revocation: "撤销",
@@ -680,7 +338,7 @@
     eventType: CreditWeeklyNewsItem["eventType"],
   ): "info" | "success" | "warning" | "neutral" {
     if (eventType === "new") return "success";
-    if (eventType === "increase") return "warning";
+    if (eventType === "increase" || eventType === "renewal_increase") return "warning";
     if (eventType === "renewal") return "info";
     return "neutral";
   }
@@ -718,31 +376,19 @@
       <div class="tr-credit-toolbar__actions">
         <label>
           <span>数据日期</span>
-          <Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="date" min={report.availableDates[0]} value={report.summary.reportDate} disabled={saveState === "saving"} onchange={handleReportDateChange} />
+          <Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="date" min={report.availableDates[0]} value={report.summary.reportDate} onchange={handleReportDateChange} />
         </label>
         {#if activeTab === "weekly"}
           <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-credit-print"} type="button" onclick={printWeeklyReport}>打印 / 导出 PDF</Button>
         {/if}
       </div>
     {/if}
-    {#if activeTab === "overview"}<Button permission="credit.institution:update" data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button "} type="button" onclick={openCreate}>新增机构</Button>{/if}
+    {#if report && activeTab === "overview"}<Button permission="credit.institution:update" data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button"} type="button" onclick={() => applicationDialog?.open()}>授信申请</Button>{/if}
   </div>
 
-  <Modal  bind:this={createDialog} aria-labelledby="credit-create-title">
-    <div class="dialog-body">
-      <form onsubmit={createInstitution}>
-        <h2 id="credit-create-title">新增授信机构</h2>
-        <div class="tr-credit-editor-grid">
-          <label><span>机构名称</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} required maxlength={200} bind:value={newName} /></label>
-          <label><span>机构性质</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} required maxlength={100} bind:value={newType} /></label>
-          <label><span>变更生效日</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} required type="date" bind:value={newDate} /></label>
-          <label><span>授信状态</span><NativeSelect data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-select"} bind:value={newStatus}><option value="applying">申请中</option><option value="approved">已获批</option><option value="revoked">已撤销</option></NativeSelect></label>
-          <label><span>授信总额（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" min="0" step="0.000001" bind:value={newTotal} /></label>
-        </div>
-        <div class="dialog-actions"><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button"} type="button" disabled={creating} onclick={() => createDialog.close()}>取消</Button><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button "} type="submit" disabled={creating}>{creating ? "保存中" : "新增"}</Button></div>
-      </form>
-    </div>
-  </Modal>
+  {#if report && activeTab === "overview"}
+    <CreditApplicationDialog bind:this={applicationDialog} institutions={report.institutions} reportDate={report.summary.reportDate} onapplied={async (date) => loadReport(date)} />
+  {/if}
 
   {#if loading}
     <section class="tr-empty-panel" aria-live="polite">
@@ -866,50 +512,47 @@
                 <td class="is-numeric">{institution.utilization == null ? "—" : `${institution.utilization.toFixed(1)}%`}</td>
                 <td>{institution.effectiveDate ?? "—"}</td>
                 <td>{institution.expiryDate ?? "—"}</td>
-                <td><Button permission="credit.institution:update" data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button  tr-credit-detail-toggle"} type="button" aria-expanded={expandedInstitution === institution.institutionName} onclick={() => toggleInstitution(institution)}>{expandedInstitution === institution.institutionName ? "收起" : "详情"}</Button></td>
+                <td><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-credit-detail-toggle"} type="button" aria-expanded={expandedInstitution === institution.institutionName} onclick={() => toggleInstitution(institution)}>{expandedInstitution === institution.institutionName ? "收起" : "详情"}</Button></td>
               </tr>
-              {#if expandedInstitution === institution.institutionName && editor && $allowed("credit.institution:update")}
+              {#if expandedInstitution === institution.institutionName}
                 <tr class="tr-credit-detail-row">
                   <td colspan="11">
                     <div class="tr-credit-detail">
-                      <div class="tr-credit-editor-head">
-                        <strong>{editor.institutionName} · {editor.reportDate}</strong>
-                        <span class:error={saveState === "error"} aria-live="polite">{saveMessage}</span>
-                      </div>
+                      <div class="tr-credit-editor-head"><strong>{institution.institutionName} · {institution.reportDate}</strong></div>
                       <div class="tr-credit-editor-grid">
-                        <label><span>机构性质</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={editor.institutionType} oninput={(event) => setEditorText("institutionType", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>审批状态</span><NativeSelect data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-select"} value={editor.status} onchange={setEditorStatus}><option value="approved">已获批</option><option value="applying">申请中</option><option value="revoked">已撤销</option></NativeSelect></label>
-                        <label><span>截至所选日状态</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={statusLabel(creditEffectiveStatus(editor))} /></label>
-                        <label class="tr-credit-checkbox"><Checkbox data-ui-owner="lib-trading-research-CreditView-svelte"  checked={editor.confidentialityStatus} onCheckedChange={setEditorConfidentiality} /><span>已签署保密协议</span></label>
-                        <label><span>授信总额（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" step="0.000001" min="0" value={editor.totalLimit ?? ""} oninput={(event) => setEditorAmount("totalLimit", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>已用额度（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={formatAmount(editor.totalUsed)} /></label>
-                        <label><span>可用额度（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={formatAmount(editor.totalLimit == null || editor.totalUsed == null ? null : editor.totalLimit - editor.totalUsed)} /></label>
-                        <label><span>生效日</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="date" data-credit-date oninput={editDate} value={editor.effectiveDate ?? ""} onblur={(event) => setEditorDate("effectiveDate", event)} /></label>
-                        <label><span>到期日</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="date" data-credit-date oninput={editDate} value={editor.expiryDate ?? ""} onblur={(event) => setEditorDate("expiryDate", event)} /></label>
-                        <label><span>关联客户</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={editor.clients?.map(client => client.name).join("、") || "待维护"} /></label>
-                        <label><span>银行经办机构</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={editor.bankOffice ?? ""} oninput={(event) => setEditorText("bankOffice", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>我司申请部门</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={editor.applyingDepartment ?? ""} oninput={(event) => setEditorText("applyingDepartment", event)} onblur={() => void flushEditor()} /></label>
-                        <label><span>我司经办人</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={editor.handler ?? ""} oninput={(event) => setEditorText("handler", event)} onblur={() => void flushEditor()} /></label>
+                        <label><span>机构性质</span><Input readonly value={institution.institutionType} /></label>
+                        <label><span>审批状态</span><Input readonly value={statusLabel(institution.status)} /></label>
+                        <label><span>截至所选日状态</span><Input readonly value={statusLabel(creditEffectiveStatus(institution))} /></label>
+                        <label><span>保密协议</span><Input readonly value={institution.confidentialityStatus ? '已签署' : '未签署'} /></label>
+                        <label><span>授信总额（亿元）</span><Input readonly value={formatAmount(institution.totalLimit)} /></label>
+                        <label><span>已用额度（亿元）</span><Input readonly value={formatAmount(institution.totalUsed)} /></label>
+                        <label><span>可用额度（亿元）</span><Input readonly value={formatAmount(institution.availableAmount)} /></label>
+                        <label><span>生效日</span><Input readonly value={institution.effectiveDate ?? '—'} /></label>
+                        <label><span>到期日</span><Input readonly value={institution.expiryDate ?? '—'} /></label>
+                        <label><span>关联客户</span><Input readonly value={institution.clients?.map(client => client.name).join('、') || '—'} /></label>
+                        <label><span>银行经办机构</span><Input readonly value={institution.bankOffice ?? '—'} /></label>
+                        <label><span>我司申请部门</span><Input readonly value={institution.applyingDepartment ?? '—'} /></label>
+                        <label><span>我司经办人</span><Input readonly value={institution.handler ?? '—'} /></label>
                       </div>
                       <div class="tr-credit-item-grid">
-                        {#each editor.items as item, itemIndex (item.type)}
+                        {#each institution.items as item (item.type)}
                           <fieldset>
                             <legend>{creditItemLabels[item.type]}</legend>
-                            <label><span>额度（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" step="0.000001" min="0" value={item.limitAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "limitAmount", event)} onblur={() => void flushEditor()} /></label>
-                            <label><span>{item.type === "bond_investment" ? "已用合计（亿元）" : item.usageSource === "financing" ? "已用（亿元，融资台账）" : "已用（亿元）"}</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" step="0.000001" readonly={item.type === "bond_investment" || item.type === "yield_certificate" || item.type === "interbank_lending"} value={item.usedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "usedAmount", event)} onblur={() => void flushEditor()} /></label>
-                            {#if item.type === "bond_investment"}
-                              <label><span>一级发行存续额（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={formatAmount(item.primaryUsedAmount ?? null)} /></label>
-                              <label><span>债券投资——二级买卖（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="number" step="0.000001" value={item.secondaryUsedAmount ?? ""} oninput={(event) => setItemAmount(itemIndex, "secondaryUsedAmount", event)} onblur={() => void flushEditor()} /></label>
+                            <label><span>额度（亿元）</span><Input readonly value={formatAmount(item.limitAmount)} /></label>
+                            <label><span>{item.type === 'bond_investment' ? '已用合计（亿元）' : '已用（亿元）'}</span><Input readonly value={formatAmount(item.usedAmount)} /></label>
+                            {#if item.type === 'bond_investment'}
+                              <label><span>一级发行存续额（亿元）</span><Input readonly value={formatAmount(item.primaryUsedAmount)} /></label>
+                              <label><span>二级买卖净余额（亿元）</span><Input readonly value={formatAmount(item.secondaryUsedAmount)} /></label>
                             {/if}
-                            {#if item.type !== "other"}<label><span>可用（亿元）</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} readonly value={formatAmount(item.limitAmount == null || (item.usageSource !== "credit" && item.usedAmount == null) ? null : item.limitAmount - (item.usedAmount ?? 0))} /></label>{/if}
-                            <label><span>说明</span><Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} value={item.details ?? ""} oninput={(event) => setItemDetails(itemIndex, event)} onblur={() => void flushEditor()} /></label>
+                            <label><span>可用（亿元）</span><Input readonly value={formatAmount(item.remainingAmount)} /></label>
+                            <label><span>说明</span><Input readonly value={item.details ?? '—'} /></label>
                           </fieldset>
                         {/each}
                       </div>
                       <div class="tr-credit-notes-grid">
-                        <label><span>授信额度描述</span><Textarea data-ui-owner="lib-trading-research-CreditView-svelte" value={editor.detail ?? ""} class={"ui-textarea"} rows={3} oninput={(event) => setEditorText("detail", event)} onblur={() => void flushEditor()}></Textarea></label>
-                        <label><span>债券投资偏好</span><Textarea data-ui-owner="lib-trading-research-CreditView-svelte" value={editor.bondPreference ?? ""} class={"ui-textarea"} rows={3} oninput={(event) => setEditorText("bondPreference", event)} onblur={() => void flushEditor()}></Textarea></label>
-                        <label><span>备注</span><Textarea data-ui-owner="lib-trading-research-CreditView-svelte" value={editor.notes ?? ""} class={"ui-textarea"} rows={3} oninput={(event) => setEditorText("notes", event)} onblur={() => void flushEditor()}></Textarea></label>
+                        <label><span>授信额度描述</span><Input readonly value={institution.detail ?? '—'} /></label>
+                        <label><span>债券投资偏好</span><Input readonly value={institution.bondPreference ?? '—'} /></label>
+                        <label><span>备注</span><Input readonly value={institution.notes ?? '—'} /></label>
                       </div>
                     </div>
                   </td>
@@ -972,10 +615,8 @@
 
       <ModuleCard labelledBy="credit-news-title">
         <PanelHeading id="credit-news-title" title="本周授信快讯" />
-        {#if !report.previousDate}
-          <p class="tr-credit-muted">暂无周度变化</p>
-        {:else if weeklyNews.length === 0}
-          <p class="tr-credit-muted">本期无新增、续作、扩额、到期或撤销事项。</p>
+        {#if weeklyNews.length === 0}
+          <p class="tr-credit-muted">{report.previousDate ? '本期无新增、续作、扩额、到期或撤销事项。' : '暂无周度变化'}</p>
         {:else}
           <ol class="tr-credit-news-list">{#each weeklyNews as news}<li>{news}</li>{/each}</ol>
         {/if}

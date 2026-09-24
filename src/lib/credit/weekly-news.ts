@@ -14,9 +14,9 @@ export function formatCreditWeeklyNews(news: CreditWeeklyNewsItem): string {
       dateDetail("到期日", expiryDate),
     ]);
   }
-  if (news.eventType === "increase") {
+  if (news.eventType === "increase" || news.eventType === "renewal_increase") {
     return sentence([
-      `${news.institutionName}授信扩额完成`,
+      `${news.institutionName}授信${news.eventType === "renewal_increase" ? "续作及扩额" : "扩额"}完成`,
       `总额${formatAmount(totalAmount)}亿`,
       comparisonDetail(news.deltaAmount),
       dateDetail("到期日", expiryDate),

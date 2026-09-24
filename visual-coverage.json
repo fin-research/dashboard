@@ -379,7 +379,7 @@
       "id": "credit",
       "url": "/credit-workbench",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "normal/read-only/application",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -400,6 +400,16 @@
           ],
           "snapshots": [
             "credit-record-expanded.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "credit application presents distinct operations while the overview stays read only",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "credit-application-new.png"
           ]
         }
       ]

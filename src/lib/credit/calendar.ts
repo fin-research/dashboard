@@ -17,7 +17,7 @@ export function matchesCreditCalendarEvent(
     return usage.length === 0 || (event.itemType != null && usage.includes(event.itemType));
   }
   if (limits.length === 0) return true;
-  const category = event.kind === 'renewal' || event.kind === 'increase'
+  const category = event.kind === 'renewal' || event.kind === 'increase' || event.kind === 'renewal_increase'
     ? 'renewal_or_increase'
     : event.kind;
   return limits.includes(category);
