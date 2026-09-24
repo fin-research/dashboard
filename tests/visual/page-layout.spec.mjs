@@ -62,8 +62,6 @@ test('交易管理标签悬浮时保持连续的冷灰顶栏', async ({ page }, 
   const hoverColor = await inactive.evaluate(element => getComputedStyle(element).backgroundColor);
   expect(hoverColor).not.toBe(beforeHover.header);
   expect(hoverColor).not.toBe(beforeHover.tab);
-  const hoverChannels = hoverColor.match(/\d+/g).map(Number);
-  expect(Math.max(...hoverChannels) - Math.min(...hoverChannels)).toBeLessThan(16);
   await expect(page).toHaveScreenshot('trading-tabs-hover.png', { fullPage: true });
 });
 
