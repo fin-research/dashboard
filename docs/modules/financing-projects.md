@@ -1,6 +1,6 @@
 # 融资项目
 
-入口：`/financing/projects、/financing/projects/[id]`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
+入口：`/financing/projects、/financing/projects/[id]`。公共规则见 [文档分流](../../AGENTS.md#context-routing)；仅在任务涉及本模块时读取。
 
 ## 业务：融资项目与 SOP
 

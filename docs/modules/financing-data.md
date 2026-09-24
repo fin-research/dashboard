@@ -1,6 +1,6 @@
 # 融资台账与数据后台
 
-入口：`/financing/data、/financing/debts/[id]`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
+入口：`/financing/data、/financing/debts/[id]`。公共规则见 [文档分流](../../AGENTS.md#context-routing)；仅在任务涉及本模块时读取。
 
 ## 业务：负债
 

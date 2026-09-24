@@ -1,6 +1,6 @@
 # 今日聚焦
 
-入口：`/market-briefing`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
+入口：`/market-briefing`。公共规则见 [文档分流](../../AGENTS.md#context-routing)；仅在任务涉及本模块时读取。
 
 日常生成由 `market-briefing` Workflow 的 `generate-focus` 步骤执行，直接消费七个并行模块之一 `collect-focus-news` 整理完成的 DM 新闻材料；AI 步骤不重新取材，adapter 关闭内部重试，由 step 配置统一管理。页面初次只读取已归档聚焦，有写权限时可直接编辑；点击星标 AI 生成按钮才调用以下 POST，失败保留当前内容，成功替换后仍可编辑。修改后的内容由 header 导出并发下载图片和归档报告。
 
