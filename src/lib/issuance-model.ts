@@ -26,7 +26,12 @@ export const issuanceSnapshotSchema = z.object({
     metrics:z.array(z.object({lead_days:z.number().int(),year:z.number().int(),samples:z.number().int(),mae_bp:number,rmse_bp:number,flat_market_mae_bp:number,mae_skill_vs_flat_market:nullable}))}),
   base_conclusion:z.object({verdict:z.string(),preferred_window:z.string(),narrative:z.string()}),
 });
-export const issuanceReportSchema=z.object({snapshot:issuanceSnapshotSchema,conclusion:conclusionSchema,sellSide:sellSidePayloadSchema.nullable(),versions:z.array(financingModelVersionSchema)});
+const liquidityMetricSchema=z.object({date:z.string().date(),value_ratio:number,historical_percentile:number.min(0).max(100).nullable(),sample_count:z.number().int().nonnegative()});
+export const issuanceBusinessMetricsSchema=z.object({
+  lcr:liquidityMetricSchema.nullable(),nsfr:liquidityMetricSchema.nullable(),
+  issuer_spread:z.object({date:z.string().date(),spread_bp:nullable,outstanding_bonds:z.number().int().nonnegative(),balance_cny:number.nonnegative()}).nullable(),
+});
+export const issuanceReportSchema=z.object({snapshot:issuanceSnapshotSchema,conclusion:conclusionSchema,sellSide:sellSidePayloadSchema.nullable(),versions:z.array(financingModelVersionSchema),business_metrics:issuanceBusinessMetricsSchema.nullable().optional()});
 export type IssuanceSnapshot=z.infer<typeof issuanceSnapshotSchema>;
 export type IssuanceReport=z.infer<typeof issuanceReportSchema>;
 export const parseIssuanceReport=(value:unknown):IssuanceReport=>issuanceReportSchema.parse(value);

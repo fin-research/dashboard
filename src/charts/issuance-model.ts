@@ -14,11 +14,10 @@ export function renderIssuanceForecast(host:HTMLElement,rows:IssuanceSnapshot['f
   setChart(host,{animationDuration:180,aria:{enabled:true},tooltip:{...tooltip,trigger:'axis'},legend:{top:0,textStyle:axisLabel},
     grid:{left:12,right:16,top:45,bottom:10,containLabel:true},
     xAxis:{type:'category',data:rows.map(r=>r.date),axisLabel:{...axisLabel,formatter:(v:string)=>v.slice(5)},axisTick:{show:false}},
-    yAxis:[{type:'value',name:'票面 %',scale:true,axisLabel,splitLine:gridLine},{type:'value',name:'净节约 bp',axisLabel,splitLine:{show:false}}],
+    yAxis:{type:'value',name:'票面 %',scale:true,axisLabel,splitLine:gridLine},
     series:[{name:'预计票面',type:'line',data:rows.map(r=>r.coupon_percent),itemStyle:{color:colors.brand}},
       {name:'区间下限',type:'line',data:rows.map(r=>r.coupon_low_percent),lineStyle:{type:'dashed',opacity:.5},symbol:'none',itemStyle:{color:colors.quiet}},
-      {name:'区间上限',type:'line',data:rows.map(r=>r.coupon_high_percent),lineStyle:{type:'dashed',opacity:.5},symbol:'none',itemStyle:{color:colors.quiet}},
-      {name:'净节约',type:'bar',yAxisIndex:1,data:rows.map(r=>r.net_saving_bp),itemStyle:{color:colors.green,opacity:.4}}]});
+      {name:'区间上限',type:'line',data:rows.map(r=>r.coupon_high_percent),lineStyle:{type:'dashed',opacity:.5},symbol:'none',itemStyle:{color:colors.quiet}}]});
 }
 export function renderIssuanceMarket(host:HTMLElement,rows:IssuanceSnapshot['market_forecast']):void {
   setChart(host,{aria:{enabled:true},tooltip:{...tooltip,trigger:'axis'},grid:{left:12,right:16,top:30,bottom:10,containLabel:true},

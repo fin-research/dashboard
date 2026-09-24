@@ -577,11 +577,12 @@ test("卖方逻辑汇总编辑采用追加快照并保留检索证据", async ()
   assert.equal(revised.updatedAt, updatedAt);
 });
 
-test("融资模型页面使用票面、净节约与真实SHAP，保留人工与卖方操作", async () => {
+test("融资模型页面只展示发行建议、预测票面和真实SHAP，保留人工与卖方操作", async () => {
   const page = await readFile(new URL("../src/lib/pages/FinancingModelPage.svelte", import.meta.url), "utf8");
   assert.match(page, /parseIssuanceReport/);
-  for (const field of ["snapshot.forecast", "snapshot.market_forecast", "explanation?.features"]) assert.ok(page.includes(field));
-  for (const label of ["预计票面", "窗口净节约", "SHAP 因子贡献", "90%区间", "决策操作", "编辑整体结论", "编辑卖方逻辑汇总"]) assert.ok(page.includes(label));
+  for (const field of ["snapshot.forecast", "explanation?.features"]) assert.ok(page.includes(field));
+  for (const label of ["预测发行利率", "整体结论", "业务指标", "主体利差", "因子贡献", "90%区间", "决策操作", "编辑卖方逻辑汇总"]) assert.ok(page.includes(label));
+  assert.doesNotMatch(page, /窗口净节约|等待省钱概率|编辑整体结论/);
   assert.doesNotMatch(page, /snapshot\.(prediction|company_metrics|product_recommendation|forecast_window)/);
   assert.match(page, /renderIssuanceForecast/);
   assert.match(page, /renderFinancingDriverContributions/);

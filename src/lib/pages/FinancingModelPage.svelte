@@ -1,7 +1,6 @@
 <script lang="ts">
   import { NativeSelect } from "$lib/components/ui/native-select/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount } from "svelte";
 
@@ -9,6 +8,7 @@
 
   import {
     renderFinancingDriverContributions,
+    renderIssuanceShapRadar,
   } from "../../charts/financing-model";
   import ChartHost from "../../components/ChartHost.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
@@ -27,14 +27,17 @@
   import { globalMessages } from "$lib/global-messages";
   import { isAiRequestCancelled, useAiClient } from "$lib/ai-client.svelte";
   import { portal } from "$lib/portal";
+  import { permissionVisibility } from "$lib/permission-visibility";
   import { parseIssuanceReport as parseFinancingModelReport, type IssuanceReport as FinancingModelReport } from "$lib/issuance-model";
-  import { issuanceFeatureName, renderIssuanceForecast, renderIssuanceMarket } from "../../charts/issuance-model";
+  import { groupIssuanceShap, issuanceDecisionLabel, issuanceDecisionNarrative } from "$lib/issuance-presentation";
+  import { issuanceFeatureName, renderIssuanceForecast } from "../../charts/issuance-model";
   interface Props {
     embedded?: boolean;
   }
 
   let { embedded = false }: Props = $props();
   const aiClient = useAiClient();
+  const allowed = permissionVisibility();
 
   let report = $state<FinancingModelReport | null>(null);
   let loading = $state(true);
@@ -43,12 +46,10 @@
   let savingSellSide = $state(false);
   let savingDecision = $state(false);
   let generatingResearch = $state(false);
-  let editingConclusion = $state(false);
   let editingSellSide = $state(false);
   let editingDecision = $state(false);
   let futureWindowDetailsOpen = $state(false);
   let errorMessage = $state("");
-  let editVerdict = $state("");
   let editNarrative = $state("");
   let editSellSideSummary = $state("");
   let editDecisionRunId = "";
@@ -56,9 +57,20 @@
   let editDecisionOutcome = $state("");
   let selectedRunId = $state("");
   let decisionHistory = $state<TimingDecisionRecord[]>([]);
+  let conclusionTimer: ReturnType<typeof setTimeout> | null = null;
+  let conclusionRevision = 0;
+  let savedConclusionRevision = 0;
+  let conclusionSavePromise: Promise<boolean> | null = null;
 
+  onMount(() => {
+    void loadReport();
+    return () => clearConclusionTimer();
+  });
 
-  onMount(loadReport);
+  function clearConclusionTimer(): void {
+    if (conclusionTimer !== null) clearTimeout(conclusionTimer);
+    conclusionTimer = null;
+  }
 
   async function loadReport(): Promise<void> {
     loading = true;
@@ -92,12 +104,16 @@
   }
 
   function applyReport(nextReport: FinancingModelReport): void {
+    clearConclusionTimer();
     report = nextReport;
     selectedRunId = nextReport.snapshot.run_id;
     futureWindowDetailsOpen = false;
-    editingConclusion = false;
     editingSellSide = false;
-    resetConclusionEditor();
+    editNarrative = nextReport.conclusion.edited
+      ? nextReport.conclusion.narrative
+      : issuanceDecisionNarrative(nextReport.snapshot.decision.action) ?? nextReport.conclusion.narrative;
+    conclusionRevision = 0;
+    savedConclusionRevision = 0;
     resetSellSideEditor();
     closeDecisionEditor();
   }
@@ -107,9 +123,14 @@
     const nextRunId = (event.currentTarget as HTMLSelectElement).value;
     if (!nextRunId || nextRunId === report.snapshot.run_id) return;
     const previousRunId = report.snapshot.run_id;
-    selectedRunId = nextRunId;
     loadingVersion = true;
     try {
+      if (conclusionSavePromise) await conclusionSavePromise;
+      if (conclusionRevision > savedConclusionRevision && !(await saveConclusion())) {
+        selectedRunId = previousRunId;
+        return;
+      }
+      selectedRunId = nextRunId;
       const response = await fetch(
         `/api/financing-model?run=${encodeURIComponent(nextRunId)}`,
         { headers: { Accept: "application/json" } },
@@ -130,21 +151,14 @@
     }
   }
 
-  function resetConclusionEditor(): void {
-    if (!report) return;
-    editVerdict = report.conclusion.verdict;
-    editNarrative = report.conclusion.narrative;
+  function scheduleConclusionSave(delay = 650): void {
+    clearConclusionTimer();
+    conclusionTimer = setTimeout(() => { void saveConclusion(); }, delay);
   }
 
-  function openConclusionEditor(): void {
-    resetConclusionEditor();
-    editingConclusion = true;
-  }
-
-  function useBaseConclusion(): void {
-    if (!snapshot) return;
-    editVerdict = snapshot.decision.action;
-    editNarrative = snapshot.base_conclusion.narrative;
+  function onConclusionInput(): void {
+    conclusionRevision += 1;
+    scheduleConclusionSave();
   }
 
   function resetSellSideEditor(): void {
@@ -209,37 +223,49 @@
     }
   }
 
-  async function saveConclusion(): Promise<void> {
-    if (!report || saving) return;
-    saving = true;
-    try {
-      const response = await fetch("/api/financing-model/conclusion", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          runId: report.snapshot.run_id,
-          verdict: editVerdict,
-          preferredWindow: report.conclusion.preferredWindow,
-          narrative: editNarrative,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "整体结论保存失败");
-      const conclusion: FinancingModelConclusion = conclusionSchema.parse(payload);
-      report = { ...report, conclusion };
-      editingConclusion = false;
-      globalMessages.success("整体结论已保存", {
-        key: "financing-model-conclusion",
-        title: "保存完成",
-      });
-    } catch (error) {
-      globalMessages.error(
-        error instanceof Error ? error.message : String(error),
-        { key: "financing-model-conclusion", title: "结论保存失败" },
-      );
-    } finally {
-      saving = false;
+  async function saveConclusion(): Promise<boolean> {
+    clearConclusionTimer();
+    if (!report || !$allowed('model.conclusion:update')) return false;
+    if (conclusionSavePromise) return conclusionSavePromise;
+    if (conclusionRevision <= savedConclusionRevision) return true;
+    const text = editNarrative.trim();
+    if (!text) {
+      globalMessages.error("结论不能为空", { key: "financing-model-conclusion", title: "结论保存失败" });
+      return false;
     }
+    const runId = report.snapshot.run_id;
+    const revision = conclusionRevision;
+    const verdict = issuanceDecisionLabel(report.snapshot.decision.action) ?? report.conclusion.verdict;
+    const preferredWindow = report.conclusion.preferredWindow;
+    saving = true;
+    conclusionSavePromise = (async () => {
+      let succeeded = false;
+      try {
+        const response = await fetch("/api/financing-model/conclusion", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ runId, verdict, preferredWindow, narrative: text }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "整体结论保存失败");
+        const conclusion: FinancingModelConclusion = conclusionSchema.parse(payload);
+        if (report?.snapshot.run_id === runId) report = { ...report, conclusion };
+        savedConclusionRevision = revision;
+        succeeded = true;
+        return true;
+      } catch (error) {
+        globalMessages.error(
+          error instanceof Error ? error.message : String(error),
+          { key: "financing-model-conclusion", title: "结论保存失败" },
+        );
+        return false;
+      } finally {
+        saving = false;
+        conclusionSavePromise = null;
+        if (succeeded && conclusionRevision > savedConclusionRevision) scheduleConclusionSave(0);
+      }
+    })();
+    return conclusionSavePromise;
   }
 
   async function generateResearch(): Promise<void> {
@@ -319,7 +345,7 @@
   }
 
   function formatRatioPercent(value: number | null | undefined): string {
-    return value === null || value === undefined ? "—" : (value * 100).toFixed(1);
+    return value === null || value === undefined ? "—" : (value * 100).toFixed(2);
   }
 
   function formatDateRange(
@@ -338,6 +364,10 @@
 
   let snapshot = $derived(report?.snapshot ?? null);
   let versions = $derived(report?.versions ?? []);
+  let businessMetrics = $derived(report?.business_metrics ?? null);
+  let recommendation = $derived(snapshot ? issuanceDecisionLabel(snapshot.decision.action) : null);
+  let recommendationTone = $derived(recommendation === "尽快发行" ? "strong_buy" : recommendation === "等待" ? "neutral" : "wait");
+  let driverGroups = $derived(groupIssuanceShap(snapshot?.explanation?.features ?? []));
   let marketDrivers = $derived([...(snapshot?.explanation?.features ?? [])].sort((a,b)=>Math.abs(b.shap_bp)-Math.abs(a.shap_bp)).slice(0,8).map(row=>({feature:row.feature,display_name:issuanceFeatureName(row.feature),shap:row.shap_bp,value:row.value ?? 0,impact:row.shap_bp>0 ? "推高成本" as const : "降低成本" as const})));
   let current = $derived(snapshot?.forecast[0]);
   let validationMetrics = $derived(snapshot ? [
@@ -416,69 +446,55 @@
     </section>
   {:else if report && snapshot}
     <section id="financing-model-report" class="report-stack">
-      <section class="decision-grid" aria-label="融资窗口与整体结论">
-        <ModuleCard class="window-card" labelledBy="financing-window-title">
-          <PanelHeading id="financing-window-title" title="融资窗口" />
-          <div class="window-card-body">
-            <div class="window-decision">
-              <span class="recommendation-badge">{snapshot.decision.action}</span>
-              <h3>{snapshot.terms.tenor}年期{snapshot.terms.rating} {snapshot.terms.bond_type}</h3>
-              <MetricCard label="预计票面" value={formatNullable(current?.coupon_percent,2)} unit="%" tone="blue" compact />
-              <dl class="product-result-metrics">
-                <div><dt>窗口净节约</dt><dd>{formatNullable(snapshot.decision.expected_net_saving_bp,2)} bp</dd></div>
-                <div><dt>等待省钱概率</dt><dd>{formatRatioPercent(snapshot.decision.saving_probability)}%</dd></div>
-                <div><dt>报价日</dt><dd>{snapshot.market_source_date}</dd></div>
-              </dl>
-            </div>
+      <section class="overview-stack" aria-label="整体结论与业务指标">
+        <ModuleCard class="conclusion-card" labelledBy="overall-conclusion-title">
+          <div class="conclusion-heading-row">
+            <PanelHeading id="overall-conclusion-title" title="整体结论" />
+            {#if recommendation}
+              <span class={`recommendation-badge recommendation-badge--${recommendationTone}`}>{recommendation}</span>
+            {/if}
           </div>
+          <div class="issuance-summary">
+            <div class="issuance-product">
+              <span>债券品种</span>
+              <strong>{snapshot.terms.rating} {snapshot.terms.tenor}年期{snapshot.terms.bond_type}</strong>
+            </div>
+            <MetricCard label="预测发行利率" value={formatNullable(current?.coupon_percent, 2)} unit="%" tone="blue" compact />
+          </div>
+          <Textarea
+            data-ui-owner="lib-pages-FinancingModelPage-svelte"
+            class="conclusion-textarea"
+            aria-label="整体结论"
+            bind:value={editNarrative}
+            maxlength={4000}
+            rows={4}
+            readonly={!$allowed('model.conclusion:update')}
+            oninput={onConclusionInput}
+            onblur={() => { void saveConclusion(); }}
+          />
         </ModuleCard>
 
-        <ModuleCard class="conclusion-card" labelledBy="overall-conclusion-title">
-            <PanelHeading id="overall-conclusion-title" title="整体结论" controlsInline>
-              {#if !editingConclusion}
-                <Button permission="model.conclusion:update" data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="ghost" class={"ui-button  icon-button"} type="button" aria-label="编辑整体结论" onclick={openConclusionEditor}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17l-1 3ZM14.5 7.5l3 3" />
-                  </svg>
-                </Button>
-              {/if}
-            </PanelHeading>
-            {#if editingConclusion}
-              <form onsubmit={(event) => { event.preventDefault(); saveConclusion(); }}>
-                <label>
-                  <span>结论标题</span>
-                  <Input data-ui-owner="lib-pages-FinancingModelPage-svelte" class={"ui-input"} bind:value={editVerdict} maxlength={120} required />
-                </label>
-                <label>
-                  <span>结论正文</span>
-                  <Textarea data-ui-owner="lib-pages-FinancingModelPage-svelte" class={"ui-textarea"} bind:value={editNarrative} maxlength={4000} rows={5} required></Textarea>
-                </label>
-                <div class="editor-actions">
-                  <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="outline" class={"ui-button text-button"} type="button" onclick={useBaseConclusion}>恢复模型基础内容</Button>
-                  <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="outline" class={"ui-button secondary-button"} type="button" onclick={() => (editingConclusion = false)}>取消</Button>
-                  <Button data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={"ui-button  primary-button"} type="submit" disabled={saving}>{saving ? "保存中" : "保存"}</Button>
-                </div>
-              </form>
-            {:else}
-              <strong class="conclusion-verdict">{report.conclusion.verdict}</strong>
-              <p>{report.conclusion.narrative}</p>
-            {/if}
+        <ModuleCard class="business-card" labelledBy="business-title">
+          <PanelHeading id="business-title" title="业务指标" />
+          <div class="business-metric-grid">
+            <MetricCard label="LCR" value={formatRatioPercent(businessMetrics?.lcr?.value_ratio)} unit={businessMetrics?.lcr ? "%" : ""} tone="teal" compact
+              detail={businessMetrics?.lcr ? `${businessMetrics.lcr.historical_percentile === null ? "" : `历史P${businessMetrics.lcr.historical_percentile.toFixed(1)} · `}${businessMetrics.lcr.date}` : "—"} />
+            <MetricCard label="NSFR" value={formatRatioPercent(businessMetrics?.nsfr?.value_ratio)} unit={businessMetrics?.nsfr ? "%" : ""} tone="blue" compact
+              detail={businessMetrics?.nsfr ? `${businessMetrics.nsfr.historical_percentile === null ? "" : `历史P${businessMetrics.nsfr.historical_percentile.toFixed(1)} · `}${businessMetrics.nsfr.date}` : "—"} />
+            <MetricCard label="主体利差" value={formatNullable(businessMetrics?.issuer_spread?.spread_bp, 2)} unit={businessMetrics?.issuer_spread?.spread_bp === null || !businessMetrics?.issuer_spread ? "" : "bp"} tone="purple" compact
+              detail={businessMetrics?.issuer_spread ? `${businessMetrics.issuer_spread.date} · ${businessMetrics.issuer_spread.outstanding_bonds}只` : "—"} />
+          </div>
         </ModuleCard>
       </section>
 
-      <section class="driver-grid" aria-label="模型驱动">
-        <ModuleCard class="chart-card" labelledBy="driver-structure-title">
-          <PanelHeading id="driver-structure-title" title="市场利率路径" />
-          <ChartHost renderer={renderIssuanceMarket} args={[snapshot.market_forecast]} ariaLabel="AAA三年期市场利率预测" className="driver-radar-chart" />
-        </ModuleCard>
-        <ModuleCard class="chart-card" labelledBy="factor-contribution-title">
-          <PanelHeading id="factor-contribution-title" title="SHAP 因子贡献" />
-          <ChartHost
-            renderer={renderFinancingDriverContributions}
-            args={[marketDrivers, "coupon"]}
-            ariaLabel="当前票面预测 SHAP 因子贡献"
-            className="driver-contribution-chart"
-          />
+      <section aria-label="因子贡献">
+        <ModuleCard class="factor-panel" labelledBy="factor-contribution-title">
+          <PanelHeading id="factor-contribution-title" title="因子贡献" />
+          <div class="driver-grid">
+            <ChartHost renderer={renderIssuanceShapRadar} args={[driverGroups]} ariaLabel="票面预测因子贡献雷达图" className="driver-radar-chart" />
+            <ChartHost renderer={renderFinancingDriverContributions} args={[marketDrivers, "coupon"]}
+              ariaLabel="当前票面预测因子贡献条形图" className="driver-contribution-chart" />
+          </div>
         </ModuleCard>
       </section>
 
@@ -499,7 +515,7 @@
             <ChartHost
               renderer={renderIssuanceForecast}
               args={[snapshot.forecast]}
-              ariaLabel="未来发行票面区间与净节约"
+              ariaLabel="未来发行票面与预测区间"
               className="forecast-chart"
             />
             <div
@@ -514,8 +530,6 @@
                     <th scope="col">日期</th>
                     <th scope="col">预计票面</th>
                     <th scope="col">90%区间</th>
-                    <th scope="col">净节约</th>
-                    <th scope="col">省钱概率</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -524,8 +538,6 @@
                       <th scope="row">{displayDate(point.date)}</th>
                       <td>{formatNullable(point.coupon_percent,2)}%</td>
                       <td>{formatNullable(point.coupon_low_percent,2)}—{formatNullable(point.coupon_high_percent,2)}%</td>
-                      <td>{formatNullable(point.net_saving_bp,2)} bp</td>
-                      <td>{formatRatioPercent(point.saving_probability)}%</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -851,13 +863,6 @@
     gap: 10px;
   }
 
-  .conclusion-verdict {
-    display: block;
-    margin-top: 12px;
-    color: #173b78;
-    font-size: 1.25rem;
-  }
-
   :global(.text-button[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
     padding: 0 10px;
   }
@@ -950,16 +955,11 @@
     transform: rotate(180deg);
   }
 
-  .decision-grid,
   .driver-grid,
   .product-layout,
   .supporting-grid {
     display: grid;
     gap: 16px;
-  }
-
-  .decision-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .driver-grid {
@@ -1050,11 +1050,66 @@
     border-color: color-mix(in srgb, var(--brand) 28%, var(--line));
   }
 
-  :global(.conclusion-card) .conclusion-verdict {
-    margin-top: 4px;
+  .overview-stack {
+    display: grid;
+    gap: 16px;
+  }
+
+  .conclusion-heading-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .conclusion-heading-row :global(.tr-panel-heading) {
+    margin-bottom: 0;
+  }
+
+  .issuance-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+    gap: 14px;
+  }
+
+  .issuance-product {
+    display: grid;
+    align-content: center;
+    gap: 6px;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-inner);
+    background: color-mix(in srgb, var(--brand-soft) 28%, var(--surface));
+  }
+
+  .issuance-product span {
+    color: var(--text-2);
+    font-size: 0.875rem;
+  }
+
+  .issuance-product strong {
+    font-size: 1.25rem;
+    font-weight: bold;
+  }
+
+  :global(.conclusion-textarea[data-ui-owner="lib-pages-FinancingModelPage-svelte"]) {
+    width: 100%;
+    min-height: 112px;
+    resize: vertical;
+    line-height: 1.65;
+    background: var(--surface);
+  }
+
+  :global(.conclusion-textarea[data-ui-owner="lib-pages-FinancingModelPage-svelte"]:read-only) {
+    cursor: default;
+    border-color: var(--border-color);
   }
 
   .report-stack :global(.chart-card) {
+    min-width: 0;
+  }
+
+  .report-stack :global(.factor-panel) {
     min-width: 0;
   }
 
@@ -1193,7 +1248,6 @@
 
   .forecast-table {
     width: 100%;
-    min-width: 680px;
     border-collapse: collapse;
     font-variant-numeric: tabular-nums;
   }
@@ -1495,7 +1549,6 @@
       justify-content: flex-end;
     }
 
-    .decision-grid,
     .driver-grid,
     .product-layout,
     .supporting-grid {
@@ -1550,6 +1603,10 @@
     min-height: 220px;
     }
 
+    .issuance-summary {
+      grid-template-columns: 1fr;
+    }
+
     .window-decision {
       justify-items: start;
       text-align: left;
@@ -1591,7 +1648,6 @@
     min-height: 64px;
     }
 
-    .decision-grid,
     .driver-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }

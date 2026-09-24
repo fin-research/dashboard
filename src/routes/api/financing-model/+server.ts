@@ -1,4 +1,6 @@
 import { loadIssuanceModelReport } from "$lib/server/issuance-model-repository";
+import { loadIssuanceBusinessMetrics } from "$lib/server/issuance-business-metrics";
+import { issuanceReportSchema } from "$lib/issuance-model";
 import { z } from "zod";
 
 import {
@@ -16,7 +18,22 @@ export const GET: RequestHandler = async ({ platform, url }) => {
     const report = await withPostgres(
       platform?.env.HYPERDRIVE?.connectionString,
       "eastmoney-financing-model-read",
-      (client) => loadIssuanceModelReport(client, runId),
+      async (client) => {
+        const base = await loadIssuanceModelReport(client, runId);
+        try {
+          const businessMetrics = await loadIssuanceBusinessMetrics(
+            client, base.snapshot.terms.issuer, base.snapshot.market_source_date,
+          );
+          return issuanceReportSchema.parse({ ...base, business_metrics: businessMetrics });
+        } catch (error) {
+          console.error(JSON.stringify({
+            event: "financing_model_business_metrics_read_failed",
+            runId: base.snapshot.run_id,
+            error: error instanceof Error ? error.message : String(error),
+          }));
+          return { ...base, business_metrics: null };
+        }
+      },
     );
     return Response.json(report, {
       headers: { "Cache-Control": "no-store" },
