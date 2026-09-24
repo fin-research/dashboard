@@ -68,7 +68,7 @@ test('交易管理标签悬浮时保持连续的冷灰顶栏', async ({ page }, 
 test('普通页与报告页共用冷灰顶栏和深色导航', async ({ page }, testInfo) => {
   await mockResources(page);
   let reference;
-  for (const url of ['/trading-research', '/credit-workbench', '/credit-workbench/weekly', '/trading-research/financing-model', '/financing/schedule', '/management/messenger']) {
+  for (const url of ['/trading-research', '/credit-workbench', '/credit-workbench/weekly', '/trading-research/financing-model', '/financing/', '/financing/schedule', '/management/messenger']) {
     await page.goto(url);
     const mobile = testInfo.project.name === 'mobile';
     const toggle = page.getByRole('button', { name: mobile ? '打开导航菜单' : '折叠侧边导航', exact: true });
@@ -111,6 +111,8 @@ test('普通页与报告页共用冷灰顶栏和深色导航', async ({ page }, 
     expect(appearance.icon.color, url).toBe('rgb(255, 255, 255)');
     expect(appearance.link.backgroundColor, url).toBe('rgb(47, 111, 214)');
     expect(appearance.marker, url).toBe('none');
+    const inactive = page.locator('.tr-drawer__nav a:not(.active)').first();
+    if (await inactive.count()) await expect(inactive, url).toHaveCSS('color', 'rgb(216, 224, 233)');
     if (reference) expect(appearance, url).toEqual(reference);
     else reference = appearance;
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBe(true);

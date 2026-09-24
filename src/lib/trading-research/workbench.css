@@ -178,7 +178,7 @@ body:has(.tr-workbench) {
   overflow-y: auto;
 }
 
-.tr-drawer__nav a {
+.tr-workbench .tr-drawer__nav a {
   position: relative;
   display: flex;
   min-height: 48px;
@@ -192,12 +192,12 @@ body:has(.tr-workbench) {
   transition: color var(--tr-motion), border-color var(--tr-motion), background var(--tr-motion);
 }
 
-.tr-drawer__nav a:hover {
+.tr-workbench .tr-drawer__nav a:hover {
   color: #ffffff;
   background: var(--tr-nav-hover);
 }
 
-.tr-drawer__nav a.active {
+.tr-workbench .tr-drawer__nav a.active {
   color: #ffffff;
   border-color: var(--tr-nav-active);
   background: var(--tr-nav-active);
