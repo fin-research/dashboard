@@ -25,9 +25,9 @@
     try {
       if(!file.name.toLowerCase().endsWith('.xlsx')||file.size>10*1024*1024)throw new Error('请选择不超过 10 MB 的 .xlsx 文件');
       const data=await file.arrayBuffer();
-      const parsed=await new Promise<ImportCommit>((resolve,reject)=>{
+      const {parsed,warnings}=await new Promise<{parsed:ImportCommit;warnings:string[]}>((resolve,reject)=>{
         worker=new Worker(new URL('./debt-import.worker.js',import.meta.url),{type:'module'});
-        worker.onmessage=({data})=>{worker?.terminate();worker=null;data.type==='complete'?resolve(data.transformed):reject(new Error(data.message));};
+        worker.onmessage=({data})=>{worker?.terminate();worker=null;data.type==='complete'?resolve({parsed:data.transformed,warnings:data.warnings??[]}):reject(new Error(data.message));};
         worker.onerror=(event)=>{worker?.terminate();worker=null;reject(new Error(event.message||'工作簿解析失败'));};
         worker.postMessage({workbookData:data,fileName:file!.name},[data]);
       });
@@ -37,6 +37,7 @@
       phase='提交中';
       const result=await post(increment);
       globalMessages.success(`新增 ${result.insertedDebtCount} 笔负债、${result.insertedCashflowCount} 笔现金流；保留 ${result.skippedDebtCount} 笔历史负债`,{title:'导入完成',duration:0});
+      for(const warning of warnings)globalMessages.warning(warning,{title:'导入提示',duration:0});
       for(const warning of result.warnings??[])globalMessages.warning(warning,{title:'历史数据待核对',duration:0});
       file=null;if(input)input.value='';
     } catch(error) {
