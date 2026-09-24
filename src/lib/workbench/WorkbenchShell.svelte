@@ -144,4 +144,4 @@
   </section>
 </div>
 
-<style>.nav-divider { margin: 12px 8px; border-top: 1px solid var(--border-color); }</style>
+<style>.nav-divider { margin: 12px 8px; border-top: 1px solid var(--tr-sidebar-divider); }</style>

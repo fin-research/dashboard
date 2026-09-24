@@ -4,7 +4,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg-page);
+  background: var(--bg-card);
 }
 
 body:has(.tr-workbench) {
@@ -15,13 +15,18 @@ body:has(.tr-workbench) {
   margin: 0;
   overflow: hidden;
   color: #172033;
-  background: var(--bg-page);
+  background: var(--bg-card);
   font-family: var(--font);
   line-height: 1.5;
 }
 
 .tr-workbench {
-  --tr-page: var(--bg-page);
+  --tr-page: var(--bg-card);
+  --tr-header: #edf0f3;
+  --tr-sidebar: #202a38;
+  --tr-nav-hover: #344052;
+  --tr-nav-active: var(--tr-primary);
+  --tr-sidebar-divider: rgba(255, 255, 255, 0.12);
   --tr-surface: var(--bg-card);
   --tr-surface-muted: var(--panel);
   --tr-primary: var(--color-primary);
@@ -137,8 +142,8 @@ body:has(.tr-workbench) {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  border-right: 1px solid var(--tr-border);
-  background: var(--tr-surface);
+  border-right: 1px solid var(--tr-sidebar);
+  background: var(--tr-sidebar);
 }
 
 .tr-sidebar-toggle,
@@ -173,7 +178,7 @@ body:has(.tr-workbench) {
   overflow-y: auto;
 }
 
-.tr-drawer__nav a {
+.tr-workbench .tr-drawer__nav a {
   position: relative;
   display: flex;
   min-height: 48px;
@@ -182,20 +187,20 @@ body:has(.tr-workbench) {
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: var(--tr-nav-radius);
-  color: var(--tr-text-2);
+  color: #d8e0e9;
   text-decoration: none;
   transition: color var(--tr-motion), border-color var(--tr-motion), background var(--tr-motion);
 }
 
-.tr-drawer__nav a:hover {
-  color: var(--tr-primary-deep);
-  background: var(--tr-primary-soft);
+.tr-workbench .tr-drawer__nav a:hover {
+  color: #ffffff;
+  background: var(--tr-nav-hover);
 }
 
-.tr-drawer__nav a.active {
-  color: var(--tr-primary-deep);
-  border-color: color-mix(in srgb, var(--tr-primary) 26%, var(--tr-border));
-  background: var(--tr-primary-soft);
+.tr-workbench .tr-drawer__nav a.active {
+  color: #ffffff;
+  border-color: var(--tr-nav-active);
+  background: var(--tr-nav-active);
   font-weight: bold;
 }
 
@@ -205,7 +210,11 @@ body:has(.tr-workbench) {
   height: 24px;
   flex: 0 0 24px;
   place-items: center;
-  color: var(--tr-primary-deep);
+  color: #b9c5d3;
+}
+
+.tr-drawer__nav a:is(:hover, .active) .tr-nav-icon {
+  color: #ffffff;
 }
 
 .tr-nav-icon svg {
@@ -241,6 +250,7 @@ body:has(.tr-workbench) {
 
 .tr-workspace {
   grid-area: workspace;
+  background: var(--tr-surface);
   height: 100%;
   min-width: 0;
   min-height: 0;
