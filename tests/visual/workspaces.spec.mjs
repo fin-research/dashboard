@@ -17,7 +17,9 @@ test.afterEach(() => {
 async function screenshot(page, name) {
   if (name !== 'credit-error') await expect(page.getByRole('alert')).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot(`${name}.png`, { fullPage: true });
+  const target = name === 'home' ? page : name === 'market-report'
+    ? page.locator('#visual-report-panel') : page.locator('.tr-workspace');
+  await expect(target).toHaveScreenshot(`${name}.png`);
 }
 
 const scenes = [

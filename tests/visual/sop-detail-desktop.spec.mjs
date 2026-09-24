@@ -34,7 +34,7 @@ test('desktop SOP opens node dialog and cancels keyboard sorting cleanly',async(
  const moved=page.getByRole('button',{name:'拖拽排序 材料准备与内部审批，当前第 2 项',exact:true});
  await expect(moved).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('.node-card.dragging')).toHaveCount(1);
- await expect(page).toHaveScreenshot('sop-keyboard-sort-desktop.png',{fullPage:true});
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('sop-keyboard-sort-desktop.png');
  await moved.press('Escape');await expect(first).toHaveAttribute('aria-pressed','false');
  const add=page.getByRole('button',{name:'添加流程节点',exact:true});
  await add.click();const dialog=page.getByRole('dialog',{name:'添加流程节点',exact:true});
@@ -55,7 +55,7 @@ test('desktop reminder history supports pagination filters and empty recovery',a
  await page.goto('/financing/sop/reminders');
  await expect(page.locator('.history-row')).toHaveCount(4);
  await expect(page.getByRole('link',{name:'查看投递',exact:true})).toHaveAttribute('href','/management/messenger?id=fixture-message-0');
- await expect(page).toHaveScreenshot('reminder-history-desktop.png',{fullPage:true});
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('reminder-history-desktop.png');
  await page.getByRole('button',{name:'加载更多',exact:true}).click();
  await expect(page.locator('.history-row')).toHaveCount(5);
  await expect(page.getByRole('button',{name:'加载更多',exact:true})).toHaveCount(0);
@@ -65,7 +65,7 @@ test('desktop reminder history supports pagination filters and empty recovery',a
  await page.getByRole('textbox',{name:'提醒关键词',exact:true}).fill('不存在的提醒');
  await page.getByRole('button',{name:'查询',exact:true}).click();
  await expect(page.getByText('没有匹配的提醒记录',{exact:true})).toBeVisible();
- await expect(page).toHaveScreenshot('reminder-empty-desktop.png');
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('reminder-empty-desktop.png');
  await page.getByRole('link',{name:'清除',exact:true}).click();
  await expect(page.locator('.history-row')).toHaveCount(4);
 });

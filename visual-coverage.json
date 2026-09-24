@@ -44,7 +44,8 @@
         "credit",
         "calendar",
         "credit-weekly",
-        "credit-assistant"
+        "credit-assistant",
+        "sidebar-credit"
       ]
     },
     {
@@ -55,7 +56,8 @@
       "source": "src/routes/financing/+page.svelte",
       "scenarios": [
         "financing-dashboard",
-        "financing-calendar"
+        "financing-calendar",
+        "sidebar-financing"
       ]
     },
     {
@@ -119,7 +121,8 @@
     {
       "source": "src/routes/fund-report/+page.svelte",
       "scenarios": [
-        "fund-report-header"
+        "fund-report-header",
+        "header-fund-report-actions"
       ]
     },
     {
@@ -129,7 +132,8 @@
     {
       "source": "src/routes/management/me/+page.svelte",
       "scenarios": [
-        "management-me"
+        "management-me",
+        "sidebar-management"
       ]
     },
     {
@@ -197,7 +201,8 @@
     {
       "source": "src/routes/trading-research/+page.svelte",
       "scenarios": [
-        "overview"
+        "overview",
+        "sidebar-trading"
       ]
     },
     {
@@ -292,7 +297,7 @@
       "id": "trading",
       "url": "/trading-research/trading",
       "kind": "screenshot",
-      "state": "交易管理的交易记录标签选中，标签间无白缝，悬浮标签融入冷灰顶栏；桌面1280宽筛选排序后末列可见",
+      "state": "交易管理工作区；独立顶栏标签、悬浮态及侧栏证据",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -307,12 +312,23 @@
         },
         {
           "spec": "tests/visual/page-layout.spec.mjs",
-          "test": "交易管理标签悬浮时保持连续的冷灰顶栏",
+          "test": "交易管理标签悬浮时保持连续的白色顶栏",
           "projects": [
             "desktop"
           ],
           "snapshots": [
             "trading-tabs-hover.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "带标签或附加操作的顶栏分别截图",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "header-trading-tabs.png"
           ]
         }
       ]
@@ -344,6 +360,17 @@
             "workflow-inquiry-labels-desktop.png",
             "workflow-node-editor-desktop.png",
             "workflow-node-settings-desktop.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "带标签或附加操作的顶栏分别截图",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "header-workflow-actions.png"
           ]
         }
       ]
@@ -500,6 +527,17 @@
           "snapshots": [
             "market-report.png"
           ]
+        },
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "带标签或附加操作的顶栏分别截图",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "header-market-tabs.png"
+          ]
         }
       ]
     },
@@ -626,6 +664,17 @@
           "snapshots": [
             "messenger-test-single.png",
             "messenger-test-bulk.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "带标签或附加操作的顶栏分别截图",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "header-management-tabs.png"
           ]
         }
       ]
@@ -836,7 +885,7 @@
     {
       "id": "fund-report-header",
       "url": "/fund-report",
-      "kind": "screenshot",
+      "kind": "interaction",
       "state": "单面页面无标签，跨板块标题字体一致",
       "evidence": [
         {
@@ -845,9 +894,6 @@
           "projects": [
             "desktop",
             "mobile"
-          ],
-          "snapshots": [
-            "fund-report-header.png"
           ]
         }
       ]
@@ -923,18 +969,15 @@
     {
       "id": "workbench-navigation",
       "url": "/management/messenger",
-      "kind": "screenshot",
-      "state": "普通页与报告页共享冷灰顶栏、深色侧栏及白色工作区；导航折叠和标签切换",
+      "kind": "interaction",
+      "state": "普通页与报告页共享白色顶栏、淡色工作区和深色导航；各一级工作台侧栏另行截图",
       "evidence": [
         {
           "spec": "tests/visual/page-layout.spec.mjs",
-          "test": "普通页与报告页共用冷灰顶栏和深色导航",
+          "test": "普通页与报告页共用白色顶栏和深色导航",
           "projects": [
             "desktop",
             "mobile"
-          ],
-          "snapshots": [
-            "workbench-navigation.png"
           ]
         }
       ]
@@ -1327,6 +1370,17 @@
             "financing-quota-desktop.png",
             "financing-simulation-desktop.png"
           ]
+        },
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "带标签或附加操作的顶栏分别截图",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "header-financing-actions.png"
+          ]
         }
       ]
     },
@@ -1363,6 +1417,101 @@
           ],
           "snapshots": [
             "verification-notice-desktop.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sidebar-trading",
+      "url": "/trading-research",
+      "kind": "screenshot",
+      "state": "一级工作台侧栏独立取景与当前选中项",
+      "evidence": [
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "普通页与报告页共用白色顶栏和深色导航",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "sidebar-trading.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sidebar-credit",
+      "url": "/credit-workbench",
+      "kind": "screenshot",
+      "state": "一级工作台侧栏独立取景与当前选中项",
+      "evidence": [
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "普通页与报告页共用白色顶栏和深色导航",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "sidebar-credit.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sidebar-financing",
+      "url": "/financing/",
+      "kind": "screenshot",
+      "state": "一级工作台侧栏独立取景与当前选中项",
+      "evidence": [
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "普通页与报告页共用白色顶栏和深色导航",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "sidebar-financing.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sidebar-management",
+      "url": "/management/me",
+      "kind": "screenshot",
+      "state": "一级工作台侧栏独立取景与当前选中项",
+      "evidence": [
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "普通页与报告页共用白色顶栏和深色导航",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "sidebar-management.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "header-fund-report-actions",
+      "url": "/fund-report",
+      "kind": "screenshot",
+      "state": "资金日报附加操作顶栏独立取景",
+      "evidence": [
+        {
+          "spec": "tests/visual/page-layout.spec.mjs",
+          "test": "带标签或附加操作的顶栏分别截图",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "header-fund-report-actions.png"
           ]
         }
       ]
