@@ -16,10 +16,12 @@ test('JSON import rejects missing permission, foreign origin, wrong encoding and
  assert.equal((await POST(event({}, {locals:{permissions:[]}}))).status,403);
  assert.equal((await POST(event({}, {request:new Request('https://example.test/financing/data/import',{method:'POST',headers:{origin:'https://foreign.test','content-type':'application/json'},body:'{}'})}))).status,403);
  assert.equal((await POST(event({}, {request:new Request('https://example.test/financing/data/import',{method:'POST',headers:{origin:'https://example.test','content-type':'application/octet-stream'},body:'test'})}))).status,415);
- const response=await POST(event({action:'commit'}));assert.equal(response.status,400);assert.match((await response.json()).error,/整个导入已拒绝/);
+ const response=await POST(event({action:'commit'}));assert.equal(response.status,400);assert.match((await response.json()).error,/导入数据格式无效/);
+ const oversizedIndex=await POST(event({action:'index',identities:[{sourceKey:'old'}]}));
+ assert.equal(oversizedIndex.status,400);
 });
 test('connection failures are sanitized and do not claim that a possibly committed request was rolled back',async()=>{
- const request=event({action:'plan',snapshot:{asOfDate:'2026-09-04',totalYi:1},identities:[{sourceKey:'a',table:'debt',debtType:'同业拆借',name:'测试'}]});
+ const request=event({action:'index'});
  request.locals.database={query:async()=>{throw new Error('secret-database-host and credentials');}};
  const response=await POST(request);assert.equal(response.status,503);
  const result=await response.json();assert.match(result.error,/无法确认/);assert.doesNotMatch(result.error,/secret|未写入/);

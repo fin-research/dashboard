@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as XLSX from 'xlsx/xlsx.mjs';
 import { parseDebtWorkbookData } from '../../scripts/financing/lib/excel-import.mjs';
 import { transformWorkbook } from '../../scripts/financing/lib/debt-transform.mjs';
-import { validateWorkbook, validateIncrement, incrementForPlan, balanceKey } from '../../src/lib/financing/debt-import-json.ts';
+import { validateWorkbook, validateIncrement, incrementForIndex, balanceKey } from '../../src/lib/financing/debt-import-json.ts';
 
 function workbookFixture() {
 	const workbook = XLSX.utils.book_new();
@@ -121,14 +121,22 @@ test('failed issues and recognized narrative rows are skipped with counts', () =
 });
 
 
-test('browser increment excludes stored business records while retaining the complete identity manifest',()=>{
+test('browser compares the downloaded index and uploads only candidate additions',()=>{
  const workbook=validateWorkbook(transformWorkbook(parseDebtWorkbookData(workbookFixture(),'借入资金汇总表20260903.xlsx')));
  const old=workbook.debts[0];
  const newDebt={...old,sourceKey:'new-debt',name:'新增借款',amount:20};
  const parsed=validateWorkbook({...workbook,debts:[old,newDebt],cashflows:[{sourceKey:old.sourceKey,cashflowType:'principal',dueDate:'2026-09-03',amount:100},{sourceKey:newDebt.sourceKey,cashflowType:'principal',dueDate:'2026-09-03',amount:20}]});
- const increment=incrementForPlan(parsed,{version:'verified',newKeys:['new-debt'],balanceKeys:parsed.balances.map(balanceKey)});
- assert.equal(increment.identities.length,2);assert.deepEqual(increment.debts,[newDebt]);
+ const index={version:'verified',debts:[old],balanceKeys:parsed.balances.map(balanceKey)};
+ const increment=incrementForIndex(parsed,index);
+ assert.deepEqual(increment.debts,[newDebt]);assert.equal('identities' in increment,false);
  assert.deepEqual(increment.cashflows.map(c=>c.sourceKey),['new-debt']);assert.equal(increment.balances.length,0);
  assert.equal(increment.snapshotBalances.length,10);
- assert.throws(()=>incrementForPlan(parsed,{version:'verified',newKeys:['unknown'],balanceKeys:[]}),/无效负债/);
+ assert.throws(()=>incrementForIndex(parsed,{...index,version:''}));
+ const corrected={...old,sourceKey:'corrected',maturityDate:'2027-09-02'};
+ const related=validateWorkbook({...parsed,debts:[old,corrected],cashflows:[]});
+ assert.deepEqual(incrementForIndex(related,index).debts.map(d=>d.sourceKey),[old.sourceKey,'corrected']);
+ const swap={...old,sourceKey:'swap',table:'swap_facility',debtType:'互换便利',name:'互换便利·2026-09-01',legacyName:'互换便利·2026-09-01',subtype:null};
+ const withSwap=validateWorkbook({...parsed,debts:[old,swap],cashflows:[]});
+ assert.deepEqual(incrementForIndex(withSwap,{...index,debts:[old,swap]}).debts,[]);
+ assert.deepEqual(incrementForIndex(withSwap,{...index,debts:[old,{...swap,issueDate:'2026-08-31'}]}).debts.map(d=>d.sourceKey),['swap']);
 });

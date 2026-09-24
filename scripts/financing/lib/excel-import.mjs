@@ -412,7 +412,7 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 			blankrows: true
 		});
 		const header = findHeaderRow(rows);
-		if (!header) throw new Error(`工作表 ${sheetName} 无法识别表头，整个导入已拒绝`);
+		if (!header) throw new Error(`工作表 ${sheetName} 无法识别表头`);
 		sheetCount += 1;
 		const headers = rows[header.index];
 		const averageRepoBalanceColumn = sheetName === '互换便利'
@@ -487,7 +487,7 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 
 			if (!parent) {
 				if(row.filter(value=>text(value)!==null).every(value=>/^(合计|总计|小计|备注|说明)([：:].*)?$/u.test(String(value)))){skipped+=1;continue;}
-				throw new Error(`工作表 ${sheetName} 第 ${sourceRow} 行无法关联负债，整个导入已拒绝`);
+				throw new Error(`工作表 ${sheetName} 第 ${sourceRow} 行无法关联负债`);
 			}
 			const values = Array(DEBT_FIELD_COLUMNS.length).fill(null);
 			for (const field of fieldValuesForRow(sheet, sourceRow, headers, bounds.maxColumn)) {

@@ -6,7 +6,8 @@ import { PGlite } from '@electric-sql/pglite';
 import { loadCreditReport, persistCreditWorkbook, saveCreditInstitution } from '../src/lib/server/credit-repository.ts';
 import { creditInstitutionUpdateSchema } from '../src/lib/credit/update.ts';
 import { creditItemTypes } from '../src/lib/credit/types.ts';
-import { importDebtWorkbook } from '../src/lib/server/financing/debt-importer.js';
+import { importDebtWorkbook, readDebtImportIndex } from '../src/lib/server/financing/debt-importer.js';
+import { clientFromDebtCounterparty } from '../src/lib/financing/debt-import-client.js';
 import { listClients, saveClient } from '../src/lib/server/financing/clients.ts';
 import { transformWorkbook } from '../scripts/financing/lib/debt-transform.mjs';
 
@@ -314,27 +315,59 @@ test('alias migration removes redundant exact and regex rules, keeps ownership e
 });
 
 
-test('unknown client rejects all new debts, cashflows, balances and derivatives',async t=>{
+test('new branch customers are created and linked in the import transaction',async t=>{
  const db=await database(t);
- const payload={snapshot:{asOfDate:'2026-09-04',totalYi:1},debts:[
- {sourceKey:'a',table:'debt',debtType:'同业拆借',name:'有效',counterparty:'招商银行',amount:100000000,interestPayable:0,extension:{}},
- {sourceKey:'b',table:'debt',debtType:'同业拆借',name:'无效',counterparty:'未登记银行',amount:1,interestPayable:0,extension:{}}],
- cashflows:[{sourceKey:'a',cashflowType:'principal',dueDate:'2026-09-10',amount:100000000}],
- balances:[{asOfDate:'2026-09-04',debtType:'同业拆借',subtype:'',amount:100000000}]};
- await assert.rejects(importDebtWorkbook(db,payload),/整个导入已拒绝.*未登记银行/);
- for(const table of ['debt','cashflow','balance_snapshot'])assert.equal((await db.query(`SELECT count(*) n FROM financing.${table}`)).rows[0].n,0);
+ const names=['营业部大客户-厦门东昂科技股份有限公司','营业部大客户-广电运通集团股份有限公司'];
+ const payload={snapshot:{asOfDate:'2026-09-04',totalYi:1},debts:names.map((counterparty,i)=>({
+  sourceKey:`branch-${i}`,table:'debt',debtType:'同业拆借',name:`新增-${i}`,counterparty,amount:50000000,interestPayable:0,extension:{}})),
+ cashflows:[],balances:[{asOfDate:'2026-09-04',debtType:'同业拆借',subtype:'',amount:100000000}]};
+ const result=await importDebtWorkbook(db,payload);
+ assert.equal(result.insertedDebtCount,2);assert.equal(result.createdClientCount,2);
+ assert.deepEqual(result.unlinkedClientNames,[]);
+ const linked=(await db.query(`SELECT c.name,c.type FROM financing.debt d JOIN public.client c ON c.id=d.client_id ORDER BY c.name`)).rows;
+ assert.deepEqual(linked,[
+  {name:'厦门东昂科技股份有限公司',type:'营业部客户'},
+  {name:'广电运通集团股份有限公司',type:'营业部客户'}
+ ]);
+ assert.equal((await importDebtWorkbook(db,payload)).createdClientCount,0);
+ assert.equal((await db.query('SELECT count(*) n FROM public.client WHERE type=$1',['营业部客户'])).rows[0].n,2);
+ assert.deepEqual(clientFromDebtCounterparty('营业部大客户-某某公司（代表“某某1号资金信托计划”）'),
+  {name:'某某1号资金信托计划',fullname:null,type:'营业部客户',subtype:null});
+ assert.equal(clientFromDebtCounterparty('营业部大客户新客户有限公司').name,'新客户有限公司');
 });
 
-test('increment plan is read only, commit rejects missing additions and stale versions, exact retry is idempotent',async t=>{
+test('failed business validation rolls back automatically created customers',async t=>{
+ const db=await database(t);
+ const payload={snapshot:{asOfDate:'2026-09-04',totalYi:2},debts:[{
+  sourceKey:'new',table:'debt',debtType:'同业拆借',name:'测试',counterparty:'营业部大客户-新客户有限公司',amount:100000000,interestPayable:0,extension:{}
+ }],cashflows:[],balances:[{asOfDate:'2026-09-04',debtType:'同业拆借',subtype:'',amount:100000000}]};
+ await assert.rejects(importDebtWorkbook(db,payload),/余额核对失败/);
+ assert.equal((await db.query("SELECT count(*) n FROM public.client WHERE name='新客户有限公司'")).rows[0].n,0);
+ assert.equal((await db.query('SELECT count(*) n FROM financing.debt')).rows[0].n,0);
+});
+
+test('ambiguous customers leave one new debt unlinked without rejecting the import',async t=>{
+ const db=await database(t);
+ await db.exec("INSERT INTO public.client(name,type) VALUES('测试银行','银行'),('测试银行股份有限公司','银行')");
+ const payload={snapshot:{asOfDate:'2026-09-04',totalYi:1},debts:[{
+  sourceKey:'ambiguous',table:'debt',debtType:'同业拆借',name:'测试',counterparty:'银行-测试银行',amount:100000000,interestPayable:0,extension:{}
+ }],cashflows:[],balances:[{asOfDate:'2026-09-04',debtType:'同业拆借',subtype:'',amount:100000000}]};
+ const result=await importDebtWorkbook(db,payload);
+ assert.equal(result.insertedDebtCount,1);assert.equal(result.createdClientCount,0);
+ assert.deepEqual(result.unlinkedClientNames,['银行-测试银行']);
+ assert.match(result.warnings.join(' '),/未能唯一关联/);
+ assert.equal((await db.query("SELECT client_id FROM financing.debt WHERE name='测试'")).rows[0].client_id,null);
+});
+
+test('downloaded index is read only, stale versions fail, and a retry is idempotent',async t=>{
  const db=await database(t);
  const payload={snapshot:{asOfDate:'2026-09-04',totalYi:1},debts:[{sourceKey:'a',table:'debt',debtType:'同业拆借',name:'测试',counterparty:'招商银行',amount:100000000,interestPayable:0,extension:{}}],cashflows:[],balances:[{asOfDate:'2026-09-04',debtType:'同业拆借',subtype:'',amount:100000000}]};
- const plan=await importDebtWorkbook(db,payload,{planOnly:true});assert.deepEqual(plan.newKeys,['a']);
+ const index=await readDebtImportIndex(db);assert.equal(index.debts.length,0);
  assert.equal((await db.query('SELECT count(*) n FROM financing.debt')).rows[0].n,0);
- await assert.rejects(importDebtWorkbook(db,payload,{expectedVersion:plan.version,expectedNewKeys:[]}),/核对结果不一致/);
- const result=await importDebtWorkbook(db,payload,{expectedVersion:plan.version,expectedNewKeys:['a']});assert.equal(result.insertedDebtCount,1);
- await assert.rejects(importDebtWorkbook(db,payload,{expectedVersion:plan.version,expectedNewKeys:['a']}),/台账已发生变化/);
- const again=await importDebtWorkbook(db,payload,{planOnly:true});assert.deepEqual(again.newKeys,[]);
- const repeat=await importDebtWorkbook(db,{...payload,balances:[],snapshotBalances:payload.balances},{expectedVersion:again.version,expectedNewKeys:[]});assert.equal(repeat.insertedDebtCount,0);
+ const result=await importDebtWorkbook(db,payload,{expectedVersion:index.version});assert.equal(result.insertedDebtCount,1);
+ await assert.rejects(importDebtWorkbook(db,payload,{expectedVersion:index.version}),/台账已发生变化/);
+ const again=await readDebtImportIndex(db);assert.equal(again.debts.length,1);
+ const repeat=await importDebtWorkbook(db,{...payload,balances:[],snapshotBalances:payload.balances},{expectedVersion:again.version});assert.equal(repeat.insertedDebtCount,0);
 });
 
 test('Tianjin Binhai alias resolves both new imports and previously unlinked records',async t=>{

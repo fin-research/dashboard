@@ -1,8 +1,12 @@
 // @ts-nocheck
 import { DebtImportError } from '../../financing/debt-import-error.ts';
 import { balanceKey } from '../../financing/debt-import-json.ts';
+import { clientFromDebtCounterparty } from '../../financing/debt-import-client.js';
 
 const IMPORT_BATCH_SIZE = 1_000;
+const versionSql = `SELECT
+  (SELECT md5(COALESCE(string_agg(id::text || ':' || updated_at::text, ',' ORDER BY id), '')) FROM financing.debt) || ':' ||
+  (SELECT md5(COALESCE(string_agg(as_of_date::text || ':' || debt_type || ':' || subtype || ':' || amount::text, ',' ORDER BY as_of_date,debt_type,subtype), '')) FROM financing.balance_snapshot) AS version`;
 
 const commonColumns = [
 	'id', 'debt_type', 'subtype', 'name', 'counterparty', 'amount', 'interest_payable',
@@ -75,11 +79,31 @@ function workbookSnapshot(transformed) {
 	};
 }
 
+/** Send the current database identity index to the browser; no workbook rows are uploaded. */
+export async function readDebtImportIndex(database) {
+	await database.query('BEGIN');
+	try {
+		await database.query("SELECT pg_advisory_xact_lock(hashtext('financing.local_debt_maintenance'))");
+		const version = (await database.query(versionSql)).rows[0].version;
+		const debts = (await database.query(`SELECT d.debt_type AS "debtType", d.subtype,
+			d.name, d.counterparty, d.issue_date::text AS "issueDate",
+			d.maturity_date::text AS "maturityDate",
+			replace(d.tableoid::regclass::text, 'financing.', '') AS "table"
+			FROM financing.debt d ORDER BY d.id`)).rows;
+		const balances = (await database.query('SELECT as_of_date::text AS "asOfDate",debt_type AS "debtType",subtype FROM financing.balance_snapshot')).rows;
+		await database.query('ROLLBACK');
+		return { version, debts, balanceKeys: balances.map(balanceKey) };
+	} catch (error) {
+		await database.query('ROLLBACK').catch(() => {});
+		throw error;
+	}
+}
+
 /**
  * Applies one parsed workbook to the financing base tables in one transaction.
  * @param {any} database
  * @param {any} transformed
- * @param {{rollback?:boolean,refreshDerivatives?:boolean,onStage?:(stage:any)=>Promise<void>,planOnly?:boolean,expectedVersion?:string|null,expectedNewKeys?:string[]|null}} options
+ * @param {{rollback?:boolean,refreshDerivatives?:boolean,onStage?:(stage:any)=>Promise<void>,expectedVersion?:string|null}} options
  * Existing records are matched by stable business identity and left unchanged; records
  * that exist only online are retained.
  */
@@ -87,17 +111,15 @@ export async function importDebtWorkbook(database, transformed, {
 	rollback = false,
 	refreshDerivatives = false,
 	onStage = async () => {},
-	planOnly = false, expectedVersion = null, expectedNewKeys = null
+	expectedVersion = null
 } = {}) {
 	const snapshot = workbookSnapshot(transformed);
 	await database.query('BEGIN');
 	try {
 		await database.query("SELECT pg_advisory_xact_lock(hashtext('financing.local_debt_maintenance'))");
-		const versionResult = await database.query(`SELECT
-      (SELECT md5(COALESCE(string_agg(id::text || ':' || updated_at::text, ',' ORDER BY id), '')) FROM financing.debt) || ':' ||
-      (SELECT md5(COALESCE(string_agg(as_of_date::text || ':' || debt_type || ':' || subtype || ':' || amount::text, ',' ORDER BY as_of_date,debt_type,subtype), '')) FROM financing.balance_snapshot) AS version`);
+		const versionResult = await database.query(versionSql);
     const version = versionResult.rows[0].version;
-    if (expectedVersion !== null && expectedVersion !== version) throw new DebtImportError('台账已发生变化，请重新导入；本次未写入任何数据');
+    if (expectedVersion !== null && expectedVersion !== version) throw new DebtImportError('台账已发生变化，请重新导入');
 		await onStage({ stage: 'importing', progress: 65, message: '正在原子加入新增负债、现金流与余额日期' });
 		await database.query(`
 			CREATE TEMP TABLE maintenance_debt (
@@ -249,18 +271,25 @@ export async function importDebtWorkbook(database, transformed, {
 		if (mismatches.rowCount) {
 			throw new DebtImportError(`已有负债的继承类型与工作簿不一致：${JSON.stringify(mismatches.rows.slice(0, 5))}`);
 		}
-    const newKeys = (await database.query('SELECT source_key FROM maintenance_debt WHERE debt_id IS NULL ORDER BY source_ordinal')).rows.map(row => row.source_key);
-    if (planOnly) {
-      const balances = (await database.query('SELECT as_of_date::text AS "asOfDate",debt_type AS "debtType",subtype FROM financing.balance_snapshot')).rows;
-      await database.query('ROLLBACK');
-      return {version, newKeys, balanceKeys: balances.map(balanceKey)};
-    }
-    if (expectedNewKeys && (newKeys.length !== expectedNewKeys.length || newKeys.some(key => !expectedNewKeys.includes(key)))) {
-      throw new DebtImportError('新增负债与核对结果不一致，请重新导入；本次未写入任何数据');
-    }
     const unlinked = (await database.query(`SELECT DISTINCT counterparty FROM maintenance_debt
       WHERE debt_id IS NULL AND NULLIF(btrim(counterparty),'') IS NOT NULL AND public.resolve_client(counterparty) IS NULL`)).rows;
-    if (unlinked.length) throw new DebtImportError(`整个导入已拒绝，未写入任何数据：${unlinked.length} 个新增客户名称未能关联，请维护客户清单：${unlinked.map(row=>row.counterparty).join('、')}`);
+		const createdClients = [];
+		if (unlinked.length) {
+			await database.query("SELECT pg_advisory_xact_lock(hashtextextended('credit.excel_import',0))");
+			for (const { counterparty } of unlinked) {
+				const proposal = clientFromDebtCounterparty(counterparty);
+				if (!proposal) continue;
+				const candidates = await database.query('SELECT count(*)::int AS n FROM public.client_name_candidates($1)', [proposal.name]);
+				if (Number(candidates.rows[0].n) > 0) continue;
+				const inserted = (await database.query(`INSERT INTO public.client(name,fullname,type,subtype)
+					VALUES($1,NULL,$2,$3) ON CONFLICT(name) DO NOTHING RETURNING id,name`,
+					[proposal.name, proposal.type, proposal.subtype])).rows[0];
+				if (!inserted) continue;
+				const resolved = (await database.query('SELECT public.resolve_client($1) AS id', [counterparty])).rows[0]?.id;
+				if (String(resolved ?? '') === String(inserted.id)) createdClients.push(proposal.name);
+				else await database.query('DELETE FROM public.client WHERE id=$1', [inserted.id]);
+			}
+		}
 		await database.query(`
 			UPDATE maintenance_debt SET debt_id = nextval('financing.debt_id_seq'), is_new = true
 			WHERE debt_id IS NULL
@@ -341,7 +370,7 @@ export async function importDebtWorkbook(database, transformed, {
 			FROM maintenance_debt debt WHERE debt.source_key = flow.source_key AND debt.is_new
 		`);
 		const orphanFlows = await database.query('SELECT source_key FROM maintenance_cashflow WHERE source_key NOT IN (SELECT source_key FROM maintenance_debt) LIMIT 1');
-		if (orphanFlows.rows.length) throw new DebtImportError('现金流没有对应负债，整个导入已拒绝');
+		if (orphanFlows.rows.length) throw new DebtImportError('现金流没有对应负债');
 		// Cashflows of existing debts belong to administrator-maintained history.
 		await database.query('DELETE FROM maintenance_cashflow WHERE debt_id IS NULL');
 		await database.query(`
@@ -443,12 +472,14 @@ export async function importDebtWorkbook(database, transformed, {
 			cashflowCount: databaseNumber(result.cashflow_count),
 			historyDateCount: databaseNumber(result.history_date_count),
 			insertedDebtCount: databaseNumber(result.inserted_debt_count),
+			createdClientCount: createdClients.length,
 			updatedDebtCount: databaseNumber(result.updated_debt_count),
 			skippedDebtCount: databaseNumber(result.skipped_debt_count),
 			snapshotDifferenceYi,
 			unlinkedClientNames: result.unlinked_client_names ?? [],
 			warnings: [
-				...(Math.abs(snapshotDifferenceYi) > 0.0001 ? [`历史余额保持不变：数据库与本次工作簿相差 ${snapshotDifferenceYi.toFixed(6)} 亿元，请管理员核对`] : [])
+				...(Math.abs(snapshotDifferenceYi) > 0.0001 ? [`历史余额保持不变：数据库与本次工作簿相差 ${snapshotDifferenceYi.toFixed(6)} 亿元，请管理员核对`] : []),
+				...(result.unlinked_client_names?.length ? [`${result.unlinked_client_names.length} 个交易对手未能唯一关联，负债已导入，请核对客户：${result.unlinked_client_names.slice(0, 5).join('、')}`] : [])
 			],
 			insertedCashflowCount: databaseNumber(result.inserted_cashflow_count),
 			updatedCashflowCount: databaseNumber(result.updated_cashflow_count),
