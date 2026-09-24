@@ -6,7 +6,7 @@
 
 融资入口 `/financing`（仪表盘、负债周报、项目、SOP、台账）；管理中心 `/management`（角色权限配置）与全站个人信息 `/profile`。
 
-页面入口、兼容路由和模块范围只在 [docs/INDEX.md](docs/INDEX.md) 维护。
+页面与模块文档按下方 Context Routing 选读；精确路由以 `src/routes/` 和 `worker/entry.ts` 为准。
 
 ## Repository Structure
 
@@ -29,7 +29,7 @@
 - 修改前先搜索现有页面、组件、图表、派生函数和测试；优先复用，不建立平行实现。
 - UI 变更必须读取 `DESIGN.md`；保持既有桌面布局和移动端模块顺序，不自行引入新设计体系。
 - 前端禁止解释性小字和口径扩写，保持简洁标签；交互说明通过控件、状态与布局表达，不另加提示文案。
-- 跨服务路由、DATA / InternalData 与身份所有权遵循 [共享架构](../eastmoney/docs/ARCHITECTURE.md)；只改页面时按模块索引读取，不预读其他仓库。
+- 跨服务路由、DATA / InternalData 与身份所有权遵循 [共享架构](../eastmoney/docs/ARCHITECTURE.md)；只改页面时按下方对应模块读取，不预读其他仓库。
 - 市场点评 REST 编排与视觉/文字共用契约、旧资源兼容边界见 [市场点评模块](docs/modules/market-briefing.md)；业务加工留在 Dashboard。
 - Data 消费端使用 `src/data-contracts.ts` 的 Zod Schema 校验最小 DTO；字段投影与分页遵循 [Data API 契约](../data/docs/API.md)，不透传上游 envelope。债券动态代码与类型筛选见市场点评模块。
 - 新闻详情扇出保持有界并发，复用 `src/lib/server/data-news.ts` 和既有 DATA adapter。
@@ -72,15 +72,21 @@ CI 等待统一使用 `node scripts/wait-ci.mjs <owner/repo> <run-id> <full-sha>
 
 跨项目执行与并行工作树规则见 [项目组 AGENTS](../eastmoney/AGENTS.md)；未在上下文中时读取一次。只加载任务相关文档，跨模块仅加读受影响部分，不重复读取已有上下文。
 
-- 页面、API、业务或定时任务：先按 [docs/INDEX.md](docs/INDEX.md) 定位唯一模块文档与代码，再按任务叠加专题。
+- 页面、API、业务或定时任务：先按下方路径定位唯一模块文档，再按任务叠加专题。兼容入口复用目标模块规范，不另建一份。
+- 门户 `/` 读[门户](docs/modules/portal.md)；市场点评、文字版和报告 API 读[市场点评](docs/modules/market-briefing.md)，其中今日聚焦另读[今日聚焦](docs/modules/market-focus.md)；市场热点、政策跟踪、跟踪点评分别读[热点](docs/modules/market-hotspots.md)、[政策](docs/modules/policy-tracking.md)、[跟踪点评](docs/modules/tracking-commentary.md)；资讯、研报与点评详情读[详情](docs/modules/research-details.md)；资金日报读[资金日报](docs/modules/fund-report.md)。
+- 交易研究首页、交易、流程及兼容跳转读[交易研究工作台](docs/TRADING_RESEARCH_WORKBENCH.md)；研究辅助与 EDB 读[研究辅助](docs/modules/research-assistance.md)；二级池读[二级池](docs/modules/secondary-bond-pool.md)；融资择时模型读[融资模型](docs/modules/financing-model.md)。
+- 授信工作台、日历、周报、Excel 导入读[授信工作台](docs/modules/credit-workbench.md)；授信材料和 CreditAgent 读[授信助手](docs/CREDIT_ASSISTANT.md)。
+- 融资首页、投资人、项目、SOP/提醒、台账与数据后台、负债周报、客户关联依次读[总览](docs/modules/financing-overview.md)、[投资人](docs/modules/bond-investors.md)、[项目](docs/modules/financing-projects.md)、[SOP](docs/modules/financing-sop.md)、[数据后台](docs/modules/financing-data.md)、[负债周报](docs/modules/liability-report.md)、[客户](docs/modules/clients.md)；管理中心、个人资料、账号与 `/auth/*` 读[管理](docs/modules/management.md)，登录配置才加读 [Gateway Auth0](../gateway/auth0/README.md)。
+- 机构图标读[Logo](docs/INSTITUTION_LOGOS.md)；Quant 原始输入读[Quant 输入](docs/modules/quant-inputs.md)；消息投递读[Messenger](docs/modules/messenger.md)；业务 MCP 读[MCP](docs/MCP.md)。历史合并记录和需求底稿仅供追溯，不作当前规范。
 - UI、组件、图表、响应式、打印：加读 [DESIGN](DESIGN.md)。
 - 本仓库分层：加读 [ARCHITECTURE](docs/ARCHITECTURE.md)；只有跨服务变化才加读共享架构。
+- 业务不变量与计算：加读 [DOMAIN](docs/DOMAIN.md) 和目标模块；云资源用量与性能基线读[云资源审计](docs/operations/cloud-resource-audit-2026-09-21.md)。
 - SQL、日期、事务和导入：加读 [DATABASE](docs/DATABASE.md)；共享表/存储归属变化才加读共享数据库。
 - API / actions：加读 [API](docs/API.md)；身份与权限：加读 [SECURITY](docs/SECURITY.md)。
 - 测试、开发和交付：加读 [DEVELOPMENT](docs/DEVELOPMENT.md)。
 - AI 调用：加读 [共享 AI](../eastmoney/docs/AI.md) 与模块 Prompt/Schema；授信助手 `credit_answer` 例外由 [CREDIT_ASSISTANT](docs/CREDIT_ASSISTANT.md) 维护。
 
-融资和管理功能不读取旧 Financing 文档作为当前规范。共享文档总入口为 [项目组索引](../eastmoney/docs/INDEX.md)。
+融资和管理功能不读取旧 Financing 文档作为当前规范。共享专题按[项目组 AGENTS](../eastmoney/AGENTS.md#context-routing)选读。
 
 ## 权限测试
 

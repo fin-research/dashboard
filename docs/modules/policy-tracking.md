@@ -1,6 +1,6 @@
 # 政策跟踪
 
-入口：`/trading-research/policy-tracking`。公共规则见 [文档分流](../INDEX.md)；仅在任务涉及本模块时读取。
+入口：`/trading-research/policy-tracking`。公共规则见 [文档分流](../../AGENTS.md#context-routing)；仅在任务涉及本模块时读取。
 
 ## 接口
 

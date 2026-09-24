@@ -47,7 +47,7 @@ Data 错误保留安全诊断字段；市场点评 Workflow 对失败资源独�
 
 前端发起的 AI 请求统一携带 `Accept: text/event-stream`，由 Worker 流式请求上游并返回以下 SSE 事件：`progress` 的 `data` 是移除 Markdown 加粗标记后的模型公开 reasoning summary 纯文本，`result` 的 `data` 是完整终态 JSON，`error` 的 `data` 是可公开错误文本。事件类型只使用 SSE 原生 `event` 字段，数据内不重复写 `type` 或 `id`；保活仅使用注释帧。前端统一由 `src/lib/ai-client.svelte.ts` 解析，终态后立即停止读取；不再新增 `complete`、`session`、`draft` 或 NDJSON AI 流协议。
 
-具体页面规则和接口见 [模块索引](INDEX.md)，不在公共文档重复维护。
+具体页面规则和接口见 [模块分流](../AGENTS.md#context-routing)，不在公共文档重复维护。
 
 ## 融资与管理路由
 
