@@ -43,8 +43,7 @@ assert.equal(document.querySelectorAll(".credit-chat, .chat-toolbar, .tr-workben
 // Exercise the real component with the unified AI client and a controllable SSE
 // transport. No browser or authentication flow is involved in this regression.
 const streams = [];
-const activities = [{ id: 1, stage: "retrieval", message: "正在检索材料", startedAt: Date.now() }];
-const running = { ...session, running: true, questionId: "q-1", pendingQuestion: "公司资产是多少", stage: "retrieval", progress: "正在检索材料", activities };
+const running = { ...session, running: true, questionId: "q-1", pendingQuestion: "公司资产是多少", progress: "正在检索资料" };
 const requests = [];
 globalThis.fetch = async (url, options) => {
   requests.push({ url: String(url), options });
@@ -67,15 +66,13 @@ flushSync();
 assert.equal(streams.length, 1);
 assert.match(streams[0].url, /session\/events$/);
 assert.equal(document.querySelector(".credit-stages"), null);
-assert.match(document.querySelector(".activity-summary").textContent, /检索材料/);
-assert.equal(document.querySelector(".activity-details").open, false);
-document.querySelector(".activity-details").open = true;
+assert.match(document.querySelector(".credit-activity").textContent, /检索资料/);
 assert.equal(document.querySelector("#credit-question").hasAttribute("maxlength"), false);
 streams[0].emit("progress", "正在分析授信材料");
 await new Promise(resolve => setImmediate(resolve));
 flushSync();
 assert.equal(streamingApp.aiProgress(), "正在分析授信材料");
-assert.equal(document.querySelector(".activity-details").open, true, "SSE preserves expanded activity state");
+assert.match(document.querySelector(".credit-activity").textContent, /检索资料/);
 assert.equal(requests.length, 2, "one history request and one SSE request are sufficient");
 flushSync(() => streamingApp.changeView("weekly"));
 await new Promise(resolve => setImmediate(resolve));
