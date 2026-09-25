@@ -4,20 +4,23 @@ import { CreditTrace } from "../src/lib/server/credit-tracing.ts";
 import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
 import { AiGatewayResponseError, generateAiGatewayObject } from "../src/lib/server/ai-gateway.ts";
 import { recordingCreditTracing } from "./helpers/credit-trace-recorder.mjs";
+import { searchResultEvidence } from "../src/lib/server/credit-evidence.ts";
 
 const identity = { agentId: "a".repeat(64), conversationId: "ba6f6333-62dc-49d9-a35b-000000000001", runId: "ba6f6333-62dc-49d9-a35b-000000000002" };
 const credentials = { accountId: "test", gatewayId: "default", token: "secret-test-token" };
 const customer = { name: "敏感客户名称", confidentialityStatus: true, reportDate: "2026-09-10" };
-const doc = { id: "b".repeat(24), title: "敏感文件名称.pdf", relativePath: "定期报告/敏感文件名称.pdf", originalKey: "originals/定期报告/敏感文件名称.pdf",
+const doc = { id: "b".repeat(24), title: "敏感文件名称.pdf", relativePath: "public/敏感文件名称.pdf", originalKey: "public/敏感文件名称.pdf",
   authority: "audited", bytes: 1, sha256: "b".repeat(64), modifiedAt: "2026-09-10", blockCount: 1, ocrCount: 0 };
-const block = { id: "b-1", documentId: doc.id, text: "公司2025年，单位元。流动资产200，存货50，流动负债100。", locator: "PDF第1页", extraction: "text", searchKey: "search/b.md" };
+const block = { id: "b-1", documentId: doc.id, text: "公司2025年，单位元。流动资产200，存货50，流动负债100。", locator: "PDF第1页", extraction: "text", searchKey: "public/敏感文件名称.pdf" };
 const corpus = { version: "credit-document-v2", builtAt: "2026-09-10", documents: [doc], blocks: [block] };
+const hit = { key: block.searchKey, text: block.text };
+const sourceId = searchResultEvidence(corpus, [hit])[0].id;
 const calculation = { label: "敏感计算标签", expression: "a/c", resultUnit: "倍", decimals: 2, inputs: [
-  { name: "a", value: "200", unit: "元", sourceId: block.id, quote: "流动资产200" },
-  { name: "c", value: "100", unit: "元", sourceId: block.id, quote: "流动负债100" },
+  { name: "a", value: "200", unit: "元", sourceId, quote: "流动资产200" },
+  { name: "c", value: "100", unit: "元", sourceId, quote: "流动负债100" },
 ] };
 const quick = { ...calculation, expression: "(a-b)/c", inputs: [...calculation.inputs,
-  { name: "b", value: "50", unit: "元", sourceId: block.id, quote: "存货50" }] };
+  { name: "b", value: "50", unit: "元", sourceId, quote: "存货50" }] };
 const options = { question: "敏感问题：公司流动比率与速动比率", credentials, customer, corpus, history: [] };
 const capture = () => { const recorded = recordingCreditTracing(); return { ...recorded, trace: new CreditTrace(recorded.tracing, identity) }; };
 const snapshots = spans => spans.map(span => ({ name: span.name, attributes: span.attributes }));
@@ -43,7 +46,7 @@ test("iterative search, reading, individual and batch calculations share the tur
     return schema.parse(name === "credit_scope" ? { inScope: true, queries: ["流动比率", "速动比率"], attachments: [] }
       : name === "credit_review" ? { approved: true, issues: [] } : { step: steps.shift() });
   };
-  const semanticSearch = async () => { searches++; if (searches === 2) release(); await gate; return [block.searchKey]; };
+  const semanticSearch = async () => { searches++; if (searches === 2) release(); await gate; return [hit]; };
   const answer = await recorded.trace.agent(() => answerCreditQuestion({ ...options, trace: recorded.trace, cache, generate, semanticSearch }));
   // Only calculations cited in the released answer are returned, but all runs are traced.
   assert.deepEqual(answer.calculations.map(item => item.result), ["2.00", "1.50"]);
@@ -95,7 +98,7 @@ test("iterative search, reading, individual and batch calculations share the tur
   assert.ok(resumed.spans.every(span => span.attributes["gen_ai.usage.input_tokens"] === undefined));
 });
 
-test("failed AI Search and lexical fallback are distinct nodes without exposing queries or errors", async () => {
+test("failed AI Search reports unavailable evidence without exposing queries or errors", async () => {
   const recorded = capture();
   const answer = await recorded.trace.agent(() => answerCreditQuestion({ ...options, trace: recorded.trace,
     semanticSearch: async () => { throw new Error("敏感上游错误正文"); },
@@ -107,7 +110,7 @@ test("failed AI Search and lexical fallback are distinct nodes without exposing 
   assert.equal(search.attributes["credit.outcome"], "fallback");
   assert.equal(search.attributes["credit.fallback_reason"], "unavailable");
   assert.equal(recorded.spans.find(span => span.name === "execute_tool ai_search").attributes["credit.outcome"], "error");
-  assert.ok(recorded.spans.some(span => span.name === "execute_tool lexical_search" && span.parent === search));
+  assert.ok(!recorded.spans.some(span => span.name === "execute_tool lexical_search"));
   assert.ok(recorded.spans.every(span => span.ended));
   assert.doesNotMatch(JSON.stringify(snapshots(recorded.spans)), /敏感|公司2025|待补充/);
 });
@@ -137,7 +140,7 @@ test("a rejected batch closes all calculation spans and preserves atomic results
   const recorded = capture();
   let decisions = 0;
   await recorded.trace.agent(() => answerCreditQuestion({ ...options, trace: recorded.trace,
-    semanticSearch: async () => [block.searchKey],
+    semanticSearch: async () => [hit],
     generate: async (_c, messages, schema, name) => {
       if (name === "credit_scope") return schema.parse({ inScope: true, queries: ["流动资产"], attachments: [] });
       if (++decisions === 1) return schema.parse({ step: { action: "calculate_answer", calculations: [calculation,

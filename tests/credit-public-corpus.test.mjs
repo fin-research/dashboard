@@ -4,26 +4,20 @@ import { creditQuestionSchema } from "../src/lib/credit-assistant/types.ts";
 import { isPublicCreditDocument, loadCreditCorpus, searchResultEvidence } from "../src/lib/server/credit-evidence.ts";
 import { creditAnswerForTurn } from "../src/lib/server/credit-links.ts";
 
-const document = { id: "a".repeat(24), title: "年度报告.pdf", relativePath: "定期报告/年度报告.pdf",
-  originalKey: "originals/定期报告/年度报告.pdf", sha256: "0".repeat(64), bytes: 100,
-  authority: "audited", modifiedAt: "2026-09-07", blockCount: 1, ocrCount: 0 };
-const block = { id: `${document.id}-1`, documentId: document.id, locator: "PDF第1页", extraction: "text",
-  searchKey: "search/定期报告/年度报告.pdf.md", text: "公开现金10亿元。" };
-const corpus = { version: "credit-document-v2", builtAt: "2026-09-07", documents: [document], blocks: [block],
-  searchFiles: [{ key: block.searchKey, documentId: document.id, sha256: "0".repeat(64), bytes: 100, part: 1 }] };
-const bucket = data => ({ get: async key => key === "credit/catalog/corpus.json" ? { size: 100, json: async () => data } : null });
+const object = key => ({ key, size: 100, uploaded: new Date("2026-09-25T12:00:00Z"), httpEtag: "etag" });
+const bucket = keys => ({ list: async () => ({ objects: keys.map(object), truncated: false }) });
+const publicKey = "credit/public/2026半年报.pdf";
 
-test("only canonical 定期报告 paths enter the public corpus", async () => {
-  assert.equal(isPublicCreditDocument(document), true);
-  for (const relativePath of ["风控/审计.pdf", "定期报告备份/审计.pdf", "定期报告/../风控/报告.pdf",
-    "定期报告//报告.pdf", "定期报告/报告.pdf\n", "定期报告/风控\\报告.pdf"]) {
-    const candidate = { ...document, relativePath, originalKey: `originals/${relativePath}` };
-    assert.equal(isPublicCreditDocument(candidate), false);
-    await assert.rejects(loadCreditCorpus(bucket({ ...corpus, documents: [candidate] })), /非公开文件/);
-  }
-  assert.equal((await loadCreditCorpus(bucket(corpus))).documents.length, 1);
-  await assert.rejects(loadCreditCorpus(bucket({ ...corpus, blocks: [{ ...block, documentId: "b".repeat(24) }] })), /非公开文件/);
-  await assert.rejects(loadCreditCorpus(bucket({ ...corpus, searchFiles: [{ ...corpus.searchFiles[0], key: "search/内部/报告.md" }] })), /非公开文件/);
+test("only direct public PDFs enter the live corpus", async () => {
+  const corpus = await loadCreditCorpus(bucket([
+    publicKey, "credit/public/", "credit/public/nested/private.pdf", "credit/catalog/corpus.json",
+    "credit/originals/内部.pdf", "credit/public/notes.docx", "credit/public/../private.pdf",
+  ]));
+  assert.deepEqual(corpus.documents.map(document => document.originalKey), ["public/2026半年报.pdf"]);
+  assert.equal(corpus.blocks.length, 0);
+  assert.equal(isPublicCreditDocument(corpus.documents[0]), true);
+  assert.equal(isPublicCreditDocument({ ...corpus.documents[0], originalKey: "originals/private.pdf" }), false);
+  await assert.rejects(loadCreditCorpus(bucket(["credit/public/"])), /尚未上传/);
 });
 
 test("question API accepts ordinary text without an institution field", () => {
@@ -32,21 +26,23 @@ test("question API accepts ordinary text without an institution field", () => {
   assert.equal(creditQuestionSchema.safeParse({ question: "报告", institutionName: "银行" }).success, false);
 });
 
-test("AI Search matches only catalog keys under the public directory", () => {
+test("AI Search accepts PDF chunks only from listed public objects", async () => {
+  const corpus = await loadCreditCorpus(bucket([publicKey]));
   const hits = searchResultEvidence(corpus, [
-    { key: "credit/search/定期报告/年度报告.pdf.md", text: "公开现金10亿元。" },
-    { key: "credit/search/风控/私有报告.pdf.md", text: "不应出现" },
+    { key: publicKey, text: "资产总计 426,403,159,812.34" },
+    { key: "credit/search/内部.md", text: "不应出现" },
+    { key: "credit/public/未上传.pdf", text: "不应出现" },
   ]);
   assert.equal(hits.length, 1);
-  assert.equal(hits[0].documentId, document.id);
-  assert.equal(hits[0].searchKey, block.searchKey);
+  assert.equal(hits[0].documentId, corpus.documents[0].id);
+  assert.equal(hits[0].searchKey, "public/2026半年报.pdf");
 });
 
-test("source and file links identify a turn without carrying institution state", () => {
+test("source and file links identify a turn without carrying institution state", async () => {
+  const document = (await loadCreditCorpus(bucket([publicKey]))).documents[0];
   const answer = { files: [{ id: document.id, title: document.title, url: `/api/credit-assistant/files/${document.id}` }],
-    sources: [{ id: block.id, url: `/api/credit-assistant/files/${document.id}#page=1` }] };
+    sources: [{ id: "source-1", url: `/api/credit-assistant/files/${document.id}` }] };
   const linked = creditAnswerForTurn(answer, "turn-1");
   assert.match(linked.files[0].url, /turnId=turn-1/);
   assert.doesNotMatch(linked.files[0].url, /institutionName|confidentiality/);
-  assert.match(linked.sources[0].url, /#page=1$/);
 });

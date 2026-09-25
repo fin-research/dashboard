@@ -66,8 +66,8 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
     const id = url.pathname.match(/^\/api\/credit-assistant\/files\/([a-f0-9]{24})$/)?.[1];
     const doc = id ? corpus.documents.find(d => d.id === id) : undefined;
     if (!doc) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
-    // Resolve only catalog-owned immutable keys; arbitrary R2 paths cannot be requested.
-    if (!isCreditOriginalKey(doc.originalKey)) throw new Error("Invalid catalog key");
+    // Resolve only exact public PDF keys from the current R2 listing.
+    if (!isCreditOriginalKey(doc.originalKey)) throw new Error("Invalid public key");
     const file = await env.EASTMONEY.get(`credit/${doc.originalKey}`, { range: request.headers });
     if (!file) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
     const isPdf = doc.originalKey.endsWith(".pdf");

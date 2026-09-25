@@ -146,7 +146,8 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         },
         semanticSearch: async query => {
           const result = await this.env.CREDIT_SEARCH.search({ query, ai_search_options: {
-            retrieval: { retrieval_type: "hybrid", max_num_results: 50 },
+            retrieval: { retrieval_type: "hybrid", max_num_results: 50, match_threshold: 0, context_expansion: 1 },
+            reranking: { enabled: true, model: "@cf/baai/bge-reranker-base", match_threshold: 0 },
             query_rewrite: { enabled: false }, cache: { enabled: false },
           } });
           return result.chunks.map(c => ({ id: c.id, key: c.item.key, text: c.text }));

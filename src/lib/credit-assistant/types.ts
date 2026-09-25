@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const documentSchema = z.object({
-  id: z.string(), title: z.string(), relativePath: z.string(), sha256: z.string(),
+  id: z.string(), title: z.string(), relativePath: z.string(), sha256: z.string().optional(),
   bytes: z.number(), authority: z.enum(["audited", "disclosure", "internal", "historical_reply", "draft"]),
   originalKey: z.string(), modifiedAt: z.string(), blockCount: z.number(), ocrCount: z.number(),
 });

@@ -4,11 +4,11 @@
 
 ## 公开资料边界
 
-唯一问答语料为 R2 `eastmoney/credit/`：`originals/` 存公开原件，`search/` 存供 AI Search 索引的 Markdown，`catalog/corpus.json` 存当前公开目录与本地全文证据。公开材料仅限原件路径位于顶层 `定期报告/`、路径与目录一致的文件；审计或披露标签本身不扩大公开范围。准备脚本只解析这个目录，上传脚本再次按此路径筛选，Worker 加载目录时拒绝任何非公开文档或悬空证据。旧 R2 `credit` 桶不再绑定到生产 Worker。
+唯一问答语料为 R2 `eastmoney/credit/public/` 下直接存放的 PDF。AI Search `credit` 直接索引这些 PDF；Worker 枚举同一前缀生成附件清单，并只接受该清单中的搜索来源和下载请求。`credit/catalog/`、`credit/originals/`、`credit/search/` 的旧文件不进入新问答链路。
 
-AI Search `credit` 的数据源为 R2 `eastmoney`，只包含 `credit/search/**`，排除原件与目录；发布脚本只允许该前缀下的顶层 `定期报告/` 公开材料。原件、搜索文本和目录分别验证 SHA-256；目录发布和索引完成分别验收。搜索返回的 key 去掉 `credit/` 前缀后必须匹配当前目录中的搜索文件，否则不能作为答复证据。AI Search 只调用 `search()`，不调用其生成回答接口。每次检索请求 50 个结果；最多 3 轮、每轮最多 3 个并行查询，总共选入 12 个完整片段。
+AI Search `credit` 的数据源为 R2 `eastmoney`，只包含 `credit/public/**`。中文关键词索引采用 trigram 和 `or` 匹配；问答检索按请求开启重排并取消默认阈值。PDF 仍由 AI Search 直接解析，不另建 Markdown 语料。OCR 转换在现有大 PDF 上超时，当前关闭。AI Search 只调用 `search()`，不调用其生成回答接口。每次检索请求最多 50 个结果；最多 3 轮、每轮最多 3 个并行查询，总共选入 12 个原始片段。检索结果没有证据时明确说明缺口。
 
-线上迁移先运行 `node scripts/migrate-public-credit.mjs` 只读盘点，再使用 `--apply` 复制并校验公开对象、发布公开目录、切换 AI Search 数据源并启动索引。代码经合并队列和 Cloudflare Git 发布、线上读取及检索验证通过后，运行 `--apply --remove-source` 从旧 `credit` 桶删除已迁出的公开对象并更新旧目录；旧桶的其余资料不进入新问答链路。后续更新使用 `scripts/prepare-credit-corpus.py` 和 `scripts/upload-credit-corpus.mjs`，只发布公开目录。材料原件、全文和本地证据不提交 Git。
+更新材料时，只向 `credit/public/` 上传确认可公开的 PDF，核对 AI Search item 完成状态并通过 MCP `/mcp` 的 `search` 工具抽查。不要把文件夹标记、内部资料或旧目录放入索引。
 
 ## 问答与会话
 
@@ -18,7 +18,7 @@ AI Search `credit` 的数据源为 R2 `eastmoney`，只包含 `credit/search/**`
 
 提交后 `schedule()` 持久化问答任务。统一 AI SSE 只发送纯文本 `progress` reasoning summary、完整终态 `result` 会话或 `error`；不发送正文增量、原始 reasoning、工具 JSON 或引文 ID。summary 在全局 AI 面板显示，聊天只显示当前活动、用时、可展开的处理记录和完成答复。断线重新连接 events，不重复提交。运行中可以起草下一条；刷新后可查看或重试失败问题。
 
-服务端先判断问题范围并规划检索；仅索取原件可直接选当前目录的文档 ID。其他问题经语义检索取证，AI Search 无结果或不可用时回退当前公开目录的全文关键词检索。每次语义检索最多等 60 秒，失败后本轮不反复等待。模型只看公开目录、当前读取证据和该用户公开会话历史。范围外固定回答“我只能回答授信业务、公司数据及相关资料问题，无法处理与这些内容无关的请求。”资料不足明确列出缺口，不猜测受限或未披露数据。
+服务端先判断问题范围并规划检索；仅索取原件可直接选当前公开 PDF。其他问题使用 AI Search 检索取证；无结果或不可用时明确资料缺口。每次检索最多等 60 秒，失败后本轮不反复等待。模型只看公开文件名、当前检索证据和该用户会话历史。范围外固定回答“我只能回答授信业务、公司数据及相关资料问题，无法处理与这些内容无关的请求。”资料不足明确列出缺口，不猜测受限或未披露数据。
 
 所有生成与复核共用 `src/lib/server/ai-gateway.ts`：`credit_answer` 固定 `custom-codex/responses`、`gpt-5.6-luna`、`xhigh`、单次尝试。当前提示词在 `src/lib/server/credit-assistant.ts`。模型最多 8 个决策步骤；连续 2 步没有新增证据/计算时仅答复。独立复核最多 2 次；一轮总时限 12 分钟。会话最多 30 轮或约 1 MiB 已保存内容，达到上限提示新建会话。
 
@@ -26,7 +26,7 @@ AI Search `credit` 的数据源为 R2 `eastmoney`，只包含 `credit/search/**`
 
 ## 证据与运行追踪
 
-PDF 按实际页码定位；扫描页标注 OCR。Word 保留段落与表格顺序，Excel/XLS 保留工作表、行、单元格、单位、公式及缓存值。正式审计和披露优先；文件修改时间不代表报告期。答复每段必须引用已读取的连续原文；引用、附件和计算输入只接受当前目录中的 ID。四则运算用 Decimal 和有界语法，输入数值须出现在原文中。复核校验主体、合并范围、报告期和单位；模型复核不代替人工核验。
+AI Search PDF 片段没有可核验页码时只标为检索片段。正式审计和披露优先；文件修改时间不代表报告期。答复每段必须引用已读取的连续原文；引用、附件和计算输入只接受当前公开 PDF 的来源 ID。四则运算用 Decimal 和有界语法，输入数值须出现在原文中。复核校验主体、合并范围、报告期和单位；模型复核不代替人工核验。
 
 `worker/credit-agent.ts` 通过 Workers `tracing.enterSpan` 记录 `invoke_agent`、`chat`、`execute_tool`；节点只带固定标签、计数、耗时、错误类别和不透明标识，不记录用户 ID、问题、材料正文、Prompt、推理或答复。失败按模型、材料、时限等类别提示并附本轮 UUID。`credit_operation`、`credit_answer_completed` 和 `credit_answer_failed` 共享 `run_id`。
 
@@ -46,4 +46,4 @@ PDF 按实际页码定位；扫描页标注 OCR。Word 保留段落与表格顺�
 
 ## 验证
 
-转换与目录测试：`uv run tests/test_credit_materials.py`。本地快速检查：`pnpm worker:typegen`、`pnpm check:quick` 及受影响授信问答单元测试。完整类型、Python/Node、构建、浏览器组件和截图比较由合并组 `Dashboard CI` 验收；有意视觉变化先生成并审阅 macOS CI 截图候选。程序化线上联调只用根目录 `.env` 中的 `test@18.cn`；不使用浏览器做权限登录。`scripts/evaluate-credit-assistant.mjs` 支持 `--base-url=https://eastmoney.hasbai.xyz` 和 `--case=...`，问答结果写入未跟踪 `.credit-local/evaluations/`，仍须逐份核对答复和来源。发布、候选与 CI 流程见 [DEVELOPMENT](DEVELOPMENT.md) 和 [TESTING](TESTING.md)。
+本地快速检查：`pnpm check:quick` 及受影响授信问答单元测试。完整类型、Python/Node、构建、浏览器组件和截图比较由合并组 `Dashboard CI` 验收；有意视觉变化先生成并审阅 macOS CI 截图候选。程序化线上联调只用根目录 `.env` 中的 `test@18.cn`；不使用浏览器做权限登录。`scripts/evaluate-credit-assistant.mjs` 支持 `--base-url=https://eastmoney.hasbai.xyz` 和 `--case=...`，问答结果写入未跟踪 `.credit-local/evaluations/`，仍须逐份核对答复和来源。发布、候选与 CI 流程见 [DEVELOPMENT](DEVELOPMENT.md) 和 [TESTING](TESTING.md)。

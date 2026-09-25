@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
 import { creditAgentName } from "../src/lib/server/credit-session.ts";
@@ -26,11 +27,8 @@ async function workerModule(file) {
 }
 const { CreditAgent } = await workerModule("credit-agent.ts");
 const { creditAssistantHttp } = await workerModule("credit-assistant-http.ts");
-const doc = { id: "a".repeat(24), title: "年度报告.pdf", relativePath: "定期报告/年度报告.pdf",
-  originalKey: "originals/定期报告/年度报告.pdf", authority: "audited", bytes: 4, sha256: "a".repeat(64),
-  modifiedAt: "2026-09-07", blockCount: 1, ocrCount: 0 };
-const corpus = { version: "credit-document-v2", builtAt: "2026-09-07", documents: [doc],
-  blocks: [{ id: doc.id + "-1", documentId: doc.id, text: "现金50亿元", locator: "PDF第1页", extraction: "text", searchKey: "search/定期报告/年度报告.pdf.md" }] };
+const publicKey = "credit/public/年度报告.pdf";
+const doc = { id: createHash("sha256").update(publicKey).digest("hex").slice(0, 24), title: "年度报告.pdf" };
 const origin = "https://test.example";
 const testUser = { id: "access-test", auth0Id: "auth0|test", email: "test@18.cn", issuedAt: 0, expiresAt: 9999999999 };
 function setup() {
@@ -41,10 +39,10 @@ function setup() {
     warnings: [], corpusVersion: options.corpus.builtAt, createdAt: new Date().toISOString() });
   const sessions = new Map();
   const reads = [];
-  const env = { EASTMONEY: { get: async key => {
+  const env = { EASTMONEY: { list: async () => ({ objects: [{ key: publicKey, size: 4,
+    uploaded: new Date("2026-09-07T00:00:00Z"), httpEtag: "test-etag" }], truncated: false }), get: async key => {
     reads.push(key);
-    if (key === "credit/catalog/corpus.json") return { size: 100, json: async () => corpus };
-    if (key !== `credit/${doc.originalKey}`) return null;
+    if (key !== publicKey) return null;
     return { body: "file", size: 4, httpEtag: "test-etag", range: { offset: 0, length: 4 } };
   } }, CREDIT_SEARCH: { search: async () => ({ chunks: [] }) }, CREDIT_AGENT: { get: name => {
     if (!sessions.has(name)) { const agent = new CreditAgent({ id: { toString: () => name } }, env); agent.fetch = request => agent.onRequest(request); sessions.set(name, agent); }
@@ -70,7 +68,7 @@ test("ordinary question creates a user session and serves only public files from
   assert.equal(state.turns[0].answer.files[0].id, doc.id);
   assert.equal((await app.request("files/" + doc.id)).status, 200);
   assert.equal((await app.request("files/" + "b".repeat(24))).status, 404);
-  assert.ok(app.reads.includes(`credit/${doc.originalKey}`));
+  assert.ok(app.reads.includes(publicKey));
   assert.ok(app.reads.every(key => key.startsWith("credit/")));
 });
 

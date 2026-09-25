@@ -57,7 +57,7 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
     serviceBindings: { TEST_GATE: async () => { await gate; return new Response("ready"); } } }] });
   const mf = new Miniflare({ ...config, resourcePersistencePath: directory, unsafeObservability: true });
   try {
-    await (await mf.getR2Bucket("EASTMONEY")).put("credit/catalog/corpus.json", JSON.stringify({ version: "credit-document-v2", builtAt: "2026-09-09", documents: [], blocks: [] }));
+    await (await mf.getR2Bucket("EASTMONEY")).put("credit/public/2026半年报.pdf", new Uint8Array([37, 80, 68, 70]));
     const request = (path, body) => mf.dispatchFetch("https://test.example/api/credit-assistant/" + path, {
       ...(body ? { method: "POST", body: JSON.stringify(body) } : {}), headers: { origin: "https://test.example", "content-type": "application/json" },
     });

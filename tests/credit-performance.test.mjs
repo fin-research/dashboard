@@ -6,13 +6,15 @@ import { AiGatewayResponseError } from "../src/lib/server/ai-gateway.ts";
 import { creditCacheParts } from "../src/lib/server/credit-checkpoint.ts";
 import { CreditEventHub } from "../src/lib/server/credit-events.ts";
 
-const doc = { id: "public-report", title: "2025年公司年报.pdf", relativePath: "定期报告/2025年公司年报.pdf",
-  originalKey: "originals/定期报告/2025年公司年报.pdf", sha256: "a".repeat(64), bytes: 1, authority: "audited", modifiedAt: "2026-09-10", blockCount: 1, ocrCount: 0 };
+const doc = { id: "public-report", title: "2025年公司年报.pdf", relativePath: "public/2025年公司年报.pdf",
+  originalKey: "public/2025年公司年报.pdf", sha256: "a".repeat(64), bytes: 1, authority: "audited", modifiedAt: "2026-09-10", blockCount: 1, ocrCount: 0 };
 const text = "2025年合并口径，单位亿元：流动资产120，流动负债80，存货20。速动资产按流动资产扣除存货计算。";
-const block = { id: "balance", documentId: doc.id, locator: "PDF第3页", text, extraction: "text", searchKey: "search/report.md" };
+const block = { id: "balance", documentId: doc.id, locator: "PDF第3页", text, extraction: "text", searchKey: "public/2025年公司年报.pdf" };
 const corpus = { version: "credit-document-v2", builtAt: "2026-09-10", documents: [doc], blocks: [block] };
 const customer = { name: "测试银行", confidentialityStatus: false, reportDate: "2026-09-10" };
-const base = { corpus, customer, question: "2025年公司流动比率、速动比率是多少？", history: [], credentials: { accountId: "test", gatewayId: "test", token: "test" } };
+const base = { corpus, customer, question: "2025年公司流动比率、速动比率是多少？", history: [],
+  credentials: { accountId: "test", gatewayId: "test", token: "test" },
+  semanticSearch: async () => [{ key: block.searchKey, text }] };
 const plan = { inScope: true, queries: ["2025流动资产", "2025流动负债", "2025速动比率口径"], attachments: [] };
 const input = (name, value, sourceId) => ({ name, value, sourceId, quote: text, unit: "亿元" });
 const attachmentAnswer = { status: "complete", paragraphs: [], gaps: [], attachments: [doc.id] };
@@ -103,24 +105,24 @@ test("repeated searches are cached, evidence is not duplicated, and a stalled ru
   assert.equal(searches, 1); assert.equal(decisions, 3);
 });
 
-test("an unavailable semantic service is tried only once per run, then local evidence remains usable", async () => {
+test("an unavailable semantic service is tried only once and reports the gap", async () => {
   let searches = 0, decisions = 0;
   const answer = await answerCreditQuestion({ ...base, semanticSearch: async () => { searches++; throw new Error("offline"); },
     generate: async (_credentials, _messages, schema, name) => {
       if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
       return schema.parse({ step: ++decisions === 1 ? { action: "search_many", queries: ["流动负债", "存货"] } : { action: "answer", answer: attachmentAnswer } });
     } });
-  assert.equal(searches, 1); assert.match(answer.warnings.join(""), /全文/);
+  assert.equal(searches, 1); assert.match(answer.warnings.join(""), /检索暂不可用/);
 });
 
-test("document reads provide relevant original text immediately instead of requiring another directory lookup", async () => {
+test("reads can revisit a retrieved PDF passage", async () => {
   let decisions = 0;
   await answerCreditQuestion({ ...base, generate: async (_credentials, messages, schema, name) => {
     if (name === "credit_scope") return schema.parse({ ...plan, queries: ["missing"] });
-    if (++decisions === 1) return schema.parse({ step: { action: "read", sourceIds: [doc.id] } });
+    if (++decisions === 1) return schema.parse({ step: { action: "read", sourceIds: [JSON.parse(messages[2].content).sources[0].id] } });
     const evidence = JSON.parse(messages[2].content);
     assert.equal(evidence.sources[0].text, text);
-    assert.equal(evidence.toolResults[0].directory[0].sourceId, block.id);
+    assert.equal(evidence.toolResults[0].sourceIds[0], evidence.sources[0].id);
     return schema.parse({ step: { action: "answer", answer: attachmentAnswer } });
   } });
 });
@@ -128,11 +130,11 @@ test("document reads provide relevant original text immediately instead of requi
 test("two failed independent reviews stop immediately without spending the remaining decision budget", async () => {
   let decisions = 0, reviews = 0;
   const drafts = [];
-  const answer = await answerCreditQuestion({ ...base, draft: draft => drafts.push(draft), generate: async (_credentials, _messages, schema, name) => {
+  const answer = await answerCreditQuestion({ ...base, draft: draft => drafts.push(draft), generate: async (_credentials, messages, schema, name) => {
     if (name === "credit_scope") return schema.parse(plan);
     if (name === "credit_review") { reviews++; return schema.parse({ approved: false, issues: ["口径不符"] }); }
     decisions++;
-    return schema.parse({ step: { action: "answer", answer: { ...attachmentAnswer, paragraphs: [{ text: "不支持的结论", citations: [{ sourceId: block.id, quote: text }] }] } } });
+    return schema.parse({ step: { action: "answer", answer: { ...attachmentAnswer, paragraphs: [{ text: "不支持的结论", citations: [{ sourceId: JSON.parse(messages[2].content).sources[0].id, quote: text }] }] } } });
   } });
   assert.equal(decisions, 2); assert.equal(reviews, 2);
   assert.equal(answer.status, "insufficient"); assert.deepEqual(answer.paragraphs, []);
@@ -148,7 +150,7 @@ test("a batch with an unsupported input does not commit even its valid first res
   await answerCreditQuestion({ ...base, generate: async (_credentials, messages, schema, name) => {
     if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
     if (++decisions === 1) return schema.parse({ step: { action: "calculate_answer", calculations: ["120", "999"].map(value => ({
-      label: "流动比率", expression: "a/b", resultUnit: "倍", decimals: 2, inputs: [input("a", value, block.id), input("b", "80", block.id)],
+      label: "流动比率", expression: "a/b", resultUnit: "倍", decimals: 2, inputs: [input("a", value, JSON.parse(messages[2].content).sources[0].id), input("b", "80", JSON.parse(messages[2].content).sources[0].id)],
     })), answer: attachmentAnswer } });
     const evidence = JSON.parse(messages[2].content);
     assert.deepEqual(evidence.calculations, []);
@@ -179,11 +181,11 @@ test("batch calculations reject a source absent from the public evidence snapsho
 
 test("a supported partial answer with a gap still receives independent review", async () => {
   let reviews = 0;
-  const answer = await answerCreditQuestion({ ...base, generate: async (_credentials, _messages, schema, name) => {
+  const answer = await answerCreditQuestion({ ...base, generate: async (_credentials, messages, schema, name) => {
     if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
     if (name === "credit_review") { reviews++; return schema.parse({ approved: true, issues: [] }); }
     return schema.parse({ step: { action: "answer", answer: {
-      status: "partial", paragraphs: [{ text: "流动资产120亿元", citations: [{ sourceId: block.id, quote: text }] }],
+      status: "partial", paragraphs: [{ text: "流动资产120亿元", citations: [{ sourceId: JSON.parse(messages[2].content).sources[0].id, quote: text }] }],
       gaps: ["还需其他期间明细"], attachments: [],
     } } });
   } });
@@ -232,10 +234,10 @@ test("a completed review checkpoint is reusable after a restart despite the new 
   t.mock.timers.enable({ apis: ["Date"] });
   const stored = new Map();
   const cache = { get: key => stored.get(key), put: (key, value) => stored.set(key, value) };
-  const first = await answerCreditQuestion({ ...base, cache, generate: async (_credentials, _messages, schema, name) => {
+  const first = await answerCreditQuestion({ ...base, cache, generate: async (_credentials, messages, schema, name) => {
     if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
     if (name === "credit_review") return schema.parse({ approved: true, issues: [] });
-    return schema.parse({ step: { action: "answer", answer: { ...attachmentAnswer, paragraphs: [{ text: "流动资产120亿元", citations: [{ sourceId: block.id, quote: text }] }] } } });
+    return schema.parse({ step: { action: "answer", answer: { ...attachmentAnswer, paragraphs: [{ text: "流动资产120亿元", citations: [{ sourceId: JSON.parse(messages[2].content).sources[0].id, quote: text }] }] } } });
   } });
   t.mock.timers.tick(1000);
   const second = await answerCreditQuestion({ ...base, cache, generate: async () => assert.fail("all model results have already been checkpointed") });
