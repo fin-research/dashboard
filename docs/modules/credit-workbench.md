@@ -35,7 +35,7 @@ Worker 通过 `HYPERDRIVE` 访问 Neon `credit` schema，migration 只放 `credi
 
 - `GET /api/credit?date=YYYY-MM-DD&month=YYYY-MM` 返回所选日期截面、前期汇总、周报事件、六个月批复和日历。`month` 可省略，默认所选日期所在月；返回该月及周边日历格中的额度与已用事件。非法日期/月为 400，早于历史覆盖起点或无记录为 404，连接异常为 503。
 - 周环比优先采用七天前的截面；历史不足七天时取更早的最近变更日。周报申请事件由 `diff.type` 决定，续期与扩额同日合并显示；本周内续期的机构不再列到期。到期日期从当前期限生成，旧期限被续期覆盖后不再提醒。首次历史导入作为基准，不虚构当日新增批复。
-- `PATCH /api/credit` 以 `operation`、`reportDate`（本次变更业务日）、`institutionName` 和 `changes` 写入申请。`changes.institution` / `changes.items` 仅传修改字段。续期须延长到期日，扩额须增加总额，撤销须明确更改状态；维护不产生授信申请事件。用户 ID 由 `locals.user.auth0Id` 注入，客户端不能指定作者或审计字段。
+- `PATCH /api/credit` 必须以 `operation`、`reportDate`（本次变更业务日）、`institutionName` 和 `changes` 写入申请；不再接受省略操作类型的旧请求。`changes.institution` / `changes.items` 仅传修改字段。续期须延长到期日，扩额须增加总额，撤销须明确更改状态；维护不产生授信申请事件。用户 ID 由 `locals.user.auth0Id` 注入，客户端不能指定作者或审计字段。
 - `POST /api/credit` 使用相同结构新增机构，至少包含机构性质、状态、保密协议状态。主体重复返回 409；成功后可继续维护全部详情。
 - 债券投资合计、一级发行存续额、收益凭证、拆借及总已用只读。债券分项的 `secondaryUsedAmount` 可编辑，`primaryUsedAmount` 由服务器提供；禁止通过 `usedAmount` 覆盖派生债券合计。所有写入校验同源、身份与 `credit.institution:update` 权限；GET 使用 `credit.institution:read`。所有响应 `Cache-Control: no-store`。
 - 已登记金额传 NULL 不能清零，API 返回400并提示填0，避免页面清空后误报保存成功；尚未登记的金额仍允许缺失。导入空白不覆盖原值，若分项额度继续继承非零值，返回逐机构警告；dry-run明确提示空白与零的区别。

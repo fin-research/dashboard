@@ -203,12 +203,18 @@ test("分项维护只追加该字段并在同一事务返回重建后的截面",
   assert.equal(Number(row.bond_investment_secondary_used),2);assert.equal(row.bond_investment_limit,null);assert.equal(row.status,null);
 });
 
-test("授信增量 PATCH 不需要版本且拒绝空变更", () => {
+test("授信增量 PATCH 须指明申请操作且拒绝空变更", () => {
   const base = {
+    operation: "maintenance",
     reportDate: "2026-08-21",
     institutionName: "甲银行",
   };
 
+  assert.equal(creditInstitutionUpdateSchema.safeParse({
+    reportDate: base.reportDate,
+    institutionName: base.institutionName,
+    changes: { institution: { notes: "旧请求" } },
+  }).success, false);
   assert.equal(creditInstitutionUpdateSchema.safeParse({
     ...base,
     changes: { institution: { status: "approved" } },
@@ -453,7 +459,7 @@ test('授信总已用按分项重算并警告原表差额，保密协议仅明�
 });
 
 test('授信布尔协议契约拒绝字符串及已删除的周报标记', () => {
-  const check = institution => creditInstitutionUpdateSchema.safeParse({ reportDate: '2026-08-21', institutionName: '甲', changes: { institution } }).success;
+  const check = institution => creditInstitutionUpdateSchema.safeParse({ operation: 'maintenance', reportDate: '2026-08-21', institutionName: '甲', changes: { institution } }).success;
   assert.equal(check({ confidentialityStatus: true }), true);
   assert.equal(check({ confidentialityStatus: false }), true);
   for (const value of ['signed', 'not_signed', 'unknown', 'false']) assert.equal(check({ confidentialityStatus: value }), false);

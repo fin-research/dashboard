@@ -90,7 +90,7 @@ test('旧台账导入按真实值登记残差；无客户关联非零值拒绝�
 });
 
 test('API 只允许债券二级净余额输入，移除两融收益权转让并拒绝非有限数值',()=>{
-  const valid=item=>creditInstitutionUpdateSchema.safeParse({reportDate:'2026-09-10',institutionName:'甲',changes:{items:[item]}}).success;
+  const valid=item=>creditInstitutionUpdateSchema.safeParse({operation:'maintenance',reportDate:'2026-09-10',institutionName:'甲',changes:{items:[item]}}).success;
   assert.equal(valid({type:'bond_investment',secondaryUsedAmount:-0.1}),true);
   assert.equal(valid({type:'bond_investment',usedAmount:1}),false);
   assert.equal(valid({type:'other',secondaryUsedAmount:1}),false);
