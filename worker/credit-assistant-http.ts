@@ -1,9 +1,6 @@
 import { getAgentByName } from "agents";
 import { loadCreditCorpus, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
-import { findCreditCustomers } from "../src/lib/server/credit-repository.ts";
-import { withPostgres } from "../src/lib/server/postgres.ts";
-import { canDownloadCreditDocument, creditCorpusForCustomer, isPublicCreditDocument, CREDIT_NDA_REQUIRED } from "../src/lib/server/credit-confidentiality.ts";
-import { creditCustomerSelectionSchema, creditQuestionSchema, type CreditSession } from "../src/lib/credit-assistant/types.ts";
+import { creditQuestionSchema } from "../src/lib/credit-assistant/types.ts";
 import type { SiteIdentity } from "../src/lib/identity.ts";
 import { creditAgentName } from "../src/lib/server/credit-session.ts";
 
@@ -19,22 +16,14 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
     return Response.json({ error: "请求来源不匹配" }, { status: 403, headers: PRIVATE_HEADERS });
   }
   try {
-    if (url.pathname === "/api/credit-assistant/institutions") {
-      if (request.method !== "GET") return new Response(null, { status: 405, headers: PRIVATE_HEADERS });
-      const query = (url.searchParams.get("q") ?? "").trim();
-      if (query.length > 200) return Response.json({ error: "客户名称不能超过200字" }, { status: 400, headers: PRIVATE_HEADERS });
-      const institutions = await withPostgres(env.HYPERDRIVE.connectionString, "credit-customer-search", client => findCreditCustomers(client, query));
-      return Response.json({ institutions }, { headers: PRIVATE_HEADERS });
-    }
-    if (["/api/credit-assistant/session", "/api/credit-assistant/session/new", "/api/credit-assistant/session/institution", "/api/credit-assistant/session/events"].includes(url.pathname)) {
+    if (["/api/credit-assistant/session", "/api/credit-assistant/session/new", "/api/credit-assistant/session/events"].includes(url.pathname)) {
       const newSession = url.pathname.endsWith("/new");
       const stream = url.pathname.endsWith("/events");
       const streamQuestion = request.method === "POST" && url.pathname === "/api/credit-assistant/session"
         && request.headers.get("accept")?.includes("text/event-stream");
       if (stream && request.method !== "GET") return new Response(null, { status: 405 });
-      if ((newSession || url.pathname.endsWith("/institution")) && request.method !== "POST") return new Response(null, { status: 405 });
+      if (newSession && request.method !== "POST") return new Response(null, { status: 405 });
       if (!["GET", "POST", "DELETE"].includes(request.method)) return new Response(null, { status: 405 });
-      let institutionName = (url.searchParams.get("institutionName") ?? "").trim();
       let forwarded = request;
       if (request.method === "POST") {
         if (Number(request.headers.get("content-length") ?? 0) > MAX_REQUEST_BYTES) return new Response(null, { status: 413 });
@@ -51,16 +40,11 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
         const body = new TextDecoder().decode(bytes);
         let input: unknown;
         try { input = JSON.parse(body); } catch { return Response.json({ error: "请求不是有效JSON" }, { status: 400 }); }
-        const parsed = (newSession || url.pathname.endsWith("/institution") ? creditCustomerSelectionSchema : creditQuestionSchema).safeParse(input);
-        if (!parsed.success) return Response.json({ error: "请输入问题并从列表中选择客户机构。" }, { status: 400, headers: PRIVATE_HEADERS });
-        institutionName = parsed.data.institutionName;
+        const parsed = (newSession ? creditQuestionSchema.partial() : creditQuestionSchema).safeParse(input);
+        if (!parsed.success || newSession && Object.keys(parsed.data).length) return Response.json({ error: "请输入问题。" }, { status: 400, headers: PRIVATE_HEADERS });
         forwarded = new Request(request.url, { method: "POST", headers: request.headers, body });
       }
-      if (!institutionName) return request.method === "GET" && !stream
-        ? Response.json({ turns: [], running: false, progress: "", error: null, startedAt: 0, customer: null }, { headers: PRIVATE_HEADERS })
-        : Response.json({ error: "请先输入客户名称并从列表中选择机构。" }, { status: 400, headers: PRIVATE_HEADERS });
-      if (!creditCustomerSelectionSchema.safeParse({ institutionName }).success) return new Response(null, { status: 400 });
-      const agent = await getAgentByName(env.CREDIT_AGENT, creditAgentName(userId, institutionName));
+      const agent = await getAgentByName(env.CREDIT_AGENT, creditAgentName(userId));
       let response = await agent.fetch(forwarded);
       if (streamQuestion && response.status === 202) {
         await response.body?.cancel();
@@ -74,31 +58,17 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
       return new Response(response.body, { status: response.status, headers });
     }
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405 });
-    const corpus = await loadCreditCorpus(env.CREDIT);
-    async function currentSession(): Promise<CreditSession | null> {
-      const institutionName = (url.searchParams.get("institutionName") ?? "").trim();
-      if (!creditCustomerSelectionSchema.safeParse({ institutionName }).success) return null;
-      const agent = await getAgentByName(env.CREDIT_AGENT, creditAgentName(userId, institutionName));
-      const result = await agent.fetch(new Request(url.origin + "/api/credit-assistant/session"));
-      if (!result.ok) throw new Error("Credit session unavailable");
-      return result.json<CreditSession>();
-    }
+    const corpus = await loadCreditCorpus(env.EASTMONEY);
     if (url.pathname === "/api/credit-assistant/materials") {
-      const session = await currentSession();
-      const allowed = creditCorpusForCustomer(corpus, session?.customer ?? null);
-      return Response.json({ builtAt: corpus.builtAt, documents: allowed.documents.map(d => ({ id: d.id, title: d.title,
-        confidentiality: isPublicCreditDocument(d) ? "public" : "confidential",
+      return Response.json({ builtAt: corpus.builtAt, documents: corpus.documents.map(d => ({ id: d.id, title: d.title,
         authority: d.authority, blockCount: d.blockCount, ocrCount: d.ocrCount, url: `/api/credit-assistant/files/${d.id}` })) }, { headers: PRIVATE_HEADERS });
     }
     const id = url.pathname.match(/^\/api\/credit-assistant\/files\/([a-f0-9]{24})$/)?.[1];
     const doc = id ? corpus.documents.find(d => d.id === id) : undefined;
     if (!doc) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
-    if (!isPublicCreditDocument(doc) && !canDownloadCreditDocument(doc, await currentSession(), url.searchParams.get("turnId"))) {
-      return Response.json({ error: CREDIT_NDA_REQUIRED }, { status: 403, headers: PRIVATE_HEADERS });
-    }
-    // Resolve only catalog-owned immutable keys; arbitrary R2 paths cannot be requested.
-    if (!isCreditOriginalKey(doc.originalKey)) throw new Error("Invalid catalog key");
-    const file = await env.CREDIT.get(doc.originalKey, { range: request.headers });
+    // Resolve only exact public PDF keys from the current R2 listing.
+    if (!isCreditOriginalKey(doc.originalKey)) throw new Error("Invalid public key");
+    const file = await env.EASTMONEY.get(`credit/${doc.originalKey}`, { range: request.headers });
     if (!file) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
     const isPdf = doc.originalKey.endsWith(".pdf");
     const headers = new Headers(PRIVATE_HEADERS);

@@ -1,16 +1,14 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { onMount, tick } from "svelte";
   import WorkbenchIcon from "../trading-research/WorkbenchIcon.svelte";
   import { portal } from "../portal";
   import { globalMessages } from "../global-messages";
   import { useAiClient } from "../ai-client.svelte";
-  import { customerAnswerText, creditCustomerSchema, confidentialityLabel, type CreditAnswer, type CreditCustomer, type CreditSession } from "./types";
+  import { customerAnswerText, type CreditAnswer, type CreditSession } from "./types";
   import CreditActivityView from "./CreditActivityView.svelte";
 
-  let { customerOptions = $bindable(null) }: { customerOptions?: CreditCustomer[] | null } = $props();
   const aiClient = useAiClient();
 
   let session = $state<CreditSession>({ turns: [], running: false, progress: "", error: null, startedAt: 0 });
@@ -20,15 +18,6 @@
   let loadError = $state("");
   let sending = $state(false);
   let creating = $state(false);
-  let customerName = $state("");
-  let activeInstitution = $state("");
-  let chosenCustomer = $state<CreditCustomer | null>(null);
-  const customers = $derived((customerOptions ?? []).filter(customer => customer.name.toLocaleLowerCase().includes(customerName.trim().toLocaleLowerCase())).slice(0, 20));
-  let searching = $state(false);
-  let searchError = $state("");
-  let showCustomers = $state(false);
-  let activeCustomer = $state(-1);
-  let customerInput = $state<HTMLInputElement>(null!);
   let restoreController: AbortController | undefined;
   let chat: HTMLDivElement;
   let textarea = $state<HTMLTextAreaElement>(null!);
@@ -38,13 +27,10 @@
   let revision = 0;
   const pendingQuestion = $derived(session.pendingQuestion || optimisticQuestion);
   const busy = $derived(sending || session.running || creating);
-  const selectedCustomer = $derived(chosenCustomer?.name === customerName.trim()
-    ? customerOptions?.find(customer => customer.name === chosenCustomer?.name) ?? chosenCustomer : null);
   const authorityNames: Record<string, string> = { audited: "审计报告", disclosure: "正式披露", internal: "业务材料", historical_reply: "历史答复", draft: "待部门确认" };
 
   async function api<T>(path: string, init?: RequestInit): Promise<T> {
-    const query = activeInstitution ? `${path.includes("?") ? "&" : "?"}institutionName=${encodeURIComponent(activeInstitution)}` : "";
-    const response = await fetch(`/api/credit-assistant/${path}${query}`, { ...init, signal: init?.signal ?? AbortSignal.timeout(30_000),
+    const response = await fetch(`/api/credit-assistant/${path}`, { ...init, signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: { "content-type": "application/json", ...init?.headers } });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? "请求未完成，请重试");
@@ -54,19 +40,15 @@
     streamController?.abort();
     streamController = undefined;
   }
-  function rememberInstitution(name: string) {
-    activeInstitution = name;
-    try { localStorage.setItem("credit-assistant:institution", name); } catch { /* Selection can still be used in this tab. */ }
-  }
   function watchSession() {
-    if (!mounted || !session.running || !activeInstitution) { stopStream(); return; }
+    if (!mounted || !session.running) { stopStream(); return; }
     if (streamController) return;
     const current = revision;
     const controller = new AbortController();
     streamController = controller;
     void aiClient.run({
-      title: `授信助手 · ${activeInstitution}`,
-      url: `/api/credit-assistant/session/events?institutionName=${encodeURIComponent(activeInstitution)}`,
+      title: "授信助手",
+      url: "/api/credit-assistant/session/events",
       signal: controller.signal,
       cancellable: false,
       parse: (value) => value as CreditSession,
@@ -97,7 +79,6 @@
     workspace?.scrollTo({ top: workspace.scrollHeight, behavior: "instant" });
   }
   async function refresh() {
-    if (!activeInstitution) return;
     restoreController?.abort();
     const controller = new AbortController();
     restoreController = controller;
@@ -108,7 +89,6 @@
       const next = await api<CreditSession>("session", { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]) });
       if (!mounted || current !== revision || controller.signal.aborted || restoreController !== controller) return;
       session = next;
-      if (!chosenCustomer && next.customer) chosenCustomer = next.customer;
       loadError = "";
       if (!session.running && !session.error) optimisticQuestion = "";
       if (followLatest) void scrollLatest();
@@ -116,54 +96,6 @@
       if (mounted && current === revision && !controller.signal.aborted) loadError = "历史对话未能加载，可重新连接或直接提问。";
     } finally {
       if (mounted && current === revision && restoreController === controller) { loading = false; watchSession(); }
-    }
-  }
-  function searchCustomers(event: Event) {
-    customerName = (event.currentTarget as HTMLInputElement).value;
-    activeCustomer = -1;
-    showCustomers = true;
-  }
-  async function loadCustomers() {
-    if (customerOptions !== null || searching) return;
-    searching = true; searchError = "";
-    try {
-      const result = await api<{ institutions: CreditCustomer[] }>("institutions");
-      if (!mounted || customerOptions !== null) return;
-      customerOptions = result.institutions.map(value => creditCustomerSchema.parse(value));
-      if (!chosenCustomer) chosenCustomer = customerOptions.find(customer => customer.name === activeInstitution) ?? null;
-    } catch (error) {
-      if (mounted) searchError = error instanceof Error ? error.message : "机构列表加载失败";
-    } finally { if (mounted) searching = false; }
-  }
-  function selectCustomer(customer: CreditCustomer) {
-    if (busy) return;
-    showCustomers = false;
-    if (chosenCustomer?.name === customer.name && activeInstitution === customer.name) {
-      customerName = customer.name; textarea?.focus({ preventScroll: true }); return;
-    }
-    revision++;
-    restoreController?.abort();
-    stopStream();
-    chosenCustomer = customer;
-    customerName = customer.name;
-    rememberInstitution(customer.name);
-    session = { turns: [], running: false, progress: "", error: null, startedAt: 0 };
-    optimisticQuestion = ""; loadError = "";
-    textarea?.focus({ preventScroll: true });
-    void refresh();
-  }
-  function customerKeydown(event: KeyboardEvent) {
-    if (event.isComposing || event.keyCode === 229) return;
-    if (event.key === "Escape") { showCustomers = false; return; }
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      showCustomers = true;
-      activeCustomer = Math.max(0, Math.min(customers.length - 1, activeCustomer + (event.key === "ArrowDown" ? 1 : -1)));
-      void tick().then(() => { if (mounted && showCustomers) document.getElementById(`credit-customer-${activeCustomer}`)?.scrollIntoView({ block: "nearest" }); });
-    } else if (event.key === "Enter") {
-      event.preventDefault();
-      const customer = customers[activeCustomer];
-      if (showCustomers && customer) void selectCustomer(customer);
     }
   }
   function resizeInput() {
@@ -174,7 +106,6 @@
   async function sendQuestion(value: string) {
     const text = value.trim();
     if (!text || busy) return;
-    if (!selectedCustomer) { globalMessages.error("请先输入客户名称并从列表中选择机构。"); customerInput?.focus(); return; }
     revision++;
     restoreController?.abort(); loading = false; loadError = "";
     stopStream();
@@ -186,12 +117,12 @@
     void scrollLatest();
     try {
       const next = await aiClient.run({
-        title: `授信助手 · ${selectedCustomer.name}`,
-        url: `/api/credit-assistant/session?institutionName=${encodeURIComponent(selectedCustomer.name)}`,
+        title: "授信助手",
+        url: "/api/credit-assistant/session",
         init: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: text, institutionName: selectedCustomer.name }),
+          body: JSON.stringify({ question: text }),
         },
         cancellable: false,
         parse: (value) => value as CreditSession,
@@ -205,8 +136,7 @@
       question ||= draft || text;
       optimisticQuestion = "";
       globalMessages.error(error instanceof Error ? error.message : "发送失败");
-      // Another tab may have started this customer's turn while history was
-      // loading. Restore it after a conflict without re-submitting the question.
+      // Another tab may have started a turn while history was loading.
       void refresh();
     } finally {
       sending = false;
@@ -226,19 +156,16 @@
   }
   async function newSession() {
     if (busy) return;
-    if (!selectedCustomer) { customerInput?.focus(); return; }
     revision++;
     restoreController?.abort(); loading = false;
     stopStream();
     creating = true;
     try {
-      const next = await api<CreditSession>("session/new", { method: "POST", body: JSON.stringify({ institutionName: selectedCustomer.name }) });
+      const next = await api<CreditSession>("session/new", { method: "POST", body: "{}" });
       if (!mounted) return;
       session = next;
       optimisticQuestion = "";
       question = "";
-      customerName = next.customer?.name ?? "";
-      showCustomers = false;
       loadError = "";
       await tick();
       resizeInput();
@@ -256,7 +183,7 @@
       const answer = latest.turns.find(t => t.id === turnId)?.answer;
       if (!answer) throw new Error("当前会话中没有该答复，请重新提问。");
       await navigator.clipboard.writeText(customerAnswerText(answer));
-      globalMessages.success(answer.disclosure?.blocked ? "已复制保密协议签署提示" : "已复制答复和资料来源");
+      globalMessages.success("已复制答复和资料来源");
     } catch (error) { globalMessages.error(error instanceof Error ? error.message : "复制失败，请重试"); }
   }
   function citations(answer: CreditAnswer): string[] { return [...new Set(answer.paragraphs.flatMap(p => p.citations.map(c => c.sourceId)))]; }
@@ -276,10 +203,6 @@
   function fileType(title: string) { return title.match(/\.([a-z0-9]+)$/i)?.[1]?.toUpperCase() || "文件"; }
   onMount(() => {
     mounted = true;
-    try { activeInstitution = localStorage.getItem("credit-assistant:institution") ?? ""; } catch { /* No persisted selection. */ }
-    customerName = activeInstitution;
-    chosenCustomer = customerOptions?.find(customer => customer.name === activeInstitution) ?? null;
-    void loadCustomers();
     void refresh();
     return () => { mounted = false; revision++; restoreController?.abort(); stopStream(); };
   });
@@ -288,7 +211,7 @@
 <div class="credit-chat" bind:this={chat}>
   <!-- Keep the component's root in place; only move its nested toolbar. -->
   <div class="chat-toolbar" use:portal={"#tr-topbar-actions"}>
-    <Button permission="credit.assistant:ask" data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button chat-button--new"} type="button" disabled={busy || !selectedCustomer} onclick={() => void newSession()}>
+    <Button permission="credit.assistant:ask" data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button chat-button--new"} type="button" disabled={busy} onclick={() => void newSession()}>
       <WorkbenchIcon name="plus" /><span>{creating ? "正在新建…" : "新对话"}</span>
     </Button>
   </div>
@@ -306,7 +229,7 @@
       <article class="chat-turn" aria-label="一轮对话">
         <div class="message message--user"><span class="sr-only">你：</span><p>{turn.question}</p></div>
         <div class="message message--assistant">
-          <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手{turn.answer.disclosure?.institutionName ? ` · ${turn.answer.disclosure.institutionName}` : ""}</span></div>
+          <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手</span></div>
           <div class="answer-content">
             {#if turn.answer.notice}<p class="answer-paragraph">{turn.answer.notice}</p>{/if}
             {#each turn.answer.paragraphs as paragraph}
@@ -364,38 +287,11 @@
     {/if}
   </div>
   <div class="composer-dock">
-    <div class="customer-picker">
-      <label for="credit-customer">客户名称</label>
-      <div class="customer-search">
-        <Input data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" class={"ui-input"} id="credit-customer" bind:ref={customerInput} bind:value={customerName} oninput={searchCustomers} onkeydown={customerKeydown}
-          onfocus={() => { showCustomers = true; }} onblur={() => { showCustomers = false; }}
-          type="text" role="combobox" aria-autocomplete="list" aria-expanded={showCustomers} aria-controls="credit-customers"
-          aria-activedescendant={showCustomers && activeCustomer >= 0 && customers[activeCustomer] ? `credit-customer-${activeCustomer}` : undefined}
-          autocomplete="off" maxlength={200} disabled={busy} />
-        {#if showCustomers}
-          <div class="customer-options">
-            <ul id="credit-customers" role="listbox" aria-label="匹配机构">
-              {#each customers as customer, index (customer.name)}
-                <li role="option" aria-selected={index === activeCustomer} id={`credit-customer-${index}`}>
-                  <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="ghost" class={"ui-button "} type="button" tabindex={-1} onpointerdown={event => event.preventDefault()} onclick={() => selectCustomer(customer)}>
-                    <span>{customer.name}</span><span>{confidentialityLabel(customer.confidentialityStatus)}</span>
-                  </Button>
-                </li>
-              {/each}
-            </ul>
-            {#if searching}<p role="status">正在加载机构列表…</p>
-            {:else if searchError}<p role="alert">{searchError}<Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="ghost" class={"ui-button "} type="button" onpointerdown={event => event.preventDefault()} onclick={() => void loadCustomers()}>重新加载</Button></p>
-            {:else if !customers.length}<p role="status">未找到机构</p>{/if}
-          </div>
-        {/if}
-      </div>
-      <span class="customer-status" aria-live="polite" title={selectedCustomer ? `授信列表快照：${selectedCustomer.reportDate}` : undefined}>{selectedCustomer ? confidentialityLabel(selectedCustomer.confidentialityStatus) : "请选择机构"}</span>
-    </div>
     <form data-permission="credit.assistant:ask" class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
       <Textarea data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" class={"ui-textarea textarea-ghost"} id="credit-question" placeholder="输入问题" bind:ref={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows={2} disabled={creating}></Textarea>
       <div class="composer-actions">
-        <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="default" class={"ui-button  chat-button chat-button--send"} type="submit" disabled={!selectedCustomer || !question.trim() || busy} aria-label={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></Button>
+        <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="default" class={"ui-button  chat-button chat-button--send"} type="submit" disabled={!question.trim() || busy} aria-label={busy ? "正在处理消息" : "发送消息"}><WorkbenchIcon name="arrow-up" /></Button>
       </div>
     </form>
   </div>
@@ -445,16 +341,6 @@
   .answer-error p, .chat-load-error p { margin: 0 0 12px; color: var(--text-2); }
   .chat-load-error { margin-bottom: 24px; }
   .composer-dock { position: sticky; z-index: 2; bottom: 0; width: 100%; padding: 16px 24px max(20px, env(safe-area-inset-bottom)); background: var(--bg-page); }
-  .customer-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; max-width: 832px; margin: 0 auto 12px; font-size: .875rem; }
-  .customer-picker label { font-weight: bold; color: var(--text-1); }
-  .customer-search { position: relative; flex: 1; min-width: min(100%, 220px); }
-  :global(.customer-search input[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { width: 100%; padding: 10px 12px; }
-  .customer-options { position: absolute; bottom: calc(100% + 8px); width: 100%; max-height: min(320px, 40dvh); overflow-y: auto; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); box-shadow: var(--shadow-card); }
-  .customer-options ul { margin: 0; padding: 4px; list-style: none; }
-  :global(.customer-options button[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; width: 100%; padding: 10px; text-align: left; }
-  :global(.customer-options button[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"] span:last-child), .customer-status { color: var(--text-3); }
-  .customer-options li[aria-selected="true"] { background: var(--brand-soft); border-radius: var(--radius-control); }
-  .customer-options p { margin: 0; padding: 12px; color: var(--text-2); }
   .chat-composer { max-width: 832px; margin-inline: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 160ms ease; }
   .chat-composer:focus-within { border-color: var(--brand); outline: 2px solid var(--brand); outline-offset: 2px; }
   :global(textarea[data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte"]) { display: block; width: 100%; max-height: 180px; padding: 0; border: 0; box-shadow: none; resize: none; min-height: 56px; background: transparent; border-radius: 0; }

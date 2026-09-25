@@ -7,10 +7,33 @@ import { corpusSchema, type CreditCorpus, type CreditBlock, type CreditCalculati
 import type { z } from "zod";
 
 export async function loadCreditCorpus(bucket: R2Bucket): Promise<CreditCorpus> {
-  const object = await bucket.get("catalog/corpus.json");
-  if (!object) throw new Error("授信材料尚未导入");
-  if (object.size > 24 * 1024 * 1024) throw new Error("材料索引超过上限，请拆分资料库");
-  return corpusSchema.parse(await object.json());
+  // The AI Search source and the downloadable files are the same public PDFs.
+  // Do not load the legacy catalog: it also contains internal material.
+  const objects: Array<{ key: string; size: number; uploaded: Date; httpEtag: string }> = [];
+  let cursor: string | undefined;
+  do {
+    const page = await bucket.list({ prefix: "credit/public/", limit: 500, cursor });
+    objects.push(...page.objects);
+    if (objects.length > 500) throw new Error("公开材料数量超过上限");
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  const documents = objects.filter(object => isCreditOriginalKey(object.key.replace(/^credit\//, "")))
+    .sort((a, b) => a.key.localeCompare(b.key, "zh-CN"))
+    .map(object => {
+      const relativePath = object.key.replace(/^credit\//, "");
+      const digest = bytesToHex(sha256(new TextEncoder().encode(object.key)));
+      return { id: digest.slice(0, 24), title: relativePath.slice("public/".length), relativePath,
+        originalKey: relativePath, bytes: object.size,
+        authority: relativePath.includes("审计报告") ? "audited" as const : "disclosure" as const,
+        modifiedAt: object.uploaded.toISOString(), blockCount: 0, ocrCount: 0 };
+    });
+  if (!documents.length) throw new Error("公开授信材料尚未上传");
+  return corpusSchema.parse({ version: "credit-document-v2",
+    builtAt: documents.reduce((latest, document) => document.modifiedAt > latest ? document.modifiedAt : latest, ""),
+    documents, blocks: [] });
+}
+export function isPublicCreditDocument(doc: CreditCorpus["documents"][number]): boolean {
+  return doc.originalKey === doc.relativePath && isCreditOriginalKey(doc.originalKey);
 }
 export function normalized(text: string): string { return text.normalize("NFKC").replace(/\s+/g, ""); }
 export function verifyQuote(source: CreditBlock | undefined, quote: string): void {
@@ -21,7 +44,7 @@ export function verifyQuote(source: CreditBlock | undefined, quote: string): voi
 function terms(query: string): string[] {
   const words = query.toLowerCase().match(/[a-z0-9.]+|[\u4e00-\u9fff]+/g) ?? [];
   return [...new Set(words.flatMap(w => /^[\u4e00-\u9fff]+$/.test(w) && w.length > 2
-    ? [w, ...Array.from({ length: w.length - 1 }, (_, i) => w.slice(i, i + 2))] : [w]))];
+    ? [w, ...[2, 3, 4].flatMap(width => Array.from({ length: Math.max(0, w.length - width + 1) }, (_, i) => w.slice(i, i + width)))] : [w]))];
 }
 function rankCreditBlocks(corpus: CreditCorpus, query: string): Array<{ block: CreditBlock; score: number }> {
   const tokens = terms(query);
@@ -44,20 +67,22 @@ export function lexicalSearch(corpus: CreditCorpus, query: string, limit = 16): 
 export type CreditSearchHit = { key: string; text: string; id?: string };
 export function searchResultEvidence(corpus: CreditCorpus, hits: Array<CreditSearchHit | string>): CreditBlock[] {
   const found = new Map<string, CreditBlock>();
+  const documents = new Map(corpus.documents.map(document => [document.originalKey, document]));
   for (const raw of hits.slice(0, 50)) {
     const hit = typeof raw === "string" ? { key: raw, text: "" } : raw;
     if (!hit.text.trim()) continue;
-    const file = corpus.searchFiles?.find(f => f.key === hit.key);
-    const documentId = file?.documentId ?? corpus.blocks.find(b => b.searchKey === hit.key)?.documentId;
-    if (!documentId || !corpus.documents.some(d => d.id === documentId)) continue;
-    const id = "search-" + bytesToHex(sha256(new TextEncoder().encode(JSON.stringify([documentId, hit.key, hit.text])))).slice(0, 32);
-    found.set(id, { id, documentId, text: hit.text, searchKey: hit.key,
+    const key = hit.key.replace(/^\/?credit\//, "");
+    const document = documents.get(key);
+    if (!document) continue;
+    const documentId = document.id;
+    const id = "search-" + bytesToHex(sha256(new TextEncoder().encode(JSON.stringify([documentId, key, hit.text])))).slice(0, 32);
+    found.set(id, { id, documentId, text: hit.text, searchKey: key,
       extraction: "ai_search", locator: "AI Search 检索片段" });
   }
   return [...found.values()].slice(0, 12);
 }
 export function isCreditOriginalKey(key: string): boolean {
-  return key.startsWith("originals/") && /\.(pdf|docx?|xlsx?)$/i.test(key)
+  return /^public\/[^/]+\.pdf$/i.test(key)
     && new TextEncoder().encode(key).byteLength <= 1024 && !/[\\\u0000-\u001f\u007f]/.test(key)
     && key.split("/").every(segment => segment !== "" && segment !== "." && segment !== "..");
 }

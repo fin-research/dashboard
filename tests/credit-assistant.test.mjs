@@ -10,10 +10,10 @@ import { customerAnswerText, stepSchema } from "../src/lib/credit-assistant/type
 const answerCreditQuestion = options => runCreditQuestion({ ...options, generate: (...args) => args[3] === "credit_scope"
   ? Promise.resolve(args[2].parse({ inScope: true, queries: [], attachments: [] })) : options.generate(...args) });
 
-const doc = { id: "a".repeat(24), title: "2025年审计报告.pdf", relativePath: "定期报告/2025年审计报告.pdf", sha256: "a".repeat(64), bytes: 123,
-  authority: "audited", originalKey: "originals/定期报告/2025年审计报告.pdf", modifiedAt: "2026-01-01", blockCount: 2, ocrCount: 0 };
-const blocks = [{ id: "a-1", documentId: doc.id, locator: "PDF第3页", text: "2025年合并报表，单位元。吸收投资收到的现金 3,090,000,000.00，2024年为0。", extraction: "text", searchKey: "search/a-1.md" },
-  { id: "a-2", documentId: doc.id, locator: "PDF第4页", text: "股东甲现金增资30.90亿元，其中6.00亿元计入实收资本，24.90亿元计入资本公积。", extraction: "text", searchKey: "search/a-2.md" }];
+const doc = { id: "a".repeat(24), title: "2025年审计报告.pdf", relativePath: "public/2025年审计报告.pdf", sha256: "a".repeat(64), bytes: 123,
+  authority: "audited", originalKey: "public/2025年审计报告.pdf", modifiedAt: "2026-01-01", blockCount: 2, ocrCount: 0 };
+const blocks = [{ id: "a-1", documentId: doc.id, locator: "PDF第3页", text: "2025年合并报表，单位元。吸收投资收到的现金 3,090,000,000.00，2024年为0。", extraction: "text", searchKey: "public/2025年审计报告.pdf" },
+  { id: "a-2", documentId: doc.id, locator: "PDF第4页", text: "股东甲现金增资30.90亿元，其中6.00亿元计入实收资本，24.90亿元计入资本公积。", extraction: "text", searchKey: "public/2025年审计报告.pdf" }];
 const corpus = { version: "credit-extract-v1", builtAt: "2026-09-07", documents: [doc], blocks };
 const opened = new Map(blocks.map(b => [b.id, b]));
 const calculation = { label: "元换算亿元", expression: "a/100000000", resultUnit: "亿元", decimals: 2,
@@ -58,13 +58,15 @@ test("search finds Chinese terms and current report facts", () => {
 });
 test("agent calculates, validates and independently reviews before delivering", async () => {
   let calls = 0;
-  const generate = async (_credentials, _messages, schema, name) => {
+  const generate = async (_credentials, messages, schema, name) => {
     calls++;
     if (name === "credit_review") return schema.parse({ approved: true, issues: [] });
-    return schema.parse({ step: calls === 1 ? { action: "calculate", calculation } : { action: "answer", answer: draft } });
+    const sourceId = JSON.parse(messages[2].content).sources[0].id;
+    const fromSearch = { ...calculation, inputs: calculation.inputs.map(input => ({ ...input, sourceId })) };
+    return schema.parse({ step: calls === 1 ? { action: "calculate", calculation: fromSearch } : { action: "answer", answer: draft } });
   };
   const answer = await answerCreditQuestion({ customer, question: "2025吸收投资现金换算亿元", corpus, history: [], credentials, generate,
-    semanticSearch: async () => ["search/unknown.md"] });
+    semanticSearch: async () => [{ key: doc.originalKey, text: blocks[0].text }] });
   assert.equal(calls, 3); assert.equal(answer.calculations[0].result, "30.90");
 });
 test("review rejection requires correction; unverified invented claims never reach result", async () => {
@@ -89,7 +91,7 @@ test("credit model is pinned to codex with xhigh effort and no provider fallback
   assert.equal(calls[0].body.model, "gpt-5.6-luna"); assert.equal(calls[0].body.reasoning.effort, "xhigh");
 });
 
-test("slow semantic search does not block canonical lexical evidence", async t => {
+test("slow AI Search reports unavailable evidence without citing old local text", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   let initialSources;
   let markSearchStarted;
@@ -104,8 +106,8 @@ test("slow semantic search does not block canonical lexical evidence", async t =
   await searchStarted;
   t.mock.timers.tick(CREDIT_SEARCH_TIMEOUT_MS);
   const answer = await answerPromise;
-  assert.ok(initialSources.some(s => s.id === "a-1"));
-  assert.match(answer.warnings.join(""), /全文精确检索/);
+  assert.deepEqual(initialSources, []);
+  assert.match(answer.warnings.join(""), /检索暂不可用/);
   assert.equal(answer.files[0].id, doc.id);
 });
 
@@ -128,18 +130,13 @@ test("follow-up questions retain prior attachments, evidence and calculations", 
 });
 
 test("AI Search passages are directly citable and mapped to current original files", () => {
-  const key = "search/定期报告/2025年度审计报告.pdf.md";
-  const pages = [{ ...blocks[0], id: "cover", text: "2025年度审计报告封面", searchKey: key },
-    { ...blocks[1], id: "late-note", locator: "PDF第102页", text: "关联方东方财富支付借款利息8,520,547.95元。", searchKey: key }];
-  const whole = { ...corpus, version: "credit-document-v2", blocks: pages,
-    searchFiles: [{ key, documentId: doc.id, bytes: 100, sha256: "b".repeat(64), part: 1 },
-      { key: key + ".part-002.md", documentId: doc.id, bytes: 100, sha256: "c".repeat(64), part: 2 }] };
+  const key = `credit/${doc.originalKey}`;
+  const whole = { ...corpus, version: "credit-document-v2", blocks: [] };
   const result = searchResultEvidence(whole, [{ key, text: "关联方东方财富支付借款利息8,520,547.95元。" }]);
   assert.equal(result[0].extraction, "ai_search");
   assert.equal(result[0].documentId, doc.id);
-  assert.equal(searchResultEvidence(whole, [{ key: key + ".part-002.md", text: "关联方借款利息" }])[0].text, "关联方借款利息");
-  assert.deepEqual(searchResultEvidence(whole, [{ key: "search/deleted.md", text: "伪造来源" }]), []);
-  assert.equal(result[0].text, pages[1].text);
+  assert.deepEqual(searchResultEvidence(whole, [{ key: "credit/public/未上传.pdf", text: "伪造来源" }]), []);
+  assert.equal(result[0].text, "关联方东方财富支付借款利息8,520,547.95元。");
   const indexOnly = searchResultEvidence({ ...whole, blocks: [] }, [{ key, text: "直接来自索引的新增内容50亿元" }])[0];
   verifyQuote(indexOnly, "新增内容50亿元");
   const answer = finalizeCreditAnswer({ status: "complete", paragraphs: [{ text: "新增内容50亿元", citations: [{ sourceId: indexOnly.id, quote: "新增内容50亿元" }] }], gaps: [], attachments: [] },
@@ -149,13 +146,12 @@ test("AI Search passages are directly citable and mapped to current original fil
 });
 
 test("original file keys preserve names while rejecting traversal and non-material paths", () => {
-  assert.ok(isCreditOriginalKey("originals/定期报告/2025年度/公司报告.pdf"));
-  assert.ok(isCreditOriginalKey("originals/业务/【请证投部&计财部确认】情况.docx"));
-  for (const key of ["originals/../secret.pdf", "originals//报告.pdf", "originals/报告.pdf\n", "originals/报告\\a.pdf", "catalog/corpus.json", "originals/file.exe"]) assert.equal(isCreditOriginalKey(key), false);
+  assert.ok(isCreditOriginalKey("public/2025审计报告.pdf"));
+  for (const key of ["public/../secret.pdf", "public//报告.pdf", "public/报告.pdf\n", "public/报告\\a.pdf", "catalog/corpus.json", "public/file.exe", "public/报告.docx"]) assert.equal(isCreditOriginalKey(key), false);
 });
 
 test("a multi-row search chunk preserves every returned row and its numeric context", () => {
-  const key = "search/财务报表.xlsx.md";
+  const key = doc.originalKey;
   const rows = [{ ...blocks[0], id: "borrowing-row", searchKey: key, text: "2025年 取得借款收到的现金 5000000000" },
     { ...blocks[1], id: "neighbor-row", searchKey: key, text: "2025年 分配股利利润或偿付利息支付的现金。筹资活动现金流出小计。支付其他与筹资活动有关的现金。" }];
   const text = rows.map(b => b.text).join("\n");
