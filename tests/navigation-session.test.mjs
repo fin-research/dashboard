@@ -162,7 +162,7 @@ test('client GET catalogue preserves static permissions and dynamic aliases', ()
     if (!methods.GET || id === '/trading-research/[view]' || id === '/credit-workbench/[[view]]') continue;
     assert.equal(pagePermission(id, id), methods.GET);
   }
-  for (const [path, permission] of [['/trading-research/secondary-bond-pool', 'bond.ledger:read'], ['/trading%2dresearch/credit', 'credit.institution:read'], ['/trading-research/credit-assistant/__data.json', 'credit.assistant:read']]) {
+  for (const [path, permission] of [['/trading-research/secondary-bond-pool', 'bond.ledger:read'], ['/trading%2dresearch/credit', 'credit.institution:read'], ['/trading-research/credit-assistant/__data.json', 'login']]) {
     assert.equal(pagePermission(path, '/trading-research/[view]'), permission);
   }
 });

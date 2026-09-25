@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
 import { creditAgentName } from "../src/lib/server/credit-session.ts";
@@ -16,7 +15,7 @@ export class Agent {
   sql() { return []; }
   getQueues() { return []; }
 } export async function getAgentByName(binding, name) { return binding.get(name); }`);
-const assistant = moduleUrl(`export { recoverQueuedCreditAnswers, CREDIT_SCOPE_REFUSAL } from ${JSON.stringify(new URL("../src/lib/server/credit-assistant.ts", import.meta.url).href)};
+const assistant = moduleUrl(`export { recoverQueuedCreditAnswers } from ${JSON.stringify(new URL("../src/lib/server/credit-assistant.ts", import.meta.url).href)};
 export async function answerCreditQuestion(options) { return globalThis.creditTestAnswer(options); }`);
 const workers = moduleUrl(`export const tracing = {enterSpan(...args) {return globalThis.creditTestTracing.enterSpan(...args);}};`);
 async function workerModule(file) {
@@ -28,15 +27,15 @@ async function workerModule(file) {
 const { CreditAgent } = await workerModule("credit-agent.ts");
 const { creditAssistantHttp } = await workerModule("credit-assistant-http.ts");
 const publicKey = "credit/public/年度报告.pdf";
-const doc = { id: createHash("sha256").update(publicKey).digest("hex").slice(0, 24), title: "年度报告.pdf" };
+const doc = { id: publicKey, title: "年度报告.pdf" };
 const origin = "https://test.example";
 const testUser = { id: "access-test", auth0Id: "auth0|test", email: "test@18.cn", issuedAt: 0, expiresAt: 9999999999 };
 function setup() {
   const { tracing, spans } = recordingCreditTracing();
   globalThis.creditTestTracing = tracing;
-  globalThis.creditTestAnswer = async options => ({ status: "complete", paragraphs: [], gaps: [], attachments: [doc.id],
-    sources: [], calculations: [], files: [{ id: doc.id, title: doc.title, url: `/api/credit-assistant/files/${doc.id}` }],
-    warnings: [], corpusVersion: options.corpus.builtAt, createdAt: new Date().toISOString() });
+  globalThis.creditTestAnswer = async () => ({ status: "complete", paragraphs: [], gaps: [],
+    sources: [], files: [{ id: doc.id, title: doc.title, url: `/api/credit-assistant/files/${encodeURIComponent(doc.title)}` }],
+    createdAt: new Date().toISOString() });
   const sessions = new Map();
   const reads = [];
   const env = { EASTMONEY: { list: async () => ({ objects: [{ key: publicKey, size: 4,
@@ -66,8 +65,8 @@ test("ordinary question creates a user session and serves only public files from
   const state = await (await app.request("session")).json();
   assert.equal(state.turns.length, 1);
   assert.equal(state.turns[0].answer.files[0].id, doc.id);
-  assert.equal((await app.request("files/" + doc.id)).status, 200);
-  assert.equal((await app.request("files/" + "b".repeat(24))).status, 404);
+  assert.equal((await app.request("files/" + encodeURIComponent(doc.title))).status, 200);
+  assert.equal((await app.request("files/" + encodeURIComponent("missing.pdf"))).status, 404);
   assert.ok(app.reads.includes(publicKey));
   assert.ok(app.reads.every(key => key.startsWith("credit/")));
 });

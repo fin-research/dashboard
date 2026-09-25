@@ -3,7 +3,7 @@ import {mockResources} from './fixtures.mjs';
 import {assistantSession} from './audit-fixtures.mjs';
 import {assistantRunning,assistantFailed,assistantRecovered} from './assistant-state-fixtures.mjs';
 
-test('desktop assistant processing records remain readable above the composer',async({page},testInfo)=>{
+test('desktop assistant search progress remains readable above the composer',async({page},testInfo)=>{
  test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
  await mockResources(page);await page.setViewportSize({width:1280,height:900});
  await page.route(/\/api\/credit-assistant\/session(?:\?|$)/,route=>route.fulfill({json:assistantRunning}));
@@ -13,9 +13,7 @@ test('desktop assistant processing records remain readable above the composer',a
  try{
   await page.goto('/credit-workbench/assistant');
   await page.getByRole('button',{name:'关闭 AI 面板',exact:true}).click();
-  await page.getByText('处理记录',{exact:true}).click();
-  await expect(page.getByRole('list',{name:'处理记录',exact:true})).toBeVisible();
-  await expect(page.getByText('检索材料 · 第 2 轮',{exact:true})).toBeVisible();
+  await expect(page.getByRole('status').getByText('正在检索资料',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'正在处理消息',exact:true})).toBeDisabled();
   const geometry=await page.locator('.composer-dock').evaluate(el=>({bottom:el.getBoundingClientRect().bottom,viewport:innerHeight}));
   expect(Math.abs(geometry.bottom-geometry.viewport)).toBeLessThanOrEqual(1);
@@ -62,7 +60,7 @@ test('desktop credit assistant supports ordinary chat and readable cited replies
   await expect(page.getByText(assistantSession.turns[0].answer.paragraphs[0].text,{exact:false})).toBeVisible();
   await page.getByRole('link',{name:'查看资料来源1',exact:true}).click();
   await expect(page.locator('#source-audit-turn-audit-source')).toBeFocused();
-  await expect(page.getByText('测试公司2026年半年度报告 · 第12页',{exact:true})).toBeVisible();
+  await expect(page.getByText('测试公司2026年半年度报告.pdf · AI Search 检索片段',{exact:true})).toBeVisible();
   await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-assistant-citation.png');
   await input.fill('请进一步核实最新月份指标。');
   await expect(page.getByRole('button',{name:'发送消息',exact:true})).toBeEnabled();

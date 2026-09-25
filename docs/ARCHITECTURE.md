@@ -31,7 +31,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 
 ## 服务端模块
 
-- 授信助手使用同一 Worker 内的 `CreditAgent`（Agents SDK + SQLite Durable Object），从独立 R2 `credit` 原件/解析文本及 AI Search `credit` 找证据，执行有来源的计算后通过统一 Gateway 生成并复核答复。入口、材料更新、数据边界与 Gateway 私有入口见 `docs/CREDIT_ASSISTANT.md`。
+- 授信助手使用同一 Worker 内的 `CreditAgent`（Agents SDK + SQLite Durable Object）保存用户对话；每轮直接调用 AI Search `credit` 检索公开 PDF，并通过统一 AI Gateway 生成一轮答复。入口与文件下载见 `docs/CREDIT_ASSISTANT.md`。
 
 - `src/lib/server/hotspots.ts` 读取结构化证据并调用模型。
 - `src/lib/server/hotspot-snapshots.ts` 负责最新快照读取、范围校验与追加写入。

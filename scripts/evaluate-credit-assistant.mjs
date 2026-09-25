@@ -1,14 +1,11 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
-import { corpusSchema, customerAnswerText } from "../src/lib/credit-assistant/types.ts";
-import { cloudflareClient } from "./credit-cloudflare-client.mjs";
-import { isPublicCreditDocument } from "../src/lib/server/credit-evidence.ts";
+import { writeFile, mkdir } from "node:fs/promises";
+import { creditAnswerText } from "../src/lib/credit-assistant/types.ts";
 import { SITE_ORIGIN, loginTestAccount, readAuthTestConfig } from "./lib/programmatic-login.mjs";
 import { readSse } from "../src/lib/server/ai-stream.ts";
 
 const cases = [
   { id: "material", question: "请提供东方财富证券2025年度审计报告。" },
-  { id: "capital", question: "2025年公司吸收投资收到的现金30.90亿元，主要是吸收哪里的投资？请核对主体、金额和用途分类，给出可向客户提供的答复和来源。" },
+  { id: "capital", question: "2025年公司吸收投资收到的现金30.90亿元，主要是吸收哪里的投资？请核对主体、金额和用途分类，并列出来源。" },
   { id: "borrowing", question: "2025年公司取得借款收到的现金50亿元，主要是什么用途，哪里借入的？请给出准确来源，材料未披露的不要推断。" },
   { id: "calculation", question: "2025年公司现金增资中，计入实收资本和资本公积分别占增资款的比例是多少？请计算并列明来源和公式。" },
   { id: "ratios", question: "请提供东方财富证券2025年合并口径的流动比率、速动比率及其计算口径。优先引用已披露指标；未披露对应口径或科目时请明确说明，不要用资产总额和负债总额替代。" },
@@ -19,17 +16,9 @@ const cases = [
 const selected = process.argv.find(a => a.startsWith("--case="))?.slice(7);
 if (selected && !cases.some(c => c.id === selected)) throw new Error("未知用例：" + selected);
 const baseArgument = process.argv.find(a => a.startsWith("--base-url="))?.slice(11);
-const base = baseArgument ? new URL(baseArgument).origin : undefined;
-if (base && base !== SITE_ORIGIN) throw new Error("线上验收仅允许项目生产域名，避免把测试登录凭据发送到其他来源");
-if (!base && !process.env.CF_AIG_TOKEN) throw new Error("本地验收需要 CF_AIG_TOKEN；线上验收使用 --base-url=https://eastmoney.hasbai.xyz");
-const config = base ? undefined : JSON.parse(await readFile("wrangler.jsonc", "utf8"));
-const prepared = base ? undefined : corpusSchema.parse(JSON.parse(await readFile(".credit-local/corpus/corpus.json", "utf8")));
-const ids = new Set(prepared?.documents.filter(isPublicCreditDocument).map(document => document.id));
-const corpus = prepared ? { ...prepared, documents: prepared.documents.filter(document => ids.has(document.id)),
-  blocks: prepared.blocks.filter(block => ids.has(block.documentId)),
-  searchFiles: prepared.searchFiles?.filter(file => ids.has(file.documentId)) } : undefined;
-const request = base ? undefined : await cloudflareClient();
-const httpSession = base ? await loginTestAccount(await readAuthTestConfig()) : undefined;
+const base = baseArgument ? new URL(baseArgument).origin : SITE_ORIGIN;
+if (base !== SITE_ORIGIN) throw new Error("线上验收仅允许项目生产域名，避免把测试登录凭据发送到其他来源");
+const httpSession = await loginTestAccount(await readAuthTestConfig());
 await mkdir(".credit-local/evaluations", { recursive: true });
 for (const item of cases.filter(c => !selected || selected === c.id)) {
   const started = Date.now();
@@ -37,21 +26,11 @@ for (const item of cases.filter(c => !selected || selected === c.id)) {
   progress("started");
   let result;
   try {
-    result = base ? await evaluateHttp(item, progress) : { answer: await answerCreditQuestion({ question: item.question, corpus, history: [],
-      credentials: { accountId: config.vars.CLOUDFLARE_ACCOUNT_ID, gatewayId: config.vars.AI_GATEWAY_ID, token: process.env.CF_AIG_TOKEN },
-      progress,
-      semanticSearch: async query => {
-        const response = await (await request("/ai-search/namespaces/default/instances/credit/search", { method: "POST",
-          headers: { "content-type": "application/json" }, body: JSON.stringify({ query, ai_search_options: {
-            retrieval: { retrieval_type: "hybrid", max_num_results: 50 }, query_rewrite: { enabled: false }, cache: { enabled: false },
-          } }) })).json();
-        return (response.result?.chunks ?? []).map(c => ({ id: c.id, key: c.item.key, text: c.text }));
-      },
-    }) };
+    result = await evaluateHttp(item, progress);
   } catch (error) {
     result = { error: error instanceof Error ? error.message : "验收失败" };
   }
-  const prefix = `.credit-local/evaluations/${item.id}${base ? "-production" : ""}`;
+  const prefix = `.credit-local/evaluations/${item.id}-production`;
   await writeFile(prefix + ".json", JSON.stringify({ question: item.question, ...result, elapsedMs: Date.now() - started, evaluatedAt: new Date().toISOString() }, null, 2));
   if (result.error) {
     console.error(JSON.stringify({ case: item.id, error: result.error }));
@@ -59,8 +38,8 @@ for (const item of cases.filter(c => !selected || selected === c.id)) {
     break; // Do not repeatedly consume requests when the provider is unavailable.
   }
   const { answer } = result;
-  await writeFile(prefix + ".md", `# ${item.question}\n\n${customerAnswerText(answer)}\n`);
-  console.log(JSON.stringify({ case: item.id, status: answer.status, sources: answer.sources.length, calculations: answer.calculations.length, elapsedMs: Date.now() - started }));
+  await writeFile(prefix + ".md", `# ${item.question}\n\n${creditAnswerText(answer)}\n`);
+  console.log(JSON.stringify({ case: item.id, status: answer.status, sources: answer.sources.length, elapsedMs: Date.now() - started }));
 }
 
 async function evaluateHttp(item, progress) {

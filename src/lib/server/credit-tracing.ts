@@ -7,22 +7,13 @@ interface RuntimeSpan { setAttribute(key: string, value: string | number | boole
 export interface CreditTracing {
   enterSpan<T>(name: string, callback: (span: RuntimeSpan) => T): T;
 }
-type Outcome = "ok" | "error" | "cache" | "fallback" | "complete" | "partial" | "insufficient" | "refused_scope" | "recovering";
+type Outcome = "ok" | "error" | "complete" | "partial" | "insufficient" | "recovering";
 export type CreditTraceAttributes = {
-  "credit.stage"?: "scope" | "decision" | "review";
+  "credit.stage"?: "decision";
   "credit.outcome"?: Outcome;
-  "credit.step"?: number;
-  "credit.input_chars"?: number;
   "credit.source_count"?: number;
-  "credit.query_count"?: number;
-  "credit.search_round"?: number;
-  "credit.calculation_index"?: number;
-  "credit.calculation_count"?: number;
-  "credit.input_count"?: number;
   "credit.model_calls"?: number;
   "credit.search_calls"?: number;
-  "credit.review_approved"?: boolean;
-  "credit.fallback_reason"?: "unavailable" | "no_allowed_results" | "not_configured" | "checkpoint";
 };
 type Attributes = Record<string, string | number | boolean | undefined>;
 type Result<T> = { ok: true; value: T } | { ok: false; error: unknown };
@@ -82,7 +73,7 @@ export class CreditTrace {
       "gen_ai.provider.name": AI_GATEWAY_PROVIDER, "gen_ai.request.model": AI_GATEWAY_MODEL,
       "credit.reasoning_effort": "xhigh" }, callback);
   }
-  tool<T>(name: "load_materials" | "search_many" | "search" | "ai_search" | "lexical_search" | "read" | "calculate" | "calculate_batch" | "finalize_answer" | "model_checkpoint",
+  tool<T>(name: "ai_search",
     attributes: CreditTraceAttributes, callback: (span: CreditSpan) => T | Promise<T>): Promise<T> {
     return this.run(`execute_tool ${name}`, { ...attributes, "gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": name }, callback);
   }

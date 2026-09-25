@@ -761,7 +761,7 @@
       "id": "credit-assistant",
       "url": "/credit-workbench/assistant",
       "kind": "screenshot",
-      "state": "empty/cited-reply/processing/error/retry",
+      "state": "empty/cited-reply/search-progress/error/retry",
       "evidence": [
         {
           "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
@@ -776,7 +776,7 @@
         },
         {
           "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
-          "test": "desktop assistant processing records remain readable above the composer",
+          "test": "desktop assistant search progress remains readable above the composer",
           "projects": [
             "desktop"
           ],
