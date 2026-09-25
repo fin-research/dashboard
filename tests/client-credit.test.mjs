@@ -105,7 +105,7 @@ test('credit import keeps static manual mappings and automatically links clear n
 });
 
 test('API rejects edits to derived total and financing usage but permits other components',()=>{
-  const input=changes=>({reportDate:'2026-09-04',institutionName:'甲',changes});
+  const input=changes=>({operation:'maintenance',reportDate:'2026-09-04',institutionName:'甲',changes});
   for(const type of ['yield_certificate','interbank_lending']) assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type,usedAmount:4}]})).success,false);
   assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type:'bond_investment',secondaryUsedAmount:-4}]})).success,true);
   assert.equal(creditInstitutionUpdateSchema.safeParse(input({institution:{totalUsed:5}})).success,false);
