@@ -50,15 +50,15 @@ test('desktop credit assistant supports ordinary chat and readable cited replies
   await mockResources(page);
   await page.setViewportSize({width:1280,height:900});
   let sessionAttempts=0;
-  await page.route('**/api/credit-assistant/session',route=>route.fulfill(++sessionAttempts===1?{status:503,json:{error:'会话暂不可用'}}:{json:assistantSession}));
+  await page.route('**/api/credit-assistant/session',route=>route.fulfill({json:++sessionAttempts===1?{turns:[],running:false,progress:'',error:null,startedAt:0}:assistantSession}));
   await page.goto('/credit-workbench/assistant');
   const input=page.getByRole('textbox',{name:'输入消息',exact:true});
   await expect(input).toHaveAttribute('placeholder','输入问题');
   await expect(page.getByRole('button',{name:'发送消息',exact:true})).toBeDisabled();
   await expect(page.getByRole('combobox',{name:'客户名称',exact:true})).toHaveCount(0);
+  await expect(page.getByText('有什么需要核实？',{exact:true})).toBeVisible();
   await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-assistant-empty.png');
-  await expect(page.getByRole('alert')).toContainText('历史对话未能加载');
-  await page.getByRole('button',{name:'重新连接',exact:true}).click();
+  await page.reload();
   await expect(page.getByText(assistantSession.turns[0].answer.paragraphs[0].text,{exact:false})).toBeVisible();
   await page.getByRole('link',{name:'查看资料来源1',exact:true}).click();
   await expect(page.locator('#source-audit-turn-audit-source')).toBeFocused();
