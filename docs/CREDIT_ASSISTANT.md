@@ -1,165 +1,49 @@
 # 授信助手
 
-入口：`/credit-workbench/assistant`，归属首页一级授信工作台；`/credit-assistant` 和 `/trading-research/credit-assistant` 重定向到新入口。面向内部同事生成供客户使用的答复和资料来源，不自动向客户发送消息。
+入口为 `/credit-workbench/assistant`；旧 `/credit-assistant` 和 `/trading-research/credit-assistant` 重定向到该入口。面向内部同事生成供客户使用的答复和资料来源，不自动向客户发送消息。
 
-界面为单一聊天流，不展示问答/材料双模块、材料目录或预设提问案例。用户在底部输入框提问或索取文件，答复内的附件卡片直接下载原件（`?download=1`）；全文证据有明确 PDF 页码时来源链接可打开原页，AI Search 片段仅标记检索片段并链接原件，不虚构页码。Enter 发送、Shift + Enter 换行，中文输入法确认不会触发发送。问题无业务字数上限，仍拒绝空输入；HTTP 请求体保留 1 MiB 的内存保护上限。
+## 公开资料边界
 
-提交后由统一 AI SSE 推送模型公开的 reasoning summary，并在完成时一次性返回完整会话。`progress` 数据是纯文本 summary，`result` 数据是完整 `CreditSession` JSON；不向浏览器发送 `output_text` 正文增量、结构化工具 JSON、引文 ID 或原始 reasoning。summary 只显示在全局 AI 面板；业务聊天保留当前活动、用时与“处理记录”展开入口，不使用固定步骤进度条或完成勾选。记录按实际执行顺序保存问题判断、检索、分析、阅读、核算、整理和复核，最终答复只由完成结果展示。仅任务进行中保持 SSE 连接，结束即关闭；中断后重新请求 events 取得最近 summary 与最终会话，不重复提交问题。正在生成时可起草下一条消息；进行中和失败的问题保存在会话中，刷新后仍可查看或重试。
+唯一问答语料为 R2 `eastmoney/credit/`：`originals/` 存公开原件，`search/` 存供 AI Search 索引的 Markdown，`catalog/corpus.json` 存当前公开目录与本地全文证据。公开材料仅限原件路径位于顶层 `定期报告/`、路径与目录一致的文件；审计或披露标签本身不扩大公开范围。准备脚本只解析这个目录，上传脚本再次按此路径筛选，Worker 加载目录时拒绝任何非公开文档或悬空证据。旧 R2 `credit` 桶不再绑定到生产 Worker。
 
-输入框上方的“客户名称”从候选机构中选择，也支持方向键、Enter。工作台在组件实例内保留已加载授信报表的机构名称、保密状态和快照日期，切到问答直接复用；直接打开问答且没有列表时仅加载一次完整候选列表。输入过程仅本地过滤（最多展示20条，匹配范围是完整列表），不防抖请求后端。此缓存不跨 SSR 请求共享、不持久化完整台账，离开工作台实例即释放。
+AI Search `credit` 的数据源为 R2 `eastmoney`，只包含 `credit/search/**`，排除原件与目录；发布脚本只允许该前缀下的顶层 `定期报告/` 公开材料。原件、搜索文本和目录分别验证 SHA-256；目录发布和索引完成分别验收。搜索返回的 key 去掉 `credit/` 前缀后必须匹配当前目录中的搜索文件，否则不能作为答复证据。AI Search 只调用 `search()`，不调用其生成回答接口。每次检索请求 50 个结果；最多 3 轮、每轮最多 3 个并行查询，总共选入 12 个完整片段。
 
-选择客户与保密标签立即在前端更新，不调用 `POST session/institution`，不等待后端检查协议，也不清空尚未发送的输入。后台仅以 GET 恢复该用户/客户的历史对话，恢复期间仍可输入、发送和切换；迟到响应按版本隔离。没有材料内容的空闲会话读取不查协议。有历史内容或正在生成的会话读取仍按现行权限披露。第一次提交问题可直接初始化客户会话，由后端查询当前客户及保密协议；客户端不提交保密标志，也不能通过前端快照或对话中的自述授权。一次生成使用提交时确认的客户协议快照，生成结束不再重复查询协议和材料目录。
+线上迁移先运行 `node scripts/migrate-public-credit.mjs` 只读盘点，再使用 `--apply` 复制并校验公开对象、发布公开目录、切换 AI Search 数据源并启动索引。代码经合并队列和 Cloudflare Git 发布、线上读取及检索验证通过后，运行 `--apply --remove-source` 从旧 `credit` 桶删除已迁出的公开对象并更新旧目录；旧桶的其余资料不进入新问答链路。后续更新使用 `scripts/prepare-credit-corpus.py` 和 `scripts/upload-credit-corpus.mjs`，只发布公开目录。材料原件、全文和本地证据不提交 Git。
 
-## 保密规则
+## 问答与会话
 
-- 仅原件路径与目录一致且位于顶层 `定期报告/` 的文件可公开；其他目录及未识别旧路径全部需要保密协议，审计/披露标签不代表可公开。只有布尔值 `true` 可以访问保密材料。
-- `定期报告与审计` 改名为 `定期报告`；`风险控制指标监管报表专项审计报告2025.pdf` 移至 `风控与监管指标/2025年/`；`风控与监管指标/历年汇总/监管指标.xlsx` 移至 `定期报告/财务与监管指标.xlsx`。其他风控统计文件仍保密。
-- 未签署机构的模型上下文仅含公开目录、公开原文和当前仍可提供的同机构历史答复；AI Search 的受限结果只用于服务端判断材料是否存在，不进入生成或复核上下文。明确索取受限原件时无需模型即可拒绝；工具读取、附件、引文或计算输入引用受限 ID 时直接拒绝。公开证据不能完整回答且存在受限检索结果时返回统一拒绝答复。
-- 拒绝答复固定为“该机构尚未签署保密协议，请提交授信流程签署保密协议之后方可提供该数据。”，不携带数据、引文、计算、附件或原始模型的补充说明。
-- 一旦当前证据与模型缺口已确定只能返回上述固定拒绝，在进入计算、引文修复或独立复核前立即结束，不再为不会披露的正文消耗复核模型。
-- 每份答复记录客户和模型接触的文档范围，覆盖正文、附件、未引注说明及历史上下文。正在生成的答复与进度摘要沿用提交时的权限，不在完成时复查；后续新的会话读取、复制、下载和追问仍按当时状态处理，撤销协议、文件退出目录或调整为保密会阻止后续提供受限历史。已签署机构生成时接触过保密目录的答复会保守地按保密历史处理。
-- 原件链接携带 `institutionName` 和 `turnId`，保密文件仅在当前登录用户对应客户会话的该轮答复确实提供过附件或来源，且机构当前已签署时允许读取。其他用户拿到同一个链接不能读取该用户的保密附件。直接拼 ID、旧会话链接、HEAD 和 Range 均遵守同一规则，校验通过前不读取原件字节。公开材料仍须通过全站登录校验。
+界面是单一聊天流，底部直接输入问题，无机构选择、协议标签、材料目录或预设案例。Enter 发送，Shift + Enter 换行，中文输入法确认不发送。空输入拒绝，请求体保留 1 MiB 上限。答复的附件卡片直接下载原件；有确切 PDF 页码的全文来源可打开原页，AI Search 片段仅标记为检索片段，不虚构页码。
 
-## 方案
+按已验证的 `user.auth0Id` 派生一份用户级 CreditAgent SQLite Durable Object 会话；客户端不能提交用户 ID。不同用户隔离，同一用户跨浏览器恢复会话。新对话在同一 DO 中归档原会话，再清空当前上下文。旧的按用户加机构命名的 DO 保留历史，不自动并入公开会话，也不作为新会话的模型上下文。
 
-在 Dashboard 的自定义 Worker 内使用 Cloudflare Agents SDK。`authorizeRequest` 返回的已验证 `user.auth0Id` 与客户名称经 SHA-256 生成固定 DO 名称；不能从用户输入、Header 或 Cookie 接受用户 ID。相同用户和客户在不同浏览器恢复同一份会话，不同用户或客户隔离。浏览器只在 localStorage 保存上次选择的机构名称，不保存答复/材料；每次内容访问仍需登录。
+提交后 `schedule()` 持久化问答任务。统一 AI SSE 只发送纯文本 `progress` reasoning summary、完整终态 `result` 会话或 `error`；不发送正文增量、原始 reasoning、工具 JSON 或引文 ID。summary 在全局 AI 面板显示，聊天只显示当前活动、用时、可展开的处理记录和完成答复。断线重新连接 events，不重复提交。运行中可以起草下一条；刷新后可查看或重试失败问题。
 
-通过 `schedule()` 持久化到 SQLite Durable Object alarm 后执行问答；断线不终止任务，重新请求事件流恢复最近模型 summary，并在完成时取得完整会话。活动记录与完成答复通过 `setState` 保存，活动记录为有序追加列表（最多64条，连续相同事件去重），不再生成 `completedStages`。SSE 不逐 token 推送或保存草稿正文，只发送 `progress` summary 与终态 `result`；完成答复与问题持久化后不会因实例重启丢失。旧队列迁移仍先写幂等定时任务再移除旧队列记录。“新对话”在同一个 DO 的 `credit_conversation_archive` 表中归档现有对话后清空当前上下文，保留客户。此前随机 Cookie 对应的 DO 不自动归属任何用户，也不删除原存储。
+服务端先判断问题范围并规划检索；仅索取原件可直接选当前目录的文档 ID。其他问题经语义检索取证，AI Search 无结果或不可用时回退当前公开目录的全文关键词检索。每次语义检索最多等 60 秒，失败后本轮不反复等待。模型只看公开目录、当前读取证据和该用户公开会话历史。范围外固定回答“我只能回答授信业务、公司数据及相关资料问题，无法处理与这些内容无关的请求。”资料不足明确列出缺口，不猜测受限或未披露数据。
 
-已成功的模型响应与检索结果写入同一DO内部的 `credit_run_cache` 检查点表，不进入会话HTTP/SSE响应。键包含本轮ID、材料版本、客户权限快照、完整输入、Prompt和Schema；不跨用户、客户或问题复用。数据按小块在同步SQLite事务内原子保存，避免单行尺寸上限；新问题提交后仅清理上一问题的临时缓存，不删除对话历史。代码更新或平台重置交给Agents SDK恢复原定时任务，重跑编排时复用已成功的外部调用，尚未成功持久化的调用仍可能重做。模型429/输出错误等仍遵守单次尝试，不借恢复机制自动重试。12分钟总时限从首次提交计起，恢复不重置预算。
+所有生成与复核共用 `src/lib/server/ai-gateway.ts`：`credit_answer` 固定 `custom-codex/responses`、`gpt-5.6-luna`、`xhigh`、单次尝试。当前提示词在 `src/lib/server/credit-assistant.ts`。模型最多 8 个决策步骤；连续 2 步没有新增证据/计算时仅答复。独立复核最多 2 次；一轮总时限 12 分钟。会话最多 30 轮或约 1 MiB 已保存内容，达到上限提示新建会话。
 
-SSE心跳只在进行中的连接上每20秒执行轻量 `SELECT 1` 检测当前实例是否仍有效；代码更新令旧实例存储失效时关闭旧流，前端重新挂载或重新打开后由统一 AI 客户端再次请求 events。此检查不查询机构/保密状态、不读取材料，不恢复前端轮询。
+模型输出、检索结果以同一 DO 的 `credit_run_cache` 检查点保存，不进入 HTTP/SSE。键包含本轮 ID、目录版本、完整输入、Prompt 和 Schema；不跨用户或问题复用。Agents SDK 恢复定时任务时复用已成功持久化的外部调用；尚未持久化的调用可能重做，429 仍不自动重试。活动记录最多 64 条，连续相同事件去重。SSE 心跳每 20 秒检查实例状态，完成即关闭。
 
-```text
-本机材料 ── 只读解析 / OCR ── R2 credit
-                              ├─ originals/ 原件
-                              ├─ search/ 分类目录/原文件名.md ── AI Search credit 自动分片
-                              └─ catalog/corpus.json 当前有效资料目录与全文
+## 证据与运行追踪
 
-工作台 ── /api/credit-assistant/* ── CreditAgent
-                                     ├─ 范围判断 + 一次检索规划 → 范围外拒答 / 仅索取原件直接返回
-                                     ├─ 最多3个查询并行检索 → 去重证据快照 + 原件卡片
-                                     ├─ 全文回退 / 引文校验 / Decimal 批量计算并填入答复
-                                     └─ AI Gateway custom-codex → gpt-5.6-luna / xhigh
-                                         └─ SSE progress summary → 独立证据复核 → result 完整答复
-```
+PDF 按实际页码定位；扫描页标注 OCR。Word 保留段落与表格顺序，Excel/XLS 保留工作表、行、单元格、单位、公式及缓存值。正式审计和披露优先；文件修改时间不代表报告期。答复每段必须引用已读取的连续原文；引用、附件和计算输入只接受当前目录中的 ID。四则运算用 Decimal 和有界语法，输入数值须出现在原文中。复核校验主体、合并范围、报告期和单位；模型复核不代替人工核验。
 
-R2 保留原始文件名和分类目录，例如 `originals/定期报告/2025年度/公司审计报告.pdf` 与 `search/定期报告/2025年度/公司审计报告.pdf.md`。AI Search 只调用 `search()`，不调用其生成回答接口。其返回片段可直接作为来源和计算输入，使用文档、对象 key 与文本摘要生成稳定来源 ID。对象 key 必须映射到当前权限允许的材料目录（`searchFiles`，旧 `searchKey` 兼容），不能自由构造下载地址；不为引用重新检索全文、不改写或截取返回片段。引用和计算涉及的原文件自动生成附件卡片，无需模型额外列入 attachments。索引同步与目录发布仍分别验收；直接引用索引片段不代表已核对最新原件中的页码或文本一致性。
+`worker/credit-agent.ts` 通过 Workers `tracing.enterSpan` 记录 `invoke_agent`、`chat`、`execute_tool`；节点只带固定标签、计数、耗时、错误类别和不透明标识，不记录用户 ID、问题、材料正文、Prompt、推理或答复。失败按模型、材料、时限等类别提示并附本轮 UUID。`credit_operation`、`credit_answer_completed` 和 `credit_answer_failed` 共享 `run_id`。
 
-AI Search 没有可用结果、不可用或超时时，才使用 Worker 内存中的全文关键词检索。该过程不执行 D1 查询，但占用执行计算；R2 目录读取、DO 请求/持续连接与会话 SQLite 存储分别产生对应资源用量。SSE 仅在运行时保持连接、完成即关闭，以减少空闲持续连接用量。
-
-每次语义检索等待最多 60 秒，且不超过本轮剩余时间。规划器一次给出最多3个互补查询，并行执行；同轮及后续重复查询按规范化查询词去重。任何语义检索不可用或超时后，本次任务的后续检索直接使用当前全文，避免每一步重复等待60秒。缓存仅属于本次执行，不跨用户、客户或材料版本共享。
-
-错误明确区分模型超时、繁忙/限额、请求配置、输出中断/格式问题、材料目录加载失败与总时限；不把任意模型异常都提示成“检查材料索引”。错误附本轮UUID，`credit_operation` / `credit_answer_completed` / `credit_answer_failed` 记录同一 `run_id`、阶段耗时、模型/检索次数、输入字符数及安全错误类别，Gateway metadata 使用 `credit_run_id` 关联。不记录问题、材料正文、推理或上游错误体。HTTP 429仍立即结束，不自动切换Provider或重试。
-
-2026-09-10排查实测捕获 `SqlError: Durable Object reset because its code was updated`，同时测试会话的活动多次从范围判断重新开始。这证明发布重启会导致旧编排重跑，不能据旧版通用提示推断是检索轮数或索引故障。旧日志缺少问题ID，不能据此确认用户此前那一次错误的唯一原因。
-
-本功能使用 `credit_answer` 任务类型，固定 `custom-codex/responses`、`gpt-5.6-luna`、`reasoning.effort=xhigh`，不切换 Provider。其余前端 AI 任务使用同一模型和推理强度；可重试失败时仅重试同一 Provider 一次。所有生成请求和复核请求复用 `src/lib/server/ai-gateway.ts`，使用既有 `CF_AIG_TOKEN` Secret 和 Gateway BYOK。
-
-当前提示词均在 `src/lib/server/credit-assistant.ts`：范围与检索规划 `credit-scope:v2-plan`、主循环 `credit-assistant:v4-batched`、独立复核 `credit-review:v1`。范围判断覆盖授信流程及公司经营、财务、股东、融资、风控、监管资料，也允许相关连续追问与格式整理。范围外问题在材料检索前返回固定文案“我只能回答授信业务、公司数据及相关资料问题，无法处理与这些内容无关的请求。”，不附来源或文件。主循环还可通过 `refuse` 动作拒答；范围判定失败不视为允许。
-
-规划器只看当前允许的文件目录和已授权历史，不直接回答数据。纯索取文件可用一次模型调用选出文档ID，程序校验目录与权限后生成原件卡片，无需全文检索、写作与复核模型。混合的数据/解释/计算请求必须走取证链路。
-
-主循环每次只传一份去重的已读证据快照、计算结果和工具记录，完整保留选中片段及对话历史，不反复追加相同检索文本。按文档ID读取时直接附上与问题相关的原文和相邻块，同时保留来源目录，减少“先取目录、再取页面”的模型往返。`calculate_answer` 一次最多8项相互独立的计算，程序验证输入、用Decimal计算，并替换答复中的 `{{calc-N}}` 占位；仍须经过引文和独立语义复核。普通逐步 `calculate` 保持兼容。
-
-并行检索共用每轮12个完整片段的上下文预算，按查询交错选择并优先新增证据，不把三个查询机械堆成36个片段。每次AI Search仍明确请求50个结果，选中的文本、表格不截断；后续读取可补充具体上下文。
-
-流动比率/速动比率优先引用材料已披露值及其口径，直接引用不强制重算。自行计算时必须有相应科目和剔除项证据；未区分流动/非流动或未披露定义时明确缺口，不用总资产/总负债冒充流动比率。此优化不降低指定模型的 `xhigh` 推理级别。
-
-## 运行追踪
-
-`worker/credit-agent.ts` 使用 Workers 原生 `tracing.enterSpan`，由 `src/lib/server/credit-tracing.ts` 包装自定义编排，不改用 AI SDK、Think 或其他模型 Provider。配置中的追踪开关与持久化必须保持开启。
-
-- 每个实际执行的问答 attempt 建立 `invoke_agent CreditAgent`，包含材料目录加载至最终答复保存的全过程。已完成或已失效的重复任务不建立虚假运行记录。
-- 范围规划、每个决策步骤及独立复核建立 `chat gpt-5.6-luna`，以 `credit.stage` 和 `credit.step` 区分。跨度覆盖完整响应读取、SSE 消费与业务 Schema 校验，而非只计首个响应头。只在上游实际提供时记录输入/输出、缓存输入和推理 token 数；缺失用量不写成零。
-- `execute_tool` 覆盖 `load_materials`、`search_many`、单查询 `search`、`ai_search`、`lexical_search`、`read`、`calculate`、`calculate_batch`、`finalize_answer` 和 `model_checkpoint`。多轮检索有轮次与查询数量，并行查询为同一检索轮下的兄弟节点；批量计算下每项确定性计算有单独节点，批量校验失败仍保持原有原子性。
-- 检查点复用模型输出记为 `model_checkpoint`，不伪造新的 `chat` 或重复计算 token 用量。检索检查点、语义检索空结果和故障回退分别标明；被拒绝的证据校验/计算只记录安全错误类别。
-- 根节点、模型及工具节点共享 `gen_ai.agent.name=CreditAgent`、`gen_ai.agent.id`（平台不透明 DO ID）、`gen_ai.conversation.id`（现有会话 UUID）及 `credit.run_id`（问题 UUID）。连续追问保持会话标识，新对话切换标识；旧会话缺少 UUID 时以 DO ID 的 `legacy-` 前缀作为稳定回退。模型保留 Gateway log ID，用于关联已有运行日志。
-- 根节点区分完成、部分答复、材料不足、范围拒答、保密拒答、异常与平台恢复。平台重置后的新 attempt 使用同一会话与问题编号；不会声称跨 alarm/重启的多次执行是一条连续 trace。单次模型尝试、总时限、权限判断与持久化策略保持，SSE 统一为 `progress/result/error`。
-- 不记录用户/客户名称、Auth0 subject、邮箱、问题、文件名/路径、材料原文、提示词、推理或答复文本、计算表达式/输入/结果、上游错误正文。自定义 span 只带固定标签、计数、耗时、安全错误类别和不透明标识。业务异常不穿过 `enterSpan` 回调，以免平台自动附带异常正文；关闭节点后原异常仍按原业务路径处理。埋点失败不重试业务回调、不吞掉原业务错误。
-
-发布后的新问答在 Cloudflare 智能体页面按 `CreditAgent` 识别；完整平台瀑布图在对应 Worker 的 Observability 查看。历史会话不补录，追踪不是无损聊天记录，也不提供正文回放。采样、平台限额和保留期仍适用，接口读取或页面验收未执行时不能以本地单元测试代替线上可见性验证。
-
-## 证据规则
-
-- PDF 按实际文件页码定位，原生文本使用保留布局的提取；扫描页 OCR 后标记 `ocr`。Word 保留原文段落/表格顺序，引用“段落 N”或“表 N 第 M 行”；不虚构 Word 页码。Excel/XLS 按工作表、行和单元格地址保存，重复表头与单位上下文。XLSX 同时保留公式及缓存值，缺失缓存不当作零。
-- 文件 SHA-256 与相对路径生成文档标识，整理目录时通过前一份目录按摘要复用 ID，使既有下载链接继续有效；原件副本保持原字节。文件内容变化后产生新的 ID，旧版本退出当前资料目录。资料库、原件和本地证据均不提交 Git。
-- 正式审计和披露优先；客户历史答复、内部业务材料、待部门确认稿分别标记。文件修改时间不代表报告期。同名指标必须区分主体、合并/单体、年度列、币种、单位及纳入剔除口径。
-- 每段事实答复必须引用已读取来源中的连续文本（可为 AI Search 片段或全文证据）。来源标题、定位和下载地址由程序生成。资料不足时明确待补充事项；不得从现金流科目或公司常见业务推断具体出资方、银行或用途。
-- 四则运算使用有界语法解析与 Decimal，不执行模型代码。每个输入都要在引用原文中找到，记录原值、单位、来源和表达式；除零、未知变量、任意常数和伪造数字会被拒绝。
-- 答复另经一次模型证据复核，核对引用的语义、年度、合并范围和单位。模型复核并不等于人工核验：引用扫描页、待确认稿或历史答复会保留显式说明，对外使用前应核对相关原页和口径。
-- 工具决策最多8步、检索最多3轮（每轮最多3个查询），连续2步没有新增证据/计算时进入仅答复模式，不能再检索。独立复核最多2次，两次均未通过即返回明确不足，不再消耗剩余轮次。单次核对总时限仍为12分钟，包含模型传输预留；这些是复杂问题的安全上限，不是默认必须跑完的步骤数。单个会话最多30轮或约1MB已保存内容，达到上限提示新建会话。异常失败不会伪装成完成。
-
-## 材料准备与更新
-
-先用 `scripts/organize-credit-materials.py` 按报告类别、年度和反馈机构整理本地文件。该脚本在移动前写出逐文件映射和 SHA-256 清单，拒绝目标重名，移动后复核字节；除明确指定的监管指标汇总表重命名外保留原文件名；已整理目录也会执行公开目录迁移，重复运行不再改动目标路径。转换脚本本身只读原件。
-
-依赖：`uv`、MarkItDown（Word）、OpenPyXL/XLRD（财务表格）、Poppler 的 `pdftotext`/`pdftoppm`；旧 DOC 转换需要 LibreOffice。Python 的读取依赖记录在脚本 PEP 723 元数据内。macOS 推荐 Vision OCR，以页面坐标恢复表格行；可选 Tesseract 需要中文及英文语言包。
-
-```sh
-mkdir -p .credit-local
-# 首次整理；不加 --apply 为预览，实际执行须使用另一份清单路径
-python3 scripts/organize-credit-materials.py \
-  --source "$HOME/Library/CloudStorage/OneDrive-个人/东方财富/授信/授信材料" \
-  --manifest .credit-local/organization.json --apply
-swiftc scripts/credit-ocr.swift -o .credit-local/credit-ocr
-uv run scripts/prepare-credit-corpus.py \
-  --source "$HOME/Library/CloudStorage/OneDrive-个人/东方财富/授信/授信材料" \
-  --ocr-command .credit-local/credit-ocr \
-  --previous-corpus .credit-local/previous-corpus.json
-
-# 首次导入可省略 --previous-corpus；更新前将上一份 corpus.json 复制至该路径
-# 先检查 preparation-report.json、重要扫描页与表格，再上传
-node scripts/upload-credit-corpus.mjs
-node scripts/upload-credit-corpus.mjs --apply --prune-previous=.credit-local/previous-corpus.json
-```
-
-脚本只读 OneDrive 原件；所有缓存和派生物在 `.credit-local/corpus/`。失败、未识别页和不支持文件写入 `preparation-report.json`，存在解析失败或未识别页时上传会拒绝发布目录。OCR 抽查仍是必要环节：非空文字不代表正确识别。
-
-上传使用本机 `CLOUDFLARE_API_TOKEN` 或 Wrangler 已登录的 OAuth 凭证；可用 `WRANGLER_AUTH_FILE` 显式指定已知凭证文件。运行前 `wrangler whoami` 可刷新登录。凭证不写入输出或日志。该本地管理脚本使用 Cloudflare REST API；生产 Worker 始终使用绑定。
-
-每份原文件默认仅生成一份 Markdown，不按页、段落或行写入 `search/` 小文件。Word 使用 MarkItDown 输出；Excel 整表保留单元格原值、表头、单位、百分比和公式缓存说明，避免默认 DataFrame 转换引入 NaN 或浮点展示尾数；PDF 将保留布局的文本与已 OCR 扫描页按原页顺序合并。只有 UTF-8 文本超过 4,000,000 字节才按段落边界拆为 `.part-001.md` 等连续文件，分段拼接必须完全还原转换结果。引用目录中的证据单元仅用于精确定位和校验，既不单独上传，也不送去 embedding。
-
-上传按内容摘要断点续传，先生成包含新对象和待移除对象的 `upload-plan.json`。迁移时临时暂停 AI Search 索引；全部上传成功后，下载每份原件和 Markdown 核对 SHA-256，最后写入并回读核对 `catalog/corpus.json`。仅在指定 `--prune-previous` 且全部新对象验证通过后，删除前一份目录中已被替代的准确对象键；不做存储桶全量清空或前缀通配删除。迁移失败时索引保持暂停，按检查点继续上传/清理，成功后恢复原暂停状态并触发一次同步。AI Search 仅索引 `search/**`，排除 `originals/**` 和 `catalog/**`，启用中文 trigram 关键词及向量检索，关闭查询改写和回答缓存。目录发布与 AI Search 索引完成是两件事，必须分别验收。
-
-若改变提取方法，须更新提取缓存版本并重新检查相关页；发布过程中不要同时运行另一轮材料准备或上传。目录仅包含本次源目录实际存在的文件；删除/替换源文件后重新准备与上传会使旧文件退出当前证据范围，指定 `--prune-previous` 后清理不再使用的旧对象；本地前一份目录和原件副本用于回溯。
-
-## HTTP 与访问边界
+## HTTP 契约
 
 | 接口 | 用途 |
 | --- | --- |
-| `GET /api/credit-assistant/materials` | 当前客户可提供的文件目录；未选择机构时仅公开材料 |
-| `GET /api/credit-assistant/institutions` | 问答冷启动时一次加载完整机构候选；兼容 `?q=名称` 的最多20条搜索 |
-| `POST /api/credit-assistant/session/institution` | 旧客户端兼容接口；当前 UI 不调用 |
-| `GET /api/credit-assistant/files/:id` | 由目录解析的原件；PDF 支持页码深链和 Range |
-| `GET /api/credit-assistant/session?institutionName=...` | 当前用户对应客户的会话、任务进度和答复 |
-| `GET /api/credit-assistant/session/events?institutionName=...` | SSE 推送纯文本 `progress` summary；完成后以 `result` 返回完整 `CreditSession` JSON 并关闭 |
-| `POST /api/credit-assistant/session` | 提交 `{ "question": "...", "institutionName": "..." }`；普通请求异步返回 202，带 `Accept: text/event-stream` 时直接返回同一统一 SSE |
-| `POST /api/credit-assistant/session/new` | `{ "institutionName": "..." }` 在固定 DO 中归档当前对话并开始新对话 |
-| `DELETE /api/credit-assistant/session` | 删除当前会话记录；进行中返回 409，UI 不提供此操作 |
+| `GET /api/credit-assistant/materials` | 当前公开材料目录 |
+| `GET/HEAD /api/credit-assistant/files/:id` | 当前目录中的公开原件；PDF 支持页码深链和 Range |
+| `GET /api/credit-assistant/session` | 当前登录用户的会话与任务状态 |
+| `GET /api/credit-assistant/session/events` | 进行中 SSE，结束时返回完整会话 |
+| `POST /api/credit-assistant/session` | 提交 `{ "question": "..." }`；普通请求返回 202，SSE 请求直接连接任务 |
+| `POST /api/credit-assistant/session/new` | 提交 `{}`，归档当前对话并开始新对话 |
+| `DELETE /api/credit-assistant/session` | 删除当前会话；进行中返回 409，UI 不提供此操作 |
 
-所有写操作执行同源校验，请求体有传输字节上限；DO 名称仅由已验证用户和所选客户派生；下载仅接受目录中的文档 ID，不能传任意对象路径。返回 `private, no-store` 和 `nosniff`，SSE 额外使用 `no-transform`。不暴露通用 `/agents/*` 路由，不接受客户端 state 更新或任意 RPC 方法。
+所有写操作校验同源。登录与权限由 Gateway 统一校验，经私有 Service Binding 进入 Dashboard；附件只接受当前目录文档 ID，不接受任意对象路径。返回 `private, no-store` 和 `nosniff`，SSE 另用 `no-transform`。不暴露通用 `/agents/*` 路由。
 
-身份和路由权限由 Gateway 统一校验，经私有 Service Binding 进入 Dashboard，固定会话使用已验证的 Auth0 用户 ID；客户名称不等于用户身份。机构保密协议控制位于登录校验之内。页面、SSE、会话和附件均经同一私有入口；Worker 预览/直连域名关闭，默认 fetch 404。
+## 验证
 
-## 验收与发布
-
-转换测试：`uv run tests/test_credit_materials.py`（UTF-8 边界、整表数值/公式缓存、目录归类）。代码检查：`pnpm typecheck`、`pnpm worker:typecheck`、`pnpm test`、`pnpm build`、`wrangler deploy --dry-run`、`git diff --check`。新增测试覆盖精确计算、伪造数值/引用、文件路径、OCR/待确认提示、复核拒绝及指定 Provider；全站导航契约同步更新。
-
-本地真实模型验收需要在未跟踪的 `.dev.vars` 中提供 `CF_AIG_TOKEN`。线上评估脚本复用 `programmatic-login.mjs`，仅以根目录 `.env` 的 `test@18.cn` 程序化登录，再使用固定用户/客户 DO；每例先归档该测试用户的当前对话。线上链路通过 SSE 收集 `progress` 与 `result/error`，不依赖浏览器或轮询。worktree 通过 `AUTH_TEST_ENV_FILE` 指向项目组根 `.env`，不复制测试密码。Wrangler OAuth 登录不能代替 Gateway Token。模拟测试不能当作真实模型验收。
-
-```sh
-node --env-file=.env.local --env-file=.dev.vars scripts/evaluate-credit-assistant.mjs --institution=机构名称
-node scripts/evaluate-credit-assistant.mjs --base-url=https://eastmoney.hasbai.xyz --institution=机构名称
-# 或逐例执行 --case=material / capital / borrowing / calculation / scope
-```
-
-评估脚本将真实回答、来源和耗时写入 `.credit-local/evaluations/`，只输出步骤和摘要日志，仍需逐份核对回答。开发时请使用 `pnpm worker:dev` 启动自定义 Worker；`pnpm dev` 的 SvelteKit 开发服务器不承载 Worker 入口中的 Agents API。本地环境需先按 `docs/DEVELOPMENT.md` 配置 Hyperdrive；远程资料读取依赖 R2/AI Search remote bindings。
-
-2026-09-07 首次实测：55 份原件、3,281 个证据块已发布至 R2，原件及目录 SHA-256 核对通过；其中 58 页使用 OCR。线上材料目录、文件下载及会话可用。四类真实问答均已发起，但 codex 上游返回 HTTP 429：该模型全部凭证处于冷却状态；因此真实生成质量尚未通过验收。恢复上游后须重新运行以上用例并逐份核验，不把该记录当成验收通过。
-
-典型问题至少覆盖：索取审计报告、不同报告期的指标和比例计算、2025 年 30.90 亿元增资来源、50 亿元取得借款现金流的来源与用途、材料未披露的问题、错误金额前提、连续追问。
-
-当前 Dashboard 已连接 Cloudflare Git，推送 `main` 会触发自动构建和发布；不要再手动执行部署。新增 `credit-agent-v1` SQLite Durable Object migration 随 Git 发布执行，不另改 D1 或 Neon schema。独立手动部署仍需明确授权。默认不做浏览器截图验收。
-
-保密协议字段 `confidentiality_status` 与 API `confidentialityStatus` 统一为布尔值，只有后端确认的 `true` 允许提供受限材料。未签署、未知、前端展示缓存以及旧会话中的遗留字符串均不能作为授权；生成与材料内容访问时仍按上述边界查询当前状态。
+转换与目录测试：`uv run tests/test_credit_materials.py`。本地快速检查：`pnpm worker:typegen`、`pnpm check:quick` 及受影响授信问答单元测试。完整类型、Python/Node、构建、浏览器组件和截图比较由合并组 `Dashboard CI` 验收；有意视觉变化先生成并审阅 macOS CI 截图候选。程序化线上联调只用根目录 `.env` 中的 `test@18.cn`；不使用浏览器做权限登录。`scripts/evaluate-credit-assistant.mjs` 支持 `--base-url=https://eastmoney.hasbai.xyz` 和 `--case=...`，问答结果写入未跟踪 `.credit-local/evaluations/`，仍须逐份核对答复和来源。发布、候选与 CI 流程见 [DEVELOPMENT](DEVELOPMENT.md) 和 [TESTING](TESTING.md)。

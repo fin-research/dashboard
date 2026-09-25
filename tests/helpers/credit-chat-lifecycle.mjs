@@ -12,14 +12,13 @@ const Host = await loadComponent("tests/helpers/ChatHost.svelte", `<script>
   import { createAiClient, provideAiClient } from "../../src/lib/ai-client.svelte";
   const aiClient = provideAiClient(createAiClient());
   let view = $state("assistant");
-  let customers = [{ name: "测试银行", confidentialityStatus: false, reportDate: "2026-09-09" }];
   export function changeView(next) { view = next; }
   export function aiProgress() { return aiClient.activeTask?.progress.at(-1); }
 </script>
 <div class="tr-workbench">
   <header><div id="tr-topbar-actions"></div></header>
   <section class="tr-workspace"><main>
-    {#if view === "assistant"}<CreditAssistantView customerOptions={customers} />{:else}<section data-view={view}>其他标签页</section>{/if}
+    {#if view === "assistant"}<CreditAssistantView />{:else}<section data-view={view}>其他标签页</section>{/if}
   </main></section>
 </div>`);
 const app = mount(Host, { target: document.body });
@@ -28,7 +27,7 @@ for (const next of ["calendar", "weekly", "overview"]) {
   assert.equal(document.querySelectorAll(".credit-chat").length, 1);
   assert.equal(document.querySelectorAll("#tr-topbar-actions .chat-toolbar").length, 1);
   flushSync(() => app.changeView(next));
-  assert.equal(document.querySelectorAll(".credit-chat, #credit-question, #credit-customer").length, 0, "previous chat must be removed");
+  assert.equal(document.querySelectorAll(".credit-chat, #credit-question").length, 0, "previous chat must be removed");
   assert.equal(document.querySelectorAll("#tr-topbar-actions .chat-toolbar").length, 0);
   assert.equal(document.querySelector(`[data-view="${next}"]`)?.textContent, "其他标签页");
   pending.splice(0).forEach(resolve => resolve());
@@ -43,12 +42,9 @@ assert.equal(document.querySelectorAll(".credit-chat, .chat-toolbar, .tr-workben
 
 // Exercise the real component with the unified AI client and a controllable SSE
 // transport. No browser or authentication flow is involved in this regression.
-globalThis.localStorage = window.localStorage;
-localStorage.setItem("credit-assistant:institution", "测试银行");
 const streams = [];
-const customer = { name: "测试银行", confidentialityStatus: false, reportDate: "2026-09-09" };
 const activities = [{ id: 1, stage: "retrieval", message: "正在检索材料", startedAt: Date.now() }];
-const running = { ...session, running: true, questionId: "q-1", pendingQuestion: "公司资产是多少", customer, stage: "retrieval", progress: "正在检索材料", activities };
+const running = { ...session, running: true, questionId: "q-1", pendingQuestion: "公司资产是多少", stage: "retrieval", progress: "正在检索材料", activities };
 const requests = [];
 globalThis.fetch = async (url, options) => {
   requests.push({ url: String(url), options });
@@ -69,7 +65,7 @@ flushSync();
 await new Promise(resolve => setImmediate(resolve));
 flushSync();
 assert.equal(streams.length, 1);
-assert.match(streams[0].url, /session\/events\?institutionName=/);
+assert.match(streams[0].url, /session\/events$/);
 assert.equal(document.querySelector(".credit-stages"), null);
 assert.match(document.querySelector(".activity-summary").textContent, /检索材料/);
 assert.equal(document.querySelector(".activity-details").open, false);
@@ -79,7 +75,7 @@ streams[0].emit("progress", "正在分析授信材料");
 await new Promise(resolve => setImmediate(resolve));
 flushSync();
 assert.equal(streamingApp.aiProgress(), "正在分析授信材料");
-assert.equal(document.querySelector(".activity-details").open, true, "SSE preserves disclosure state");
+assert.equal(document.querySelector(".activity-details").open, true, "SSE preserves expanded activity state");
 assert.equal(requests.length, 2, "one history request and one SSE request are sufficient");
 flushSync(() => streamingApp.changeView("weekly"));
 await new Promise(resolve => setImmediate(resolve));
@@ -87,7 +83,7 @@ assert.equal(streams[0].closed, true);
 flushSync(() => streamingApp.changeView("assistant"));
 await new Promise(resolve => setImmediate(resolve));
 flushSync();
-assert.equal(streams.length, 2, "remount resumes the same customer session");
+assert.equal(streams.length, 2, "remount resumes the same user session");
 streams[1].emit("result", { ...running, running: false, pendingQuestion: "", error: "模型暂不可用" });
 await new Promise(resolve => setImmediate(resolve));
 flushSync();

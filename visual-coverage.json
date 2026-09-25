@@ -750,16 +750,16 @@
       "id": "credit-assistant",
       "url": "/credit-workbench/assistant",
       "kind": "screenshot",
-      "state": "empty/customer-picker/cited-reply/processing/error/retry",
+      "state": "empty/cited-reply/processing/error/retry",
       "evidence": [
         {
           "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
-          "test": "desktop credit assistant supports customer selection and readable cited replies",
+          "test": "desktop credit assistant supports ordinary chat and readable cited replies",
           "projects": [
             "desktop"
           ],
           "snapshots": [
-            "credit-assistant-picker.png",
+            "credit-assistant-empty.png",
             "credit-assistant-citation.png"
           ]
         },

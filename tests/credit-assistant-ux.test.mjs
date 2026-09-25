@@ -19,8 +19,8 @@ test("activity history appends recurring work without declaring milestones compl
   assert.equal(state.activities.at(-1).id, 107);
 });
 
-test("customer picker filters locally, selects immediately, and ignores stale history responses", async () => {
-  await promisify(execFile)(process.execPath, ["--conditions=browser", "tests/helpers/credit-customer-picker.mjs"], {
+test("ordinary chat sends without institution selection and ignores stale history responses", async () => {
+  await promisify(execFile)(process.execPath, ["--conditions=browser", "tests/helpers/credit-chat-basic.mjs"], {
     cwd: new URL("../", import.meta.url), timeout: 30_000, maxBuffer: 20_000,
   });
 });

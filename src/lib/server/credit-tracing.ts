@@ -7,7 +7,7 @@ interface RuntimeSpan { setAttribute(key: string, value: string | number | boole
 export interface CreditTracing {
   enterSpan<T>(name: string, callback: (span: RuntimeSpan) => T): T;
 }
-type Outcome = "ok" | "error" | "cache" | "fallback" | "complete" | "partial" | "insufficient" | "refused_scope" | "refused_confidentiality" | "recovering";
+type Outcome = "ok" | "error" | "cache" | "fallback" | "complete" | "partial" | "insufficient" | "refused_scope" | "recovering";
 export type CreditTraceAttributes = {
   "credit.stage"?: "scope" | "decision" | "review";
   "credit.outcome"?: Outcome;

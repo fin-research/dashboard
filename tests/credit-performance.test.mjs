@@ -158,35 +158,38 @@ test("a batch with an unsupported input does not commit even its valid first res
   assert.equal(decisions, 2);
 });
 
-test("batch calculations cannot access a restricted source even when the model invents its ID", async () => {
-  const privateDoc = { ...doc, id: "private-doc", title: "内部数据.pdf", relativePath: "内部材料/内部数据.pdf", originalKey: "originals/内部材料/内部数据.pdf" };
-  const privateBlock = { ...block, id: "private-source", documentId: privateDoc.id };
-  const answer = await answerCreditQuestion({ ...base, corpus: { ...corpus, documents: [doc, privateDoc], blocks: [block, privateBlock] },
-    generate: async (_credentials, messages, schema, name) => {
-      assert.ok(!JSON.stringify(messages).includes("内部数据"));
-      if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
-      assert.equal(name, "credit_step");
-      return schema.parse({ step: { action: "calculate_answer", calculations: [{ label: "比率", expression: "a/b", resultUnit: "倍", decimals: 2,
-        inputs: [input("a", "120", privateBlock.id), input("b", "80", privateBlock.id)] }], answer: attachmentAnswer } });
-    } });
-  assert.equal(answer.disclosure.blocked, true);
-  assert.deepEqual(answer.calculations, []); assert.deepEqual(answer.files, []);
+test("batch calculations reject a source absent from the public evidence snapshot", async () => {
+  let decisions = 0;
+  const answer = await answerCreditQuestion({ ...base, generate: async (_credentials, messages, schema, name) => {
+    if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
+    if (++decisions === 1) return schema.parse({ step: { action: "calculate_answer", calculations: [{
+      label: "比率", expression: "a/b", resultUnit: "倍", decimals: 2,
+      inputs: [input("a", "120", "unknown-source"), input("b", "80", "unknown-source")],
+    }], answer: attachmentAnswer } });
+    const evidence = JSON.parse(messages[2].content);
+    assert.deepEqual(evidence.calculations, []);
+    return schema.parse({ step: { action: "answer", answer: {
+      status: "insufficient", paragraphs: [], gaps: ["公开材料证据不足"], attachments: [],
+    } } });
+  } });
+  assert.equal(decisions, 2);
+  assert.equal(answer.status, "insufficient");
+  assert.deepEqual(answer.calculations, []);
 });
 
-test("an answer that must become a fixed NDA refusal skips unnecessary model review", async () => {
-  const privateDoc = { ...doc, id: "private-doc", title: "内部数据.pdf", relativePath: "内部材料/内部数据.pdf", originalKey: "originals/内部材料/内部数据.pdf" };
-  const privateBlock = { ...block, id: "private-source", documentId: privateDoc.id };
-  let calls = 0;
-  const answer = await answerCreditQuestion({ ...base, corpus: { ...corpus, documents: [doc, privateDoc], blocks: [block, privateBlock] },
-    generate: async (_credentials, _messages, schema, name) => {
-      calls++;
-      if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
-      assert.equal(name, "credit_step", "no review call for a fixed refusal");
-      return schema.parse({ step: { action: "answer", answer: { status: "partial", paragraphs: [{ text: "流动资产120亿元", citations: [{ sourceId: block.id, quote: text }] }],
-        gaps: ["缺少进一步口径"], attachments: [] } } });
-    } });
-  assert.equal(calls, 2); assert.equal(answer.disclosure.blocked, true);
-  assert.deepEqual(answer.paragraphs, []);
+test("a supported partial answer with a gap still receives independent review", async () => {
+  let reviews = 0;
+  const answer = await answerCreditQuestion({ ...base, generate: async (_credentials, _messages, schema, name) => {
+    if (name === "credit_scope") return schema.parse({ ...plan, queries: ["流动资产"] });
+    if (name === "credit_review") { reviews++; return schema.parse({ approved: true, issues: [] }); }
+    return schema.parse({ step: { action: "answer", answer: {
+      status: "partial", paragraphs: [{ text: "流动资产120亿元", citations: [{ sourceId: block.id, quote: text }] }],
+      gaps: ["还需其他期间明细"], attachments: [],
+    } } });
+  } });
+  assert.equal(reviews, 1);
+  assert.equal(answer.status, "partial");
+  assert.equal(answer.paragraphs.length, 1);
 });
 
 test("failure messages distinguish upstream failures from material/deadline issues without exposing details", () => {

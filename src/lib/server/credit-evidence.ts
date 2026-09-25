@@ -7,10 +7,24 @@ import { corpusSchema, type CreditCorpus, type CreditBlock, type CreditCalculati
 import type { z } from "zod";
 
 export async function loadCreditCorpus(bucket: R2Bucket): Promise<CreditCorpus> {
-  const object = await bucket.get("catalog/corpus.json");
+  const object = await bucket.get("credit/catalog/corpus.json");
   if (!object) throw new Error("授信材料尚未导入");
   if (object.size > 24 * 1024 * 1024) throw new Error("材料索引超过上限，请拆分资料库");
-  return corpusSchema.parse(await object.json());
+  const corpus = corpusSchema.parse(await object.json());
+  if (!corpus.documents.every(isPublicCreditDocument)) throw new Error("材料目录包含非公开文件");
+  const ids = new Set(corpus.documents.map(doc => doc.id));
+  if (corpus.blocks.some(block => !ids.has(block.documentId) || !block.searchKey.startsWith("search/定期报告/"))
+    || corpus.searchFiles?.some(file => !ids.has(file.documentId) || !file.key.startsWith("search/定期报告/"))) {
+    throw new Error("材料目录引用了非公开文件");
+  }
+  return corpus;
+}
+export function isPublicCreditDocument(doc: CreditCorpus["documents"][number]): boolean {
+  const parts = doc.relativePath.split("/");
+  return parts.length >= 2 && parts[0] === "定期报告"
+    && parts.every(part => part !== "" && part !== "." && part !== "..")
+    && !/[\\\u0000-\u001f\u007f]/.test(doc.relativePath)
+    && doc.originalKey === `originals/${doc.relativePath}`;
 }
 export function normalized(text: string): string { return text.normalize("NFKC").replace(/\s+/g, ""); }
 export function verifyQuote(source: CreditBlock | undefined, quote: string): void {
@@ -47,11 +61,12 @@ export function searchResultEvidence(corpus: CreditCorpus, hits: Array<CreditSea
   for (const raw of hits.slice(0, 50)) {
     const hit = typeof raw === "string" ? { key: raw, text: "" } : raw;
     if (!hit.text.trim()) continue;
-    const file = corpus.searchFiles?.find(f => f.key === hit.key);
-    const documentId = file?.documentId ?? corpus.blocks.find(b => b.searchKey === hit.key)?.documentId;
+    const key = hit.key.replace(/^\/?credit\//, "");
+    const file = corpus.searchFiles?.find(f => f.key === key);
+    const documentId = file?.documentId ?? corpus.blocks.find(b => b.searchKey === key)?.documentId;
     if (!documentId || !corpus.documents.some(d => d.id === documentId)) continue;
-    const id = "search-" + bytesToHex(sha256(new TextEncoder().encode(JSON.stringify([documentId, hit.key, hit.text])))).slice(0, 32);
-    found.set(id, { id, documentId, text: hit.text, searchKey: hit.key,
+    const id = "search-" + bytesToHex(sha256(new TextEncoder().encode(JSON.stringify([documentId, key, hit.text])))).slice(0, 32);
+    found.set(id, { id, documentId, text: hit.text, searchKey: key,
       extraction: "ai_search", locator: "AI Search 检索片段" });
   }
   return [...found.values()].slice(0, 12);

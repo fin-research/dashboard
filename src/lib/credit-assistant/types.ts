@@ -17,17 +17,10 @@ export const corpusSchema = z.object({
 export type CreditDocument = z.infer<typeof documentSchema>;
 export type CreditBlock = z.infer<typeof blockSchema>;
 export type CreditCorpus = z.infer<typeof corpusSchema>;
-export const creditCustomerSchema = z.object({
-  name: z.string().min(1).max(200),
-  confidentialityStatus: z.boolean(),
-  reportDate: z.string(),
-});
+// The credit workbench repository still uses this business record shape.
+export const creditCustomerSchema = z.object({ name: z.string(), confidentialityStatus: z.boolean(), reportDate: z.string() });
 export type CreditCustomer = z.infer<typeof creditCustomerSchema>;
-export const creditCustomerSelectionSchema = z.object({ institutionName: z.string().trim().min(1).max(200) }).strict();
-export const creditQuestionSchema = creditCustomerSelectionSchema.extend({ question: z.string().trim().min(1) });
-export function confidentialityLabel(signed: boolean): string {
-  return signed === true ? "已签署保密协议" : "未签署保密协议";
-}
+export const creditQuestionSchema = z.object({ question: z.string().trim().min(1) }).strict();
 export const citationSchema = z.object({ sourceId: z.string(), quote: z.string().min(2).max(1000) });
 export const calculationSchema = z.object({
   label: z.string().max(200), expression: z.string().max(300), resultUnit: z.string().max(40),
@@ -50,7 +43,6 @@ export type CreditAnswer = CreditAnswerDraft & {
   files: Array<{ id: string; title: string; url: string }>;
   corpusVersion: string; createdAt: string; warnings: string[];
   notice?: string;
-  disclosure?: { policyVersion: 1; institutionName: string; documentIds: string[]; blocked: boolean };
 };
 export type CreditTurn = { id: string; question: string; answer: CreditAnswer; createdAt: string };
 export type CreditStage = "scope" | "retrieval" | "analysis" | "read" | "calculate" | "answer" | "review";
@@ -58,7 +50,6 @@ export type CreditActivity = { id: number; stage: CreditStage; message: string; 
 export type CreditSession = {
   turns: CreditTurn[]; running: boolean; progress: string; error: string | null; startedAt: number;
   pendingQuestion?: string;
-  customer?: CreditCustomer | null;
   conversationId?: string;
   questionId?: string;
   stage?: CreditStage;

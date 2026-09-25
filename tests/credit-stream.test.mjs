@@ -136,12 +136,11 @@ test("AI Search source text streams as answer prose and supplies its original fi
   assert.equal(answer.files[0].id, doc.id); assert.equal(answer.sources[0].extraction, "ai_search");
 });
 
-test("questions longer than 3000 characters are accepted and sessions are stable per verified user and customer", () => {
-  assert.equal(creditQuestionSchema.safeParse({ institutionName: customer.name, question: "公司财务资料".repeat(4000) }).success, true);
-  assert.equal(creditQuestionSchema.safeParse({ institutionName: customer.name, question: "   " }).success, false);
-  assert.equal(creditAgentName("auth0|test", "银行甲"), creditAgentName("auth0|test", " 银行甲 "));
-  assert.notEqual(creditAgentName("auth0|test", "银行甲"), creditAgentName("auth0|test", "银行乙"));
-  assert.notEqual(creditAgentName("auth0|test", "银行甲"), creditAgentName("auth0|test-other", "银行甲"));
+test("questions longer than 3000 characters are accepted and sessions are stable per verified user", () => {
+  assert.equal(creditQuestionSchema.safeParse({ question: "公司财务资料".repeat(4000) }).success, true);
+  assert.equal(creditQuestionSchema.safeParse({ question: "   " }).success, false);
+  assert.equal(creditAgentName("auth0|test"), creditAgentName("auth0|test"));
+  assert.notEqual(creditAgentName("auth0|test"), creditAgentName("auth0|test-other"));
   assert.equal(CREDIT_SEARCH_TIMEOUT_MS, 60_000);
 });
 

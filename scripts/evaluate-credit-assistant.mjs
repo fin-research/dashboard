@@ -2,8 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { answerCreditQuestion } from "../src/lib/server/credit-assistant.ts";
 import { corpusSchema, customerAnswerText } from "../src/lib/credit-assistant/types.ts";
 import { cloudflareClient } from "./credit-cloudflare-client.mjs";
-import { withPostgres } from "../src/lib/server/postgres.ts";
-import { findCreditCustomers } from "../src/lib/server/credit-repository.ts";
+import { isPublicCreditDocument } from "../src/lib/server/credit-evidence.ts";
 import { SITE_ORIGIN, loginTestAccount, readAuthTestConfig } from "./lib/programmatic-login.mjs";
 import { readSse } from "../src/lib/server/ai-stream.ts";
 
@@ -22,15 +21,14 @@ if (selected && !cases.some(c => c.id === selected)) throw new Error("未知用�
 const baseArgument = process.argv.find(a => a.startsWith("--base-url="))?.slice(11);
 const base = baseArgument ? new URL(baseArgument).origin : undefined;
 if (base && base !== SITE_ORIGIN) throw new Error("线上验收仅允许项目生产域名，避免把测试登录凭据发送到其他来源");
-const institutionName = process.argv.find(a => a.startsWith("--institution="))?.slice(14);
-if (!institutionName) throw new Error("请使用 --institution=授信库中的机构名称，验收也必须核对真实保密协议状态");
 if (!base && !process.env.CF_AIG_TOKEN) throw new Error("本地验收需要 CF_AIG_TOKEN；线上验收使用 --base-url=https://eastmoney.hasbai.xyz");
 const config = base ? undefined : JSON.parse(await readFile("wrangler.jsonc", "utf8"));
-const corpus = base ? undefined : corpusSchema.parse(JSON.parse(await readFile(".credit-local/corpus/corpus.json", "utf8")));
+const prepared = base ? undefined : corpusSchema.parse(JSON.parse(await readFile(".credit-local/corpus/corpus.json", "utf8")));
+const ids = new Set(prepared?.documents.filter(isPublicCreditDocument).map(document => document.id));
+const corpus = prepared ? { ...prepared, documents: prepared.documents.filter(document => ids.has(document.id)),
+  blocks: prepared.blocks.filter(block => ids.has(block.documentId)),
+  searchFiles: prepared.searchFiles?.filter(file => ids.has(file.documentId)) } : undefined;
 const request = base ? undefined : await cloudflareClient();
-const customer = base ? undefined : await withPostgres(process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE ?? process.env.DATABASE_URL,
-  "credit-evaluation", async client => (await findCreditCustomers(client, institutionName, true))[0]);
-if (!base && !customer) throw new Error("最新授信记录中没有该机构");
 const httpSession = base ? await loginTestAccount(await readAuthTestConfig()) : undefined;
 await mkdir(".credit-local/evaluations", { recursive: true });
 for (const item of cases.filter(c => !selected || selected === c.id)) {
@@ -39,7 +37,7 @@ for (const item of cases.filter(c => !selected || selected === c.id)) {
   progress("started");
   let result;
   try {
-    result = base ? await evaluateHttp(item, progress) : { answer: await answerCreditQuestion({ question: item.question, corpus, customer, history: [],
+    result = base ? await evaluateHttp(item, progress) : { answer: await answerCreditQuestion({ question: item.question, corpus, history: [],
       credentials: { accountId: config.vars.CLOUDFLARE_ACCOUNT_ID, gatewayId: config.vars.AI_GATEWAY_ID, token: process.env.CF_AIG_TOKEN },
       progress,
       semanticSearch: async query => {
@@ -66,28 +64,26 @@ for (const item of cases.filter(c => !selected || selected === c.id)) {
 }
 
 async function evaluateHttp(item, progress) {
-  // Use only the programmatically verified test account. Fixed user/customer DOs
+  // Use only the programmatically verified test account. Fixed user DOs
   // archive the previous test conversation when starting each new case.
   const headers = { origin: base, cookie: httpSession.cookies.header(base), "content-type": "application/json" };
   const fresh = await fetch(base + "/api/credit-assistant/session/new", { method: "POST", headers,
-    body: JSON.stringify({ institutionName }), signal: AbortSignal.timeout(45_000), redirect: "error" });
+    body: "{}", signal: AbortSignal.timeout(45_000), redirect: "error" });
   if (!fresh.ok) throw new Error("归档验收会话失败 HTTP " + fresh.status);
   await fresh.body?.cancel();
   const submit = await fetch(base + "/api/credit-assistant/session", { method: "POST",
-    headers, body: JSON.stringify({ question: item.question, institutionName }), signal: AbortSignal.timeout(45_000), redirect: "error" });
+    headers, body: JSON.stringify({ question: item.question }), signal: AbortSignal.timeout(45_000), redirect: "error" });
   if (submit.status !== 202) throw new Error("创建验收会话失败 HTTP " + submit.status);
   await submit.body?.cancel();
-  const response = await fetch(`${base}/api/credit-assistant/session/events?institutionName=${encodeURIComponent(institutionName)}`,
+  const response = await fetch(`${base}/api/credit-assistant/session/events`,
     { headers: { cookie: headers.cookie, accept: "text/event-stream" }, signal: AbortSignal.timeout(15 * 60_000), redirect: "error" });
   if (!response.ok || !response.body || !response.headers.get("content-type")?.includes("text/event-stream")) throw new Error("SSE 连接失败 HTTP " + response.status);
-  let state, draftEvents = 0, last = "";
+  let state, progressEvents = 0, last = "";
   await readSse(response.body, event => {
-    if (event.event === "draft") { draftEvents++; return; }
-    if (event.event !== "session") return;
-    state = JSON.parse(event.data);
-    if (state.progress !== last) { last = state.progress; progress(last); }
+    if (event.event === "progress") { progressEvents++; if (event.data !== last) { last = event.data; progress(last); } }
+    if (event.event === "result") state = JSON.parse(event.data);
   }, 32 * 1024 * 1024);
   if (!state || state.running) throw new Error("SSE 在问答完成前断开，请检查服务日志或重新读取会话");
   const answer = state.turns.at(-1)?.answer;
-  return state.error ? { error: state.error, state, draftEvents } : answer ? { answer, draftEvents, activities: state.activities ?? [], runId: state.questionId } : { error: "任务结束但没有答复", state };
+  return state.error ? { error: state.error, state, progressEvents } : answer ? { answer, progressEvents, activities: state.activities ?? [], runId: state.questionId } : { error: "任务结束但没有答复", state };
 }

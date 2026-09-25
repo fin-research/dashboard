@@ -393,6 +393,8 @@ def prepare(
             part.startswith((".", "~$")) for part in relative_path.parts
         ):
             continue
+        if len(relative_path.parts) < 2 or relative_path.parts[0] != "定期报告":
+            continue
         relative = relative_path.as_posix()
         if path.suffix.lower() not in SUPPORTED:
             ignored.append(relative)
