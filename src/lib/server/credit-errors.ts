@@ -1,8 +1,8 @@
 import { AiGatewayResponseError } from "./ai-gateway.ts";
 
 export class CreditExecutionError extends Error {
-  readonly code: "deadline" | "materials";
-  constructor(code: "deadline" | "materials", message: string) {
+  readonly code: "deadline";
+  constructor(code: "deadline", message: string) {
     super(message);
     this.name = "CreditExecutionError";
     this.code = code;
@@ -12,9 +12,7 @@ export class CreditExecutionError extends Error {
 /** Safe categories only: never send upstream bodies, prompts or credentials to the UI/log. */
 export function creditFailure(error: unknown): { code: string; message: string } {
   if (error instanceof Error && error.name === "SqlError") return { code: "session_storage", message: "会话状态暂时无法保存，请稍后重试，或将错误编号提供给管理员。" };
-  if (error instanceof CreditExecutionError) return { code: error.code, message: error.code === "deadline"
-    ? "本次核对已达到时间上限，未返回未经核实的答复。请明确报告期和合并或单体口径后重试。"
-    : "授信材料目录暂时不可用，请稍后重试；若持续失败，请管理员检查材料发布状态。" };
+  if (error instanceof CreditExecutionError) return { code: error.code, message: "本次答复已达到时间上限，请稍后重试。" };
   if (error instanceof AiGatewayResponseError) {
     if (error.status === 429) return { code: "model_busy", message: "指定模型服务暂时繁忙或额度受限，请稍后重试。" };
     if (error.status === 408 || error.status === 504 || /timeout|timed out|aborted/i.test(error.message)) {
