@@ -17,14 +17,14 @@ export function legacyCreditFileId(key: string): string {
 }
 
 export async function listPublicCreditFiles(bucket: R2Bucket) {
-  const documents: Array<{ id: string; key: string; title: string; etag: string; authority: 'audited' | 'disclosure'; url: string }> = [];
+  const documents: Array<{ id: string; key: string; title: string; authority: 'audited' | 'disclosure'; url: string }> = [];
   let cursor: string | undefined;
   do {
     const page = await bucket.list({ prefix: PREFIX, limit: MAX_FILES, cursor });
     for (const object of page.objects) {
       const title = publicCreditFileName(object.key);
       if (!title) continue;
-      documents.push({ id: legacyCreditFileId(object.key), key: object.key, title, etag: object.etag,
+      documents.push({ id: legacyCreditFileId(object.key), key: object.key, title,
         authority: title.includes('审计报告') ? 'audited' : 'disclosure',
         url: `/api/credit-assistant/files/${encodeURIComponent(title)}` });
       if (documents.length > MAX_FILES) throw new Error('公开材料数量超过上限');
