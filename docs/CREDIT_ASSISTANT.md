@@ -4,9 +4,9 @@
 
 ## 公开资料边界
 
-材料目录只枚举 R2 `eastmoney/credit/public/` 下的单层 PDF，原件链接使用 URL 编码后的文件名。搜索调用 Cloudflare AI Search `credit` 的 `search()`，最多取 50 个线上片段，并只返回仍在该公开目录中的文件片段，最终工具结果最多 12 个。检索片段没有可核验页码时仅标记“AI Search 检索片段”，不虚构页码。旧 `credit/catalog/`、`credit/originals/`、`credit/search/` 不进入浏览器 Agent 的检索结果。
+材料目录只枚举 R2 `eastmoney/credit/public/` 下的单层 PDF，原件链接使用 URL 编码后的文件名。搜索调用 Cloudflare AI Search `credit` 的 `search()`，每次最多取 50 个线上片段，并只返回仍在该公开目录中的文件片段，最终工具结果最多 12 个。ROE/净资产收益率问题会补查指定或最近审计年度；2023–2025 年审计报告的加权平均净资产收益率由已核对 PDF 表格的证据记录优先提供，且仅在公开原件的 R2 ETag 匹配时生效。检索片段没有可核验页码时仅标记“AI Search 检索片段”，不虚构页码。旧 `credit/catalog/`、`credit/originals/`、`credit/search/` 不进入浏览器 Agent 的检索结果。
 
-AI Search 数据源仅索引 `credit/public/**`；中文关键词使用 trigram 和 `or` 匹配，检索开启重排并取消默认阈值。当前 OCR 对部分大 PDF 超时，实例保持关闭。更新材料时只上传确认可公开的 PDF，核对索引完成状态并通过线上 AI Search MCP 抽查。
+AI Search 数据源仅索引 `credit/public/**`；中文关键词使用 trigram 和 `or` 匹配，检索开启重排并取消默认阈值。当前 OCR 对部分大 PDF 超时，OCR 保持关闭；部分审计报告片段的中文文本会乱码。更新材料时只上传确认可公开的 PDF，核对索引完成状态并通过线上 AI Search MCP 抽查。替换已核验的审计报告时，应重新目视核对补充资料表格页、更新 `src/lib/server/credit-public-roe.ts` 的数值、页码和 ETag；不匹配时旧证据自动失效。
 
 ## 浏览器 Agent
 

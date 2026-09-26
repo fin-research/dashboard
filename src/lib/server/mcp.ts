@@ -8,6 +8,7 @@ import { CONTEXT_HEADER } from './gateway-context.ts';
 import type { SiteIdentity } from '../identity.ts';
 import { mcpOperations, operationPath, type McpOperation } from './mcp-catalog.ts';
 import { listPublicCreditFiles } from './credit-public-files.ts';
+import { auditedRoeSources, isRoeQuestion, roeQuestionYears } from './credit-public-roe.ts';
 
 const MAX_REQUEST = 1024 * 1024;
 const MAX_RESPONSE = 8 * 1024 * 1024;
@@ -106,21 +107,47 @@ export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENT
         const documents = (await listPublicCreditFiles(env.EASTMONEY)).map(({ title, authority, url }) => ({ title, authority, url }));
         return { content: [{ type: 'text', text: JSON.stringify(documents) }], structuredContent: { documents } };
       });
-      server.registerTool('credit_public_search', { title: '检索公开授信材料', description: '搜索当前公开授信 PDF，返回原始片段和原件链接。检索片段没有可核验页码。',
+      server.registerTool('credit_public_search', { title: '检索公开授信材料', description: '搜索当前公开授信 PDF，返回原始片段和原件链接。ROE 问题会按审计年度检索，并优先返回已核验的审计报告表格数值。普通检索片段没有可核验页码。',
         inputSchema: z.object({ query: z.string().trim().min(2).max(200) }).strict(),
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async ({ query }) => {
         const documents = await listPublicCreditFiles(env.EASTMONEY);
         const byKey = new Map(documents.map(document => [document.key, document]));
-        const result = await env.CREDIT_SEARCH.search({ query, ai_search_options: {
-          retrieval: { retrieval_type: 'hybrid', max_num_results: 50, match_threshold: 0 },
-          reranking: { enabled: true, model: '@cf/baai/bge-reranker-base', match_threshold: 0 },
-          query_rewrite: { enabled: false }, cache: { enabled: false },
-        } });
-        const sources = result.chunks.flatMap((chunk: { item: { key: string }; text: string }) => {
+        const verified = auditedRoeSources(documents, query);
+        const targetedYears = isRoeQuestion(query) ? roeQuestionYears(query).slice(0, 4) : [];
+        const queries = [query, ...targetedYears.map(year =>
+          `东方财富证券 ${year}年 审计报告 加权平均净资产收益率`)];
+        const searches = await Promise.allSettled(queries.map(searchQuery => env.CREDIT_SEARCH.search({
+          query: searchQuery, ai_search_options: {
+            retrieval: { retrieval_type: 'hybrid', max_num_results: 50, match_threshold: 0 },
+            reranking: { enabled: true, model: '@cf/baai/bge-reranker-base', match_threshold: 0 },
+            query_rewrite: { enabled: false }, cache: { enabled: false },
+          },
+        })));
+        if (searches.every(search => search.status === 'rejected') && verified.length === 0) {
+          throw new Error('授信材料检索暂不可用');
+        }
+        const toSource = (chunk: { item: { key: string }; text: string }) => {
           const document = byKey.get(chunk.item.key);
-          return document && chunk.text.trim() ? [{ title: document.title, text: chunk.text,
-            url: document.url, locator: 'AI Search 检索片段', authority: document.authority }] : [];
-        }).slice(0, 12);
+          return document && chunk.text.trim() ? { title: document.title, text: chunk.text,
+            url: document.url, locator: 'AI Search 检索片段', authority: document.authority } : null;
+        };
+        const seen = new Set<string>();
+        const order = [...targetedYears.map((_, index) => index + 1), 0];
+        const excerpts = order.flatMap(index => {
+          const search = searches[index];
+          if (!search || search.status !== 'fulfilled') return [];
+          const year = targetedYears[index - 1];
+          return search.value.chunks.flatMap((chunk: { item: { key: string }; text: string }) => {
+            if (year && chunk.item.key !== `credit/public/${year}审计报告.pdf`) return [];
+            const source = toSource(chunk);
+            if (!source) return [];
+            const identity = `${chunk.item.key}\n${chunk.text}`;
+            if (seen.has(identity)) return [];
+            seen.add(identity);
+            return [source];
+          }).slice(0, year ? 2 : 12);
+        });
+        const sources = [...verified, ...excerpts].slice(0, 12);
         return { content: [{ type: 'text', text: JSON.stringify(sources) }], structuredContent: { sources } };
       });
       const allowed = await policies(env, user);

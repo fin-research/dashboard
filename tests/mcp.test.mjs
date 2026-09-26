@@ -6,6 +6,7 @@ const { handleDashboardMcp, executeOperation, decodeBusinessResponse, boundedTex
 const { mcpOperations, operationPath } = await import('../src/lib/server/mcp-catalog.ts');
 const { clientRequestPermission } = await import('../src/lib/route-permissions.ts');
 const { stringify } = await import('devalue');
+const { auditedRoeSources } = await import('../src/lib/server/credit-public-roe.ts');
 const user = { id:'auth0|test',auth0Id:'auth0|test',email:'test@18.cn',issuedAt:1,expiresAt:9999999999,authorization:{name:'测试',picture:'',roles:[],permissions:[],mode:'enforce'} };
 function fixture(allow = () => true, response = () => Response.json({ saved:true })) {
   const calls = [];
@@ -95,4 +96,32 @@ test('public credit search exposes only current public PDF excerpts and original
   assert.ok(!JSON.stringify(sources).includes('内部数据'));
   const materials=await rpc(f,'tools/call',{name:'credit_public_materials',arguments:{}});
   assert.deepEqual(materials.payload.result.structuredContent.documents.map(document=>document.title),['测试报告.pdf']);
+});
+test('ROE search returns verified annual tables before noisy excerpts and rejects changed originals',async()=>{
+  const reports=[
+    {year:2023,etag:'074f1743e4087111415d1ea6d71ff1ec',value:'9.75%'},
+    {year:2024,etag:'c7e65bb5f836592812dd6e3c47cb220c',value:'11.64%'},
+    {year:2025,etag:'38c1ac97ef61e3e5700a1498f4f639e4',value:'13.23%'},
+  ];
+  const f=fixture();
+  f.env.EASTMONEY={list:async()=>({objects:reports.map(report=>({key:`credit/public/${report.year}审计报告.pdf`,etag:report.etag,size:100})),truncated:false})};
+  const queries=[];
+  f.env.CREDIT_SEARCH={search:async({query})=>{
+    queries.push(query);
+    const year=reports.find(report=>query.includes(String(report.year)));
+    return {chunks:year?[{item:{key:`credit/public/${year.year}审计报告.pdf`},text:`OCR 乱码 ${year.value}`}]:[]};
+  }};
+  const {payload}=await rpc(f,'tools/call',{name:'credit_public_search',arguments:{query:'近几年的ROE是多少'}});
+  assert.equal(payload.result.isError,undefined);
+  const sources=payload.result.structuredContent.sources;
+  assert.deepEqual(sources.slice(0,3).map(source=>source.text.match(/\d+\.\d+%/)[0]),['9.75%','11.64%','13.23%']);
+  assert.deepEqual(sources.slice(0,3).map(source=>source.locator),[
+    'PDF 第 110 页（补充资料第 1 页）','PDF 第 110 页（补充资料第 1 页）','PDF 第 111 页（补充资料第 1 页）',
+  ]);
+  assert.ok(queries.some(query=>query.includes('2023年 审计报告')));
+  assert.ok(queries.some(query=>query.includes('2024年 审计报告')));
+  assert.ok(queries.some(query=>query.includes('2025年 审计报告')));
+  const changed=reports.map(report=>({key:`credit/public/${report.year}审计报告.pdf`,title:`${report.year}审计报告.pdf`,url:`/api/credit-assistant/files/${report.year}审计报告.pdf`,authority:'audited',etag:report.year===2025?'new-object':report.etag}));
+  assert.deepEqual(auditedRoeSources(changed,'2025年ROE'),[]);
+  assert.equal(auditedRoeSources(changed,'2024年ROE').length,1);
 });
