@@ -6,7 +6,7 @@
   import { portal } from "../portal";
   import { globalMessages } from "../global-messages";
   import { useAiClient } from "../ai-client.svelte";
-  import { customerAnswerText, type CreditAnswer, type CreditSession } from "./types";
+  import { creditAnswerText, type CreditAnswer, type CreditSession } from "./types";
   import CreditActivityView from "./CreditActivityView.svelte";
 
   const aiClient = useAiClient();
@@ -27,7 +27,6 @@
   let revision = 0;
   const pendingQuestion = $derived(session.pendingQuestion || optimisticQuestion);
   const busy = $derived(sending || session.running || creating);
-  const authorityNames: Record<string, string> = { audited: "审计报告", disclosure: "正式披露", internal: "业务材料", historical_reply: "历史答复", draft: "待部门确认" };
 
   async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`/api/credit-assistant/${path}`, { ...init, signal: init?.signal ?? AbortSignal.timeout(30_000),
@@ -113,7 +112,7 @@
     optimisticQuestion = text;
     const draft = question;
     question = "";
-    session = { ...session, error: null, pendingQuestion: "", activities: [], startedAt: 0 };
+    session = { ...session, error: null, pendingQuestion: "", startedAt: 0 };
     void scrollLatest();
     try {
       const next = await aiClient.run({
@@ -182,14 +181,14 @@
       session = latest;
       const answer = latest.turns.find(t => t.id === turnId)?.answer;
       if (!answer) throw new Error("当前会话中没有该答复，请重新提问。");
-      await navigator.clipboard.writeText(customerAnswerText(answer));
+      await navigator.clipboard.writeText(creditAnswerText(answer));
       globalMessages.success("已复制答复和资料来源");
     } catch (error) { globalMessages.error(error instanceof Error ? error.message : "复制失败，请重试"); }
   }
   function citations(answer: CreditAnswer): string[] { return [...new Set(answer.paragraphs.flatMap(p => p.citations.map(c => c.sourceId)))]; }
   function sessionResultText(value: CreditSession): string {
     const answer = value.turns.at(-1)?.answer;
-    return value.error || (answer ? customerAnswerText(answer) : '');
+    return value.error || (answer ? creditAnswerText(answer) : '');
   }
   async function showCitation(event: MouseEvent, turnId: string, sourceId: string) {
     event.preventDefault();
@@ -211,7 +210,7 @@
 <div class="credit-chat" bind:this={chat}>
   <!-- Keep the component's root in place; only move its nested toolbar. -->
   <div class="chat-toolbar" use:portal={"#tr-topbar-actions"}>
-    <Button permission="credit.assistant:ask" data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button chat-button--new"} type="button" disabled={busy} onclick={() => void newSession()}>
+    <Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button chat-button--new"} type="button" disabled={busy} onclick={() => void newSession()}>
       <WorkbenchIcon name="plus" /><span>{creating ? "正在新建…" : "新对话"}</span>
     </Button>
   </div>
@@ -231,7 +230,6 @@
         <div class="message message--assistant">
           <div class="assistant-identity"><WorkbenchIcon name="chat" /><span>授信助手</span></div>
           <div class="answer-content">
-            {#if turn.answer.notice}<p class="answer-paragraph">{turn.answer.notice}</p>{/if}
             {#each turn.answer.paragraphs as paragraph}
               <p class="answer-paragraph">{paragraph.text}{#each paragraph.citations as cite}<a class="citation" href={`#source-${turn.id}-${cite.sourceId}`} aria-label={`查看资料来源${citations(turn.answer).indexOf(cite.sourceId) + 1}`} onclick={event => void showCitation(event, turn.id, cite.sourceId)}>[{citations(turn.answer).indexOf(cite.sourceId) + 1}]</a>{/each}</p>
             {/each}
@@ -248,21 +246,14 @@
               </ul>
             {/if}
             {#if turn.answer.gaps.length}<div class="answer-gaps"><h3>尚需确认</h3><ul>{#each turn.answer.gaps as gap}<li>{gap}</li>{/each}</ul></div>{/if}
-            {#if turn.answer.warnings.length}<div class="answer-warnings">{#each turn.answer.warnings as warning}<p>{warning}</p>{/each}</div>{/if}
-            {#if turn.answer.sources.length || turn.answer.calculations.length}
+            {#if turn.answer.sources.length}
               <details class="answer-sources" id={`references-${turn.id}`}>
-                <summary>资料来源与计算过程</summary>
+                <summary>资料来源</summary>
                 {#each turn.answer.sources as source}
                   <div class="source" id={`source-${turn.id}-${source.id}`} tabindex="-1">
-                    <a href={source.url} target="_blank" rel="noreferrer">{source.title} · {source.locator}</a>
-                    <span class="source-kind">{authorityNames[source.authority]}{source.extraction === "ocr" ? " · 扫描识别" : source.extraction === "ai_search" ? " · 检索片段" : ""}</span>
+                    {#if source.url}<a href={source.url} target="_blank" rel="noreferrer">{source.title} · {source.locator}</a>{:else}<span>{source.title} · {source.locator}</span>{/if}
+                    <span class="source-kind">检索片段</span>
                     {#each turn.answer.paragraphs.flatMap(p => p.citations).filter(c => c.sourceId === source.id) as cite}<blockquote>{cite.quote}</blockquote>{/each}
-                  </div>
-                {/each}
-                {#each turn.answer.calculations as calc}
-                  <div class="source" id={`source-${turn.id}-${calc.id}`} tabindex="-1">
-                    <h3>{calc.label}</h3><p>{calc.expression} = {calc.result} {calc.resultUnit}</p>
-                    <ul>{#each calc.inputs as input}<li>{input.name} = {input.value} {input.unit}<blockquote>{input.quote}</blockquote><a href={turn.answer.sources.find(s => s.id === input.sourceId)?.url} target="_blank" rel="noreferrer">{turn.answer.sources.find(s => s.id === input.sourceId)?.title} · {turn.answer.sources.find(s => s.id === input.sourceId)?.locator}</a></li>{/each}</ul>
                   </div>
                 {/each}
               </details>
@@ -280,14 +271,14 @@
           {#if session.running || sending}
             <CreditActivityView {session} {sending} />
           {:else if session.error}
-            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<Button permission="credit.assistant:ask" data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button"} type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</Button>{/if}</div>
+            <div class="answer-error" role="alert"><p>{session.error}</p>{#if pendingQuestion}<Button data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" variant="outline" class={"ui-button chat-button"} type="button" disabled={busy || !!loadError} onclick={() => void sendQuestion(pendingQuestion)}>重新发送</Button>{/if}</div>
           {/if}
         </div>
       </article>
     {/if}
   </div>
   <div class="composer-dock">
-    <form data-permission="credit.assistant:ask" class="chat-composer" onsubmit={send} bind:this={form}>
+    <form class="chat-composer" onsubmit={send} bind:this={form}>
       <label class="sr-only" for="credit-question">输入消息</label>
       <Textarea data-ui-owner="lib-credit-assistant-CreditAssistantView-svelte" class={"ui-textarea textarea-ghost"} id="credit-question" placeholder="输入问题" bind:ref={textarea} bind:value={question} oninput={resizeInput} onkeydown={handleKeydown} rows={2} disabled={creating}></Textarea>
       <div class="composer-actions">
@@ -330,8 +321,6 @@
   .file-download :global(svg) { width: 20px; height: 20px; }
   h3 { margin: 12px 0 8px; font-size: 1rem; font-weight: bold; }
   .answer-gaps ul, .source ul { margin: 0 0 12px; padding-left: 24px; }
-  .answer-warnings { color: var(--text-3); font-size: .875rem; }
-  .answer-warnings p { margin: 8px 0; }
   .answer-sources { margin: 12px 0 4px; color: var(--text-2); font-size: .875rem; }
   summary { width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--text-3); }
   summary:hover { color: var(--brand); }

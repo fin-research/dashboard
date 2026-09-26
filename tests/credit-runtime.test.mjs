@@ -24,28 +24,17 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
       plugin.onResolve({ filter: /credit-assistant\.ts$/ }, args => ({ path: args.path, namespace: "fixture" }));
       plugin.onLoad({ filter: /credit-assistant\.ts$/, namespace: "fixture" }, () => ({ contents: `
         import { env } from 'cloudflare:workers';
-        export const CREDIT_SCOPE_REFUSAL = 'scope refusal';
         export async function recoverQueuedCreditAnswers() {}
         export async function answerCreditQuestion(options) {
-          const checkpoint = '中😀'.repeat(400000);
-          options.cache.put('runtime-checkpoint', checkpoint);
-          if (options.cache.get('runtime-checkpoint') !== checkpoint) throw new Error('checkpoint roundtrip failed');
           await env.TEST_GATE.fetch('https://gate.test/ready');
-          await options.trace.chat({'credit.stage':'scope'}, span => {
+          await options.trace.tool('ai_search', {}, () => []);
+          await options.trace.chat({'credit.stage':'decision'}, span => {
             span.modelResponse({status:200,gatewayLogId:'runtime-test',inputTokens:50,outputTokens:10});
           });
-          await options.trace.tool('search_many', {'credit.search_round':1}, () => Promise.all([1,2].map(() =>
-            options.trace.tool('search', {}, () => options.trace.tool('ai_search', {}, () => [])))));
-          await options.trace.tool('calculate_batch', {'credit.calculation_count':1}, () =>
-            options.trace.tool('calculate', {'credit.input_count':2}, () => 2));
-          options.progress('正在检索材料','retrieval');
+          options.progress('正在检索资料');
           options.summary('正在分析公司资产');
           await new Promise(resolve=>setTimeout(resolve,150));
-          options.summary('正在核对公司资产口径');
-          options.progress('正在复核','review');
-          await new Promise(resolve=>setTimeout(resolve,150));
-          return {status:'complete',paragraphs:[{text:'公司资产100亿元。',citations:[]}],gaps:[],attachments:[],sources:[],calculations:[],files:[],warnings:[],
-            corpusVersion:options.corpus.builtAt,createdAt:new Date().toISOString()};
+          return {status:'complete',paragraphs:[{text:'公司资产100亿元。',citations:[]}],gaps:[],sources:[],files:[],createdAt:new Date().toISOString()};
         }
       ` }));
     } }] });
@@ -69,13 +58,12 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
     const events = [];
     await readSse(response.body, event => events.push({ type: event.event, data: event.event === "result" ? JSON.parse(event.data) : event.data }), 100000);
     assert.ok(events.some(event => event.type === "progress" && event.data === "正在分析公司资产"));
-    assert.ok(events.some(event => event.type === "progress" && event.data === "正在核对公司资产口径"));
     assert.equal(events.at(-1).type, "result");
     assert.equal(events.at(-1).data.running, false);
     const read = () => request("session").then(response => response.json());
     const saved = await read();
     assert.equal(saved.turns[0].answer.paragraphs[0].text, "公司资产100亿元。");
-    assert.deepEqual(saved.activities.map(activity => activity.stage), ["scope", "retrieval", "review"]);
+    assert.equal(saved.progress, "");
     // Read the real workerd tail collector's local SQLite store, not a fake span
     // recorder. The synthetic model above avoids network calls in this test.
     const traceDirectory = join(directory, "observability");
@@ -101,10 +89,8 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
     const modelSpan = spans.find(span => span.name === "chat gpt-5.6-luna");
     assert.equal(modelSpan.parent_id, rootSpan.span_id);
     assert.equal(modelSpan.attributes["gen_ai.usage.input_tokens"], 50);
-    const searchSpan = spans.find(span => span.name === "execute_tool search_many");
-    assert.equal(spans.filter(span => span.parent_id === searchSpan.span_id && span.name === "execute_tool search").length, 2);
-    const batchSpan = spans.find(span => span.name === "execute_tool calculate_batch");
-    assert.equal(spans.find(span => span.name === "execute_tool calculate").parent_id, batchSpan.span_id);
+    const searchSpan = spans.find(span => span.name === "execute_tool ai_search");
+    assert.equal(searchSpan.parent_id, rootSpan.span_id);
     assert.ok(spans.every(span => span.duration_ms !== null && span.duration_ms >= 0));
     assert.doesNotMatch(JSON.stringify(spans.map(span => span.attributes)), /公司资产|auth0\||test@18.cn/);
     const fresh = await request("session/new", {});

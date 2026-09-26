@@ -6,29 +6,12 @@ import { toCreditDiffPatch, toCreditImportPatch } from '../credit/diff.ts';
 import type { CreditInstitutionUpdateInput } from '../credit/update.ts';
 import { compareCreditInstitutionOrder } from '../credit/presentation.ts';
 import { creditEffectiveStatus, isCreditEffective } from '../credit/validity.ts';
-import { creditCustomerSchema, type CreditCustomer } from '../credit-assistant/types.ts';
 import type { DatabaseClient } from './postgres.ts';
 
 const AMOUNT_TOLERANCE = 0.000001;
 export class CreditDatabaseError extends Error {
   readonly status: number;
   constructor(status: number, message: string) { super(message); this.status = status; this.name = 'CreditDatabaseError'; }
-}
-
-/** Resolve today's NDA flag from all prior diffs, never from one sparse row. */
-export async function findCreditCustomers(client: DatabaseClient, query: string, exact = false): Promise<CreditCustomer[]> {
-  const name = query.trim();
-  if ((exact && !name) || name.length > 200) return [];
-  await client.query('BEGIN READ ONLY');
-  try {
-    const result = await client.query(`SELECT institution_name AS name, confidentiality_status AS "confidentialityStatus",
-      to_char(effective_on,'YYYY-MM-DD') AS "reportDate", CURRENT_TIMESTAMP::text AS "checkedAt"
-      FROM credit.state_as_of((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date)
-      WHERE ($2::boolean AND institution_name=$1 OR NOT $2::boolean AND strpos(lower(institution_name),lower($1))>0)
-      ORDER BY (institution_name=$1) DESC,institution_name LIMIT CASE WHEN $1='' THEN NULL ELSE 20 END`, [name,exact]);
-    const customers = result.rows.map(row => creditCustomerSchema.parse(row));
-    await client.query('COMMIT'); return customers;
-  } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
 }
 
 export interface PersistCreditImportInput { parsed: ParsedCreditWorkbook; createdBy?: string | null }

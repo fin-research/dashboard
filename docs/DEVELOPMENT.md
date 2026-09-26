@@ -66,7 +66,7 @@ pnpm 下载缓存和按 OS/架构/Playwright 版本固定的 Chromium 缓存由 
 
 - `wrangler.jsonc` 显式开启 `observability.traces.enabled`，采样率 `head_sampling_rate: 0.1`，并以 `persist: true` 保存至 Cloudflare Observability；日志仍为全量采样，保留失败诊断。
 - 此开关作用于整个 `eastmoney-dashboard` Worker，而非仅授信助手。发布后的新请求可产生平台自动追踪（HTTP、binding 和 handler）；不会补录历史请求或把 DO 会话转换成追踪记录。
-- 在 `eastmoney-dashboard → Observability` 查看平台追踪；授信助手已按 [Cloudflare Agents tracing](https://developers.cloudflare.com/agents/runtime/operations/observability/tracing/#custom-harnesses) 增加 `invoke_agent`、`chat`、`execute_tool` 与 Agent/会话标识，具体节点与边界见 [授信助手运行追踪](CREDIT_ASSISTANT.md#运行追踪)。
+- 在 `eastmoney-dashboard → Observability` 查看平台追踪；授信助手按 [Cloudflare Agents tracing](https://developers.cloudflare.com/agents/runtime/operations/observability/tracing/#custom-harnesses) 记录 `invoke_agent`、`chat`、`execute_tool` 与 Agent/会话标识，不记录问题或检索正文。
 - 追踪不增加问题、授信材料正文、提示词、模型输出或工具参数/结果的内容采集，也不配置外部导出目的地；自定义埋点只记录安全元数据。
 - 日常追踪采用 10% 头部采样；专项排障可临时恢复全量并在完成后回调。抽样不保证每次问答都有追踪，不能替代日志和业务状态。额度与计费以 [Cloudflare Workers tracing](https://developers.cloudflare.com/workers/observability/traces/#limits--pricing) 为准。
 

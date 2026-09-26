@@ -83,7 +83,7 @@ test('浏览器 agent 完成授信检索工具循环并展示原件链接', asyn
     toolCalls++;
     expect(rpc.params.name).toBe('credit_public_search');
     return route.fulfill({ json: { jsonrpc: '2.0', id: rpc.id, result: { structuredContent: { sources: [
-      { title: '公开报告', text: '授信余额为 10 亿元', url: '/api/credit-assistant/files/0123456789abcdef01234567', locator: 'AI Search 检索片段' },
+      { title: '公开报告', text: '授信余额为 10 亿元', url: '/api/credit-assistant/files/%E5%85%AC%E5%BC%80%E6%8A%A5%E5%91%8A.pdf', locator: 'AI Search 检索片段' },
     ] } } } });
   });
   await page.route('**/api/ai/responses', route => {
@@ -99,7 +99,7 @@ test('浏览器 agent 完成授信检索工具循环并展示原件链接', asyn
   await panel.getByRole('textbox', { name: '输入消息' }).fill('查询授信');
   await panel.getByRole('button', { name: '发送消息' }).click();
   await expect(panel.getByText('依据公开报告，授信余额为 10 亿元。')).toBeVisible();
-  await expect(panel.getByRole('link', { name: '公开报告' })).toHaveAttribute('href', '/api/credit-assistant/files/0123456789abcdef01234567');
+  await expect(panel.getByRole('link', { name: '公开报告' })).toHaveAttribute('href', '/api/credit-assistant/files/%E5%85%AC%E5%BC%80%E6%8A%A5%E5%91%8A.pdf');
   expect(modelCalls).toBe(2);
   expect(toolCalls).toBe(1);
 });

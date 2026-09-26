@@ -90,7 +90,9 @@ test('public credit search exposes only current public PDF excerpts and original
   const sources=payload.result.structuredContent.sources;
   assert.equal(sources.length,1);
   assert.equal(sources[0].title,'测试报告.pdf');
-  assert.match(sources[0].url,/^\/api\/credit-assistant\/files\/[a-f0-9]{24}$/);
+  assert.equal(sources[0].url,'/api/credit-assistant/files/%E6%B5%8B%E8%AF%95%E6%8A%A5%E5%91%8A.pdf');
   assert.equal(sources[0].locator,'AI Search 检索片段');
   assert.ok(!JSON.stringify(sources).includes('内部数据'));
+  const materials=await rpc(f,'tools/call',{name:'credit_public_materials',arguments:{}});
+  assert.deepEqual(materials.payload.result.structuredContent.documents.map(document=>document.title),['测试报告.pdf']);
 });

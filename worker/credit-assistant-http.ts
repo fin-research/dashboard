@@ -1,8 +1,8 @@
 import { getAgentByName } from "agents";
-import { loadCreditCorpus, isCreditOriginalKey } from "../src/lib/server/credit-evidence.ts";
 import { creditQuestionSchema } from "../src/lib/credit-assistant/types.ts";
 import type { SiteIdentity } from "../src/lib/identity.ts";
 import { creditAgentName } from "../src/lib/server/credit-session.ts";
+import { listPublicCreditFiles, publicCreditFileName } from "../src/lib/server/credit-public-files.ts";
 
 // Transport/memory protection only; there is no question character limit.
 const MAX_REQUEST_BYTES = 1024 * 1024;
@@ -58,22 +58,20 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
       return new Response(response.body, { status: response.status, headers });
     }
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405 });
-    const corpus = await loadCreditCorpus(env.EASTMONEY);
-    if (url.pathname === "/api/credit-assistant/materials") {
-      return Response.json({ builtAt: corpus.builtAt, documents: corpus.documents.map(d => ({ id: d.id, title: d.title,
-        authority: d.authority, blockCount: d.blockCount, ocrCount: d.ocrCount, url: `/api/credit-assistant/files/${d.id}` })) }, { headers: PRIVATE_HEADERS });
+    const encoded = url.pathname.match(/^\/api\/credit-assistant\/files\/([^/]+)$/)?.[1];
+    let requested = "";
+    try { requested = encoded ? decodeURIComponent(encoded) : ""; } catch { /* invalid path */ }
+    const title = /^[a-f0-9]{24}$/.test(requested)
+      ? (await listPublicCreditFiles(env.EASTMONEY)).find(file => file.id === requested)?.title
+      : requested;
+    if (!title || !publicCreditFileName(`credit/public/${title}`)) {
+      return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
     }
-    const id = url.pathname.match(/^\/api\/credit-assistant\/files\/([a-f0-9]{24})$/)?.[1];
-    const doc = id ? corpus.documents.find(d => d.id === id) : undefined;
-    if (!doc) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
-    // Resolve only exact public PDF keys from the current R2 listing.
-    if (!isCreditOriginalKey(doc.originalKey)) throw new Error("Invalid public key");
-    const file = await env.EASTMONEY.get(`credit/${doc.originalKey}`, { range: request.headers });
+    const file = await env.EASTMONEY.get(`credit/public/${title}`, { range: request.headers });
     if (!file) return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
-    const isPdf = doc.originalKey.endsWith(".pdf");
     const headers = new Headers(PRIVATE_HEADERS);
-    headers.set("content-type", isPdf ? "application/pdf" : "application/octet-stream");
-    headers.set("content-disposition", `${isPdf && url.searchParams.get("download") !== "1" ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(doc.title)}`);
+    headers.set("content-type", "application/pdf");
+    headers.set("content-disposition", `${url.searchParams.get("download") !== "1" ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(title)}`);
     headers.set("accept-ranges", "bytes");
     headers.set("etag", file.httpEtag);
     const range = request.headers.has("range") ? file.range : undefined;
