@@ -48,7 +48,7 @@
   <AiPanel client={aiClient} identity="visual-test" />
 </div>
 <style>
-  .site-with-ai { display:flex; align-items:flex-start; min-height:100dvh; }
-  .site-content { flex:1; min-width:0; }
+  .site-with-ai { display:flex; align-items:flex-start; height:100dvh; min-height:0; }
+  .site-content { flex:1; min-width:0; min-height:0; height:100%; }
   @media (max-width:600px) { .site-with-ai { display:block; } }
 </style>
