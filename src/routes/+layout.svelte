@@ -69,5 +69,9 @@
 <style>
   :global(.site-with-ai) { display:flex; align-items:flex-start; height:100dvh; min-height:0; }
   :global(.site-content) { flex:1; min-width:0; min-height:0; height:100%; }
-  @media (max-width:600px) { :global(.site-with-ai) { display:block; } }
+  @media (max-width:600px) {
+    :global(.site-with-ai) { display:block; }
+    :global(.site-with-ai:has(.page-shell)) { height:auto; min-height:100dvh; }
+    :global(.site-with-ai:has(.page-shell) .site-content) { height:auto; }
+  }
 </style>
