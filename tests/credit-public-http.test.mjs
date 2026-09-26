@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import ts from "typescript";
 import { creditAgentName } from "../src/lib/server/credit-session.ts";
 import { recordingCreditTracing } from "./helpers/credit-trace-recorder.mjs";
+import { legacyCreditFileId } from "../src/lib/server/credit-public-files.ts";
 
 const moduleUrl = code => `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
 const agents = moduleUrl(`export { isDurableObjectCodeUpdateReset, isPlatformTransientError } from ${JSON.stringify(new URL("../node_modules/agents/dist/retries.js", import.meta.url).href)};
@@ -66,6 +67,7 @@ test("ordinary question creates a user session and serves only public files from
   assert.equal(state.turns.length, 1);
   assert.equal(state.turns[0].answer.files[0].id, doc.id);
   assert.equal((await app.request("files/" + encodeURIComponent(doc.title))).status, 200);
+  assert.equal((await app.request("files/" + legacyCreditFileId(publicKey))).status, 200);
   assert.equal((await app.request("files/" + encodeURIComponent("missing.pdf"))).status, 404);
   assert.ok(app.reads.includes(publicKey));
   assert.ok(app.reads.every(key => key.startsWith("credit/")));

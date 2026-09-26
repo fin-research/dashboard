@@ -7,6 +7,7 @@ import { readSse } from '../sse.ts';
 import { CONTEXT_HEADER } from './gateway-context.ts';
 import type { SiteIdentity } from '../identity.ts';
 import { mcpOperations, operationPath, type McpOperation } from './mcp-catalog.ts';
+import { listPublicCreditFiles } from './credit-public-files.ts';
 
 const MAX_REQUEST = 1024 * 1024;
 const MAX_RESPONSE = 8 * 1024 * 1024;
@@ -90,7 +91,7 @@ export async function executeOperation(operation: McpOperation, input: Record<st
   }));
   return decodeBusinessResponse(response, operation, signal);
 }
-export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENTITY'>, user: SiteIdentity | null): Promise<Response> {
+export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENTITY' | 'EASTMONEY' | 'CREDIT_SEARCH'>, user: SiteIdentity | null): Promise<Response> {
   if (!user) return Response.json({ error: '请先登录' }, { status: 401, headers: privateHeaders });
   if (request.method !== 'POST') return new Response(null, { status: 405, headers: { ...privateHeaders, Allow: 'POST' } });
   try {
@@ -100,7 +101,28 @@ export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENT
     const bounded = new Request(request, { headers, body });
     const handler = createMcpHandler(async () => {
       const server = new McpServer({ name: 'eastmoney-dashboard', version: '1.0.0' });
-      server.registerTool('health', { description: 'Dashboard MCP 可用性与当前账号的工具数量。', inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async () => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: { status: 'ok', toolCount: allowed.filter(Boolean).length + 1 } }));
+      server.registerTool('health', { description: 'Dashboard MCP 可用性与当前账号的工具数量。', inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async () => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: { status: 'ok', toolCount: allowed.filter(Boolean).length + 3 } }));
+      server.registerTool('credit_public_materials', { title: '列出公开授信材料', description: '列出授信公开 PDF 材料与可打开的原件链接。', inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async () => {
+        const documents = (await listPublicCreditFiles(env.EASTMONEY)).map(({ title, authority, url }) => ({ title, authority, url }));
+        return { content: [{ type: 'text', text: JSON.stringify(documents) }], structuredContent: { documents } };
+      });
+      server.registerTool('credit_public_search', { title: '检索公开授信材料', description: '搜索当前公开授信 PDF，返回原始片段和原件链接。检索片段没有可核验页码。',
+        inputSchema: z.object({ query: z.string().trim().min(2).max(200) }).strict(),
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async ({ query }) => {
+        const documents = await listPublicCreditFiles(env.EASTMONEY);
+        const byKey = new Map(documents.map(document => [document.key, document]));
+        const result = await env.CREDIT_SEARCH.search({ query, ai_search_options: {
+          retrieval: { retrieval_type: 'hybrid', max_num_results: 50, match_threshold: 0 },
+          reranking: { enabled: true, model: '@cf/baai/bge-reranker-base', match_threshold: 0 },
+          query_rewrite: { enabled: false }, cache: { enabled: false },
+        } });
+        const sources = result.chunks.flatMap((chunk: { item: { key: string }; text: string }) => {
+          const document = byKey.get(chunk.item.key);
+          return document && chunk.text.trim() ? [{ title: document.title, text: chunk.text,
+            url: document.url, locator: 'AI Search 检索片段', authority: document.authority }] : [];
+        }).slice(0, 12);
+        return { content: [{ type: 'text', text: JSON.stringify(sources) }], structuredContent: { sources } };
+      });
       const allowed = await policies(env, user);
       mcpOperations.forEach((operation, index) => {
         if (!allowed[index]) return;

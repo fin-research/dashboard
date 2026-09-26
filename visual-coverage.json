@@ -44,7 +44,7 @@
         "credit",
         "calendar",
         "credit-weekly",
-        "credit-assistant",
+        "browser-agent-credit",
         "sidebar-credit"
       ]
     },
@@ -249,8 +249,7 @@
       "scenarios": {
         "overview": "credit",
         "calendar": "calendar",
-        "weekly": "credit-weekly",
-        "assistant": "credit-assistant"
+        "weekly": "credit-weekly"
       }
     }
   ],
@@ -758,42 +757,22 @@
       ]
     },
     {
-      "id": "credit-assistant",
-      "url": "/credit-workbench/assistant",
+      "id": "browser-agent-credit",
+      "url": "/credit-workbench",
       "kind": "screenshot",
-      "state": "empty/cited-reply/search-progress/error/retry",
+      "state": "通用对话取代授信助手页面；公开材料工具和本地历史",
       "evidence": [
         {
           "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
-          "test": "desktop credit assistant supports ordinary chat and readable cited replies",
-          "projects": [
-            "desktop"
-          ],
-          "snapshots": [
-            "credit-assistant-empty.png",
-            "credit-assistant-citation.png"
-          ]
+          "test": "通用 AI 侧栏接替授信助手并可选择公开材料工具",
+          "projects": ["desktop"],
+          "snapshots": ["agent-credit-tools.png"]
         },
         {
           "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
-          "test": "desktop assistant search progress remains readable above the composer",
-          "projects": [
-            "desktop"
-          ],
-          "snapshots": [
-            "credit-assistant-processing.png"
-          ]
-        },
-        {
-          "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
-          "test": "desktop assistant failed answer can be retried without losing the question",
-          "projects": [
-            "desktop"
-          ],
-          "snapshots": [
-            "credit-assistant-failed.png",
-            "credit-assistant-result.png"
-          ]
+          "test": "本地授信对话刷新后恢复且保留来源文本",
+          "projects": ["desktop"],
+          "snapshots": ["agent-credit-history.png"]
         }
       ]
     },
@@ -942,6 +921,20 @@
             "ai-panel-progress.png",
             "ai-panel-complete.png"
           ]
+        }
+      ]
+    },
+    {
+      "id": "browser-agent-panel",
+      "url": "/market-briefing",
+      "kind": "screenshot",
+      "state": "通用 AI 对话、会话与工具设置；桌面侧栏挤压页面",
+      "evidence": [
+        {
+          "spec": "tests/visual/market-report.spec.mjs",
+          "test": "AI 对话侧栏挤压桌面页面并提供会话与工具设置",
+          "projects": ["desktop", "mobile"],
+          "snapshots": ["ai-agent-welcome.png"]
         }
       ]
     },

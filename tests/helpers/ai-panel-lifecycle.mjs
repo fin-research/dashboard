@@ -26,7 +26,7 @@ const Host = await loadComponent("tests/helpers/AiPanelHost.svelte", `<script>
   const client = provideAiClient(createAiClient());
   export function run(title = "测试分析") { return client.run({ title, url: "/api/test-ai", parse: value => value, resultText: value => value.ok === true ? "材料核对完成。" : "比较结果已生成。" }); }
 </script>
-<AiPanel {client} />`);
+<AiPanel {client} identity={null} />`);
 
 const settle = async () => {
   await new Promise(resolve => setTimeout(resolve, 260));

@@ -37,9 +37,22 @@
     : Promise.reject(new Error(`Unregistered visual scenario: ${path}`));
 </script>
 <GlobalMessages />
-<AiPanel client={aiClient} />
-{#await component then module}
-  <module.default viewId={view || 'overview'} {...(/^(?:\/news|\/articles|\/commentaries)\//.test(path) ? {data:{id:view}} : {})} />
-{:catch error}
-  <pre role="alert">{error.message}</pre>
-{/await}
+<div class="site-with-ai">
+  <div class="site-content">
+    {#await component then module}
+      <module.default viewId={view || 'overview'} {...(/^(?:\/news|\/articles|\/commentaries)\//.test(path) ? {data:{id:view}} : {})} />
+    {:catch error}
+      <pre role="alert">{error.message}</pre>
+    {/await}
+  </div>
+  <AiPanel client={aiClient} identity="visual-test" />
+</div>
+<style>
+  .site-with-ai { display:flex; align-items:flex-start; height:100dvh; min-height:0; }
+  .site-content { flex:1; min-width:0; min-height:0; height:100%; }
+  @media (max-width:600px) {
+    .site-with-ai { display:block; }
+    :global(.site-with-ai:has(.page-shell)) { height:auto; min-height:100dvh; }
+    :global(.site-with-ai:has(.page-shell) .site-content) { height:auto; }
+  }
+</style>

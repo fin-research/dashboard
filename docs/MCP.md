@@ -2,6 +2,8 @@
 
 业务 MCP 上游为 `https://eastmoney.hasbai.xyz/api/mcp`，统一客户端入口仍为 Cloudflare Portal `https://mcp.hasbai.xyz/mcp`。Portal 的 `dashboard` 上游使用逐用户 Auth0 OAuth（`on_behalf=true`），工具名自动加 `dashboard_` 前缀。
 
+全站 AI 侧栏的浏览器端 ToolLoopAgent 通过同源 `/api/mcp` 读取当前用户可见工具并执行；Ask 只加载只读工具，Act 中的修改或生成操作仍须在面板逐次确认。`credit_public_materials` 和 `credit_public_search` 仅访问 `credit/public/` 当前 PDF 清单及其 AI Search 命中片段，片段不标注虚构页码。原 `ask_credit_assistant` 和 `credit_session` 已从 MCP 目录退出，旧 HTTP/DO 仅保留历史兼容。
+
 ## 实现与权限
 
 - SvelteKit `src/routes/api/mcp/+server.ts` 使用项目已有 Cloudflare Agents 的 `createMcpHandler` 和 MCP SDK v2；兼容 2026-07-28 发现协议及旧版初始化/Streamable HTTP。Svelte 官方开发文档 MCP 不提供本站业务能力。
@@ -25,7 +27,7 @@
 | 融资业务 | 总览、项目/任务、SOP、客户、投资人、台账、负债周报 | 项目创建/更新/删除、任务维护、SOP 节点维护、客户维护、白名单台账增删改 |
 | 资金日报 | 历史列表、指定日期 HTML | 文件上传沿用网站 |
 
-二级池查询的 `start`/`end` 读取结构化周报；Excel 原件下载/上传、附件/PDF 二进制传输沿用网站。MCP 不新增手动消息发送工具。授信问答提交返回异步状态，用 `credit_session` 查询结果；其它 AI SSE 只把终态业务结果交给 MCP，错误或流中断返回 `isError`。输入上限 1 MiB，响应上限 8 MiB；不自动重试写入或生成，连接中断时应先读取当前记录/历史再决定是否重试。
+二级池查询的 `start`/`end` 读取结构化周报；Excel 原件下载/上传、附件/PDF 二进制传输沿用网站。MCP 不新增手动消息发送工具。AI SSE 只把终态业务结果交给 MCP，错误或流中断返回 `isError`。输入上限 1 MiB，响应上限 8 MiB；不自动重试写入或生成，连接中断时应先读取当前记录/历史再决定是否重试。
 
 所有非只读操作具有 `readOnlyHint=false`、`destructiveHint=true`、`idempotentHint=false`，AI 具有 `openWorldHint=true`。这些是客户端提示，不代替服务端授权。客户端执行修改和生成仍应根据用户明确意图选择工具。
 

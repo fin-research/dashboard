@@ -1,12 +1,17 @@
 import { z } from "zod";
 import { readResponsesStream } from "./ai-stream.ts";
+import { AI_GATEWAY_MODEL } from "../agent-model.ts";
+export { AI_GATEWAY_MODEL } from "../agent-model.ts";
 
 const MAX_AI_GATEWAY_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_CREDIT_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAX_AI_GATEWAY_TIMEOUT_MS = 300_000;
 
-export const AI_GATEWAY_MODEL = "gpt-5.6-luna" as const;
 export const AI_GATEWAY_PROVIDER = "custom-codex" as const;
+export function aiGatewayResponsesUrl(credentials: Pick<AiGatewayCredentials, "accountId" | "gatewayId">): string {
+  return `https://gateway.ai.cloudflare.com/v1/${encodeURIComponent(credentials.accountId)}/` +
+    `${encodeURIComponent(credentials.gatewayId)}/${encodeURIComponent(AI_GATEWAY_PROVIDER)}/responses`;
+}
 export const AI_GATEWAY_REASONING_EFFORT_BY_TASK = {
   generation: "xhigh",
   market_briefing: "xhigh",
@@ -296,9 +301,7 @@ async function runProvider<OUTPUT>(
   const streaming = Boolean(options.onTextDelta || options.onReasoningSummary);
   const prompt = splitInstructions(messages);
   const reasoningEffort = AI_GATEWAY_REASONING_EFFORT_BY_TASK[options.taskType];
-  const url =
-    `https://gateway.ai.cloudflare.com/v1/${encodeURIComponent(credentials.accountId)}/` +
-    `${encodeURIComponent(credentials.gatewayId)}/${encodeURIComponent(provider)}/responses`;
+  const url = aiGatewayResponsesUrl(credentials);
   const metadata = {
     ...options.metadata,
     ai_model: AI_GATEWAY_MODEL,

@@ -2,6 +2,7 @@ import { getAgentByName } from "agents";
 import { creditQuestionSchema } from "../src/lib/credit-assistant/types.ts";
 import type { SiteIdentity } from "../src/lib/identity.ts";
 import { creditAgentName } from "../src/lib/server/credit-session.ts";
+import { listPublicCreditFiles, publicCreditFileName } from "../src/lib/server/credit-public-files.ts";
 
 // Transport/memory protection only; there is no question character limit.
 const MAX_REQUEST_BYTES = 1024 * 1024;
@@ -58,8 +59,12 @@ export async function creditAssistantHttp(request: Request, env: Cloudflare.Env,
     }
     if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405 });
     const encoded = url.pathname.match(/^\/api\/credit-assistant\/files\/([^/]+)$/)?.[1];
-    const title = encoded ? decodeURIComponent(encoded) : "";
-    if (!title || !/^[^/\\\u0000-\u001f\u007f]+\.pdf$/i.test(title) || title === "." || title === "..") {
+    let requested = "";
+    try { requested = encoded ? decodeURIComponent(encoded) : ""; } catch { /* invalid path */ }
+    const title = /^[a-f0-9]{24}$/.test(requested)
+      ? (await listPublicCreditFiles(env.EASTMONEY)).find(file => file.id === requested)?.title
+      : requested;
+    if (!title || !publicCreditFileName(`credit/public/${title}`)) {
       return new Response("Not found", { status: 404, headers: PRIVATE_HEADERS });
     }
     const file = await env.EASTMONEY.get(`credit/public/${title}`, { range: request.headers });
