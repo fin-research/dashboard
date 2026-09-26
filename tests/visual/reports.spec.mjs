@@ -12,7 +12,9 @@ test('financing-model preserves its approved report layout',async({page})=>{
   await expect(page.getByText('123.00',{exact:true})).toBeVisible();
   await expect(page.getByText('历史P45.0',{exact:false})).toBeVisible();
   await expect(page.getByRole('heading',{name:'因子贡献',exact:true})).toBeVisible();
-  await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue('未来窗口没有明显更低的预测票面，建议尽快发行。');
+  await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue('首个可发行日预计票面1.85%，未来窗口最大预计净节约1.0bp，未达到等待门槛；建议按融资计划尽快发行。');
+  await expect(page.getByRole('heading',{name:'四品种对比'})).toBeVisible();
+  await expect(page.getByText('68.0%',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'编辑整体结论'})).toHaveCount(0);
   await expect(page.getByText('窗口预期净节约',{exact:false})).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);
@@ -64,7 +66,7 @@ test('financing-model switches between issuance model dates', async ({page}) => 
   await expect(page.getByText('尽快发行',{exact:true}).first()).toBeVisible();
   await page.getByRole('button',{name:'展开未来发行窗口明细'}).click();
   await expect(page.getByRole('columnheader',{name:'预计票面'})).toBeVisible();
-  await expect(page.getByRole('columnheader',{name:'90%区间',exact:true})).toBeVisible();
+  await expect(page.getByRole('columnheader',{name:'90%区间',exact:true})).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

@@ -30,7 +30,7 @@
   import { permissionVisibility } from "$lib/permission-visibility";
   import { parseIssuanceReport as parseFinancingModelReport, type IssuanceReport as FinancingModelReport } from "$lib/issuance-model";
   import { groupIssuanceShap, selectIssuanceShapDrivers, issuanceDecisionLabel, issuanceDecisionNarrative } from "$lib/issuance-presentation";
-  import { issuanceFeatureName, renderIssuanceForecast } from "../../charts/issuance-model";
+  import { issuanceFeatureName, renderIssuanceForecast, renderIssuanceProductComparison } from "../../charts/issuance-model";
   interface Props {
     embedded?: boolean;
   }
@@ -111,7 +111,7 @@
     editingSellSide = false;
     editNarrative = nextReport.conclusion.edited
       ? nextReport.conclusion.narrative
-      : issuanceDecisionNarrative(nextReport.snapshot.decision.action) ?? nextReport.conclusion.narrative;
+      : issuanceDecisionNarrative(nextReport.snapshot) ?? nextReport.conclusion.narrative;
     conclusionRevision = 0;
     savedConclusionRevision = 0;
     resetSellSideEditor();
@@ -348,14 +348,6 @@
     return value === null || value === undefined ? "—" : (value * 100).toFixed(2);
   }
 
-  function formatDateRange(
-    start: string | null,
-    end: string | null,
-  ): string {
-    if (!start || !end) return "—";
-    return `${start.slice(0, 7).replace("-", "/")}\n${end.slice(0, 7).replace("-", "/")}`;
-  }
-
   function displayDate(value: string): string {
     const [year, month, day] = value.split("-");
     return `${year}年${Number(month)}月${Number(day)}日`;
@@ -368,15 +360,28 @@
   let recommendation = $derived(snapshot ? issuanceDecisionLabel(snapshot.decision.action) : null);
   let recommendationTone = $derived(recommendation === "尽快发行" ? "strong_buy" : recommendation === "等待" ? "neutral" : "wait");
   let driverGroups = $derived(groupIssuanceShap(snapshot?.explanation?.features ?? []));
-  let marketDrivers = $derived(selectIssuanceShapDrivers(snapshot?.explanation?.features ?? []).map(row=>({feature:row.feature,display_name:issuanceFeatureName(row.feature),shap:row.shap_bp,value:row.value,impact:row.shap_bp>0 ? "推高成本" as const : "降低成本" as const})));
+  let marketDrivers = $derived.by(() => {
+    const merged = new Map<string, { display_name:string; shap:number; value:number|null }>();
+    for (const row of selectIssuanceShapDrivers(snapshot?.explanation?.features ?? [])) {
+      const name = issuanceFeatureName(row.feature);
+      const existing = merged.get(name);
+      merged.set(name, { display_name:name, shap:(existing?.shap ?? 0)+row.shap_bp,
+        value:existing ? null : row.value });
+    }
+    return [...merged.values()].sort((left,right)=>Math.abs(right.shap)-Math.abs(left.shap));
+  });
   let current = $derived(snapshot?.forecast[0]);
-  let validationMetrics = $derived(snapshot ? [
-    {label:"预测检验数",value:String(snapshot.validation.sample_count)},
-    {label:"检验区间",value:formatDateRange(snapshot.validation.prediction_start,snapshot.validation.prediction_end)},
-    {label:"2026当日MAE",value:formatNullable(snapshot.validation.metrics.find(r=>r.year===2026&&r.lead_days===0)?.mae_bp,2)+" bp"},
-    {label:"2026末日MAE",value:formatNullable(snapshot.validation.metrics.find(r=>r.year===2026&&r.lead_days===30)?.mae_bp,2)+" bp"},
-    {label:"末日基准MAE",value:formatNullable(snapshot.validation.metrics.find(r=>r.year===2026&&r.lead_days===30)?.flat_market_mae_bp,2)+" bp"},
-  ] : []);
+  let validationMetrics = $derived(snapshot ? (() => {
+    const first = snapshot.forecast[0];
+    const observed = snapshot.validation.metrics.find(row => row.year === 2026 && row.lead_days === 0);
+    return [
+      {label:"训练样本",value:first ? String(first.market_training_samples) : "—"},
+      {label:"训练截止",value:first?.market_train_label_end ?? "—"},
+      {label:"2026检验样本",value:observed ? String(observed.samples) : "—"},
+      {label:"2026预测胜率（±5bp）",value:observed?.hit_rate_5bp == null ? "—" : `${(observed.hit_rate_5bp*100).toFixed(1)}%`},
+      {label:"平均误差",value:observed ? `${observed.mae_bp.toFixed(1)} bp` : "—"},
+    ];
+  })() : []);
 </script>
 
 <svelte:head>
@@ -478,12 +483,22 @@
           <PanelHeading id="business-title" title="业务指标" />
           <div class="business-metric-grid">
             <MetricCard label="LCR" value={formatRatioPercent(businessMetrics?.lcr?.value_ratio)} unit={businessMetrics?.lcr ? "%" : ""} tone="teal" compact
-              detail={businessMetrics?.lcr ? `${businessMetrics.lcr.historical_percentile === null ? "" : `历史P${businessMetrics.lcr.historical_percentile.toFixed(1)} · `}${businessMetrics.lcr.date}` : "—"} />
+              detail={businessMetrics?.lcr?.historical_percentile == null ? "—" : `历史P${businessMetrics.lcr.historical_percentile.toFixed(1)}`} />
             <MetricCard label="NSFR" value={formatRatioPercent(businessMetrics?.nsfr?.value_ratio)} unit={businessMetrics?.nsfr ? "%" : ""} tone="blue" compact
-              detail={businessMetrics?.nsfr ? `${businessMetrics.nsfr.historical_percentile === null ? "" : `历史P${businessMetrics.nsfr.historical_percentile.toFixed(1)} · `}${businessMetrics.nsfr.date}` : "—"} />
+              detail={businessMetrics?.nsfr?.historical_percentile == null ? "—" : `历史P${businessMetrics.nsfr.historical_percentile.toFixed(1)}`} />
+            <MetricCard label="资金缺口" value={formatNullable(businessMetrics?.funding_gap?.value_yi,1)} unit={businessMetrics?.funding_gap ? "亿元" : ""} tone="orange" compact
+              detail={businessMetrics?.funding_gap?.historical_percentile == null ? "—" : `历史P${businessMetrics.funding_gap.historical_percentile.toFixed(1)}`} />
             <MetricCard label="主体利差" value={formatNullable(businessMetrics?.issuer_spread?.spread_bp, 2)} unit={businessMetrics?.issuer_spread?.spread_bp === null || !businessMetrics?.issuer_spread ? "" : "bp"} tone="purple" compact
-              detail={businessMetrics?.issuer_spread ? `${businessMetrics.issuer_spread.date} · ${businessMetrics.issuer_spread.outstanding_bonds}只` : "—"} />
+              detail={businessMetrics?.issuer_spread?.historical_percentile == null ? "—" : `历史P${businessMetrics.issuer_spread.historical_percentile.toFixed(1)}`} />
           </div>
+        </ModuleCard>
+      </section>
+
+      <section aria-label="四品种对比">
+        <ModuleCard class="chart-card" labelledBy="product-title">
+          <PanelHeading id="product-title" title="四品种对比" />
+          <ChartHost renderer={renderIssuanceProductComparison} args={[snapshot.product_scenarios]}
+            ariaLabel="3年与5年公募债和次级债预计票面对比" className="product-comparison-chart" />
         </ModuleCard>
       </section>
 
@@ -515,7 +530,7 @@
             <ChartHost
               renderer={renderIssuanceForecast}
               args={[snapshot.forecast]}
-              ariaLabel="未来发行票面与预测区间"
+              ariaLabel="未来发行票面预测"
               className="forecast-chart"
             />
             <div
@@ -529,7 +544,6 @@
                   <tr>
                     <th scope="col">日期</th>
                     <th scope="col">预计票面</th>
-                    <th scope="col">90%区间</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -537,7 +551,6 @@
                     <tr>
                       <th scope="row">{displayDate(point.date)}</th>
                       <td>{formatNullable(point.coupon_percent,2)}%</td>
-                      <td>{formatNullable(point.coupon_low_percent,2)}—{formatNullable(point.coupon_high_percent,2)}%</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -550,7 +563,7 @@
             {#each validationMetrics as metric}
               <div>
                 <dt>{metric.label}</dt>
-                <dd class:sample-range={metric.label === "样本区间"}>{metric.value}</dd>
+                <dd>{metric.value}</dd>
               </div>
             {/each}
             </dl>
@@ -1126,7 +1139,7 @@
 
   .business-metric-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
   }
 
@@ -1217,11 +1230,6 @@
     color: var(--text-2);
     font-size: 0.875rem;
     white-space: nowrap;
-  }
-
-  .validation-grid dd.sample-range {
-    white-space: pre-line;
-    font-size: 0.875rem;
   }
 
   .validation-grid dd {
@@ -1661,7 +1669,7 @@
     }
 
     .business-metric-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .sell-side-grid--3 {

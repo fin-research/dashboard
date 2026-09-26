@@ -284,7 +284,7 @@ export function financingDriverRadarScale(
   return { min: 50 - halfSpan, max: 50 + halfSpan };
 }
 
-/** Restores the existing radar visual with actual, unsigned group SHAP magnitudes. */
+/** Show the net contribution of each business group without double counting offsets. */
 export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): void {
   if (!rows.length || rows.every(row => row.absolute_bp === 0)) {
     setEmpty(host, "因子贡献暂缺");
@@ -294,17 +294,17 @@ export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): v
   const maximum = Math.max(0.1, ...rows.map(row => row.absolute_bp));
   setChart(host, {
     animationDuration: 180,
-    aria: { enabled: true, description: "本次票面预测各类因子的 SHAP 绝对贡献雷达图" },
+    aria: { enabled: true, description: "本次票面预测各类因子的 SHAP 净贡献雷达图" },
     color: [chartBlue],
     legend: {
       top: 0, right: 0, itemWidth: 16, itemHeight: 10,
-      textStyle: forecastAxisLabel, data: ["贡献强度"],
+      textStyle: forecastAxisLabel, data: ["净贡献"],
     },
     tooltip: {
       ...tooltip,
       trigger: "item",
       formatter: () => rows.map(row =>
-        `${escapeHtml(row.display_name)} · 绝对贡献 ${row.absolute_bp.toFixed(3)} bp · 净贡献 ${signed(row.net_bp, 3)} bp`,
+        `${escapeHtml(row.display_name)} · 净贡献 ${signed(row.net_bp, 3)} bp`,
       ).join("<br>"),
     },
     radar: {
@@ -319,7 +319,7 @@ export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): v
     series: [{
       type: "radar", symbol: "circle", symbolSize: 6,
       data: [{
-        name: "贡献强度", value: rows.map(row => row.absolute_bp),
+        name: "净贡献", value: rows.map(row => row.absolute_bp),
         lineStyle: { color: chartBlue, width: 2.2 },
         itemStyle: { color: colors.paper, borderColor: chartBlue, borderWidth: 2 },
         areaStyle: { color: "rgba(47,111,214,0.13)" },
@@ -362,7 +362,7 @@ export function renderFinancingDriverContributions(
         return [
           `<strong>${escapeHtml(row.display_name)}</strong>`,
           `${label} ${signed(contribution, 3)} bp`,
-          `因子值 ${row.value === null ? '暂缺' : row.value.toFixed(4)}`,
+          ...(row.value === null ? [] : [`因子值 ${row.value.toFixed(4)}`]),
         ].join("<br>");
       },
     },
