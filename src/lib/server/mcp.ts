@@ -8,6 +8,7 @@ import { CONTEXT_HEADER } from './gateway-context.ts';
 import type { SiteIdentity } from '../identity.ts';
 import { mcpOperations, operationPath, type McpOperation } from './mcp-catalog.ts';
 import { listPublicCreditFiles } from './credit-public-files.ts';
+import { searchPublicCreditDocuments } from './credit-search.ts';
 
 const MAX_REQUEST = 1024 * 1024;
 const MAX_RESPONSE = 8 * 1024 * 1024;
@@ -106,22 +107,20 @@ export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENT
         const documents = (await listPublicCreditFiles(env.EASTMONEY)).map(({ title, authority, url }) => ({ title, authority, url }));
         return { content: [{ type: 'text', text: JSON.stringify(documents) }], structuredContent: { documents } };
       });
-      server.registerTool('credit_public_search', { title: '检索公开授信材料', description: '搜索当前公开授信 PDF，返回原始片段和原件链接。检索片段没有可核验页码。',
+      server.registerTool('credit_public_search', { title: '检索公开授信材料', description: '搜索当前公开授信 PDF，返回原始片段和原件链接。跨年度 ROE 问题逐年检索现有审计报告表格。检索片段没有可核验页码。',
         inputSchema: z.object({ query: z.string().trim().min(2).max(200) }).strict(),
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async ({ query }) => {
         const documents = await listPublicCreditFiles(env.EASTMONEY);
         const byKey = new Map(documents.map(document => [document.key, document]));
-        const result = await env.CREDIT_SEARCH.search({ query, ai_search_options: {
-          retrieval: { retrieval_type: 'hybrid', max_num_results: 50, match_threshold: 0 },
-          reranking: { enabled: true, model: '@cf/baai/bge-reranker-base', match_threshold: 0 },
-          query_rewrite: { enabled: false }, cache: { enabled: false },
-        } });
-        const sources = result.chunks.flatMap((chunk: { item: { key: string }; text: string }) => {
+        const search = await searchPublicCreditDocuments(env.CREDIT_SEARCH, documents, query, 12);
+        const sources = search.chunks.flatMap((chunk: { item: { key: string }; text: string }) => {
           const document = byKey.get(chunk.item.key);
           return document && chunk.text.trim() ? [{ title: document.title, text: chunk.text,
             url: document.url, locator: 'AI Search 检索片段', authority: document.authority }] : [];
-        }).slice(0, 12);
-        return { content: [{ type: 'text', text: JSON.stringify(sources) }], structuredContent: { sources } };
+        });
+        const coverage = { requestedYears: search.requestedYears, foundYears: search.foundYears,
+          missingYears: search.requestedYears.filter(year => !search.foundYears.includes(year)) };
+        return { content: [{ type: 'text', text: JSON.stringify({ sources, coverage }) }], structuredContent: { sources, coverage } };
       });
       const allowed = await policies(env, user);
       mcpOperations.forEach((operation, index) => {
