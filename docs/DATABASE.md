@@ -37,10 +37,4 @@ Schema 与 migration 的所有权表已集中到 [共享数据库](../../eastmon
 
 ## 历史统一权限迁移
 
-当前 `authorization` 表和后续 migration 由 Gateway 维护，Dashboard 不持有权限连接。以下保留原跨 schema 初始化历史，不因 Gateway 重构重放。
-
-`pnpm auth:db:migrate` 通过 Auth0 管理 API 核对旧人员关联，默认只读。以直连数据库环境执行 `--apply` 后，在一个事务中应用 `authorization-migrations/` 与 `financing-migrations/0032_unified_permissions.sql`，分别登记原 migration ledger。替换账号的旧人员 ID 到 Auth0 ID 映射通过 `--person-map` 文件提供；不按姓名或邮箱猜测。缺失、重复映射或未预期的数据库依赖会使整个事务回滚。
-
-迁移将 `projects.owner_id`、`project_tasks.assignee_id` 和周报生成人改为 Auth0 ID，并将 `generated_by_person_id` 重命名为 `generated_by`。SOP 默认角色替换为 Auth0 role ID。原 `financing.people`、`financing.role_permissions`、`financing.audit_logs` 及审计触发器移除；不复制到其他人员、角色或审计表。负债周报 SQL 保留业务口径，仅输出 ownerId，应用再从 Auth0 解析姓名。
-
-首次迁移为当时存在的 Auth0 角色播种全部权限，不覆盖后续人工配置。新增角色的正式授权默认关闭；内测有效权限由部署模式统一开放。切换步骤与验证见 [权限发布](UNIFIED_PERMISSIONS.md)。
+Auth0 与 Gateway 现行拥有角色授权；旧 `authorization` 表和 migration 仅供回溯，Dashboard 不持有权限连接。首次融资身份迁移把负责人、任务执行人、周报生成人和 SOP 默认角色改为已确认的 Auth0 ID；历史数据不重放。必要的回退边界见[历史记录](UNIFIED_PERMISSIONS.md)，当前所有权见[共享数据库](../../eastmoney/docs/DATABASE.md#neon-领域与迁移所有权)。

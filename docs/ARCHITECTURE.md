@@ -24,7 +24,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 - `src/report-view.ts` 将 API 已规范的最小报告字段投影为视觉数据。
 - `src/text-report.ts` 从同一份归档报告数据派生只读文字版；不得保存完整文字版或建立第二套数据源。
 - `src/charts/` 只负责图表配置和图形表达；业务筛选应位于视图派生层。
-- `/credit-workbench` 的授信报表通过 `/api/credit` 读取 Neon `credit` 日报；交易研究工作台总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；融资工作台的负债周报也只读这张公共表。Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易管理仍读取 `src/lib/trading-research/demo-data.ts`；交易流程通过 `/api/trading-workflow/config` 读写 D1 节点配置，日内进度与提醒状态仅在浏览器本地维护，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
+- `/credit-workbench` 的授信报表通过 `/api/credit` 读取 Neon `credit` 日报；交易研究工作台总览复用其最新可用额度。研究辅助通过 `/api/economic-indicators` 和 Hyperdrive 读取 Neon `public.edb`；融资工作台的负债周报也只读这张公共表。Choice EDB 与 DM 只由首次本地全历史回填及每日增量 Cron 调用。交易管理仍读取 `src/lib/trading-research/demo-data.ts`；交易流程通过 `/api/trading-workflow/config` 读写 D1 节点配置，通过 `/api/trading-workflow/day` 读写当日调度进度；询价记录和名单仍在浏览器本地，二级池与融资择时复用原页面组件及既有数据链路。具体边界见 `docs/TRADING_RESEARCH_WORKBENCH.md`。
 - `/trading-research/policy-tracking` 只读 ingest Workflow 已聚合的政策、面向境内资金/利率研究的三档重要性与自动研报关系；人工调整关系通过同源 `/api/policies/*` 写 D1；生成与编辑归集到跟踪点评工作台 `/trading-research/tracking-commentary`，并保留旧 API 兼容。页面加载和筛选不调用模型。政策资讯、关联研报与点评分别使用 `/news/[id]`、`/articles/[id]`、`/commentaries/[id]` 独立深链；政策资讯详情读取 D1 已归档的 DM 原文与政策原文链接，研报详情通过 Worker 的 `DATA` Service Binding 获取正文，点评详情只读 D1。
 
 - 交易研究工作台与授信工作台使用同一 `src/lib/workbench/WorkbenchShell.svelte`。市场热点和政策跟踪由 `src/lib/pages/` 维护单一业务组件，在工作台内使用嵌入布局；旧独立入口仅做兼容跳转。授信助手以固定根容器包裹聊天和工具栏，只有嵌套工具栏通过 portal 挂载页头，避免切换标签时遗留聊天 DOM。
@@ -49,7 +49,7 @@ worker/entry.ts → SvelteKit / Workflow / CreditAgent / Authorization entrypoin
 
 ## 模块数据流
 
-- 工作台装配、交易范围与交易流程本地进度边界：[交易研究工作台](TRADING_RESEARCH_WORKBENCH.md)。
+- 工作台装配、交易范围与交易流程配置与进度边界：[交易研究工作台](TRADING_RESEARCH_WORKBENCH.md)。
 - 授信日报导入、自动保存、事件比较：[授信模块](modules/credit-workbench.md)。
 - 经济数据回填、增量同步、研究与周报共享读取：[研究辅助](modules/research-assistance.md)。
 - 研究资讯、研报和点评详情来源：[详情模块](modules/research-details.md)。
@@ -71,7 +71,7 @@ Dashboard 是唯一 UI/API Worker。融资领域位于 `src/lib/financing/`（�
 
 融资人员授权查询、提醒查询、报表生成和数据库连接均不能放进全站根 layout。仅融资业务导航执行融资授权与集合查询；重型导入解析器留在浏览器 Web Worker，报表动作客户端按路由加载。Finance 的 CSS 限定 `.financing-scope`，其颜色与表面映射 Dashboard 令牌，不能在导航后污染门户和报告。
 
-融资与二级池均由浏览器本地解析、线上直接执行原子导入，旧导入 Workflow 已退役。Dashboard 包含每小时融资提醒与北京时间交易日 17:00 市场点评两项 Cron；经济指标午夜 Cron 与 Workflow 由 Data 持有。从旧 Worker 切换时停止旧 cron，防止重复扫描。迁移不会改变 Quant、Data、Ingest 或其他上游接口。
+融资与二级池均由浏览器本地解析、线上直接执行原子导入，旧导入 Workflow 已退役。Dashboard 仅保留北京时间交易日 17:00 市场点评 Cron；融资与交易提醒由 Messenger 定时触发私有 NotificationSource；经济指标午夜 Cron 与 Workflow 由 Data 持有。迁移不会改变 Quant、Data、Ingest 或其他上游接口。
 
 Gateway 在私有 `GatewayDashboard` 中传入唯一身份；hooks 设置 `locals.user` 及 `user.authorization`；融资领域只使用该统一身份与权限。`src/lib/identity.ts` 定义身份及客户端 DTO，基础 subject、邮箱和认证有效期不被业务缓存替换。
 
