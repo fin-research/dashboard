@@ -48,7 +48,6 @@
       }
       selectedId = conversations.some(item => item.id === saved.selectedId) ? saved.selectedId : conversations[0]?.id ?? null;
     } catch { error = '本地会话无法读取'; }
-    void refreshTools();
   }
   $effect(() => {
     if (typeof window === 'undefined' || loadedIdentity === identity) return;
@@ -68,6 +67,10 @@
       selectedTools = before.size ? available.filter(item => before.has(item.name)).map(item => item.name) : available.map(item => item.name);
     } catch (failure) { if (identity === forUser) error = failure instanceof Error ? failure.message : '工具目录无法读取'; }
     finally { if (identity === forUser) loadingTools = false; }
+  }
+  function openSettings() {
+    showSettings = !showSettings;
+    if (showSettings && !tools.length && !loadingTools) void refreshTools();
   }
   function newConversation() {
     if (!identity) return;
@@ -95,6 +98,9 @@
   async function send(value = draft) {
     const text = value.trim();
     if (!identity || !text || busy) return;
+    if (loadingTools) return;
+    if (tools.length === 0) await refreshTools();
+    if (!identity) return;
     if (!selected) newConversation();
     const conversation = conversations.find(item => item.id === selectedId);
     if (!conversation) return;
@@ -108,7 +114,6 @@
     const active = controller;
     persist(); void scrollEnd();
     try {
-      if (!tools.length) await refreshTools();
       const result = await runBrowserAgent({
         messages: conversation.modelMessages,
         tools, selectedNames: new Set(selectedTools), readOnly, maxSteps, signal: active.signal,
@@ -139,7 +144,7 @@
       event.preventDefault(); void send();
     }
     if (event.key === '?' && !draft) { event.preventDefault(); showShortcuts = !showShortcuts; }
-    if (event.key === '@' && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); showSettings = true; }
+    if (event.key === '@' && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); showSettings = true; if (!tools.length && !loadingTools) void refreshTools(); }
   }
   async function copy(text: string) { await navigator.clipboard.writeText(text); }
 </script>
@@ -220,7 +225,7 @@
     <div class="composer-actions">
       <button type="button" class="mode" onclick={() => readOnly = !readOnly} aria-label="切换运行模式">{readOnly ? 'Ask' : 'Act'} <ChevronDown size={15} /></button>
       <div>
-        <button class="icon-button" type="button" aria-label="工具设置" aria-expanded={showSettings} onclick={() => showSettings = !showSettings}><Settings2 size={19} /></button>
+        <button class="icon-button" type="button" aria-label="工具设置" aria-expanded={showSettings} onclick={openSettings}><Settings2 size={19} /></button>
         {#if busy}<button class="send" type="button" aria-label="停止生成" onclick={stop}><Square size={18} /></button>
         {:else}<button class="send" type="button" aria-label="发送消息" disabled={!identity || !draft.trim()} onclick={() => send()}><ArrowUp size={20} /></button>{/if}
       </div>
