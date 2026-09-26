@@ -20,23 +20,13 @@
 
 - 项目：`planning`、`in_progress`、`at_risk`、`completed`、`cancelled`。
 
-## 业务不变量
-
 - 项目任务：`not_started`、`in_progress`、`blocked`、`completed`。
-
-## 业务不变量
 
 - 提醒发送：`pending`、`sent`、`failed`。
 
-## 业务不变量
-
 - 业务“今天”按 `Asia/Shanghai` 解释。
 
-## 业务不变量
-
 - 甘特范围由今天、项目计划簿记日和节点日期共同决定，并扩展到完整月份。
-
-## 业务不变量
 
 - mutation 成功后只合并服务端确认的实体；失败时保留输入，不回滚到旧页面快照。
 

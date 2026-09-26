@@ -4,7 +4,7 @@
 
 ## 定时生成
 
-- Dashboard 共两项 Cron：`0 * * * *` 为每小时整点融资提醒（支持任意提前小时，不能缩成每日一次）；`0 9 * * MON-FRI` 为北京时间工作日 17:00 市场点评。Cron 使用 UTC。Data 午夜同步、Ingest 采集分别由各自 Worker 持有。
+- Dashboard 的 `0 9 * * MON-FRI`（UTC）Cron 在北京时间工作日 17:00 启动市场点评；融资和交易提醒由 Messenger 集中扫描。Data 与 Ingest 各自维护其采集调度。
 - `MARKET_BRIEFING` 绑定 `MarketBriefingWorkflow`，平台名称固定 `market-briefing`。实例 ID 为 `market-briefing-YYYY-MM-DD`，同日重复 Cron 不重复创建。
 - Cron 在创建 Workflow 实例前判断 workday；`knownMarketClosure(reportDate) === true` 时立即返回，完全不进入 Workflow。Workflow 内不再判断或返回非交易日 skipped 状态，当前内置2026年公告。`collect-equity` 与 `collect-primary` 各自要求 DATA `/data/industry` 的 `tradingDates` 包含当天，否则视为行情滞后，由 step 重试并失败，不能误判假期。未知年度只允许有当日行情证据时生成；每年须按交易所公告更新休市日。
 - Workflow 只保留一组七个并行模块 step，直接写在 `worker/market-briefing-runner.ts` 的原生 `await Promise.allSettled([...])` 中：今日聚焦 `collect-focus-news`、公开市场操作 `collect-open-market`、固收市场 `collect-fixed-income`、权益市场 `collect-equity`、一级发行 `collect-primary`、二级行情 `collect-secondary`、东财债券 `collect-inventory`。
@@ -48,8 +48,6 @@
 `tests/market-report.test.mjs` 直接执行无 date 的 GET handler，覆盖 Choice 不可达/503/异常日历仍读取准确 R2 定稿、缺失不回退、17:00 切日及未来年度无需日历配置；`tests/report-date.test.mjs` 覆盖周末全天、节假日按工作日选日、跨年与闰日。浏览器固定报告夹具只验证展示与交互，不能证明真实 DATA/Choice/R2 可用；发布后须程序化请求生产 `/api/market-report` 及显式日期接口核对 HTTP 状态和 `report_date`。
 
 Cloudflare 流程图由静态语法分析生成，并不回放实际执行。`completeAll(...).then(...)` 曾使解析器把依赖步骤全部标为 `starts=1`，因此 Workflow 编排使用原生 Promise 批次与直接 await。发布后通过 `GET /accounts/{account}/workflows/market-briefing/versions/{version}/graph` 核对唯一并行组恰有七个模块 step，及其后 AI、归档两个串行 step；测试通过不能替代平台图核验。见 [Cloudflare 流程图文档](https://developers.cloudflare.com/workflows/build/visualizer/)。
-
-2026-09-16 本地验证：类型检查、Worker 类型检查、生产构建、544 项 Node 测试、53 项浏览器用例通过；1 项手机矩形拖拽按原规则跳过。CI 候选运行 `35077845510` 通过 5 项 Python、544 项 Node、构建与 53 项浏览器用例。市场点评桌面/手机的 darwin 与 macos-ci 基线已人工对照；本轮不更新其他模块基线。
 
 手动触发使用 `pnpm exec wrangler workflows trigger market-briefing '{"reportDate":"YYYY-MM-DD"}' --id market-briefing-YYYY-MM-DD`。运行失败时先检查失败步骤，同日可执行 `pnpm exec wrangler workflows instances restart market-briefing <id>`；通知投递失败在 Messenger 管理页重试，不重启业务 Workflow。跨日不能补跑实时行情。休市日期应在新年度交易所公告发布后更新 `src/lib/server/market-calendar.ts`。
 

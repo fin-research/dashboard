@@ -90,7 +90,7 @@ Gateway 切换验证后，删除 Dashboard 不再使用的 Auth0 管理 Secret�
 
 浏览器关键表单交互、200% 缩放和甘特图大字号视觉回归仍作为专项验收；未执行时不得写成已通过。仓库内已覆盖 Excel 映射/勾稽、提醒周期、项目建档和构建后路由测试，旧待办中的对应“缺少单元测试”不再重复列为待办。
 
-统一权限迁移与发布步骤见 [UNIFIED_PERMISSIONS](UNIFIED_PERMISSIONS.md)。旧融资人员管理和 Auth0 初次账号导入脚本仅供历史迁移参考；当前人员和角色直接在 Auth0 管理，不重建已删除人员表。
+统一权限的历史迁移边界见 [UNIFIED_PERMISSIONS](UNIFIED_PERMISSIONS.md)；当前发布按 Gateway 和本仓库交付流程执行。旧融资人员管理和 Auth0 初次账号导入脚本仅供历史迁移参考；当前人员和角色直接在 Auth0 管理，不重建已删除人员表。
 
 ## 权限专项验证
 
@@ -100,4 +100,4 @@ Auth0 配置维护在 Gateway 使用 `pnpm auth0:export` / `pnpm auth0:plan` / `
 
 ## 测试分层与覆盖率
 
-测试规范、覆盖率口径、当前审计及专项入口见 [TESTING](TESTING.md)。
+测试规范、覆盖率口径及视觉门禁见 [TESTING](TESTING.md)。

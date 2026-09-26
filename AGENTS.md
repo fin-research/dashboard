@@ -8,22 +8,6 @@
 
 页面与模块文档按下方 Context Routing 选读；精确路由以 `src/routes/` 和 `worker/entry.ts` 为准。
 
-## Repository Structure
-
-- `src/routes/`：页面与 SvelteKit Worker API。
-- `src/components/`、`src/lib/components/`：可复用 UI 组件。
-- `src/charts/`：ECharts 配置和图表派生。
-- `src/api.ts`、`src/report-view.ts`、`src/text-report.ts`：数据客户端与报告视图派生。
-- `src/lib/server/`：仅服务端运行的数据访问、AI、快照和台账逻辑。
-- `src/lib/bond-ledger/`：Excel 解析、校验、格式化与分析。
-- `worker/`：自定义 Worker 入口和市场点评 Workflow。
-- `migrations/`：D1 migration；`postgres-migrations/`：Neon `bond` schema migration；`financing-model-migrations/`：Neon `financing_model` schema migration。
-- `authorization-migrations/`：旧跨 schema 迁移的历史快照；后续权限 migration、Auth0 与角色授权由 Gateway 维护。
-- `auth0/`：保留注册配置的历史来源；当前 Auth0 Actions、配置和发布由 Gateway 维护，见 [Gateway](../gateway/AGENTS.md)。
-- `scripts/`：类型生成、D1 同步、Neon migration 与台账回填。
-- `tests/`：Node 单元与契约测试，融资原有回归位于 `tests/financing/`。
-- `financing-migrations/`、`scripts/financing/`：融资 schema migration 与本地维护命令；原 Excel 与凭证不迁入 Git。
-
 ## Mandatory Rules
 
 - 修改前先搜索现有页面、组件、图表、派生函数和测试；优先复用，不建立平行实现。
@@ -44,11 +28,11 @@
 - 不手动编辑生成文件 `worker-configuration.d.ts`；绑定变化使用 `pnpm worker:typegen`。
 - `pnpm dev` 不自动同步远程 D1。只有任务明确需要本地证据时才运行 `pnpm db:sync:remote`。
 - 保留用户已有改动，不做无关重构，不通过删除测试或关闭检查掩盖错误。
-- 本地推送前必须通过 `pnpm check:quick`（差异、Svelte/应用及 Worker 类型检查）；逻辑变更或缺陷修复还须运行直接相关的轻量单元测试，不等待云端首次发现简单错误。纯文档修改只需 `git diff --check`。完整验收保留在 GitHub Actions：任务分支 push 不触发 CI，PR 更新只核验合并队列门禁；准备合并时进入 GitHub merge queue，在最新 main 与队列改动的合并结果上运行 `Dashboard CI`（类型、Python、Node 单元/覆盖率、构建、Playwright 浏览器组件集成测试及截图比较），合并后不重复跑全量 CI。本地默认不重复全量覆盖率、浏览器截图或生产构建，排障需要时可运行；本地通过不能替代当前提交的 CI 通过。
-- 每次改完代码后派一个新的子代理负责提交/推送任务分支、创建或更新 PR、加入合并队列并核对最终合并组提交的 CI；推送与 CI 核验属于子代理执行职责。子代理不修改业务代码，失败时返回运行链接和日志，由主代理修复后重新委派。禁止直接推送 `main` 或绕过必需检查；完整流程见 [DEVELOPMENT](docs/DEVELOPMENT.md)。
+- 推送前代码变更运行 `pnpm check:quick` 和直接相关的轻量单元测试；纯文档修改只运行 `git diff --check`。完整验收由合并队列的 `Dashboard CI` 执行，本地检查不替代 CI。阶段、截图候选与部署边界见 [DEVELOPMENT](docs/DEVELOPMENT.md) 和 [TESTING](docs/TESTING.md)。
+- 代码交付由新的子代理提交任务分支、推送、创建/更新 PR、加入合并队列并核对 CI；失败证据交回主代理修复。禁止直推 `main` 或绕过必需检查；完整流程见 [DEVELOPMENT](docs/DEVELOPMENT.md)。
 
 
-CI 等待统一使用 `node scripts/wait-ci.mjs <owner/repo> <run-id> <full-sha> <event>`；一个运行只启动一次等待，主代理不并行轮询，终态齐备立即结束。候选只生成一次，审阅导入后由普通 CI 严格比较；具体超时、失败和停止条件见 [CI 等待与收尾](docs/TESTING.md#ci-等待与收尾2026-09-20)。
+CI 等待和停止条件见 [CI 等待与收尾](docs/TESTING.md#ci-等待与收尾2026-09-20)。
 
 ## Commands
 
@@ -88,12 +72,6 @@ CI 等待统一使用 `node scripts/wait-ci.mjs <owner/repo> <run-id> <full-sha>
 
 融资和管理功能不读取旧 Financing 文档作为当前规范。共享专题按[项目组 AGENTS](../eastmoney/AGENTS.md#context-routing)选读。
 
-## 权限测试
+## 权限与测试
 
-共享认证架构、各权限范围及测试账号配置见 [项目组 AUTH](../eastmoney/docs/AUTH.md)。权限登录与验收只使用程序化 HTTP、单元测试与 CLI，禁止 browser、Chrome、Playwright 和浏览器 MCP。新增测试仅使用匿名和 `test@18.cn` 两种身份；真实密码只读根目录 `.env`，不进入测试夹具或日志。
-
-Auth0 租户配置与用户资料服务由 Gateway 维护。Dashboard 只经 `IDENTITY: IdentityService` 调用，不新增 Auth0 凭据或权限数据库 binding。历史维护脚本不构成运行时身份服务。
-
-## 测试规范
-
-页面或视觉变更先更新 `visual-coverage.json` 的证据/明确豁免；有意视觉变化在加入合并队列前主动生成、核对并导入当前 SHA 的 CI baseline 候选，不等待普通 CI 报截图差异。测试新增、合并、覆盖率与视觉回归按 [TESTING](docs/TESTING.md) 执行；不要通过源码样式或控件数量锁定代替行为验证。
+权限范围、匿名与测试账号、程序化登录限制见 [共享 AUTH](../eastmoney/docs/AUTH.md#程序化权限测试)；禁止用浏览器、Chrome、Playwright 或浏览器 MCP 做权限登录验收。页面或视觉变更按 [TESTING](docs/TESTING.md) 更新视觉覆盖清单并审阅候选；不要用源码样式或控件数量代替行为验证。

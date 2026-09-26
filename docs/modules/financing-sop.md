@@ -32,13 +32,7 @@
 - 事件按“负债简称•事件摘要”展示并可下钻；事件过多使用“更多”入口，不缩小字号。
 - 顶栏提醒展示未来 7 天与逾期节点，每条可直接进入对应项目。
 
-## 每小时调度与交付边界
-
-`worker/entry.ts` 的 `0 * * * *` 仅运行融资提醒。经济观测同步的午夜 Cron 已迁至 Data。提醒沿用原查询、周期、去重键和状态含义；无 Resend 配置时仍为 pending。真实发送测试需明确收件人与发件人，Provider accepted 不等于 delivered。
-
-邮件投递通过 MESSENGER。新增 queued 为中台已入队，最终状态在 `/management/messenger` 查询；既有 sent 历史不变。
-
-### 集中通知调度
+## 集中通知调度
 
 融资提醒不再由 Dashboard 的小时 Cron 触发；Messenger 每分钟经私有 NotificationSource 调用既有业务候选查询。责任人/经办人及规则指定的本站账号形成 userIds，提交 financing 通知事件；Messenger 解析用户订阅、独立联系方式和渠道。reminder_deliveries 保留历史与逻辑通知提交 ID，queued 不表示渠道送达；规则中的历史 email 列仅保留兼容，实际渠道由个人订阅决定。
 
