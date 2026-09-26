@@ -6,6 +6,8 @@ import { creditQuestionSchema, type CreditSession } from "../src/lib/credit-assi
 import { CreditEventHub } from "../src/lib/server/credit-events.ts";
 import { CreditExecutionError, creditFailure } from "../src/lib/server/credit-errors.ts";
 import { CreditTrace, type CreditSpan } from "../src/lib/server/credit-tracing.ts";
+import { listPublicCreditFiles } from "../src/lib/server/credit-public-files.ts";
+import { searchPublicCreditDocuments } from "../src/lib/server/credit-search.ts";
 
 export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
   initialState: CreditSession = { turns: [], running: false, progress: "", error: null, startedAt: 0, pendingQuestion: "" };
@@ -104,13 +106,12 @@ export class CreditAgent extends Agent<Cloudflare.Env, CreditSession> {
         modelStarted: () => { modelCalls++; },
         runId: payload.id, trace,
         semanticSearch: async query => {
-          searchCalls++;
-          const result = await this.env.CREDIT_SEARCH.search({ query, ai_search_options: {
-            retrieval: { retrieval_type: "hybrid", max_num_results: 50, match_threshold: 0 },
-            reranking: { enabled: true, model: "@cf/baai/bge-reranker-base", match_threshold: 0 },
-            query_rewrite: { enabled: false }, cache: { enabled: false },
-          } });
-          console.log(JSON.stringify({ event: "credit_search_completed", run_id: payload.id, source_count: result.chunks.length }));
+          const documents = await listPublicCreditFiles(this.env.EASTMONEY);
+          const result = await searchPublicCreditDocuments(this.env.CREDIT_SEARCH, documents, query, 50);
+          searchCalls += result.searchCalls;
+          console.log(JSON.stringify({ event: "credit_search_completed", run_id: payload.id,
+            source_count: result.chunks.length, requested_years: result.requestedYears,
+            found_years: result.foundYears }));
           return result.chunks.map(c => ({ id: c.id, key: c.item.key, text: c.text }));
         },
       });

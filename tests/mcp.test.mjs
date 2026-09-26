@@ -96,3 +96,15 @@ test('public credit search exposes only current public PDF excerpts and original
   const materials=await rpc(f,'tools/call',{name:'credit_public_materials',arguments:{}});
   assert.deepEqual(materials.payload.result.structuredContent.documents.map(document=>document.title),['测试报告.pdf']);
 });
+test('public credit ROE search returns indexed audit table evidence for each available year',async()=>{
+  const f=fixture();
+  f.env.EASTMONEY={list:async()=>({objects:[2023,2024,2025].map(year=>({key:`credit/public/${year}审计报告.pdf`,size:100})),truncated:false})};
+  f.env.CREDIT_SEARCH={search:async({query})=>{
+    const year=Number(query.match(/20\d{2}/)?.[0]);
+    return {chunks:[{item:{key:`credit/public/${year}审计报告.pdf`},text:`加权平均净资产收益率 归属于公司普通股股东的净利润 ${year-2000}.37%`}]};
+  }};
+  const {payload}=await rpc(f,'tools/call',{name:'credit_public_search',arguments:{query:'近几年的ROE是多少'}});
+  assert.deepEqual(payload.result.structuredContent.coverage,{requestedYears:[2023,2024,2025],foundYears:[2023,2024,2025],missingYears:[]});
+  assert.deepEqual(payload.result.structuredContent.sources.map(source=>source.text.match(/\d+\.37%/)[0]),['23.37%','24.37%','25.37%']);
+  assert.ok(payload.result.structuredContent.sources.every(source=>source.url.startsWith('/api/credit-assistant/files/')));
+});
