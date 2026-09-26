@@ -603,7 +603,7 @@
       "id": "financing-model-online",
       "url": "/trading-research/financing-model",
       "kind": "screenshot",
-      "state": "three-state conclusion, business metrics, radar and SHAP, date switching",
+      "state": "three-state conclusion, four-product comparison, four business metrics, net SHAP, date switching",
       "evidence": [
         {
           "spec": "tests/visual/reports.spec.mjs",
