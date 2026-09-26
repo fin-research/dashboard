@@ -33,6 +33,9 @@
       aiClient.reset();
     }
   });
+  $effect(() => {
+    if (page.url.searchParams.get('ai') === 'open' && $session?.user) aiClient.setOpen(true);
+  });
 
   beforeNavigate(createClientNavigationGuard(session, {
     origin: () => page.url.origin,
@@ -58,5 +61,13 @@
 
 <GlobalMessages />
 <LoginDialog bind:this={loginDialog} {session} />
-{@render children()}
-<AiPanel client={aiClient} />
+<div class="site-with-ai">
+  <div class="site-content">{@render children()}</div>
+  <AiPanel client={aiClient} identity={$session?.user?.id ?? null} />
+</div>
+
+<style>
+  :global(.site-with-ai) { display:flex; align-items:flex-start; min-height:100dvh; }
+  :global(.site-content) { flex:1; min-width:0; }
+  @media (max-width:600px) { :global(.site-with-ai) { display:block; } }
+</style>

@@ -1,17 +1,21 @@
 <script lang="ts">
-  import { ArrowLeft, Bot, Check, ChevronRight, Circle, Square, X } from "@lucide/svelte";
+  import { ArrowLeft, Bot, Check, ChevronRight, Circle, Expand, Square, X } from "@lucide/svelte";
   import { cubicIn, cubicOut } from "svelte/easing";
   import { tick } from "svelte";
   import { fade, fly } from "svelte/transition";
   import { Button } from "$lib/components/ui/button/index.js";
   import type { AiClient, AiTaskRecord } from "$lib/ai-client.svelte";
+  import BrowserAgent from "$lib/BrowserAgent.svelte";
 
-  let { client }: { client: AiClient } = $props();
+  let { client, identity }: { client: AiClient; identity: string | null } = $props();
   let trigger = $state<HTMLButtonElement | null>(null);
   let panel = $state<HTMLElement | null>(null);
+  let tab = $state<'chat' | 'tasks'>('chat');
+  let expanded = $state(false);
 
   const running = $derived(client.activeTasks);
   const selectedTask = $derived(client.tasks.find((task) => task.id === client.selectedTaskId));
+  $effect(() => { if (client.selectedTaskId) tab = 'tasks'; });
 
   $effect(() => {
     if (!client.open) return;
@@ -87,22 +91,32 @@
   <aside
     bind:this={panel}
     id="global-ai-panel"
+    class:expanded
     class="ai-panel"
-    aria-label="AI 任务面板"
+    aria-label="AI 助手"
     tabindex="-1"
     in:fly|local={{ x: 24, duration: motionDuration(240), easing: cubicOut }}
     out:fly|local={{ x: 12, duration: motionDuration(150), easing: cubicIn }}
   >
     <header class="ai-panel-header">
       <div class="ai-panel-heading">
-        {#if selectedTask}
+        {#if tab === 'tasks' && selectedTask}
           <Button variant="ghost" class="ai-panel-back" aria-label="返回任务列表" onclick={() => client.selectTask(null)}><ArrowLeft aria-hidden="true" /></Button>
         {/if}
-        <div class="ai-panel-title"><Bot aria-hidden="true" /><h2>{selectedTask ? "任务详情" : "AI"}</h2></div>
+        <div class="ai-panel-title"><Bot aria-hidden="true" /><h2>{tab === 'tasks' && selectedTask ? "任务详情" : "AI"}</h2></div>
       </div>
+      <div class="ai-header-actions">
+        <Button variant="ghost" class="ai-panel-expand" aria-label={expanded ? '收起宽面板' : '展开宽面板'} onclick={() => expanded = !expanded}><Expand aria-hidden="true" /></Button>
       <Button variant="ghost" class="ai-panel-close" aria-label="关闭 AI 面板" onclick={closePanel}><X aria-hidden="true" /></Button>
+      </div>
     </header>
-
+    <div class="ai-tabs" role="tablist" aria-label="AI 面板内容">
+      <button type="button" role="tab" aria-selected={tab === 'chat'} class:active={tab === 'chat'} onclick={() => tab = 'chat'}>对话</button>
+      <button type="button" role="tab" aria-selected={tab === 'tasks'} class:active={tab === 'tasks'} onclick={() => tab = 'tasks'}>任务{#if running.length} · {running.length}{/if}</button>
+    </div>
+    {#if tab === 'chat'}
+      <BrowserAgent {identity} />
+    {:else}
     <div class="ai-panel-body">
       {#if selectedTask}
         {#key selectedTask.id}
@@ -172,6 +186,7 @@
         </section>
       {/if}
     </div>
+    {/if}
   </aside>
 {/if}
 
@@ -190,27 +205,33 @@
   :global(.ai-trigger) :global(svg), .ai-panel-title :global(svg) { width: 20px; height: 20px; }
   .ai-trigger-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-foreground); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-foreground) 28%, transparent); }
   .ai-panel {
-    position: fixed;
-    z-index: 45;
-    inset: 16px max(16px, env(safe-area-inset-right)) 16px auto;
+    position: sticky;
+    z-index: 100;
+    top: 0;
     display: flex;
-    width: min(420px, calc(100vw - 32px));
-    max-height: calc(100dvh - 32px);
+    flex: 0 0 min(420px, 40vw);
+    width: min(420px, 40vw);
+    height: 100dvh;
     flex-direction: column;
     overflow: hidden;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-card);
+    border-radius: 0;
     background: var(--surface);
     color: var(--text-1);
-    box-shadow: 0 24px 64px rgb(23 32 51 / 24%);
+    box-shadow: -8px 0 24px rgb(23 32 51 / 7%);
   }
+  .ai-panel.expanded { flex-basis: min(720px, 60vw); width: min(720px, 60vw); }
   .ai-panel:focus { outline: none; }
   .ai-panel-header { display: flex; min-height: 64px; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border-color); }
+  .ai-header-actions { display:flex; gap:4px; }
+  .ai-tabs { display:flex; border-bottom:1px solid var(--border-color); }
+  .ai-tabs button { flex:1; min-height:44px; border:0; border-bottom:2px solid transparent; background:var(--surface); color:var(--text-muted); font:inherit; cursor:pointer; }
+  .ai-tabs button.active { border-color:var(--brand); color:var(--brand); font-weight:bold; }
   .ai-panel-heading, .ai-panel-title { display: flex; min-width: 0; align-items: center; gap: 8px; }
   .ai-panel-title { color: var(--brand); }
   .ai-panel-title h2 { margin: 0; color: var(--text-1); font-size: 1.25rem; font-weight: bold; }
-  :global(.ai-panel-close), :global(.ai-panel-back), :global(.ai-stop) { width: 44px; height: 44px; padding: 0; }
-  :global(.ai-panel-close) :global(svg), :global(.ai-panel-back) :global(svg), :global(.ai-stop) :global(svg) { width: 20px; height: 20px; }
+  :global(.ai-panel-close), :global(.ai-panel-expand), :global(.ai-panel-back), :global(.ai-stop) { width: 44px; height: 44px; padding: 0; }
+  :global(.ai-panel-close) :global(svg), :global(.ai-panel-expand) :global(svg), :global(.ai-panel-back) :global(svg), :global(.ai-stop) :global(svg) { width: 20px; height: 20px; }
   .ai-panel-body { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; }
   .ai-task-detail, .ai-task-index { padding: 20px; }
   .ai-task-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -247,7 +268,7 @@
   @keyframes ai-pulse { 0%, 100% { opacity: .35; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
   @media (max-width: 600px) {
     :global(.ai-trigger) { right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); }
-    .ai-panel { inset: 0; width: 100vw; max-height: 100dvh; border: 0; border-radius: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    .ai-panel,.ai-panel.expanded { position:fixed; inset:0; width:100vw; height:100dvh; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
   }
   @media (prefers-reduced-motion: reduce) {
     .ai-panel, .ai-panel *, .ai-pulse { animation: none !important; transition-duration: .01ms !important; }

@@ -1,6 +1,6 @@
 # 授信助手
 
-入口为 `/credit-workbench/assistant`；旧 `/credit-assistant` 和 `/trading-research/credit-assistant` 重定向到该入口。面向内部同事生成供客户使用的答复和资料来源，不自动向客户发送消息。
+原页面已由全站 AI 侧栏取代。`/credit-workbench/assistant`、`/credit-assistant` 和 `/trading-research/credit-assistant` 重定向到门户并打开侧栏。浏览器端 ToolLoopAgent 可通过 MCP 的 `credit_public_materials`、`credit_public_search` 读取同一公开材料目录和检索片段；原 CreditAgent HTTP/DO 会话暂保留历史兼容，不再作为页面入口。答复不自动向客户发送消息。
 
 ## 公开资料边界
 

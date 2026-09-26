@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { progressPatch } from './trading-progress.ts';
-import { creditQuestionSchema } from '../credit-assistant/types.ts';
 import { creditInstitutionUpdateSchema } from '../credit/update.ts';
 import { conclusionUpdateSchema, timingDecisionInputSchema, sellSideSummaryUpdateSchema } from '../financing-model.ts';
 import { policyCategorySchema, articleAssociationUpdateSchema, commentaryContentSchema, commentaryTypeSchema } from '../policies.ts';
@@ -48,8 +47,6 @@ export const mcpOperations: McpOperation[] = [
   api('create_tracking_commentary', '创建跟踪点评', '/api/tracking-commentaries', 'POST', body(createTrackingSchema)),
   api('update_tracking_commentary', '修改跟踪点评', '/api/tracking-commentaries/[id]', 'PUT', at(updateTrackingSchema)),
   api('generate_tracking_commentary', 'AI 生成并保存跟踪点评', '/api/tracking-commentaries/[id]/generate', 'POST', at(generateTrackingSchema), { ai: true }),
-  api('credit_session', '读取本人授信问答及生成状态', '/api/credit-assistant/session', 'GET'),
-  api('ask_credit_assistant', 'AI 授信问答', '/api/credit-assistant/session', 'POST', body(creditQuestionSchema), { ai: true, description: '提交后异步生成；返回 running 时用 credit_session 查询同一会话。' }),
   api('economic_indicators', '读取经济指标与趋势', '/api/economic-indicators'),
   api('credit_report', '读取授信报表与日历', '/api/credit', 'GET', query({ date: dateSchema.optional(), month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional() })),
   api('update_credit_institution', '修改授信机构', '/api/credit', 'PATCH', body(creditInstitutionUpdateSchema)),

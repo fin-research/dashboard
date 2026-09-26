@@ -5,7 +5,7 @@ async function closeAiSurfaces(page) {
   const closePanel = page.getByRole('button', { name: '关闭 AI 面板' });
   if (await closePanel.isVisible()) {
     await closePanel.click();
-    await expect(page.getByRole('complementary', { name: 'AI 任务面板' })).not.toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'AI 助手' })).not.toBeVisible();
   }
   const notifications = page.getByRole('button', { name: '关闭通知' });
   while (await notifications.count()) {
@@ -126,7 +126,7 @@ test('AI 生成自动展开任务详情、轮替模型摘要并保留完成结�
   });
   await page.goto('/market-briefing');
   await page.getByRole('button', { name: '重新生成今日聚焦' }).click();
-  const panel = page.getByRole('complementary', { name: 'AI 任务面板' });
+  const panel = page.getByRole('complementary', { name: 'AI 助手' });
   await expect(panel).toBeVisible();
   const liveProgress = panel.getByRole('status');
   await expect(liveProgress.getByText('正在核对股债市场驱动', { exact: true })).toBeVisible();
@@ -138,6 +138,36 @@ test('AI 生成自动展开任务详情、轮替模型摘要并保留完成结�
   await expect(page.getByText('生成完成', { exact: true })).toBeVisible();
   await expect(panel).toHaveScreenshot('ai-panel-complete.png');
   expect(unexpected).toEqual([]);
+});
+
+test('AI 对话侧栏挤压桌面页面并提供会话与工具设置', async ({ page, isMobile }) => {
+  await mockResources(page);
+  await page.route('**/api/mcp', route => route.fulfill({ json: { jsonrpc: '2.0', id: 'visual', result: { tools: [
+    { name: 'credit_report', title: '读取授信报表', description: '读取授信报表', inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true } },
+    { name: 'update_credit_institution', title: '修改授信机构', description: '修改授信机构', inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: false } },
+  ] } } }));
+  await page.goto('/market-briefing');
+  const content = page.locator('.site-content');
+  const before = await content.boundingBox();
+  await page.getByRole('button', { name: '打开 AI 面板' }).click();
+  const panel = page.getByRole('complementary', { name: 'AI 助手' });
+  await expect(panel.getByRole('heading', { name: '你好。' })).toBeVisible();
+  if (!isMobile) {
+    const after = await content.boundingBox();
+    expect(after.width).toBeLessThan(before.width - 300);
+    await panel.getByRole('button', { name: '展开宽面板' }).click();
+    const wide = await content.boundingBox();
+    expect(wide.width).toBeLessThan(after.width - 200);
+    await panel.getByRole('button', { name: '收起宽面板' }).click();
+  }
+  await expect(panel).toHaveScreenshot('ai-agent-welcome.png');
+  await panel.getByRole('button', { name: '工具设置' }).click();
+  await expect(panel.getByRole('checkbox')).toHaveCount(3);
+  await panel.getByRole('button', { name: '切换运行模式' }).click();
+  await expect(panel.getByRole('button', { name: '切换运行模式' })).toContainText('Act');
+  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await panel.getByRole('button', { name: '关闭 AI 面板' }).click();
+  await expect(panel).not.toBeVisible();
 });
 
 test('导出并发下载图片与归档，保存失败保留编辑且可重试', async ({ page }) => {

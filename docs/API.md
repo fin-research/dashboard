@@ -62,3 +62,5 @@ Data 错误保留安全诊断字段；市场点评 Workflow 对失败资源独�
 ## 业务 MCP
 
 `POST /api/mcp` 提供经 Gateway 逐用户授权的查询、修改与 AI 工具；定义、边界及验证见 [MCP](MCP.md)。
+
+`POST /api/ai/responses` 为已登录浏览器的流式 Responses 接口。Gateway 校验会话及同源请求，Dashboard 固定模型和 Cloudflare AI Gateway `custom-codex` 路径，服务端持有 `CF_AIG_TOKEN`。浏览器仅用同源 HttpOnly 会话 Cookie 调用，ToolLoopAgent、工具循环和本地对话历史均在浏览器运行；请求与响应不缓存。

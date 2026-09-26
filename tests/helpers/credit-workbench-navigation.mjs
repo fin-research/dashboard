@@ -20,7 +20,7 @@ const Host = await loadComponent("tests/helpers/CreditWorkspaceHost.svelte", `<s
   import WorkbenchShell from "../../src/lib/workbench/WorkbenchShell.svelte";
   import { createAiClient, provideAiClient } from "../../src/lib/ai-client.svelte";
   provideAiClient(createAiClient());
-  let view = $state("assistant");
+  let view = $state("overview");
   let workspace = $state("credit");
   export function navigate(next) { view = next; }
   export function openWorkspace(next) { workspace = next; }
@@ -36,17 +36,17 @@ const workspace = document.querySelector('.tr-workspace');
 let scrollResets = 0;
 workspace.scrollTo = () => { scrollResets++; };
 assert.doesNotThrow(() => afterNavigation({ from: { url: null }, to: { url: null }, type: 'enter' }));
-afterNavigation({ from: { url: null }, to: { url: new URL('http://localhost/credit-workbench/assistant') }, type: 'goto' });
+afterNavigation({ from: { url: null }, to: { url: new URL('http://localhost/credit-workbench/calendar') }, type: 'goto' });
 assert.equal(scrollResets, 1, 'a resolved navigation resets the business scroller even when its source URL is unavailable');
 afterNavigation({ from: { url: null }, to: { url: new URL('http://localhost/credit-workbench') }, type: 'popstate' });
 assert.equal(scrollResets, 1, 'history navigation preserves scroll position');
 assert.equal(document.querySelector(".tr-breadcrumb a").textContent, "授信工作台");
 assert.deepEqual([...document.querySelectorAll(".tr-drawer__nav a")].map(a => [a.textContent.trim(), a.getAttribute("href")]), [
   ["授信一览表", "/credit-workbench"], ["授信日历", "/credit-workbench/calendar"],
-  ["授信周报", "/credit-workbench/weekly"], ["授信助手", "/credit-workbench/assistant"],
+  ["授信周报", "/credit-workbench/weekly"],
 ]);
-assert.equal(document.querySelector("h1").textContent, "授信助手");
-assert.equal(document.querySelector("main").classList.contains("tr-chat-page"), true);
+assert.equal(document.querySelector("h1").textContent, "授信一览表");
+assert.equal(document.querySelector("main").classList.contains("tr-chat-page"), false);
 flushSync(() => app.navigate("calendar"));
 const reportView = document.querySelector(".tr-credit-view");
 assert.ok(reportView);
@@ -64,18 +64,13 @@ for (const [view, label] of [["weekly", "授信周报"], ["overview", "授信一
 }
 await tick();
 assert.equal(reportRequests, 1);
-flushSync(() => app.navigate("assistant"));
-assert.equal(document.querySelectorAll(".credit-chat").length, 1);
-assert.equal(document.querySelector(".tr-credit-view"), null);
-assert.equal(document.querySelectorAll("#tr-topbar-actions .chat-toolbar").length, 1);
-assert.equal(document.querySelector(".tr-credit-toolbar"), null);
 flushSync(() => app.openWorkspace("trading"));
 assert.equal(document.querySelectorAll(".tr-workbench").length, 1);
 assert.equal(document.querySelectorAll(".credit-chat, .chat-toolbar").length, 0);
 flushSync(() => app.openWorkspace("credit"));
 assert.equal(document.querySelectorAll("#tr-topbar-actions").length, 1);
-assert.equal(document.querySelectorAll("#tr-topbar-actions .chat-toolbar").length, 1);
-assert.equal(document.querySelectorAll(".credit-chat").length, 1);
+assert.equal(document.querySelectorAll("#tr-topbar-actions .tr-credit-toolbar").length, 1);
+assert.equal(document.querySelectorAll(".credit-chat").length, 0);
 await unmount(app);
 await tick();
 assert.equal(document.querySelectorAll(".tr-workbench, .chat-toolbar, .tr-credit-toolbar").length, 0);
@@ -93,15 +88,16 @@ const { load: loadTrading } = await import("../../src/routes/trading-research/[v
 const { workbenchViews } = await import("../../src/lib/trading-research/demo-data.ts");
 const { load: loadOldAssistant } = await import("../../src/routes/credit-assistant/+page.ts");
 const url = new URL("http://localhost/trading-research/credit?date=2026-09-04");
-for (const view of [undefined, "calendar", "weekly", "assistant"]) {
+for (const view of [undefined, "calendar", "weekly"]) {
   assert.deepEqual(loadCredit({ params: { view }, url }), { view: view ?? "overview" });
 }
+assert.throws(() => loadCredit({ params: { view: "assistant" }, url }), error => error.status === 307 && error.location === "/?ai=open");
 for (const view of workbenchViews.filter(v => v.id !== "overview")) {
   assert.deepEqual(loadTrading({ params: { view: view.id }, url }), { view: view.id });
 }
 assert.throws(() => loadTrading({ params: { view: "credit" }, url }), error => error.status === 307 && error.location === "/credit-workbench?date=2026-09-04");
-assert.throws(() => loadTrading({ params: { view: "credit-assistant" }, url }), error => error.status === 307 && error.location === "/credit-workbench/assistant?date=2026-09-04");
-assert.throws(() => loadOldAssistant(), error => error.status === 307 && error.location === "/credit-workbench/assistant");
+assert.throws(() => loadTrading({ params: { view: "credit-assistant" }, url }), error => error.status === 307 && error.location === "/?ai=open");
+assert.throws(() => loadOldAssistant(), error => error.status === 307 && error.location === "/?ai=open");
 assert.throws(() => loadCredit({ params: { view: "missing" }, url }), error => error.status === 404);
 assert.throws(() => loadTrading({ params: { view: "missing" }, url }), error => error.status === 404);
 await window.happyDOM.abort();

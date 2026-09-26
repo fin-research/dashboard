@@ -28,7 +28,8 @@ test('real MCP discovery lists only Gateway-approved tools and labels writes/gen
   assert.ok(payload.result.tools.some(t=>t.name==='credit_report'));
   assert.ok(!payload.result.tools.some(t=>t.name==='create_project'));
   const all=await rpc(fixture(),'tools/list');
-  assert.equal(all.payload.result.tools.length,mcpOperations.length+1);
+  assert.equal(all.payload.result.tools.length,mcpOperations.length+3);
+  assert.ok(all.payload.result.tools.some(t=>t.name==='credit_public_search'));
   assert.equal(all.payload.result.tools.find(t=>t.name==='generate_tracking_commentary').annotations.readOnlyHint,false);
   assert.equal(all.payload.result.tools.find(t=>t.name==='create_project').annotations.destructiveHint,true);
 });
@@ -76,4 +77,20 @@ test('modern discovery and legacy initialization both serve the Dashboard identi
     const {response,payload}=await rpc(fixture(),method,params);
     assert.equal(response.status,200,JSON.stringify(payload));assert.ok(payload.result,JSON.stringify(payload));if(method==='initialize') assert.equal(payload.result.serverInfo.name,'eastmoney-dashboard'); else assert.ok(payload.result.supportedVersions.includes('2026-07-28'));
   }
+});
+test('public credit search exposes only current public PDF excerpts and original links',async()=>{
+  const f=fixture();
+  f.env.EASTMONEY={list:async()=>({objects:[{key:'credit/public/测试报告.pdf',size:100,uploaded:new Date('2026-09-01'),httpEtag:'etag'}],truncated:false})};
+  f.env.CREDIT_SEARCH={search:async()=>({chunks:[
+    {id:'visible',item:{key:'credit/public/测试报告.pdf'},text:'公开授信额度为10亿元'},
+    {id:'hidden',item:{key:'credit/originals/内部报告.pdf'},text:'内部数据'},
+  ]})};
+  const {payload}=await rpc(f,'tools/call',{name:'credit_public_search',arguments:{query:'授信额度'}});
+  assert.equal(payload.result.isError,undefined);
+  const sources=payload.result.structuredContent.sources;
+  assert.equal(sources.length,1);
+  assert.equal(sources[0].title,'测试报告.pdf');
+  assert.match(sources[0].url,/^\/api\/credit-assistant\/files\/[a-f0-9]{24}$/);
+  assert.equal(sources[0].locator,'AI Search 检索片段');
+  assert.ok(!JSON.stringify(sources).includes('内部数据'));
 });

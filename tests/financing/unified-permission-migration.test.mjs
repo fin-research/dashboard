@@ -28,7 +28,8 @@ test('permission migration preserves business references, refuses unmapped ident
   const codes=(await db.query('SELECT code FROM "authorization".permission ORDER BY sort_order')).rows.map(row=>row.code);
   // Archived SQL predates the Auth0-only workflow and messenger permissions. Preserve its 58-code snapshot.
   assert.equal(codes.length,58);
-  assert.deepEqual(codes,PERMISSION_CODES.filter(code=>code!=='research.workflow:update'&&!code.startsWith('messenger.')));
+  const retiredCreditCodes=['credit.assistant:read','credit.assistant:ask','credit.material:upload','credit.material:delete','credit.assistant:delete'];
+  assert.deepEqual(new Set(codes),new Set([...PERMISSION_CODES.filter(code=>code!=='research.workflow:update'&&!code.startsWith('messenger.')),...retiredCreditCodes]));
   assert.ok(!codes.includes('research.workflow:update'));
   assert.equal((await db.query('SELECT count(*)::int AS count FROM "authorization".role_permission')).rows[0].count,3*codes.length);
   const report=(await db.query("SELECT financing.liability_weekly_report_data('2026-09-01') AS value")).rows[0].value;
