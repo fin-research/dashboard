@@ -16,7 +16,9 @@ test('issuance publication round-trips coupon and SHAP while retaining daily man
   const first=snapshot(),id=await publish(db,first),report=await loadIssuanceModelReport(db);
   assert.equal(report.snapshot.run_id,id);assert.equal(report.snapshot.forecast[0].coupon_percent,1.85);
   assert.deepEqual(report.snapshot.explanation.features,first.explanation.features);
+  assert.deepEqual(report.snapshot.product_scenarios,first.product_scenarios);
   assert.equal(report.snapshot.validation.metrics.length,2);
+  assert.equal(report.snapshot.validation.metrics[0].hit_rate_5bp,.68);
   assert.equal(report.snapshot.market_forecast.length,11);
   assert.equal((await db.query('SELECT predicted_deviation_bp FROM financing_model.model_run')).rows[0].predicted_deviation_bp,null);
   await saveFinancingModelConclusion(db,{runId:id,verdict:'人工结论',preferredWindow:'下周',narrative:'保留人工判断'});
@@ -42,12 +44,13 @@ test('issuance publication rejects old models, unavailable labels, broken SHAP a
     v=>{delete v.online_run.training_as_of;},v=>{v.online_run.model_version='invalid';},v=>{v.forecast[0].market_train_label_end=v.as_of_date;},
     v=>{v.market_forecast[1].date=v.as_of_date;},v=>{v.forecast[0].effective_horizon=30;},
     v=>{v.explanation.prediction_coupon_bp+=1;v.explanation.base_coupon_bp+=1;},v=>{v.explanation=null;},
-    v=>{v.explanation.features=[];},v=>{v.explanation.features[0].shap_bp=99;},v=>{v.decision.action='';}]){
+    v=>{v.explanation.features=[];},v=>{v.explanation.features[0].shap_bp=99;},v=>{v.decision.action='';},
+    v=>{v.product_scenarios[0].bond_type='unknown';},v=>{v.product_scenarios.pop();}]){
    const invalid=structuredClone(first);invalid.generated_at='2026-08-24T05:00:00Z';mutate(invalid);await assert.rejects(publish(db,invalid));
   }
   const broken=structuredClone(first);broken.generated_at='2026-08-24T05:00:00Z';broken.decision.expected_net_saving_bp=99;broken.forecast[1].saving_probability=2;
   await assert.rejects(publish(db,broken),/check constraint/);
-  const after=await loadIssuanceModelReport(db);assert.equal(after.snapshot.decision.expected_net_saving_bp,3);assert.equal(after.snapshot.forecast[1].saving_probability,.7);
+  const after=await loadIssuanceModelReport(db);assert.equal(after.snapshot.decision.expected_net_saving_bp,1);assert.equal(after.snapshot.forecast[1].saving_probability,.7);
  }finally{await db.close();}
 });
 

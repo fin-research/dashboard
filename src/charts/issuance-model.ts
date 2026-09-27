@@ -1,5 +1,5 @@
 import type { IssuanceSnapshot } from '../lib/issuance-model';
-import { colors, axisLabel, gridLine, tooltip } from './common';
+import { colors, axisLabel, gridLine, tooltip, escapeHtml } from './common';
 import { setChart, setEmpty } from './charting';
 
 export function issuanceFeatureName(name:string):string {
@@ -12,18 +12,36 @@ export function issuanceFeatureName(name:string):string {
   const secondary:Record<string,string>={bond_volume_20d_avg:'债券成交量·20日均值',bond_volume_chg_5d:'债券成交量·5日变化',bond_volume_pctile_60d:'债券成交量·60日分位',credit_bond_volume_ratio:'信用债成交比',credit_volume_chg_5d:'信用债成交量·5日变化',rate_credit_volume_ratio:'利率/信用成交比'};
   if(secondary[name])return secondary[name];
   const curve=name.match(/^rate_(gov_1y|gov_3y|gov_10y|aaa_3y)_(level|change_\d+|deviation_\d+|volatility_\d+)$/);
-  if(curve){const bond:Record<string,string>={gov_1y:'国债1Y',gov_3y:'国债3Y',gov_10y:'国债10Y',aaa_3y:'券商AAA3Y'};const suffix=curve[2]!.replace('level','收益率').replace(/change_(\d+)/,'$1期变化').replace(/deviation_(\d+)/,'$1期偏离').replace(/volatility_(\d+)/,'$1期波动');return `${bond[curve[1]!]}·${suffix}`;}
+  if(curve){const bond:Record<string,string>={gov_1y:'1年国债',gov_3y:'3年国债',gov_10y:'10年国债',aaa_3y:'券商AAA3年'};const suffix=curve[2]!.replace('level','收益率').replace(/change_(\d+)/,'变化率').replace(/deviation_(\d+)/,'偏离').replace(/volatility_(\d+)/,'波动率');return `${bond[curve[1]!]}${suffix}`;}
   return name.replace('dr007','DR007').replace('credit_spread','信用利差').replace('term_spread','期限利差').replace('gov_10y','10年国债').replace('yield_vol','收益率波动').replace('pctile','分位').replace('vol','波动').replace('ma','均值').replace('chg','变化').replace('slope','斜率').replace('trend','趋势').replace('dev','偏离').replaceAll('_','·');
 }
 export function renderIssuanceForecast(host:HTMLElement,rows:IssuanceSnapshot['forecast']):void {
   if(!rows.length){setEmpty(host,'窗口内无发行日期');return;}
-  setChart(host,{animationDuration:180,aria:{enabled:true},tooltip:{...tooltip,trigger:'axis'},legend:{top:0,textStyle:axisLabel},
+  setChart(host,{animationDuration:180,aria:{enabled:true,description:'未来发行日预计票面'},tooltip:{...tooltip,trigger:'axis'},legend:{top:0,textStyle:axisLabel},
     grid:{left:12,right:16,top:45,bottom:10,containLabel:true},
     xAxis:{type:'category',data:rows.map(r=>r.date),axisLabel:{...axisLabel,formatter:(v:string)=>v.slice(5)},axisTick:{show:false}},
     yAxis:{type:'value',name:'票面 %',scale:true,axisLabel,splitLine:gridLine},
-    series:[{name:'预计票面',type:'line',data:rows.map(r=>r.coupon_percent),itemStyle:{color:colors.brand}},
-      {name:'区间下限',type:'line',data:rows.map(r=>r.coupon_low_percent),lineStyle:{type:'dashed',opacity:.5},symbol:'none',itemStyle:{color:colors.quiet}},
-      {name:'区间上限',type:'line',data:rows.map(r=>r.coupon_high_percent),lineStyle:{type:'dashed',opacity:.5},symbol:'none',itemStyle:{color:colors.quiet}}]});
+    series:[{name:'预计票面',type:'line',data:rows.map(r=>r.coupon_percent),itemStyle:{color:colors.brand}}]});
+}
+
+export function renderIssuanceProductComparison(host:HTMLElement,rows:IssuanceSnapshot['product_scenarios']):void {
+  if(!rows.length){setEmpty(host,'品种预测暂缺');return;}
+  const names=rows.map(row=>`${row.tenor}年${{
+    '证券公司债':'公募债','证券公司次级债':'次级债',
+  }[row.bond_type]}`);
+  setChart(host,{animationDuration:180,aria:{enabled:true,description:'3年与5年公募债和次级债预计票面对比'},
+    legend:{top:0,textStyle:axisLabel,data:['预计票面']},
+    grid:{left:12,right:80,top:35,bottom:30,containLabel:true},
+    tooltip:{...tooltip,trigger:'axis',axisPointer:{type:'shadow'},formatter:(params:unknown)=>{
+      const index=(params as Array<{dataIndex:number}>)[0]?.dataIndex??-1;
+      const row=rows[index];if(!row)return '';
+      return `<strong>${escapeHtml(names[index]??'')}</strong><br>预计票面 ${row.coupon_percent===null?'—':`${row.coupon_percent.toFixed(2)}%`}<br>同类历史 ${row.own_observations}笔本机构 / ${row.peer_observations}笔合计`;
+    }},
+    xAxis:{type:'value',name:'预计票面 %',scale:true,axisLabel,splitLine:{lineStyle:gridLine}},
+    yAxis:{type:'category',inverse:true,data:names,axisLabel:{...axisLabel,color:colors.ink},axisTick:{show:false}},
+    series:[{name:'预计票面',type:'bar',barMaxWidth:24,data:rows.map(row=>({value:row.coupon_percent,
+      itemStyle:{color:colors.brand,borderRadius:[0,4,4,0]}})),
+      label:{show:true,position:'right',formatter:(param:{dataIndex:number})=>rows[param.dataIndex]?.coupon_percent==null?'—':`${rows[param.dataIndex]!.coupon_percent!.toFixed(2)}%`}}]});
 }
 export function renderIssuanceMarket(host:HTMLElement,rows:IssuanceSnapshot['market_forecast']):void {
   setChart(host,{aria:{enabled:true},tooltip:{...tooltip,trigger:'axis'},grid:{left:12,right:16,top:30,bottom:10,containLabel:true},

@@ -34,5 +34,7 @@ function versions() {
   ];
 }
 
-export const financingModel = { snapshot: snapshot(), sellSide: sellSidePayload(), versions: versions(), conclusion: {verdict:'可按资金计划发行', preferredWindow:'8月24日', narrative:'基础结论', edited:false, updatedAt:null},
-  business_metrics: {lcr:{date:'2026-08-21',value_ratio:1.23,historical_percentile:45,sample_count:60},nsfr:{date:'2026-08-21',value_ratio:1.38,historical_percentile:62,sample_count:60},issuer_spread:{date:'2026-08-21',spread_bp:12.5,outstanding_bonds:8,balance_cny:150_000_000_000}} };
+export const financingModel = { snapshot: snapshot(), sellSide: sellSidePayload(), versions: versions(), conclusion: {verdict:'尽快发行', preferredWindow:'8月24日', narrative:'基础结论', edited:false, updatedAt:null},
+  business_metrics: {lcr:{date:'2026-08-21',value_ratio:1.23,historical_percentile:45,sample_count:60},nsfr:{date:'2026-08-21',value_ratio:1.38,historical_percentile:62,sample_count:60},
+    funding_gap:{date:'2026-08-21',value_yi:-20,historical_percentile:35,sample_count:60},
+    issuer_spread:{date:'2026-08-21',spread_bp:12.5,outstanding_bonds:8,balance_cny:150_000_000_000,historical_percentile:72,sample_count:60}} };

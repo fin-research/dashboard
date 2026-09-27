@@ -12,6 +12,7 @@ export async function loadIssuanceModelReport(client:BondDatabaseClient,runId:st
       'decision',jsonb_build_object('action',i.action,'reason',i.reason,'scope',i.decision_scope,'validation_status',i.validation_status,'first_issuance_date',i.first_issuance_date,'lowest_expected_cost_date',i.lowest_expected_cost_date,
         'expected_net_saving_bp',i.expected_net_saving_bp,'annual_saving_wan',i.annual_saving_wan,'saving_probability',i.saving_probability,'saving_p10_bp',i.saving_p10_bp,'joint_error_pairs',i.joint_error_pairs),
       'forecast',COALESCE((SELECT jsonb_agg(to_jsonb(f)-'run_id'-'ordinal' ORDER BY ordinal) FROM financing_model.issuance_forecast f WHERE f.run_id=r.id),'[]'::jsonb),
+      'product_scenarios',i.product_scenarios,
       'market_forecast',COALESCE((SELECT jsonb_agg(to_jsonb(f)-'run_id'-'ordinal' ORDER BY ordinal) FROM financing_model.issuance_market_path f WHERE f.run_id=r.id),'[]'::jsonb),
       'explanation',CASE WHEN i.base_coupon_bp IS NULL THEN NULL ELSE jsonb_build_object('method','tree_path_dependent','unit','bp','base_coupon_bp',i.base_coupon_bp,'prediction_coupon_bp',i.prediction_coupon_bp,
         'market_anchor_bp',i.market_anchor_bp,'issuer_premium_bp',i.issuer_premium_bp,'horizon_drift_bp',i.horizon_drift_bp,'tree_expected_change_bp',i.tree_expected_change_bp,

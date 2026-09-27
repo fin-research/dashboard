@@ -12,11 +12,21 @@ export type IssuerSpreadMetric = {
   spread_bp: number | null;
   outstanding_bonds: number;
   balance_cny: number;
+  historical_percentile: number | null;
+  sample_count: number;
+};
+
+export type FundingGapMetric = {
+  date: string;
+  value_yi: number;
+  historical_percentile: number | null;
+  sample_count: number;
 };
 
 export type IssuanceBusinessMetrics = {
   lcr: LiquidityMetric | null;
   nsfr: LiquidityMetric | null;
+  funding_gap: FundingGapMetric | null;
   issuer_spread: IssuerSpreadMetric | null;
 };
 
@@ -47,7 +57,7 @@ function matchingYield(term: number, curve: CurveNode[]): number | null {
 
 /** The issuer spread is absent unless every expected bond has a known balance
  * and every positive-balance bond has a same-day valuation and curve tenor. */
-export function balanceWeightedIssuerSpread(bonds: BondQuote[], curve: CurveNode[]): Omit<IssuerSpreadMetric, 'date'> {
+export function balanceWeightedIssuerSpread(bonds: BondQuote[], curve: CurveNode[]): Pick<IssuerSpreadMetric, 'spread_bp' | 'outstanding_bonds' | 'balance_cny'> {
   const sorted = [...curve].sort((left, right) => left.tenor_years - right.tenor_years);
   let total = 0;
   let weighted = 0;
@@ -98,7 +108,7 @@ export async function loadIssuanceBusinessMetrics(
          AND history.source='local-workbook' AND history.numeric_value IS NOT NULL
          AND history.observation_date <= $2::date AND history.numeric_value <= latest.numeric_value) AS rank_count
     FROM latest`, [['lcr', 'nsfr'], marketDate]);
-  const output: IssuanceBusinessMetrics = { lcr: null, nsfr: null, issuer_spread: null };
+  const output: IssuanceBusinessMetrics = { lcr: null, nsfr: null, funding_gap: null, issuer_spread: null };
   for (const row of liquidity.rows) {
     const count = Number(row.sample_count);
     output[row.field] = {
@@ -109,40 +119,75 @@ export async function loadIssuanceBusinessMetrics(
     };
   }
 
-  const quoteDate = await client.query<{ date: string | null }>(
-    `SELECT max(curve.observation_date)::text AS date
+  const gap = await client.query<{date:string;value_yi:number;sample_count:number;rank_count:number}>(
+    `WITH latest AS (
+      SELECT observation_date,numeric_value FROM public.quant_input
+      WHERE dataset='company_report' AND entity_key='' AND field='static_gap_1m'
+        AND source='r2-fund-report' AND numeric_value IS NOT NULL
+        AND observation_date <= $1::date
+      ORDER BY observation_date DESC LIMIT 1
+    ) SELECT latest.observation_date::text AS date,latest.numeric_value AS value_yi,
+      (SELECT count(*)::integer FROM public.quant_input history
+       WHERE history.dataset='company_report' AND history.entity_key='' AND history.field='static_gap_1m'
+         AND history.source='r2-fund-report' AND history.numeric_value IS NOT NULL
+         AND history.observation_date <= $1::date) AS sample_count,
+      (SELECT count(*)::integer FROM public.quant_input history
+       WHERE history.dataset='company_report' AND history.entity_key='' AND history.field='static_gap_1m'
+         AND history.source='r2-fund-report' AND history.numeric_value IS NOT NULL
+         AND history.observation_date <= $1::date AND history.numeric_value <= latest.numeric_value) AS rank_count
+    FROM latest`, [marketDate],
+  );
+  if (gap.rows[0]) {
+    const row = gap.rows[0];
+    const count = Number(row.sample_count);
+    output.funding_gap = {date:row.date,value_yi:Number(row.value_yi),sample_count:count,
+      historical_percentile:count>=20?100*Number(row.rank_count)/count:null};
+  }
+
+  const quoteDates = await client.query<{ date: string }>(
+    `SELECT DISTINCT curve.observation_date::text AS date
      FROM public.bond_industry_curve curve
      WHERE curve.curve_code=$1 AND curve.observation_date <= $2::date
        AND EXISTS (SELECT 1 FROM public.bond_history history
-                   WHERE history.valuation_date=curve.observation_date)`,
+                   WHERE history.valuation_date=curve.observation_date)
+     ORDER BY date DESC LIMIT 60`,
     [AAA_SECURITIES_CURVE, marketDate],
   );
-  const date = quoteDate.rows[0]?.date;
+  const date = quoteDates.rows[0]?.date;
   if (!date) return output;
+  const dates = quoteDates.rows.map(row => row.date);
 
   const [bonds, curve] = await Promise.all([
-    client.query<BondQuote>(
-      `SELECT issuance.bond_code, history.chinabond_yield_pct,
+    client.query<BondQuote & {date:string}>(
+      `SELECT dates.date::text AS date,issuance.bond_code,history.chinabond_yield_pct,
          history.outstanding_balance_cny, history.remaining_term_years
-       FROM public.bond_issuance issuance
+       FROM unnest($2::date[]) AS dates(date)
+       CROSS JOIN public.bond_issuance issuance
        LEFT JOIN public.bond_history history
-         ON history.bond_code=issuance.bond_code AND history.valuation_date=$2::date
+         ON history.bond_code=issuance.bond_code AND history.valuation_date=dates.date
        WHERE issuance.issuer_name=$1 AND issuance.issuer_rating='AAA'
          AND issuance.bond_type='证券公司债' AND issuance.interest_rate_type='固息'
          AND issuance.has_option=false
-         AND issuance.issue_date <= $2::date
+         AND issuance.issue_date <= dates.date
          AND (issuance.original_tenor_years IS NULL
-              OR issuance.issue_date + round(issuance.original_tenor_years * 365.25)::integer >= $2::date
+              OR issuance.issue_date + round(issuance.original_tenor_years * 365.25)::integer >= dates.date
               OR history.outstanding_balance_cny > 0)
-       ORDER BY issuance.bond_code`,
-      [issuer, date],
+       ORDER BY dates.date DESC,issuance.bond_code`,
+      [issuer, dates],
     ),
-    client.query<CurveNode>(
-      `SELECT tenor_years, yield_pct FROM public.bond_industry_curve
-       WHERE curve_code=$1 AND observation_date=$2::date ORDER BY tenor_years`,
-      [AAA_SECURITIES_CURVE, date],
+    client.query<CurveNode & {date:string}>(
+      `SELECT observation_date::text AS date,tenor_years,yield_pct FROM public.bond_industry_curve
+       WHERE curve_code=$1 AND observation_date=ANY($2::date[]) ORDER BY observation_date DESC,tenor_years`,
+      [AAA_SECURITIES_CURVE, dates],
     ),
   ]);
-  output.issuer_spread = { date, ...balanceWeightedIssuerSpread(bonds.rows, curve.rows) };
+  const spreadRows = dates.map(day => ({date:day,...balanceWeightedIssuerSpread(
+    bonds.rows.filter(row=>row.date===day),curve.rows.filter(row=>row.date===day),
+  )}));
+  const current = spreadRows[0]!;
+  const valid = spreadRows.map(row=>row.spread_bp).filter((value):value is number=>value!==null);
+  output.issuer_spread = {...current,sample_count:valid.length,
+    historical_percentile:current.spread_bp===null||valid.length<20?null:
+      100*valid.filter(value=>value<=current.spread_bp!).length/valid.length};
   return output;
 }
