@@ -20,9 +20,15 @@ test('financing-model preserves its approved report layout',async({page})=>{
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.evaluate(()=>document.fonts.ready);
   await expect(page.locator('.tr-workspace')).toHaveScreenshot('financing-model.png');
+  const products=page.locator('.chart-card');
+  await products.scrollIntoViewIfNeeded();
+  await expect(products).toHaveScreenshot('financing-model-products.png');
   const factors=page.locator('.factor-panel');
   await factors.scrollIntoViewIfNeeded();
   await expect(factors).toHaveScreenshot('financing-model-factors.png');
+  const supporting=page.locator('.supporting-grid');
+  await supporting.scrollIntoViewIfNeeded();
+  await expect(supporting).toHaveScreenshot('financing-model-supporting.png');
   expect(errors).toEqual([]);expect(requests).toEqual([]);
 });
 
