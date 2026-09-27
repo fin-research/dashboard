@@ -621,6 +621,22 @@
       ]
     },
     {
+      "id": "financing-model-metrics-progressive",
+      "url": "/trading-research/financing-model",
+      "kind": "interaction",
+      "state": "published model displays before independent business metrics finish",
+      "evidence": [
+        {
+          "spec": "tests/visual/reports.spec.mjs",
+          "test": "published model appears while business metrics are still loading",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        }
+      ]
+    },
+    {
       "id": "tracking-commentary",
       "url": "/trading-research/tracking-commentary?id=archive-1",
       "kind": "screenshot",

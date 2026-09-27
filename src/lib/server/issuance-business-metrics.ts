@@ -145,12 +145,16 @@ export async function loadIssuanceBusinessMetrics(
   }
 
   const quoteDates = await client.query<{ date: string }>(
-    `SELECT DISTINCT curve.observation_date::text AS date
-     FROM public.bond_industry_curve curve
-     WHERE curve.curve_code=$1 AND curve.observation_date <= $2::date
-       AND EXISTS (SELECT 1 FROM public.bond_history history
+    `WITH curve_dates AS MATERIALIZED (
+       SELECT DISTINCT observation_date
+       FROM public.bond_industry_curve
+       WHERE curve_code=$1 AND observation_date <= $2::date
+     )
+     SELECT curve.observation_date::text AS date
+     FROM curve_dates curve
+     WHERE EXISTS (SELECT 1 FROM public.bond_history history
                    WHERE history.valuation_date=curve.observation_date)
-     ORDER BY date DESC LIMIT 60`,
+     ORDER BY curve.observation_date DESC LIMIT 60`,
     [AAA_SECURITIES_CURVE, marketDate],
   );
   const date = quoteDates.rows[0]?.date;

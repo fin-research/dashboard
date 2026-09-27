@@ -29,3 +29,18 @@ export async function loadIssuanceModelReport(client:BondDatabaseClient,runId:st
   if(!result.rows[0]) throw new FinancingModelDatabaseError(404,'尚无新版融资择时模型数据');
   return issuanceReportSchema.parse(result.rows[0].report);
 }
+
+export async function loadIssuanceModelMetricSource(
+  client: BondDatabaseClient,
+  runId: string,
+): Promise<{ issuer: string; marketDate: string }> {
+  const result = await client.query<{ issuer: string; market_date: string }>(
+    `SELECT i.issuer, r.market_data_date::text AS market_date
+     FROM financing_model.model_run r
+     JOIN financing_model.issuance_run i ON i.run_id = r.id
+     WHERE r.schema_version = 4 AND r.id = $1::uuid`,
+    [runId],
+  );
+  if (!result.rows[0]) throw new FinancingModelDatabaseError(404, '尚无新版融资择时模型数据');
+  return { issuer: result.rows[0].issuer, marketDate: result.rows[0].market_date };
+}

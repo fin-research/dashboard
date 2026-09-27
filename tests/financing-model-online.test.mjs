@@ -4,7 +4,7 @@ import {readFile,readdir} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {issuanceSnapshot} from './fixtures/issuance.mjs';
 import {financingModel} from './visual/report-fixtures.mjs';
-import {loadIssuanceModelReport} from '../src/lib/server/issuance-model-repository.ts';
+import {loadIssuanceModelReport,loadIssuanceModelMetricSource} from '../src/lib/server/issuance-model-repository.ts';
 import {saveFinancingModelConclusion,saveTimingDecisionRecord,loadTimingDecisionHistory} from '../src/lib/server/financing-model-repository.ts';
 const directory=new URL('../financing-model-migrations/',import.meta.url);
 function snapshot(){const value=issuanceSnapshot();value.online_run={model_version:'0123456789abcdef0123',feature_version:'issuance-lgb-v1',training_as_of:'2026-08-01',retrain_after:'2026-08-31',runtime:'cloudflare-workflow',workflow_id:'bond-test',input_prefix:`quant-trial/runs/${value.as_of_date}/bond-test`};return value;}
@@ -15,6 +15,10 @@ test('issuance publication round-trips coupon and SHAP while retaining daily man
  const db=await database();try{
   const first=snapshot(),id=await publish(db,first),report=await loadIssuanceModelReport(db);
   assert.equal(report.snapshot.run_id,id);assert.equal(report.snapshot.forecast[0].coupon_percent,1.85);
+  assert.equal(report.business_metrics,undefined);
+  assert.deepEqual(await loadIssuanceModelMetricSource(db,id),{
+    issuer:first.terms.issuer,marketDate:first.market_source_date,
+  });
   assert.deepEqual(report.snapshot.explanation.features,first.explanation.features);
   assert.deepEqual(report.snapshot.product_scenarios,first.product_scenarios);
   assert.equal(report.snapshot.validation.metrics.length,2);

@@ -4,8 +4,9 @@
 
 ## 接口
 
-- `GET /api/financing-model`：最新新版模型快照、有效整体结论、卖方观点及最近100个新版模型日期。返回当前及未来发行日票面、四组期限/券种情景、市场路径、真实TreeSHAP、逐年逐期限验证，以及独立的业务指标；无新版数据返回404。底层预测契约中的区间、净节约与等待风险保留，页面不展示。
+- `GET /api/financing-model`：只读取最新新版模型快照、有效整体结论、卖方观点及最近100个新版模型日期。返回当前及未来发行日票面、四组期限/券种情景、市场路径、真实TreeSHAP、逐年逐期限验证；不等待独立业务指标，无新版数据返回404。底层预测契约中的区间、净节约与等待风险保留，页面不展示。
 - `GET /api/financing-model?run=<uuid>`：指定新版运行及版本清单；旧相对利差运行不被转换为票面预测。
+- `GET /api/financing-model/business-metrics?run=<uuid>`：按指定运行的发行人与行情日期读取 LCR、NSFR、资金缺口和主体利差；页面在模型快照显示后独立加载，版本切换时废弃旧请求。指标失败不阻塞已发布的模型结果。
 - `PATCH /api/financing-model/conclusion`：以`runId`增量更新人工`verdict/preferredWindow/narrative`，保留模型基础结论。
 - `GET /api/financing-model/decisions`：历史人工决策与结果；旧运行的历史分位可保留，新运行该字段为null，页面不展示旧分位。
 - `POST /api/financing-model/decisions`：按`runId`保存必填`decisionAction`及可后补的`outcome`。
@@ -30,7 +31,7 @@ DTO位于`src/lib/issuance-model.ts`，读取在`src/lib/server/issuance-model-r
 
 ## 数据流与存储
 
-Data维护原始行情和真实定价字段 → Quant LightGBM推理 → R2冻结结果 → `financing_model.publish_online_result`原子发布 → Dashboard从结构化表重建新快照。页面GET只读，不触发训练、推理或写库。
+Data维护原始行情和真实定价字段 → Quant LightGBM推理 → R2冻结结果 → `financing_model.publish_online_result`原子发布 → Dashboard从结构化表重建新快照。主报告 GET 只读取已发布模型与人工内容；独立业务指标 GET 另读 Data 原始输入表，两者均不触发训练、推理或写库。
 
 | 表 | 归属内容 |
 |---|---|
