@@ -28,7 +28,7 @@
   import { isAiRequestCancelled, useAiClient } from "$lib/ai-client.svelte";
   import { portal } from "$lib/portal";
   import { permissionVisibility } from "$lib/permission-visibility";
-  import { parseIssuanceReport as parseFinancingModelReport, type IssuanceReport as FinancingModelReport } from "$lib/issuance-model";
+  import { issuanceBusinessMetricsSchema, parseIssuanceReport as parseFinancingModelReport, type IssuanceReport as FinancingModelReport } from "$lib/issuance-model";
   import { groupIssuanceShap, selectIssuanceShapDrivers, issuanceDecisionLabel, issuanceDecisionNarrative } from "$lib/issuance-presentation";
   import { issuanceFeatureName, renderIssuanceForecast, renderIssuanceProductComparison } from "../../charts/issuance-model";
   interface Props {
@@ -40,6 +40,7 @@
   const allowed = permissionVisibility();
 
   let report = $state<FinancingModelReport | null>(null);
+  let businessMetrics = $state<NonNullable<FinancingModelReport["business_metrics"]> | null>(null);
   let loading = $state(true);
   let loadingVersion = $state(false);
   let saving = $state(false);
@@ -61,10 +62,15 @@
   let conclusionRevision = 0;
   let savedConclusionRevision = 0;
   let conclusionSavePromise: Promise<boolean> | null = null;
+  let metricsController: AbortController | null = null;
 
   onMount(() => {
     void loadReport();
-    return () => clearConclusionTimer();
+    void loadDecisionHistory();
+    return () => {
+      clearConclusionTimer();
+      metricsController?.abort();
+    };
   });
 
   function clearConclusionTimer(): void {
@@ -76,26 +82,14 @@
     loading = true;
     errorMessage = "";
     try {
-      const [reportResponse, historyResponse] = await Promise.all([
-        fetch("/api/financing-model", {
-          headers: { Accept: "application/json" },
-        }),
-        fetch("/api/financing-model/decisions", {
-          headers: { Accept: "application/json" },
-        }),
-      ]);
-      const [reportPayload, historyPayload] = await Promise.all([
-        reportResponse.json(),
-        historyResponse.json(),
-      ]);
+      const reportResponse = await fetch("/api/financing-model", {
+        headers: { Accept: "application/json" },
+      });
+      const reportPayload = await reportResponse.json();
       if (!reportResponse.ok) {
         throw new Error(reportPayload.error || "融资择时模型读取失败");
       }
-      if (!historyResponse.ok) {
-        throw new Error(historyPayload.error || "择时决策记录读取失败");
-      }
       applyReport(parseFinancingModelReport(reportPayload));
-      decisionHistory = timingDecisionHistorySchema.parse(historyPayload);
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
     } finally {
@@ -103,9 +97,55 @@
     }
   }
 
+  async function loadDecisionHistory(): Promise<void> {
+    try {
+      const response = await fetch("/api/financing-model/decisions", {
+        headers: { Accept: "application/json" },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "择时决策记录读取失败");
+      decisionHistory = timingDecisionHistorySchema.parse(payload);
+    } catch (error) {
+      globalMessages.error(
+        error instanceof Error ? error.message : String(error),
+        { key: "financing-model-decisions", title: "择时决策记录读取失败" },
+      );
+    }
+  }
+
+  async function loadBusinessMetrics(runId: string): Promise<void> {
+    const controller = new AbortController();
+    metricsController = controller;
+    try {
+      const response = await fetch(
+        `/api/financing-model/business-metrics?run=${encodeURIComponent(runId)}`,
+        { headers: { Accept: "application/json" }, signal: controller.signal },
+      );
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "业务指标读取失败");
+      if (!controller.signal.aborted && report?.snapshot.run_id === runId) {
+        businessMetrics = issuanceBusinessMetricsSchema.parse(payload);
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        globalMessages.error(
+          error instanceof Error ? error.message : String(error),
+          { key: "financing-model-business-metrics", title: "业务指标读取失败" },
+        );
+      }
+    } finally {
+      if (metricsController === controller) metricsController = null;
+    }
+  }
+
   function applyReport(nextReport: FinancingModelReport): void {
     clearConclusionTimer();
+    metricsController?.abort();
     report = nextReport;
+    businessMetrics = nextReport.business_metrics ?? null;
+    if (nextReport.business_metrics === undefined) {
+      void loadBusinessMetrics(nextReport.snapshot.run_id);
+    }
     selectedRunId = nextReport.snapshot.run_id;
     futureWindowDetailsOpen = false;
     editingSellSide = false;
@@ -356,7 +396,6 @@
 
   let snapshot = $derived(report?.snapshot ?? null);
   let versions = $derived(report?.versions ?? []);
-  let businessMetrics = $derived(report?.business_metrics ?? null);
   let recommendation = $derived(snapshot ? issuanceDecisionLabel(snapshot.decision.action) : null);
   let recommendationTone = $derived(recommendation === "尽快发行" ? "strong_buy" : recommendation === "等待" ? "neutral" : "wait");
   let driverGroups = $derived(groupIssuanceShap(snapshot?.explanation?.features ?? []));

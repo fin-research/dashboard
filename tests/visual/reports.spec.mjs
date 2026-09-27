@@ -50,6 +50,30 @@ test('financing-model saves the conclusion directly from its text box',async({pa
   expect(saved.verdict).toBe('尽快发行');
 });
 
+test('published model appears while business metrics are still loading', async ({page}) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await mockResources(page);
+  const published = structuredClone(financingModel);
+  delete published.business_metrics;
+  let releaseMetrics;
+  const metricsGate = new Promise(resolve => { releaseMetrics = resolve; });
+  await page.route('**/api/financing-model/business-metrics?*', async route => {
+    await metricsGate;
+    await route.fulfill({json: financingModel.business_metrics});
+  });
+  await page.route('**/api/financing-model', route => route.fulfill({json: published}));
+  try {
+    await page.goto('/trading-research/financing-model');
+    await expect(page.getByRole('textbox', {name: '整体结论'})).toBeVisible();
+    await expect(page.getByText('123.00', {exact: true})).toHaveCount(0);
+  } finally {
+    releaseMetrics();
+  }
+  await expect(page.getByText('123.00', {exact: true})).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 
 test('financing-model switches between issuance model dates', async ({page}) => {
   const errors=[];
