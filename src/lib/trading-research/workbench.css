@@ -76,9 +76,6 @@ body:has(.tr-workbench) {
 
 .tr-workbench button:focus-visible,
 .tr-workbench a:focus-visible,
-.tr-workbench input:focus-visible,
-.tr-workbench select:focus-visible,
-.tr-workbench textarea:focus-visible,
 .tr-workbench summary:focus-visible,
 .tr-workbench main:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--tr-primary) 36%, transparent);
@@ -1313,6 +1310,7 @@ body:has(.tr-workbench) {
 .tr-credit-editor-grid input,
 .tr-credit-editor-grid select,
 .tr-credit-item-grid input,
+.tr-credit-item-grid textarea,
 .tr-credit-notes-grid textarea {
   width: 100%;
   padding: 8px 10px;
@@ -1356,6 +1354,14 @@ body:has(.tr-workbench) {
 .tr-credit-notes-grid textarea {
   resize: vertical;
 }
+
+.tr-credit-detail :is(input, select, textarea) {
+  color: var(--tr-text);
+  -webkit-text-fill-color: var(--tr-text);
+}
+.tr-credit-detail :is(input, select, textarea):disabled { opacity: 1; }
+
+.tr-credit-item-grid textarea { resize: vertical; }
 
 .tr-credit-calendar-panel {
   overflow-x: auto;

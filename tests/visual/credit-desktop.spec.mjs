@@ -31,7 +31,8 @@ test('desktop credit metrics and expanded records stay within the workspace',asy
   await expect(region.getByRole('textbox',{name:'机构性质',exact:true})).toHaveValue('商业银行');
   const products=await region.getByRole('group').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().y));
   expect(products).toHaveLength(5);
-  expect(Math.max(...products)-Math.min(...products)).toBeLessThanOrEqual(1);
+  expect(Math.max(...products.slice(0,4))-Math.min(...products.slice(0,4))).toBeLessThanOrEqual(1);
+  expect(products[4]).toBeGreaterThan(products[1]);
   await page.setViewportSize({width:1280,height:1600});
   await region.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));await expect(region).toBeInViewport({ratio:1});
   await expect(region).toHaveScreenshot('credit-record-expanded.png');
@@ -42,15 +43,33 @@ test('desktop credit metrics and expanded records stay within the workspace',asy
   await expect(region.getByRole('rowheader',{name:'银行乙',exact:true})).toBeVisible();
 });
 
-test('credit application presents distinct operations while the overview stays read only',async({page},testInfo)=>{
+test('credit application separates requests from editable maintenance details',async({page},testInfo)=>{
   test.skip(testInfo.project.name!=='desktop','Desktop credit application');
   await mockResources(page);
-  await page.route('**/api/credit**',route=>route.fulfill({json:creditFull}));
+  const report=structuredClone(creditFull);
+  let saved;
+  await page.route('**/api/credit**',route=>{
+    if(route.request().method()==='PATCH'){
+      saved=route.request().postDataJSON();
+      report.institutions[0].bankOffice=saved.changes.institution.bankOffice;
+      return route.fulfill({json:{...report,institution:report.institutions[0]}});
+    }
+    return route.fulfill({json:report});
+  });
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/credit-workbench');
   const region=page.getByRole('region',{name:'授信机构记录',exact:true});
   await region.getByRole('button',{name:'详情',exact:true}).first().click();
-  await expect(region.getByRole('textbox',{name:'机构性质',exact:true})).toHaveAttribute('readonly');
+  await expect(region.getByRole('textbox',{name:'机构性质',exact:true})).toBeEnabled();
+  await expect(region.getByRole('textbox',{name:'已用额度（亿元）',exact:true})).toBeDisabled();
+  await expect(region.getByRole('button',{name:'保存',exact:true})).toBeVisible();
+  await expect(region.getByRole('group',{name:'其它'}).getByRole('spinbutton')).toHaveCount(1);
+  await region.getByRole('textbox',{name:'银行经办机构'}).fill('分行金融市场部');
+  await region.getByRole('button',{name:'保存',exact:true}).click();
+  await expect(region.getByRole('textbox',{name:'银行经办机构'})).toHaveValue('分行金融市场部');
+  expect(saved.operation).toBe('maintenance');
+  expect(saved.changes.institution.bankOffice).toBe('分行金融市场部');
+  await page.getByRole('button',{name:'关闭通知'}).click();
   await page.getByRole('button',{name:'授信申请',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'授信申请'});
   await expect(dialog.getByRole('textbox',{name:'机构名称'})).toBeVisible();
@@ -61,8 +80,7 @@ test('credit application presents distinct operations while the overview stays r
   await expect(dialog.getByRole('spinbutton',{name:'扩额后总额（亿元）'})).toBeVisible();
   await dialog.getByRole('button',{name:'撤销',exact:true}).click();
   await expect(dialog.getByRole('checkbox',{name:'确认撤销该机构授信'})).toBeVisible();
-  await dialog.getByRole('button',{name:'维护',exact:true}).click();
-  await expect(dialog.getByRole('spinbutton',{name:'二级买卖净余额（亿元）'})).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'维护',exact:true})).toHaveCount(0);
   await dialog.getByRole('button',{name:'新增',exact:true}).click();
   await expect(dialog.getByRole('textbox',{name:'机构名称'})).toBeVisible();
   await expect(dialog).toHaveCSS('opacity','1');
