@@ -47,7 +47,7 @@ test('financing-model saves the conclusion directly from its text box',async({pa
   await conclusion.fill('结合资金计划，尽快启动发行。');
   await conclusion.blur();
   await expect.poll(()=>saved?.narrative).toBe('结合资金计划，尽快启动发行。');
-  expect(saved.verdict).toBe('尽快发行');
+  expect(saved.verdict).toBe('等待');
 });
 
 test('published model appears while business metrics are still loading', async ({page}) => {
@@ -82,18 +82,18 @@ test('financing-model switches between issuance model dates', async ({page}) => 
   const current=structuredClone(financingModel);
   current.snapshot.run_id='00000000-0000-4000-8000-000000000025';
   current.snapshot.as_of_date='2026-08-25';
-  current.snapshot.decision.action='可择机等待';current.conclusion.verdict='可择机等待';
+  current.snapshot.decision.action='尽快发行';current.conclusion.verdict='尽快发行';
   current.versions.unshift({runId:current.snapshot.run_id,asOfDate:'2026-08-25',generatedAt:current.snapshot.generated_at});
   const previous={...structuredClone(financingModel),versions:current.versions};
   await page.route('**/api/financing-model?*',route=>route.fulfill({json:previous}));
   await page.route('**/api/financing-model',route=>route.fulfill({json:current}));
   await page.goto('/trading-research/financing-model');
-  await expect(page.getByText('等待',{exact:true}).first()).toBeVisible();
+  await expect(page.getByText('尽快发行',{exact:true}).first()).toBeVisible();
   await expect(page.getByRole('heading',{name:'因子贡献',exact:true})).toBeVisible();
   await page.evaluate(()=>document.fonts.ready);
   await expect(page.locator('.tr-workspace')).toHaveScreenshot('financing-model-online.png');
   await page.getByRole('combobox',{name:'融资择时模型日期版本'}).selectOption(financingModel.snapshot.run_id);
-  await expect(page.getByText('尽快发行',{exact:true}).first()).toBeVisible();
+  await expect(page.getByText('等待',{exact:true}).first()).toBeVisible();
   await page.getByRole('button',{name:'展开未来发行窗口明细'}).click();
   await expect(page.getByRole('columnheader',{name:'预计票面'})).toBeVisible();
   await expect(page.getByRole('columnheader',{name:'90%区间',exact:true})).toHaveCount(0);
