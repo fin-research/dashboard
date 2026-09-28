@@ -82,7 +82,7 @@ test('financing-model switches between issuance model dates', async ({page}) => 
   const current=structuredClone(financingModel);
   current.snapshot.run_id='00000000-0000-4000-8000-000000000025';
   current.snapshot.as_of_date='2026-08-25';
-  current.snapshot.decision.action='尽快发行';current.conclusion.verdict='尽快发行';
+  current.conclusion={...current.conclusion,verdict:'尽快发行',edited:true,narrative:'已确认资金安排，尽快发行。'};
   current.versions.unshift({runId:current.snapshot.run_id,asOfDate:'2026-08-25',generatedAt:current.snapshot.generated_at});
   const previous={...structuredClone(financingModel),versions:current.versions};
   await page.route('**/api/financing-model?*',route=>route.fulfill({json:previous}));
