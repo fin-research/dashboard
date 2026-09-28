@@ -13,7 +13,12 @@ let institution={reportDate:summary.reportDate,institutionName:'上海农商行�
 const report=()=>({availableDates:['2026-08-21'],previousDate:null,summary,previousSummary:null,weeklySummary:{...summary,addedInstitutionCount:0,expiredInstitutionCount:0},previousWeeklySummary:null,institutions:[institution],weeklyNews:[],recentApprovals:[],limitChanges:[],usageChanges:[],calendarEvents:[]});
 const writes=[];
 globalThis.fetch=async(url,options={})=>{
-  if(options.method && options.method!=='GET') {writes.push({url,options});return Response.json({error:'授信一览表只读'},{status:405});}
+  if(options.method==='PATCH') {
+    const body=JSON.parse(options.body);
+    writes.push(body);
+    institution={...institution,expiryDate:body.changes.institution.expiryDate};
+    return Response.json({...report(),institution});
+  }
   return Response.json(report());
 };
 async function settle(){for(let i=0;i<5;i++){await new Promise(r=>setImmediate(r));flushSync();await tick();}}
@@ -22,11 +27,25 @@ const app=mount(View,{context,target:document.querySelector('#host'),props:{tab:
 flushSync(()=>document.querySelector('.tr-credit-table tbody tr button').click());await settle();
 const detail=document.querySelector('.tr-credit-detail');
 assert.ok(detail);
-for(const input of detail.querySelectorAll('input')) assert.equal(input.readOnly,true);
-assert.equal(detail.querySelectorAll('select,textarea').length,0);
 const date=[...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='到期日').querySelector('input');
+assert.equal(date.disabled,false);
+assert.equal([...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='可用额度（亿元）').querySelector('input').disabled,true);
 date.value='2027-08-31';date.dispatchEvent(new window.Event('input',{bubbles:true}));
 date.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
 assert.equal(writes.length,0);
+const save=[...detail.querySelectorAll('button')].find(button=>button.textContent.trim()==='保存');
+assert.ok(save);detail.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+assert.equal(writes.length,1);
+assert.equal(writes[0].operation,'maintenance');
+assert.equal(writes[0].changes.institution.expiryDate,'2027-08-31');
+assert.equal(institution.expiryDate,'2027-08-31');
 assert.match(document.body.textContent,/授信申请/);
-await unmount(app);await tick();await window.happyDOM.abort();console.log('Credit read-only detail checks passed');
+await unmount(app);await tick();
+document.body.innerHTML='<div id="tr-topbar-actions"></div><div id="host"></div>';
+const reader=createClientSession({user:{id:'auth0|reader',email:'reader@18.cn'},account:{name:'只读人员',department:'资金管理部'},roles:[{id:'rol_Reader',name:'authenticated'}],permissions:['credit.institution:read'],expiresAt:Date.now()/1000+3600});
+const readonly=mount(View,{context:new Map([['site-session',reader]]),target:document.querySelector('#host'),props:{tab:'overview'}});await settle();
+flushSync(()=>document.querySelector('.tr-credit-table tbody tr button').click());await settle();
+const readonlyDetail=document.querySelector('.tr-credit-detail');
+assert.ok([...readonlyDetail.querySelectorAll('input,select,textarea')].every(input=>input.disabled));
+assert.equal([...readonlyDetail.querySelectorAll('button')].some(button=>button.textContent.trim()==='保存'),false);
+await unmount(readonly);await tick();await window.happyDOM.abort();console.log('Credit editable detail and role checks passed');

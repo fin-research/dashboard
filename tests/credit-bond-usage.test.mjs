@@ -67,7 +67,7 @@ test('非空历史迁移逐期保持真实余额，未变真实值也在到期�
   for(const [date,primary,secondary,other] of [['2026-08-21',2,1,1.5],['2026-08-28',0,3,0.5]]) {
     const r=await loadCreditReport(db,date);assert.equal(bond(r).usedAmount,3);
     assert.equal(bond(r).primaryUsedAmount,primary);assert.equal(bond(r).secondaryUsedAmount,secondary);
-    const item=r.institutions[0].items.find(i=>i.type==='other');assert.equal(item.usedAmount,other);assert.equal(item.limitAmount,5);
+    const item=r.institutions[0].items.find(i=>i.type==='other');assert.equal(item.usedAmount,other);assert.equal(item.limitAmount,null);
     assert.equal(item.details,'原其它；两融收益权转让：两融旧说明');
     assert.equal(r.institutions[0].items.some(i=>i.type==='margin_income_rights'),false);
   }

@@ -11,7 +11,7 @@ import { clientFromDebtCounterparty } from '../src/lib/financing/debt-import-cli
 import { listClients, saveClient } from '../src/lib/server/financing/clients.ts';
 import { transformWorkbook } from '../scripts/financing/lib/debt-transform.mjs';
 
-async function database(t, legacy = false) {
+async function database(t, legacy = false, through = null) {
   const db = new PGlite();
   const query = db.query.bind(db);
   db.query = async (...args) => { const result = await query(...args); return {...result,rowCount: result.rows.length || result.affectedRows || 0}; };
@@ -28,7 +28,7 @@ async function database(t, legacy = false) {
   await installBondInvestors(db);
   await db.exec('CREATE SCHEMA IF NOT EXISTS credit; CREATE TABLE credit.schema_migration(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
   for (const name of fs.readdirSync(new URL('../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
-    if (!legacy || name < '0005') await applyCreditMigration(db,name);
+    if ((!legacy || name < '0005') && (!through || name <= through)) await applyCreditMigration(db,name);
   }
   return db;
 }
@@ -37,7 +37,7 @@ async function institution(db, date='2026-09-04', name='合并授信') {
   const current=(await db.query("SELECT to_regclass('credit.diff') AS name")).rows[0].name;
   if (current) {
     await db.query('SELECT credit.append_diff($1,$2,$3,$4)',[date,name,JSON.stringify({institution_type:'银行',confidentiality_status:false,status:'approved',total:20,
-      ...Object.fromEntries(creditItemTypes.map(type=>[type+'_limit',20])),other_used:2,bond_investment_used:0,legal_overdraft_used:0}),'auth0|test']);
+      ...Object.fromEntries(creditItemTypes.filter(type=>type!=='other').map(type=>[type+'_limit',20])),other_used:2,bond_investment_used:0,legal_overdraft_used:0}),'auth0|test']);
   } else {
     await db.query(`INSERT INTO credit.institution(report_date,institution_name,institution_type,confidentiality_status,status,total_limit,total_used)
       VALUES ($1,$2,'银行',false,'approved',20,10)`,[date,name]);
@@ -110,6 +110,25 @@ test('API rejects edits to derived total and financing usage but permits other c
   assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type:'bond_investment',secondaryUsedAmount:-4}]})).success,true);
   assert.equal(creditInstitutionUpdateSchema.safeParse(input({institution:{totalUsed:5}})).success,false);
   assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type:'bond_investment',usedAmount:4}]})).success,false);
+  assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type:'other',limitAmount:4}]})).success,false);
+  for(const type of ['yield_certificate','legal_overdraft','interbank_lending'])
+    assert.equal(creditInstitutionUpdateSchema.safeParse(input({items:[{type,details:'不再记录'}]})).success,false);
+});
+
+test('retired credit fields are archived before schema removal',async t=>{
+  const db=await database(t,false,'0013_explicit_credit_applications.sql');
+  await db.query('SELECT credit.append_diff($1,$2,$3::jsonb,$4)', ['2026-09-04','历史字段',JSON.stringify({
+    institution_type:'银行',status:'approved',confidentiality_status:false,
+    other_limit:5,yield_certificate_detail:'旧收益说明',legal_overdraft_detail:'旧法透说明',
+  }),'auth0|test']);
+  await applyCreditMigration(db,'0014_retire_credit_item_fields.sql');
+  const archived=(await db.query('SELECT archived_values FROM credit.retired_diff_fields')).rows[0].archived_values;
+  assert.equal(archived.other_limit,5);
+  assert.equal(archived.yield_certificate_detail,'旧收益说明');
+  assert.equal(archived.legal_overdraft_detail,'旧法透说明');
+  assert.equal((await db.query("SELECT count(*) AS count FROM information_schema.columns WHERE table_schema='credit' AND table_name='diff' AND column_name IN ('other_limit','yield_certificate_detail','legal_overdraft_detail','interbank_lending_detail')")).rows[0].count,0);
+  await db.query('SELECT credit.append_diff($1,$2,$3::jsonb,$4)', ['2026-09-05','历史字段',JSON.stringify({other_used:2}),'auth0|test']);
+  await assert.rejects(db.query('SELECT credit.append_diff($1,$2,$3::jsonb,$4)', ['2026-09-05','历史字段',JSON.stringify({other_limit:2}),'auth0|test']),/Unknown credit diff field/);
 });
 
 test('incremental import preserves old principal, dates, client override, flows and balances, including repeated imports',async t=>{
