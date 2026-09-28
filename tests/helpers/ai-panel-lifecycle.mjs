@@ -3,6 +3,14 @@ import { get } from "svelte/store";
 import { installDom, loadComponent } from "./svelte-dom.mjs";
 
 const window = installDom();
+// Observe expected animation cancellation during Svelte teardown in happy-dom;
+// retain transitions and surface every other rejection as a test failure.
+const nativeAnimate = window.HTMLElement.prototype.animate;
+window.HTMLElement.prototype.animate = function (...args) {
+  const animation = nativeAnimate.apply(this, args);
+  animation.finished.catch(error => { if (error.name !== "AbortError") throw error; });
+  return animation;
+};
 const { mount, unmount, flushSync } = await import("svelte");
 const { globalMessages } = await import("../../src/lib/global-messages.ts");
 const streams = [];

@@ -10,31 +10,14 @@ export function issuanceDecisionLabel(action: string): IssuanceDecisionLabel | n
   return null;
 }
 
-/** Keep automatic conclusion copy aligned with the three published actions.
- * Human-edited conclusion text is never passed through this function. */
+/** Display the published coupon window; preserve separately edited human text. */
 export function issuanceDecisionNarrative(snapshot: IssuanceSnapshot): string | null {
-  const label = issuanceDecisionLabel(snapshot.decision.action);
-  const first = snapshot.forecast[0];
-  const firstCost = first?.coupon_percent == null ? '' : `首个可发行日预计票面${first.coupon_percent.toFixed(2)}%`;
-  if (label === '尽快发行') {
-    const saving = snapshot.decision.expected_net_saving_bp;
-    return `${firstCost ? `${firstCost}，` : ''}${saving == null ? '未来窗口预期改善未达到择时门槛' : `未来窗口最大预计净节约${saving.toFixed(1)}bp，未达到等待门槛`}；建议按融资计划尽快发行。`;
-  }
-  if (label === '等待') {
-    const best = snapshot.forecast.find(row => row.date === snapshot.decision.lowest_expected_cost_date);
-    const saving = snapshot.decision.expected_net_saving_bp;
-    if (firstCost && best?.coupon_percent != null && saving != null) {
-      const [year,month,day] = best.date.split('-');
-      return `${firstCost}，${year}年${Number(month)}月${Number(day)}日预计票面${best.coupon_percent.toFixed(2)}%，扣除等待成本后预计节约${saving.toFixed(1)}bp；建议结合资金需求在该窗口发行。`;
-    }
-    return '建议结合资金需求等待更优发行窗口。';
-  }
-  if (label === '暂缓发行') return snapshot.decision.reason === 'insufficient_primary_history'
-    ? '同类发行历史不足，当前票面预测暂缺；建议暂缓决策并补充可比发行证据。'
-    : snapshot.decision.reason === 'no_issuance_day'
-      ? '未来窗口内没有可发行日，建议调整发行时点并重新评估融资安排。'
-      : '当前发行窗口缺少可用的成本预测，建议暂缓发行并重新评估融资安排。';
-  return null;
+  if(!['尽快发行','等待'].includes(snapshot.decision.action))return null;
+  const first=snapshot.forecast[0];
+  if(first?.coupon_percent==null)return '当前没有可用的发行利率预测。';
+  const windows=snapshot.decision.low_rate_windows.map(row=>row.start===row.end?row.start:`${row.start}至${row.end}`).join('、');
+  const best=snapshot.forecast.find(row=>row.date===snapshot.decision.lowest_expected_cost_date);
+  return `首个可发行日预计票面${first.coupon_percent.toFixed(2)}%；预测较低区间为${windows}。${best?.coupon_percent==null?'':`最低日${best.date}预计票面${best.coupon_percent.toFixed(2)}%。`}${snapshot.decision.action==='尽快发行'?'当前已处于较低区间，可按资金计划发行。':'可结合资金需求等待较低区间。'}`;
 }
 
 export type ShapGroup = { display_name: string; absolute_bp: number; net_bp: number };

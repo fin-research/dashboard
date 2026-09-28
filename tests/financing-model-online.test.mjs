@@ -7,7 +7,7 @@ import {financingModel} from './visual/report-fixtures.mjs';
 import {loadIssuanceModelReport,loadIssuanceModelMetricSource} from '../src/lib/server/issuance-model-repository.ts';
 import {saveFinancingModelConclusion,saveTimingDecisionRecord,loadTimingDecisionHistory} from '../src/lib/server/financing-model-repository.ts';
 const directory=new URL('../financing-model-migrations/',import.meta.url);
-function snapshot(){const value=issuanceSnapshot();value.online_run={model_version:'0123456789abcdef0123',feature_version:'issuance-lgb-v1',training_as_of:'2026-08-01',retrain_after:'2026-08-31',runtime:'cloudflare-workflow',workflow_id:'bond-test',input_prefix:`quant-trial/runs/${value.as_of_date}/bond-test`};return value;}
+function snapshot(){const value=issuanceSnapshot();value.online_run={model_version:'0123456789abcdef0123',feature_version:'issuance-coupon',training_as_of:'2026-08-01',retrain_after:'2026-08-31',runtime:'cloudflare-workflow',workflow_id:'bond-test',input_prefix:`quant-trial/runs/${value.as_of_date}/bond-test`};return value;}
 const publish=(db,value,key=`${value.online_run.input_prefix}/result.json`)=>db.query('SELECT financing_model.publish_online_result($1::jsonb,$2) AS id',[JSON.stringify(value),key]).then(r=>r.rows[0].id);
 async function database(){const db=new PGlite();for(const name of (await readdir(directory)).sort())await db.exec(await readFile(new URL(name,directory),'utf8'));return db;}
 
@@ -22,7 +22,7 @@ test('issuance publication round-trips coupon and SHAP while retaining daily man
   assert.deepEqual(report.snapshot.explanation.features,first.explanation.features);
   assert.deepEqual(report.snapshot.product_scenarios,first.product_scenarios);
   assert.equal(report.snapshot.validation.metrics.length,2);
-  assert.equal(report.snapshot.validation.metrics[0].hit_rate_5bp,.68);
+  assert.equal(report.snapshot.validation.metrics[0].win_rate,.68);
   assert.equal(report.snapshot.market_forecast.length,11);
   assert.equal((await db.query('SELECT predicted_deviation_bp FROM financing_model.model_run')).rows[0].predicted_deviation_bp,null);
   await saveFinancingModelConclusion(db,{runId:id,verdict:'人工结论',preferredWindow:'下周',narrative:'保留人工判断'});
@@ -49,7 +49,7 @@ test('issuance publication rejects old models, unavailable labels, broken SHAP a
     v=>{v.market_forecast[1].date=v.as_of_date;},v=>{v.forecast[0].effective_horizon=30;},
     v=>{v.explanation.prediction_coupon_bp+=1;v.explanation.base_coupon_bp+=1;},v=>{v.explanation=null;},
     v=>{v.explanation.features=[];},v=>{v.explanation.features[0].shap_bp=99;},v=>{v.decision.action='';},
-    v=>{v.product_scenarios[0].bond_type='unknown';},v=>{v.product_scenarios.pop();}]){
+    v=>{v.decision.low_rate_dates=[];},v=>{v.decision.lowest_expected_cost_date=v.as_of_date;},v=>{v.validation.metrics[0].win_rate=2;},v=>{v.product_scenarios[0].bond_type='unknown';},v=>{v.product_scenarios.pop();}]){
    const invalid=structuredClone(first);invalid.generated_at='2026-08-24T05:00:00Z';mutate(invalid);await assert.rejects(publish(db,invalid));
   }
   const broken=structuredClone(first);broken.generated_at='2026-08-24T05:00:00Z';broken.decision.expected_net_saving_bp=99;broken.forecast[1].saving_probability=2;
@@ -58,13 +58,15 @@ test('issuance publication rejects old models, unavailable labels, broken SHAP a
  }finally{await db.close();}
 });
 
-test('full-input v2 bundle publishes with a direct three-way decision and no savings copy',async()=>{
+test('unified coupon bundle preserves the report and rejects superseded model packages',async()=>{
  const db=await database();try{
-  const value=snapshot();value.online_run.feature_version='issuance-lgb-v2';value.decision.action='等待';
+  const value=snapshot();value.online_run.feature_version='issuance-coupon';value.decision.action='等待';
   const id=await publish(db,value);
   const report=await loadIssuanceModelReport(db,id);
   assert.equal(report.snapshot.decision.action,'等待');
+  const old=structuredClone(value);old.online_run.feature_version='issuance-lgb-v2';await assert.rejects(publish(db,old),/Invalid issuance/);
+  assert.deepEqual(report.snapshot.decision.low_rate_dates,value.decision.low_rate_dates);
   assert.equal(report.conclusion.narrative,'等待');
-  assert.equal((await db.query('SELECT model_name,online_feature_version FROM financing_model.model_run WHERE id=$1',[id])).rows[0].model_name,'issuance-lgb-v2');
+  assert.equal((await db.query('SELECT model_name,online_feature_version FROM financing_model.model_run WHERE id=$1',[id])).rows[0].model_name,'issuance-coupon');
  }finally{await db.close();}
 });

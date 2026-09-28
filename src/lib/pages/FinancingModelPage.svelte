@@ -412,12 +412,13 @@
   let current = $derived(snapshot?.forecast[0]);
   let validationMetrics = $derived(snapshot ? (() => {
     const first = snapshot.forecast[0];
-    const observed = snapshot.validation.metrics.find(row => row.year === 2026 && row.lead_days === 0);
+    const year = Number(snapshot.as_of_date.slice(0,4));
+    const observed = snapshot.validation.metrics.find(row => row.year === year && row.lead_days === 30);
     return [
       {label:"训练样本",value:first ? String(first.market_training_samples) : "—"},
       {label:"训练截止",value:first?.market_train_label_end ?? "—"},
-      {label:"2026检验样本",value:observed ? String(observed.samples) : "—"},
-      {label:"2026预测胜率（±5bp）",value:observed?.hit_rate_5bp == null ? "—" : `${(observed.hit_rate_5bp*100).toFixed(1)}%`},
+      {label:`${year}检验样本`,value:observed ? String(observed.samples) : "—"},
+      {label:`${year}预测胜率（1σ）`,value:observed?.win_rate == null ? "—" : `${(observed.win_rate*100).toFixed(1)}%`},
       {label:"平均误差",value:observed ? `${observed.mae_bp.toFixed(1)} bp` : "—"},
     ];
   })() : []);

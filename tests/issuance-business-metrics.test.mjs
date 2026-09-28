@@ -13,11 +13,11 @@ test('published actions have one explicit business label', () => {
   assert.equal(issuanceDecisionLabel('暂缓发行'), '暂缓发行');
   assert.equal(issuanceDecisionLabel('unrecognized'), null);
   const snapshot = issuanceSnapshot();
-  assert.match(issuanceDecisionNarrative(snapshot), /1\.85%.*最大预计净节约1\.0bp.*建议按融资计划尽快发行/);
-  snapshot.decision.action='等待';
-  assert.match(issuanceDecisionNarrative(snapshot), /2026年9月3日预计票面1\.82%.*预计节约1\.0bp/);
-  snapshot.decision.action='暂缓发行';
-  assert.match(issuanceDecisionNarrative(snapshot), /建议暂缓发行/);
+  assert.match(issuanceDecisionNarrative(snapshot), /1\.85%.*2026-09-01至2026-09-03.*等待较低区间/);
+  snapshot.decision.action='尽快发行';
+  assert.match(issuanceDecisionNarrative(snapshot), /可按资金计划发行/);
+  snapshot.forecast=[];
+  assert.match(issuanceDecisionNarrative(snapshot), /没有可用的发行利率预测/);
   snapshot.decision.action='unrecognized';
   assert.equal(issuanceDecisionNarrative(snapshot), null);
 });
