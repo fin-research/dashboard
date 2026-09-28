@@ -88,12 +88,13 @@ test('financing-model switches between issuance model dates', async ({page}) => 
   await page.route('**/api/financing-model?*',route=>route.fulfill({json:previous}));
   await page.route('**/api/financing-model',route=>route.fulfill({json:current}));
   await page.goto('/trading-research/financing-model');
-  await expect(page.getByText('尽快发行',{exact:true}).first()).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue('已确认资金安排，尽快发行。');
   await expect(page.getByRole('heading',{name:'因子贡献',exact:true})).toBeVisible();
   await page.evaluate(()=>document.fonts.ready);
   await expect(page.locator('.tr-workspace')).toHaveScreenshot('financing-model-online.png');
   await page.getByRole('combobox',{name:'融资择时模型日期版本'}).selectOption(financingModel.snapshot.run_id);
   await expect(page.getByText('等待',{exact:true}).first()).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue(/预测较低区间为/);
   await page.getByRole('button',{name:'展开未来发行窗口明细'}).click();
   await expect(page.getByRole('columnheader',{name:'预计票面'})).toBeVisible();
   await expect(page.getByRole('columnheader',{name:'90%区间',exact:true})).toHaveCount(0);
