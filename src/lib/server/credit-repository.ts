@@ -54,6 +54,7 @@ export async function persistCreditWorkbook(client: DatabaseClient, input: Persi
       const source = parsed.institutions.find(row => row.institutionName === institution.institutionName);
       if (!source) continue;
       for (const item of institution.items) {
+        if (item.type === 'other') continue;
         if (source.items.find(value => value.type === item.type)?.limitAmount == null && item.limitAmount != null && item.limitAmount !== 0) {
           warnings.push(`${institution.institutionName}：${creditItemLabels[item.type]}额度原表空白，保留线上${item.limitAmount}亿元；取消额度请明确填0`);
         }
@@ -86,13 +87,14 @@ function institutionView(state: DiffRow, date: string, clients: Array<{id:string
   const items = creditItemTypes.map(type => {
     const bond = type === 'bond_investment';
     const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
-    const limitAmount = nullableNumber(state[`${type}_limit`]);
+    const limitAmount = type === 'other' ? null : nullableNumber(state[`${type}_limit`]);
     const onlineAmount = clients.length ? usage.get(`${date}:${state.institution_name}:${type}`) ?? 0 : null;
     const secondaryUsedAmount = nullableNumber(state.bond_investment_secondary_used) ?? 0;
     const usedAmount = financing ? (onlineAmount == null ? null : sumAmounts([onlineAmount,bond ? secondaryUsedAmount : 0]))
       : nullableNumber(state[`${type}_used`]);
     return { type,limitAmount,usedAmount,remainingAmount:limitAmount == null || (financing && usedAmount == null) ? null : limitAmount-(usedAmount ?? 0),
-      details: (state[`${type}_detail`] as string | null) ?? null,usageSource:bond ? 'bond_investors' as const : financing ? 'financing' as const : 'credit' as const,linkedClientCount:clients.length,
+      details: (type === 'bond_investment' || type === 'other' ? state[`${type}_detail`] as string | null : null) ?? null,
+      usageSource:bond ? 'bond_investors' as const : financing ? 'financing' as const : 'credit' as const,linkedClientCount:clients.length,
       ...(bond ? {primaryUsedAmount:onlineAmount,secondaryUsedAmount} : {}) };
   });
   const totalLimit = nullableNumber(state.total);

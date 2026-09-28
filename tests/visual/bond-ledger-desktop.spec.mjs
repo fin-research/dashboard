@@ -4,6 +4,7 @@ import {ledgerAuditInventory,ledgerAuditReport} from './bond-ledger-fixture.mjs'
 
 test('desktop daily ledger shows balanced metrics and recoverable management controls',async({page},testInfo)=>{
  test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
+ await page.clock.setFixedTime(new Date('2026-09-15T11:00:00+08:00'));
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  await mockResources(page);await page.setViewportSize({width:1280,height:900});
  await page.route('**/api/bond-ledger*',route=>{

@@ -20,7 +20,7 @@
 .tr-shell--workspace .ui-tone-success {
   color: color-mix(in srgb, var(--color-success-content) 80%, var(--text-1));
 }
-.tr-shell--workspace :is(a, button, input, select, textarea, summary, main, [tabindex]):focus-visible {
+.tr-shell--workspace :is(a, button, summary, main, [tabindex]):focus-visible {
   outline: 2px solid var(--brand-deep);
   outline-offset: 3px;
 }
@@ -54,8 +54,10 @@
   .tr-shell--workspace .tr-credit-editor-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
   .tr-shell--workspace .tr-credit-editor-grid > label { grid-column: span 4; }
   .tr-shell--workspace .tr-credit-editor-grid > label:nth-child(-n + 4) { grid-column: span 3; }
-  .tr-shell--workspace .tr-credit-item-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; }
+  .tr-shell--workspace .tr-credit-item-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
   .tr-shell--workspace .tr-credit-item-grid fieldset { align-content: start; }
+  .tr-shell--workspace .tr-credit-item-grid fieldset:first-child { grid-row: span 2; }
+  .tr-shell--workspace .tr-credit-item-grid .tr-credit-item-other { grid-column: 2 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Keep the last action row reachable above the fixed AI launcher on desktop. */

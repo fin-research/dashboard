@@ -79,7 +79,7 @@ export function parseCreditWorkbook(
     const items = creditItemTypes.map((type) => parseItem(row, type));
     // Legacy Excel keeps its original columns; retired margin-rights amounts belong to other.
     const other = items.find(item => item.type === 'other')!;
-    other.limitAmount = finiteNumber(row[18]);
+    // Legacy column 18 was a separate margin-rights limit; other is now usage-only.
     const marginUsed = finiteNumber(row[19]);
     if (marginUsed != null) other.usedAmount = sumAmounts([other.usedAmount, marginUsed]);
     const totalLimit = finiteNumber(row[6]);

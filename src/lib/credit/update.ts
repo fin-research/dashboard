@@ -44,6 +44,12 @@ const creditItemChangesSchema = z.object({
   secondaryUsedAmount: nullableAmount.optional(),
   details: nullableText(4_000).optional(),
 }).strict().superRefine((value, context) => {
+  if (value.type === 'other' && 'limitAmount' in value) {
+    context.addIssue({ code: 'custom', path: ['limitAmount'], message: '其它仅记录已用和说明' });
+  }
+  if (value.type !== 'bond_investment' && value.type !== 'other' && 'details' in value) {
+    context.addIssue({ code: 'custom', path: ['details'], message: '该授信分项不记录说明' });
+  }
   if (["bond_investment", "yield_certificate", "interbank_lending"].includes(value.type) && "usedAmount" in value) {
     context.addIssue({ code: "custom", path: ["usedAmount"], message: "已用金额由线上数据计算；债券投资请登记二级买卖，收益凭证和拆借请维护负债数据" });
   }

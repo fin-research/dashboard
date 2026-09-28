@@ -19,12 +19,14 @@
     type CreditInstitutionView,
     type CreditItemType,
     type CreditReportResponse,
+    type CreditStatus,
     type CreditWeeklyNewsItem,
   } from "../credit/types.ts";
   import { compareCreditInstitutionOrder, matchesCreditStatus } from "../credit/presentation.ts";
   import { creditEffectiveStatus, isCreditEffective, type CreditEffectiveStatus } from "../credit/validity.ts";
   import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
   import CreditApplicationDialog from "./CreditApplicationDialog.svelte";
+  import CreditDetailEditor from "./CreditDetailEditor.svelte";
   import Badge from "./Badge.svelte";
   import PanelHeading from "./PanelHeading.svelte";
   import SectionHeading from "./SectionHeading.svelte";
@@ -58,7 +60,7 @@
   let loading = $state(true);
   let errorMessage = $state("");
   let query = $state("");
-  let statusFilter = $state<CreditEffectiveStatus | "active" | "all">("active");
+  let statusFilter = $state<CreditStatus | "active" | "all">("active");
   let riskFilter = $state("all");
   let expandedInstitution = $state<string | null>(null);
   let sortKey = $state<SortKey>("institutionType");
@@ -89,7 +91,7 @@
             .toLocaleLowerCase("zh-CN")
             .includes(normalizedQuery);
         const matchesStatus =
-          matchesCreditStatus(creditEffectiveStatus(institution), statusFilter);
+          matchesCreditStatus(institution.status, statusFilter);
         const matchesRisk =
           riskFilter === "all" ||
           (riskFilter === "attention" && isCreditEffective(institution) && (institution.utilization ?? 0) >= 60) ||
@@ -273,7 +275,7 @@
     institution: CreditInstitutionView,
     key: SortKey,
   ): string | number | null {
-    if (key === "status") return statusLabel(creditEffectiveStatus(institution));
+    if (key === "status") return statusLabel(institution.status);
     return institution[key];
   }
 
@@ -464,8 +466,6 @@
               <option value="active">未撤销</option>
               <option value="all">全部状态</option>
               <option value="approved">已获批</option>
-              <option value="expired">已到期</option>
-              <option value="pending">未生效</option>
               <option value="applying">申请中</option>
               <option value="revoked">已撤销</option>
             </NativeSelect>
@@ -505,7 +505,7 @@
                 <td>{index + 1}</td>
                 <th scope="row">{institution.institutionName}</th>
                 <td>{institution.institutionType}</td>
-                <td><Badge tone={statusTone(creditEffectiveStatus(institution))}>{statusLabel(creditEffectiveStatus(institution))}</Badge></td>
+                <td><Badge tone={statusTone(institution.status)}>{statusLabel(institution.status)}</Badge></td>
                 <td class="is-numeric">{formatAmount(institution.totalLimit)}</td>
                 <td class="is-numeric">{formatAmount(institution.totalUsed)}</td>
                 <td class="is-numeric">{formatAmount(institution.availableAmount)}</td>
@@ -517,44 +517,7 @@
               {#if expandedInstitution === institution.institutionName}
                 <tr class="tr-credit-detail-row">
                   <td colspan="11">
-                    <div class="tr-credit-detail">
-                      <div class="tr-credit-editor-head"><strong>{institution.institutionName} · {institution.reportDate}</strong></div>
-                      <div class="tr-credit-editor-grid">
-                        <label><span>机构性质</span><Input readonly value={institution.institutionType} /></label>
-                        <label><span>审批状态</span><Input readonly value={statusLabel(institution.status)} /></label>
-                        <label><span>截至所选日状态</span><Input readonly value={statusLabel(creditEffectiveStatus(institution))} /></label>
-                        <label><span>保密协议</span><Input readonly value={institution.confidentialityStatus ? '已签署' : '未签署'} /></label>
-                        <label><span>授信总额（亿元）</span><Input readonly value={formatAmount(institution.totalLimit)} /></label>
-                        <label><span>已用额度（亿元）</span><Input readonly value={formatAmount(institution.totalUsed)} /></label>
-                        <label><span>可用额度（亿元）</span><Input readonly value={formatAmount(institution.availableAmount)} /></label>
-                        <label><span>生效日</span><Input readonly value={institution.effectiveDate ?? '—'} /></label>
-                        <label><span>到期日</span><Input readonly value={institution.expiryDate ?? '—'} /></label>
-                        <label><span>关联客户</span><Input readonly value={institution.clients?.map(client => client.name).join('、') || '—'} /></label>
-                        <label><span>银行经办机构</span><Input readonly value={institution.bankOffice ?? '—'} /></label>
-                        <label><span>我司申请部门</span><Input readonly value={institution.applyingDepartment ?? '—'} /></label>
-                        <label><span>我司经办人</span><Input readonly value={institution.handler ?? '—'} /></label>
-                      </div>
-                      <div class="tr-credit-item-grid">
-                        {#each institution.items as item (item.type)}
-                          <fieldset>
-                            <legend>{creditItemLabels[item.type]}</legend>
-                            <label><span>额度（亿元）</span><Input readonly value={formatAmount(item.limitAmount)} /></label>
-                            <label><span>{item.type === 'bond_investment' ? '已用合计（亿元）' : '已用（亿元）'}</span><Input readonly value={formatAmount(item.usedAmount)} /></label>
-                            {#if item.type === 'bond_investment'}
-                              <label><span>一级发行存续额（亿元）</span><Input readonly value={formatAmount(item.primaryUsedAmount)} /></label>
-                              <label><span>二级买卖净余额（亿元）</span><Input readonly value={formatAmount(item.secondaryUsedAmount)} /></label>
-                            {/if}
-                            <label><span>可用（亿元）</span><Input readonly value={formatAmount(item.remainingAmount)} /></label>
-                            <label><span>说明</span><Input readonly value={item.details ?? '—'} /></label>
-                          </fieldset>
-                        {/each}
-                      </div>
-                      <div class="tr-credit-notes-grid">
-                        <label><span>授信额度描述</span><Input readonly value={institution.detail ?? '—'} /></label>
-                        <label><span>债券投资偏好</span><Input readonly value={institution.bondPreference ?? '—'} /></label>
-                        <label><span>备注</span><Input readonly value={institution.notes ?? '—'} /></label>
-                      </div>
-                    </div>
+                    <CreditDetailEditor {institution} onapplied={async (date, name) => { await loadReport(date); expandedInstitution = name; }} />
                   </td>
                 </tr>
               {/if}
