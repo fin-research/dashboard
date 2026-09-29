@@ -5,9 +5,9 @@
     "root": "src/routes",
     "suffix": "+page.svelte"
   },
-  "baselineTemplate": "tests/visual/__screenshots__/macos-ci/{project}/{snapshot}",
+  "baselineTemplate": "tests/visual/__screenshots__/linux-ci/{project}/{snapshot}",
   "baselineDirectories": [
-    "tests/visual/__screenshots__/macos-ci"
+    "tests/visual/__screenshots__/linux-ci"
   ],
   "pages": [
     {
