@@ -8,9 +8,9 @@ Auth0 配置与 Actions 当前由 [Gateway](../../gateway/auth0/README.md) 维�
 
 ## 当前管理入口
 
-后续租户配置按 [项目组 AUTH 的 Deploy CLI 规范](../../eastmoney/docs/AUTH.md#auth0-配置管理deploy-cli) 使用 `pnpm auth0:export`、`pnpm auth0:plan`、`pnpm auth0:apply`，每次显式限定资源。机器凭据读取项目组根 `.env`，不再依赖个人 CLI 登录。单个用户操作和 Deploy CLI 尚未支持的配置由同一机器应用通过既有 Management API adapter 执行。
+后续本地租户管理按[项目组 AUTH 的 Auth0 skill 与 CLI 规范](../../eastmoney/docs/AUTH.md#auth0-本地租户管理)执行。先用 `auth0 tenants list` 检查并复用现有授权；多个 agent 会话不要各自重复 `auth0 login`，修改时只操作已核对的目标资源并回读。
 
-本文件下面的专题脚本继续保存已实现配置的细节；其 `management()` helper 已改用机器凭据。当前套餐的 Universal Login template 402 会使 Deploy CLI `branding` 导出失败，按共享 AUTH 记录边界。权限和登录验收禁止 browser，使用 `pnpm test:auth` 与 `pnpm auth:verify`。
+本文件下面的专题脚本保存历史配置细节；依赖已退役 `cli` 机器应用的 Deploy CLI 包装器和 `management()` helper 不再是当前入口。当前套餐的 Universal Login template 402 曾使 Deploy CLI `branding` 导出失败。权限和登录验收禁止 browser，使用 `pnpm test:auth` 与 `pnpm auth:verify`。
 
 ## 中文主题
 
@@ -49,7 +49,7 @@ Auth0 配置与 Actions 当前由 [Gateway](../../gateway/auth0/README.md) 维�
 ## 配置和发布
 
 1. Auth0 Custom Domain `auth.hasbai.xyz` 使用 Auth0-managed certificate。DNS-only CNAME 为 `hasbai-cd-j8r0mxglxwb2knim.edge.tenants.eu.auth0.com`；保留该记录用于证书续期。
-2. Dashboard 的 `scripts/publish-auth0-signup.mjs` 已退役；Auth0 signup Form、资料 Action、绑定和 M2M 凭据由 Gateway 维护。请使用 Gateway 的 Auth0 Deploy/Management workflow，本仓库脚本会直接拒绝执行。
+2. Dashboard 的 `scripts/publish-auth0-signup.mjs` 已退役；Auth0 signup Form、资料 Action、绑定和 M2M 凭据由 Gateway 维护。本地配置变更使用共享 AUTH 所述 Auth0 skill 与 CLI 流程，本仓库旧脚本会直接拒绝执行。
 3. Dashboard `AUTH0_LOGIN_DOMAIN` 控制浏览器退出域名，管理服务继续使用 `AUTH0_DOMAIN`。变更后运行 `pnpm worker:typegen`、正式检查和构建，再推送 GitHub 触发自动部署；必要时手动部署 Worker，两种方式均无需再次申请授权。
 4. 提供 `CLOUDFLARE_ACCESS_API_TOKEN` 后运行 `node --use-env-proxy scripts/configure-auth0-login-domain.mjs` 查看 Access OIDC 修改计划，加 `--apply` 切换授权、token、JWKS 地址。复用现有客户端密钥、PKCE、claims、scopes 和回调白名单。
 5. `node --use-env-proxy scripts/verify-auth0-branding.mjs --login-domain=auth.hasbai.xyz` 检查实际登录／注册 HTML 的中文及配色，并回读 Form 字段和 Action 绑定。它不提交登录、注册或发送邮件，也不打印 Cookie／事务 URL；这是 HTTP 和配置检查，不是浏览器视觉验收。
