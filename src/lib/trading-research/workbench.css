@@ -74,8 +74,8 @@ body:has(.tr-workbench) {
   -webkit-tap-highlight-color: transparent;
 }
 
-.tr-workbench button:focus-visible,
-.tr-workbench a:focus-visible,
+.tr-workbench button:not([data-slot="button"]):focus-visible,
+.tr-workbench a:not([data-slot="button"]):focus-visible,
 .tr-workbench summary:focus-visible,
 .tr-workbench main:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--tr-primary) 36%, transparent);

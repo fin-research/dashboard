@@ -7,7 +7,7 @@
 - Gateway 负责认证、实时角色权限、账号目录与权限配置，Dashboard 只保留页面及私有服务转发。
 - Auth0 管理用户、角色、角色成员、姓名、部门、邮箱、停用状态和密码。应用不创建或维护人员表、角色表和成员关系表。
 - `authorization.permission` 保存全站权限目录，代码格式为 `<domain>.<resource>:<action>`；`authorization.role_permission` 只保存 Auth0 角色 ID 与权限的授权关系。
-- `/management/people` 展示本组织人员和角色权限。管理员可在站内修改人员姓名、部门；角色及成员关系仍在 Auth0 控制台维护。
+- `/management/people` 通过“人员”“角色”两个 header 标签页分别展示本组织人员资料和角色权限，默认人员，可用 `?tab=roles` 直接进入角色。管理员可在站内修改人员姓名、部门；角色及成员关系仍在 Auth0 控制台维护。
 - 融资项目负责人、任务执行人、周报生成人直接保存 Auth0 用户 ID；SOP 默认角色保存 Auth0 角色 ID。姓名和角色从请求内 Gateway 目录解析，不按邮箱或姓名自动绑定。
 - 原融资人员、权限、审计表及运行时审计流程已移除。审计后续独立规划。
 
@@ -25,7 +25,7 @@
 - `GET /auth/session` 返回一次性前端会话快照：原有 `user`、`enabled`，以及 `account`、最小角色 `roles`、有效权限 `permissions` 和到期秒数 `expiresAt`。匿名返回 null 身份、空角色/权限，不查询 Auth0；已登录快照通过统一授权入口解析，不另建角色权限系统。不返回 JWT、Cookie、密钥或内部 metadata。
 - `/profile` 和 `GET /api/profile` 使用 `account.profile:read`；`POST /api/profile` 使用 `account.profile:update`。
 - 个人信息仅操作已验证的 Auth0 ID。每次读写核对当前账号、邮箱和连接；本人可修改姓名及 `user_metadata.department`，不接受目标用户 ID、角色、权限或 app_metadata。
-- 管理员人员资料写入经 `/api/management/people` 和私有 Gateway IdentityService，需 admin，目标必须是本站 Auth0 组织成员和 `eastmoney-email` 连接；只接受 ID、姓名、部门。页面读取目录时包含部门。
+- 管理员人员资料写入经 `/api/management/people` 和私有 Gateway IdentityService，需 admin，目标必须是本站 Auth0 组织成员和 `eastmoney-email` 连接；只接受 ID、姓名、部门。人员标签只读取姓名、部门等资料，按批并行获取目录，不请求逐人成员角色；完整目录契约仍提供角色给融资等调用方。
 - 修改姓名、18.cn 邮箱及密码重置仍使用原有白名单和本人确认流程。修改邮箱后要求重新登录；密码只通过 Auth0 邮件重置。
 - 权限显示使用统一授权结果，内测显示当前全部有效权限，不再展示旧 Auth0 融资权限或硬编码通用权限。
 - `/management/financing-profile` 和 `/financing/settings` 跳转 `/profile`；旧 `/financing/avatar` 返回 410。融资不再维护独立姓名和头像。
@@ -33,7 +33,7 @@
 ## 页面与入口
 
 - 首页提供独立“管理”模块；管理总览采用角色权限、个人管理、资金日报三张入口卡片。管理使用全站工作台外壳和 shadcn-svelte Maia，不依赖融资模块的样式作用域。
-- 角色权限页为角色目录加权限编辑区，支持角色检索、权限检索、组内选择、计数和未保存状态。宽屏分栏，窄屏角色目录在权限编辑区之前；保存条在宽屏内容区内保持可见。原有权限、版本比对和草稿保留契约不变。
+- 角色标签页为角色目录加只读权限区，仅在打开时加载角色配置；人员标签页的名单只显示姓名，右侧编辑姓名和部门，两张面板在桌面等高，名单内部滚动。窄屏按目录、资料顺序单列排列。
 - 全站个人入口显示图标、姓名和部门，只读取根 layout 的会话 context。受保护首屏直接使用服务端快照；公共页由根 layout 后台初始化一次。菜单重建、标签切换、上传前检查均复用同一快照，不再独立请求 `/auth/session`。
 - 个人管理页可编辑姓名和部门，继续提供既有邮箱、密码及行情偏好操作。资料保存后更新当前浏览器的账号展示；完整重载仍按登录时签名的资料声明显示，重新登录后获取最新声明。
 

@@ -1261,7 +1261,35 @@
       "id": "management-people",
       "url": "/management/people",
       "kind": "screenshot",
-      "state": "desktop/person-and-role-selection",
+      "state": "desktop/person-selection-and-keyboard-focus",
+      "evidence": [
+        {
+          "spec": "tests/visual/management-desktop.spec.mjs",
+          "test": "desktop personnel cards align and selected name has one focus indicator",
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "management-people-desktop.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/management-mobile.spec.mjs",
+          "test": "mobile personnel list precedes the editor without horizontal overflow",
+          "projects": [
+            "mobile"
+          ],
+          "snapshots": [
+            "management-people-mobile.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "management-people-roles",
+      "url": "/management/people?tab=roles",
+      "kind": "screenshot",
+      "state": "desktop/role-selection",
       "evidence": [
         {
           "spec": "tests/visual/management-desktop.spec.mjs",
@@ -1271,6 +1299,16 @@
           ],
           "snapshots": [
             "management-role-desktop.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/management-mobile.spec.mjs",
+          "test": "mobile role tab shows role permissions separately",
+          "projects": [
+            "mobile"
+          ],
+          "snapshots": [
+            "management-role-mobile.png"
           ]
         }
       ]
