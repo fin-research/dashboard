@@ -34,14 +34,15 @@ jobs:
   build-visual:
     name: Build and visual regression
     if: github.event_name != 'pull_request'
-    # Preserve the OS, browser, production CSS and screenshot tolerance.
-    runs-on: macos-26
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: ghcr.io/hasbai/financial-visual-ci@sha256:c9bf5b87b7fe570b8325227127bda13718071021836560c14924a0c2387b7991
+      options: --ipc=host
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-ci
-        with:
-          browser: 'true'
+      - run: pnpm install --frozen-lockfile
+      - run: test "$(pnpm exec playwright --version)" = 'Version 1.63.0'
       - run: pnpm test:ci-tools
       - run: pnpm check:visual-coverage
       - name: Check types and diff
@@ -62,7 +63,7 @@ jobs:
             playwright-report/
             test-results/
             visual-dist/production-css.json
-            tests/visual/__screenshots__/macos-ci/
+            tests/visual/__screenshots__/linux-ci/
           retention-days: 14
   gate:
     name: Dashboard CI

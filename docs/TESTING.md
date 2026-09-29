@@ -14,7 +14,6 @@ pnpm test:python
 pnpm test:coverage
 pnpm exec vite build
 pnpm build:visual
-pnpm exec playwright install chromium
 pnpm test:visual
 pnpm test:visual:report
 ```
@@ -23,19 +22,21 @@ pnpm test:visual:report
 
 ## 自动视觉验收
 
-`tests/visual` 使用 Playwright 1.62.0 Chromium，固定上海时区、中文 locale、日期、动画偏好和业务响应。CI 先构建 SvelteKit 生产包，再用 `pnpm build:visual` 编译独立 harness。`prepare-visual-build.mjs` 按生产 route node 的 stylesheet 顺序复制原样压缩 CSS 和资源，删除 harness CSS，记录 SHA-256；浏览器等对应生产 CSS 加载后才挂载组件，通过 8877 的静态 preview 运行，不再使用开发服务器。不加载 SvelteKit hooks、服务端 load、Gateway、数据库、Auth0 或业务环境文件。页面链接通过这个测试入口装配相应组件，因此是浏览器组件集成测试，不是生产路由 E2E。
+`tests/visual` 使用 Playwright 1.63.0 Chromium，在固定 digest 的 Linux ARM64 自有镜像中运行，并固定上海时区、中文 locale、日期、动画偏好和业务响应。CI 先构建 SvelteKit 生产包，再用 `pnpm build:visual` 编译独立 harness。`prepare-visual-build.mjs` 按生产 route node 的 stylesheet 顺序复制原样压缩 CSS 和资源，删除 harness CSS，记录 SHA-256；浏览器等对应生产 CSS 加载后才挂载组件，通过 8877 的静态 preview 运行，不再使用开发服务器。不加载 SvelteKit hooks、服务端 load、Gateway、数据库、Auth0 或业务环境文件。页面链接通过这个测试入口装配相应组件，因此是浏览器组件集成测试，不是生产路由 E2E。
 
 当前场景：门户、交易总览与管理、交易流程及展开/编辑态、授信总览/日历/周报/失败态、研究辅助、二级池非空与空态、市场点评、融资时点/时段控件及重置，融资择时非空报告，以及 Maia 多选、弹窗、日历筛选与热点键盘交互。桌面 1440×900、手机 390×844 都运行。固定夹具覆盖实际图表与表格，不访问真实业务网络；未注册请求与浏览器异常会失败。
 
 工作台业务截图只取 `.tr-workspace`，使页头和侧栏修改不改变各业务页基线；独立新闻、研报和点评详情取 `.detail-main`。交易、授信、融资、管理四个一级工作台分别截取 `.tr-drawer`；只有含标签页或额外操作的代表顶栏截取 `.page-header`，另保留交易标签悬浮态。截图样式统一隐藏固定 AI 入口和浮动新增按钮，其行为仍由交互断言检查。门户、市场点评、AI 面板与打印态没有工作台取景容器，继续采用其专用截图。合并组仍执行完整视觉套件，不按改动路径跳过测试；分区取景用于减少无关基线变化。
 
-默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。页面改动后先运行 `pnpm visual:local`，按相对 `origin/main` 的页面文件差异生成桌面和手机截图。共享组件、样式或视觉夹具改动需显式指定 `--page src/routes/.../+page.svelte`（可重复）或 `--all`，脚本不猜测依赖范围。截图写到忽略的 `.local-visual/<时间>/review/`，使用生产 CSS 和固定夹具供本机审阅，不替代 macOS 26 runner 的 `macos-ci` 基线。有意视觉变化仍需在推送分支后、入队前手动触发候选 workflow；已有 PR 时也可主动触发：
+默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。页面改动后启动 Docker Desktop，运行 `pnpm visual:local`，按相对 `origin/main` 的页面文件差异在固定 Linux 镜像中生成桌面和手机截图。共享组件、样式或视觉夹具改动需显式指定 `--page src/routes/.../+page.svelte`（可重复）或 `--all`，脚本不猜测依赖范围。截图写到忽略的 `.local-visual/<时间>/review/`；审阅后执行 `pnpm visual:baseline:import-local .local-visual/<时间> --reviewed`，校验源码与 PNG 后只导入本次截图。`linux-ci` 基线在本地与合并组中共用。
+
+有意视觉变化在本地审阅、导入并提交，再推送入队。显式 `visual-baselines.yml` 仅作为本机容器不可用时的候选入口：
 
 ```bash
 gh workflow run visual-baselines.yml --ref <task-branch>
 ```
 
-候选 workflow 只运行一次完整生成（仍执行交互和覆盖清单断言），成功后输出待审工件；取消候选内部的第二次全量比较，严格比较由审阅、导入并提交后的合并组 CI 承担。下载 `visual-baseline-candidates` artifact 到工作树外，核对生成提交 SHA 和预期后，只提交有意变化的截图，在同一 PR 说明预期变化与审阅依据，再推送、加入合并队列并等待合并组 `Dashboard CI` 比较通过；代码发生变化后不得直接使用旧候选。候选任务成功不构成验收；同一分支重新生成会取消旧候选运行。日常比较由合并队列的 `merge_group` 自动完成，不需要每次人工或 AI 看图。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。保留历史 `darwin` 基线；日常只维护 macOS 26/ARM64、锁定 Chromium 的 `macos-ci` 基线，不要求本地生成。合并组和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。系统字体/渲染版本变化须在 CI 重新确认基线。CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
+远端候选 workflow 只运行一次完整生成（仍执行交互和覆盖清单断言），输出待审工件。若使用远端候选，下载 artifact 到工作树外，核对生成提交 SHA 和预期后导入。严格比较由合并组 CI 承担。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。保留历史 `darwin`、`macos-ci` 基线；日常只维护 Linux ARM64 镜像的 `linux-ci` 基线。合并组和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。镜像、字体或浏览器升级时统一重建本地基线并在 CI 比较；CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
 
 ## CI 等待与收尾（2026-09-20）
 
@@ -57,16 +58,15 @@ node scripts/wait-ci.mjs fin-research/dashboard <run-id> <full-run-head-sha> mer
 
 ## 视觉变更的提交前准备
 
-先判断是否改变页面视觉，列出影响的页面、状态和设备；更新 `visual-coverage.json` 的对应场景。无意视觉变化时不更新 baseline，差异须先定位根因。需要更新时，由交付子代理先推送功能分支，**先生成候选、后加入合并队列**，不要等待比较失败才补截图。普通分支 push、PR（含草稿）更新及 main push 不触发完整验收；合并队列必须执行完整视觉比较，PR 的轻量绿色门禁不算验收通过。
+先判断是否改变页面视觉，列出影响的页面、状态和设备；更新 `visual-coverage.json` 的对应场景。无意视觉变化时不更新 baseline，差异须先定位根因。需要更新时，在本地固定 Linux 镜像中生成、审阅并导入受影响页面截图，再提交和推送，最后加入合并队列。普通分支 push、PR（含草稿）更新及 main push 不触发完整验收；合并队列必须执行完整视觉比较，PR 的轻量绿色门禁不算验收通过。
 
 ```sh
-gh workflow run visual-baselines.yml --ref <task-branch>
-gh run download <candidate-run-id> -n visual-baseline-candidates -D <outside-checkout-directory>
-# 主代理核对候选与旧图及变化范围后执行；不会自动提交。
-pnpm visual:baseline:import <outside-checkout-directory> --reviewed
+pnpm visual:local --page src/routes/<page>/+page.svelte
+# 检查 .local-visual/<时间>/review/ 后执行；不会自动提交。
+pnpm visual:baseline:import-local .local-visual/<时间> --reviewed
 ```
 
-工件记录生成 SHA、run ID、各 CI PNG 的 SHA-256。导入要求工作树干净、HEAD 与生成 SHA 一致，并验证路径和校验和；代码变化后必须重新生成。候选严禁直接写 main，不自动提交，不替代随后合并组的普通比较。既有 PR 内有视觉变更时主动生成候选，最终只接受最终合并组提交的严格比较成功；不要为避免红灯关闭必需检查。
+本地候选记录镜像 digest、源码 digest、各 PNG 的 SHA-256。导入验证路径、源码及校验和；代码变化后必须重新生成。若本机容器无法运行，才从任务分支使用显式 `visual-baselines.yml` 候选流程，并按 `pnpm visual:baseline:import` 导入。两种方式均不自动提交，不替代随后合并组的严格比较；不要为避免红灯关闭必需检查。
 
 ## 并发与证据隔离
 

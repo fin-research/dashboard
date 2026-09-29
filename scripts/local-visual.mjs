@@ -19,7 +19,7 @@ function changedFiles() {
   return [...new Set(Buffer.concat([tracked, untracked]).toString().split('\0').filter(Boolean))];
 }
 
-const files = changedFiles();
+const files = !all && !selected.size ? changedFiles() : [];
 if (!all && !selected.size) {
   const pageSources = new Set(manifest.pages.map(page => page.source));
   const unknownUi = files.filter(file => (file.startsWith('src/') || file.startsWith('tests/visual/') || file === 'visual-coverage.json') && !pageSources.has(file));
@@ -78,4 +78,4 @@ for (const scenario of scenarios) for (const evidence of scenario.evidence ?? []
   }
 }
 console.log(`Captured ${count} changed-page screenshots for ${[...ids].join(', ')}: ${review}`);
-console.log('Local screenshots are review evidence; merge-queue CI still compares macos-ci baselines.');
+console.log('Local screenshots are review evidence; merge-queue CI compares linux-ci baselines.');
