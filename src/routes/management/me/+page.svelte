@@ -5,7 +5,8 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import '../../profile/profile.css';
-  import { invalidate } from '$app/navigation';
+  import { getContext } from 'svelte';
+  import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
   import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
   import { onMount } from 'svelte';
   import ModuleCard from '../../../components/ModuleCard.svelte';
@@ -16,10 +17,12 @@
   import type { PageData } from './$types';
 
   let { data }: { data: PageData } = $props();
+  const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
   let profile = $state<AccountProfile | null>(null);
   let loading = $state(true);
   let loadError = $state('');
   let name = $state('');
+  let department = $state('');
   let email = $state('');
   let confirmed = $state(false);
   let pending = $state<'name' | 'email' | 'password' | null>(null);
@@ -34,6 +37,7 @@
       if (!response.ok) throw new Error(payload.detail || '个人信息读取失败');
       profile = payload as AccountProfile;
       name = profile.name;
+      department = profile.department;
       email = profile.email;
     } catch (error) {
       if (!signal?.aborted && !isLoginRedirecting()) loadError = error instanceof Error ? error.message : '个人信息读取失败';
@@ -44,11 +48,16 @@
     if (pending || !profile) return;
     pending = action;
     try {
-      const body = action === 'name' ? { action, name } : action === 'email' ? { action, email, confirmed } : { action };
+      const body = action === 'name' ? { action, name, department } : action === 'email' ? { action, email, confirmed } : { action };
       const response = await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || '个人信息保存失败');
-      if (typeof result.name === 'string') { profile = { ...profile, name: result.name }; name = result.name; await invalidate('site:session'); }
+      if (typeof result.name === 'string' && typeof result.department === 'string') {
+        profile = { ...profile, name: result.name, department: result.department };
+        name = result.name; department = result.department;
+        const current = session.current();
+        if (current?.user) session.seed({ ...current, account: { name: result.name, department: result.department } });
+      }
       globalMessages.success(result.message, { key: 'profile-action', duration: 10000 });
       if (result.logout) { window.location.assign('/auth/logout'); return; }
     } catch (error) {
@@ -80,7 +89,7 @@
   <div class="profile-content">
     <div class="profile-summary">
       <span class="profile-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></svg></span>
-      <div><strong>{profile?.name || data.account?.name || '我的账号'} / {data.account?.department || '未填写部门'}</strong><span>{profile?.email || data.email}</span></div>
+      <div><strong>{profile?.name || data.account?.name || '我的账号'} / {profile ? profile.department || '未填写部门' : data.account?.department || '未填写部门'}</strong><span>{profile?.email || data.email}</span></div>
       <UiBadge variant="secondary" class="ui-badge ui-tone-success profile-tag">已登录</UiBadge>
     </div>
     {#if loading}
@@ -95,7 +104,7 @@
           <label for="profile-name">显示姓名</label>
           <Input data-ui-owner="routes-profile--page-svelte" class={"ui-input"} id="profile-name" name="name" autocomplete="name" bind:value={name} required maxlength={50} disabled={!profile || pending !== null} />
           <label for="profile-department">部门</label>
-          <Input data-ui-owner="routes-profile--page-svelte" class={"ui-input"} id="profile-department" value={data.account?.department || '未填写部门'} readonly />
+          <Input data-ui-owner="routes-profile--page-svelte" class={"ui-input"} id="profile-department" name="department" bind:value={department} maxlength={100} disabled={!profile || pending !== null} />
           <div class="profile-actions"><Button data-ui-owner="routes-profile--page-svelte" variant="default" class={"ui-button  profile-button primary"} permission="account.profile:update" type="submit" disabled={!profile || pending !== null}>{pending === 'name' ? '正在保存' : '保存个人资料'}</Button></div>
         </form>
       </ModuleCard>

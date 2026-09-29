@@ -1247,7 +1247,7 @@
       "id": "management-people",
       "url": "/management/people",
       "kind": "screenshot",
-      "state": "desktop/selection",
+      "state": "desktop/person-and-role-selection",
       "evidence": [
         {
           "spec": "tests/visual/management-desktop.spec.mjs",

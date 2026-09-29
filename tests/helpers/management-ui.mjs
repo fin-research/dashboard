@@ -10,8 +10,12 @@ const session=createClientSession({user:{id:'auth0|test',email:'test@18.cn'},acc
 const context=new Map([['site-session',session]]);
 globalThis.fetch = async () => Response.json({user:null,account:null});
 const Page = await loadComponent('src/routes/management/people/+page.svelte', (await readFile(new URL('../../src/routes/management/people/+page.svelte',import.meta.url),'utf8')).replace("import { invalidate } from '$app/navigation';", "const invalidate=async()=>{};"));
-const app = mount(Page,{context,target:document.body,props:{data:{roles:[{id:'rol_A',name:'测试管理员',description:''},{id:'rol_B',name:'测试成员',description:''}],configurations:{rol_A:{permissions:[PERMISSION_CODES[0]]},rol_B:{permissions:[]}},permissions:['auth.permission:update'],updatedAt:Date.now(),mode:'enforce'}}});
+const app = mount(Page,{context,target:document.body,props:{data:{roles:[{id:'rol_A',name:'测试管理员',description:''},{id:'rol_B',name:'测试成员',description:''}],configurations:{rol_A:{permissions:[PERMISSION_CODES[0]]},rol_B:{permissions:[]}},permissions:['auth.permission:update'],updatedAt:Date.now(),mode:'enforce',people:[{id:'auth0|test',name:'测试人员',department:'资金管理部',email:'test@18.cn',active:true,roles:[]},{id:'auth0|other',name:'同事',department:'研究部',email:'other@18.cn',active:true,roles:[]}]}}});
 flushSync();
+assert.equal(document.querySelector('#person-department').value,'资金管理部');
+flushSync(()=>document.querySelectorAll('.people-list button')[1].click());
+assert.equal(document.querySelector('#person-name').value,'同事');
+assert.equal(document.querySelector('#person-department').value,'研究部');
 assert.equal(document.querySelector('a[target="_blank"]').getAttribute('href'),'https://manage.auth0.com/dashboard/eu/hasbai/roles');
 assert.equal(document.querySelector('.permission-editor form'),null);
 assert.equal(document.querySelectorAll('.action-granted').length,1);
@@ -29,6 +33,22 @@ assert.ok(document.querySelector('.permission-editor').textContent.includes('无
 flushSync(()=>scopeButton('全部范围').click());
 assert.ok(document.querySelector('.scope-section[aria-label="市场研究"]'),'clearing the scope recovers matching search results');
 assert.equal(search.value,'市场','changing scope preserves the search');
+const personWrites=[];
+globalThis.fetch=async(url,init)=>{
+  if(url==='/api/management/people'){
+    personWrites.push(JSON.parse(init.body));
+    return Response.json({id:'auth0|other',name:'新同事',department:'投资部',email:'other@18.cn'});
+  }
+  return Response.json({user:null,account:null});
+};
+flushSync(()=>{
+  const input=document.querySelector('#person-name');input.value='新同事';input.dispatchEvent(new window.Event('input',{bubbles:true}));
+  const department=document.querySelector('#person-department');department.value='投资部';department.dispatchEvent(new window.Event('input',{bubbles:true}));
+  document.querySelector('.person-form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
+});
+for(let i=0;i<5;i++){await new Promise(resolve=>setTimeout(resolve,0));flushSync();}
+assert.deepEqual(personWrites,[{id:'auth0|other',name:'新同事',department:'投资部'}]);
+assert.match(document.querySelector('.people-list').textContent,/新同事/);
 await unmount(app);
 globalMessages.clear();
 
@@ -36,10 +56,12 @@ const profileSource=(await readFile(new URL('../../src/routes/management/me/+pag
   .replace("import { invalidate } from '$app/navigation';", "const invalidate=async()=>{};")
   .replace("import { isLoginRedirecting } from '$lib/auth-client';", "const isLoginRedirecting=()=>false;");
 const ProfilePage=await loadComponent('src/routes/management/me/+page.svelte',profileSource);
-globalThis.fetch=async()=>Response.json({name:'测试人员',email:'test@18.cn',emailVerified:true,roles:[],permissions:[]});
+globalThis.fetch=async()=>Response.json({name:'测试人员',department:'资金管理部',email:'test@18.cn',emailVerified:true,roles:[],permissions:[]});
 const profileApp=mount(ProfilePage,{context,target:document.body,props:{data:{email:'test@18.cn',account:{name:'测试人员',department:'资金管理部'}}}});
 for(let i=0;i<10;i++){await new Promise(resolve=>setTimeout(resolve,0));flushSync();}
 assert.equal(document.querySelector('input[name="name"]').value,'测试人员');
+assert.equal(document.querySelector('input[name="department"]').value,'资金管理部');
+assert.equal(document.querySelector('input[name="department"]').readOnly,false);
 assert.equal(document.querySelector('.profile-permissions'),null,'permissions moved to their own page');
 await unmount(profileApp);
 const PermissionPage=await loadComponent('src/routes/management/permissions/+page.svelte');
