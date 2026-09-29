@@ -2,7 +2,9 @@
   "name": "main requires queued Dashboard CI",
   "target": "branch",
   "enforcement": "active",
-  "bypass_actors": [],
+  "bypass_actors": [
+    { "actor_id": 34417826, "actor_type": "User", "bypass_mode": "always" }
+  ],
   "conditions": {
     "ref_name": {
       "include": [
