@@ -20,7 +20,7 @@
 .tr-shell--workspace .ui-tone-success {
   color: color-mix(in srgb, var(--color-success-content) 80%, var(--text-1));
 }
-.tr-shell--workspace :is(a, button, summary, main, [tabindex]):focus-visible {
+.tr-shell--workspace :is(a, button, summary, main, [tabindex]):not([data-slot="button"]):focus-visible {
   outline: 2px solid var(--brand-deep);
   outline-offset: 3px;
 }

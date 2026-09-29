@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import { installDom, loadComponent } from './svelte-dom.mjs';
 const window = installDom();
 const { mount, unmount, flushSync } = await import('svelte');
-const { notificationTab } = await import('../../src/lib/workbench/navigation.ts');
+const { notificationTab, managementPeopleTab, managementPeopleTabs } = await import('../../src/lib/workbench/navigation.ts');
 assert.equal(notificationTab('test'), 'test');
 assert.equal(notificationTab('invalid'), 'delivery');
 assert.equal(notificationTab(null), 'delivery');
+assert.equal(managementPeopleTab('roles'), 'roles');
+assert.equal(managementPeopleTab('invalid'), 'people');
+assert.equal(managementPeopleTab(null), 'people');
+assert.deepEqual(managementPeopleTabs.map(tab => tab.href), ['/management/people?tab=people', '/management/people?tab=roles']);
 const Host = await loadComponent('tests/helpers/HeaderHost.svelte', `<script>
   import PageHeader from '../../src/lib/workbench/PageHeader.svelte';
   let tabs = $state([]);

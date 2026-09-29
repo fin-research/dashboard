@@ -8,13 +8,31 @@ test.beforeEach(async({page},testInfo)=>{
   await page.setViewportSize({width:1280,height:900});
 });
 
-test('desktop role catalog identifies the selected role without changing permissions',async({page})=>{
+test('desktop personnel cards align and selected name has one focus indicator',async({page})=>{
   await page.goto('/management/people');
   await expect(page.getByRole('textbox',{name:'姓名',exact:true})).toHaveValue('测试用户');
   await expect(page.getByRole('textbox',{name:'部门',exact:true})).toHaveValue('资金管理部');
-  await page.getByRole('button',{name:/同事.*colleague@18.cn/}).click();
+  const list=page.getByRole('list',{name:'人员',exact:true});
+  await expect(list).not.toContainText('test@18.cn');
+  await expect(list).not.toContainText('colleague@18.cn');
+  await list.getByRole('button',{name:/同事.*colleague@18.cn/}).click();
   await expect(page.getByRole('textbox',{name:'部门',exact:true})).toHaveValue('研究部');
-  await page.getByRole('button',{name:/测试用户.*test@18.cn/}).click();
+  const selected=list.getByRole('button',{name:/测试用户.*test@18.cn/});
+  await selected.click();
+  const cards=await Promise.all([page.locator('.people-catalog').boundingBox(),page.locator('.person-editor').boundingBox()]);
+  expect(Math.abs(cards[0].height-cards[1].height)).toBeLessThanOrEqual(1);
+  await page.keyboard.press('Tab');
+  await selected.focus();
+  const focus=await selected.evaluate(el=>({visible:el.matches(':focus-visible'),outline:getComputedStyle(el).outlineStyle,shadow:getComputedStyle(el).boxShadow}));
+  expect(focus.visible).toBe(true);
+  expect(focus.outline).toBe('none');
+  expect(focus.shadow).not.toBe('none');
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('management-people-desktop.png');
+});
+
+test('desktop role catalog identifies the selected role without changing permissions',async({page})=>{
+  await page.goto('/management/people?tab=roles');
+  await expect(page.getByRole('list',{name:'人员',exact:true})).toHaveCount(0);
   const roles=page.getByRole('list',{name:'角色',exact:true});
   const research=roles.getByRole('button',{name:'研究业务组 13',exact:true});
   await page.getByRole('button',{name:'授信工作台',exact:true}).click();

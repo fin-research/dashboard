@@ -22,6 +22,13 @@ export const notificationTabs: readonly PageTab[] = [
   { id: 'delivery', label: '消息投递', href: '/management/messenger?tab=delivery' },
   { id: 'test', label: '测试消息', href: '/management/messenger?tab=test' },
 ];
+export const managementPeopleTabs: readonly PageTab[] = [
+  { id: 'people', label: '人员', href: '/management/people?tab=people' },
+  { id: 'roles', label: '角色', href: '/management/people?tab=roles' },
+];
+export function managementPeopleTab(value: string | null): 'people' | 'roles' {
+  return value === 'roles' ? 'roles' : 'people';
+}
 export function notificationTab(value: string | null): 'delivery' | 'test' {
   return value === 'test' ? 'test' : 'delivery';
 }
