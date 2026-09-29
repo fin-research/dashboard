@@ -5,9 +5,9 @@
     "root": "src/routes",
     "suffix": "+page.svelte"
   },
-  "baselineTemplate": "tests/visual/__screenshots__/macos-ci/{project}/{snapshot}",
+  "baselineTemplate": "tests/visual/__screenshots__/linux-ci/{project}/{snapshot}",
   "baselineDirectories": [
-    "tests/visual/__screenshots__/macos-ci"
+    "tests/visual/__screenshots__/linux-ci"
   ],
   "pages": [
     {
@@ -652,7 +652,19 @@
             "mobile"
           ],
           "snapshots": [
-            "tracking-commentary.png"
+            "tracking-commentary.png",
+            "tracking-commentary-editor.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/tracking-commentary.spec.mjs",
+          "test": "manual edits autosave and print isolates the A4 report",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "tracking-commentary-print.png"
           ]
         },
         {

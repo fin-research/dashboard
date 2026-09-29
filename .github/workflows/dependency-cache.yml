@@ -1,12 +1,5 @@
 name: Warm dependency caches
 on:
-  push:
-    branches: [main]
-    paths:
-      - pnpm-lock.yaml
-      - package.json
-      - .github/actions/setup-ci/action.yml
-      - .github/workflows/dependency-cache.yml
   workflow_dispatch:
 permissions:
   contents: read

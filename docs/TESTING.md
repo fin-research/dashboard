@@ -14,7 +14,6 @@ pnpm test:python
 pnpm test:coverage
 pnpm exec vite build
 pnpm build:visual
-pnpm exec playwright install chromium
 pnpm test:visual
 pnpm test:visual:report
 ```
@@ -23,23 +22,21 @@ pnpm test:visual:report
 
 ## 自动视觉验收
 
-`tests/visual` 使用 Playwright 1.62.0 Chromium，固定上海时区、中文 locale、日期、动画偏好和业务响应。CI 先构建 SvelteKit 生产包，再用 `pnpm build:visual` 编译独立 harness。`prepare-visual-build.mjs` 按生产 route node 的 stylesheet 顺序复制原样压缩 CSS 和资源，删除 harness CSS，记录 SHA-256；浏览器等对应生产 CSS 加载后才挂载组件，通过 8877 的静态 preview 运行，不再使用开发服务器。不加载 SvelteKit hooks、服务端 load、Gateway、数据库、Auth0 或业务环境文件。页面链接通过这个测试入口装配相应组件，因此是浏览器组件集成测试，不是生产路由 E2E。
+`tests/visual` 使用 Playwright 1.63.0 Chromium，在固定 digest 的 Linux ARM64 自有镜像中运行，并固定上海时区、中文 locale、日期、动画偏好和业务响应。CI 先构建 SvelteKit 生产包，再用 `pnpm build:visual` 编译独立 harness。`prepare-visual-build.mjs` 按生产 route node 的 stylesheet 顺序复制原样压缩 CSS 和资源，删除 harness CSS，记录 SHA-256；浏览器等对应生产 CSS 加载后才挂载组件，通过 8877 的静态 preview 运行，不再使用开发服务器。不加载 SvelteKit hooks、服务端 load、Gateway、数据库、Auth0 或业务环境文件。页面链接通过这个测试入口装配相应组件，因此是浏览器组件集成测试，不是生产路由 E2E。
 
 当前场景：门户、交易总览与管理、交易流程及展开/编辑态、授信总览/日历/周报/失败态、研究辅助、二级池非空与空态、市场点评、融资时点/时段控件及重置，融资择时非空报告，以及 Maia 多选、弹窗、日历筛选与热点键盘交互。桌面 1440×900、手机 390×844 都运行。固定夹具覆盖实际图表与表格，不访问真实业务网络；未注册请求与浏览器异常会失败。
 
 工作台业务截图只取 `.tr-workspace`，使页头和侧栏修改不改变各业务页基线；独立新闻、研报和点评详情取 `.detail-main`。交易、授信、融资、管理四个一级工作台分别截取 `.tr-drawer`；只有含标签页或额外操作的代表顶栏截取 `.page-header`，另保留交易标签悬浮态。截图样式统一隐藏固定 AI 入口和浮动新增按钮，其行为仍由交互断言检查。门户、市场点评、AI 面板与打印态没有工作台取景容器，继续采用其专用截图。合并组仍执行完整视觉套件，不按改动路径跳过测试；分区取景用于减少无关基线变化。
 
-默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。页面改动后先运行 `pnpm visual:local`，按相对 `origin/main` 的页面文件差异生成桌面和手机截图。共享组件、样式或视觉夹具改动需显式指定 `--page src/routes/.../+page.svelte`（可重复）或 `--all`，脚本不猜测依赖范围。截图写到忽略的 `.local-visual/<时间>/review/`，使用生产 CSS 和固定夹具供本机审阅，不替代 macOS 26 runner 的 `macos-ci` 基线。有意视觉变化仍需在推送分支后、入队前手动触发候选 workflow；已有 PR 时也可主动触发：
+默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。页面改动后启动 Docker Desktop，运行 `pnpm visual:local`，按相对 `origin/main` 的页面文件差异在固定 Linux 镜像中生成桌面和手机截图。共享组件、样式或视觉夹具改动需显式指定 `--page src/routes/.../+page.svelte`（可重复）或 `--all`，脚本不猜测依赖范围。截图写到忽略的 `.local-visual/<时间>/review/`；审阅后执行 `pnpm visual:baseline:import-local .local-visual/<时间> --reviewed`，校验源码与 PNG 后只导入本次截图。`linux-ci` 基线在本地与合并组中共用。
 
-```bash
-gh workflow run visual-baselines.yml --ref <task-branch>
-```
+有意视觉变化在本地审阅、导入并提交，再推送入队。默认分支合并组在相同镜像中严格比较全部已提交的 `linux-ci` PNG；远端候选截图工作流已移除。
 
-候选 workflow 只运行一次完整生成（仍执行交互和覆盖清单断言），成功后输出待审工件；取消候选内部的第二次全量比较，严格比较由审阅、导入并提交后的合并组 CI 承担。下载 `visual-baseline-candidates` artifact 到工作树外，核对生成提交 SHA 和预期后，只提交有意变化的截图，在同一 PR 说明预期变化与审阅依据，再推送、加入合并队列并等待合并组 `Dashboard CI` 比较通过；代码发生变化后不得直接使用旧候选。候选任务成功不构成验收；同一分支重新生成会取消旧候选运行。日常比较由合并队列的 `merge_group` 自动完成，不需要每次人工或 AI 看图。禁止为消除差异提高容差、屏蔽业务区域或盲目更新。保留历史 `darwin` 基线；日常只维护 macOS 26/ARM64、锁定 Chromium 的 `macos-ci` 基线，不要求本地生成。合并组和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。系统字体/渲染版本变化须在 CI 重新确认基线。CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
+禁止为消除差异提高容差、屏蔽业务区域或盲目更新。旧 macOS PNG 已清理；日常只维护 Linux ARM64 镜像的 `linux-ci` 基线。合并组和手动重跑 `tests.yml` 均永不更新截图，`Dashboard CI` 不接受跳过比较的输入。镜像、字体或浏览器升级时统一重建本地基线并在 CI 比较；CI 保存覆盖率、HTML 报告和失败 trace 等证据 14 天。
 
 ## CI 等待与收尾（2026-09-20）
 
-每个仓库、每次交付只由一个新子代理负责推送、候选/CI/合并和部署核验，主代理不并行查询同一运行。派发时给出任务工作树、允许提交的文件、目标 SHA、PR 与所需验收阶段；CI 失败后返回具体失败证据，由主代理修改，再派新子代理。候选待审时返回工件即可，不提前启动必然因旧基线失败的普通验收。
+每个仓库、每次交付只由一个新子代理负责推送、CI/合并和部署核验，主代理不并行查询同一运行。派发时给出任务工作树、允许提交的文件、目标 SHA、PR 与所需验收阶段；CI 失败后返回具体失败证据，由主代理修改，再派新子代理。本地截图待审时先完成审阅和导入，不提前启动必然因缺失基线失败的普通验收。
 
 发现当前运行 ID 后，用仓库内命令等待一次；SHA 使用 GitHub 该运行的完整 head SHA，event 必须符合所需阶段：
 
@@ -53,30 +50,29 @@ node scripts/wait-ci.mjs fin-research/dashboard <run-id> <full-run-head-sha> mer
 
 失败时只下载当前运行的失败job日志、对应截图/trace一次；区分代码缺陷、测试假设、预期视觉变化与runner/API故障。未修改代码/基线/环境且无临时基础设施故障证据时，不盲目重跑；同一问题修复后仍失败，应先重新判断根因。
 
-停止条件：所需普通验收成功、PR合并已确认，以及本任务涉及的部署结果/版本已核对后立即回报并结束；不再额外跑测试、下载已成功的整套artifact或扩展至无关页面。CI/文档工具变更不追加业务登录或浏览器专项验收。回报只需PR、代码/合并SHA、各必要run链接与结论、部署证据及实际未验收项；候选成功和轻量入队成功都不得报告成完整CI通过。
+停止条件：所需普通验收成功、PR合并已确认，以及本任务涉及的部署结果/版本已核对后立即回报并结束；不再额外跑测试、下载已成功的整套artifact或扩展至无关页面。CI/文档工具变更不追加业务登录或浏览器专项验收。回报只需PR、代码/合并SHA、各必要run链接与结论、部署证据及实际未验收项；本地截图和轻量入队成功都不得报告成完整CI通过。
 
 ## 视觉变更的提交前准备
 
-先判断是否改变页面视觉，列出影响的页面、状态和设备；更新 `visual-coverage.json` 的对应场景。无意视觉变化时不更新 baseline，差异须先定位根因。需要更新时，由交付子代理先推送功能分支，**先生成候选、后加入合并队列**，不要等待比较失败才补截图。普通分支 push、PR（含草稿）更新及 main push 不触发完整验收；合并队列必须执行完整视觉比较，PR 的轻量绿色门禁不算验收通过。
+先判断是否改变页面视觉，列出影响的页面、状态和设备；更新 `visual-coverage.json` 的对应场景。无意视觉变化时不更新 baseline，差异须先定位根因。需要更新时，在本地固定 Linux 镜像中生成、审阅并导入受影响页面截图，再提交和推送，最后加入合并队列。普通分支 push、PR（含草稿）更新及 main push 不触发完整验收；合并队列必须执行完整视觉比较，PR 的轻量绿色门禁不算验收通过。
 
 ```sh
-gh workflow run visual-baselines.yml --ref <task-branch>
-gh run download <candidate-run-id> -n visual-baseline-candidates -D <outside-checkout-directory>
-# 主代理核对候选与旧图及变化范围后执行；不会自动提交。
-pnpm visual:baseline:import <outside-checkout-directory> --reviewed
+pnpm visual:local --page src/routes/<page>/+page.svelte
+# 检查 .local-visual/<时间>/review/ 后执行；不会自动提交。
+pnpm visual:baseline:import-local .local-visual/<时间> --reviewed
 ```
 
-工件记录生成 SHA、run ID、各 CI PNG 的 SHA-256。导入要求工作树干净、HEAD 与生成 SHA 一致，并验证路径和校验和；代码变化后必须重新生成。候选严禁直接写 main，不自动提交，不替代随后合并组的普通比较。既有 PR 内有视觉变更时主动生成候选，最终只接受最终合并组提交的严格比较成功；不要为避免红灯关闭必需检查。
+本地候选记录镜像 digest、源码 digest、各 PNG 的 SHA-256。导入验证路径、源码及校验和；代码变化后必须重新生成。导入不自动提交，也不替代随后合并组的严格比较；不要为避免红灯关闭必需检查。
 
 ## 并发与证据隔离
 
-不同 Actions job 在独立托管 runner/checkout 运行，固定端口和工作树内输出目录不会跨任务共享；候选 artifact 由运行 ID、源码 SHA 和 PNG 校验和绑定。入队前只导入当前任务、当前源码的已审候选，不导入另一个任务的整个截图目录。合并队列串行产生最终合并结果；如果共享样式或布局组合后发生差异，应按差异修复或重新审阅候选，不通过放宽容差、重复重跑或关闭门禁消除失败。
+不同 Actions job 在独立托管 runner/checkout 运行，固定端口和工作树内输出目录不会跨任务共享；本地候选由镜像 digest、源码 digest 和 PNG 校验和绑定。入队前只导入当前任务、当前源码的已审候选，不导入另一个任务的整个截图目录。合并队列串行产生最终合并结果；如果共享样式或布局组合后发生差异，应按差异修复或重新审阅候选，不通过放宽容差、重复重跑或关闭门禁消除失败。
 
-候选与普通验收分开：生成一次、审阅导入、最终合并组严格比较一次；普通 CI 保持零自动重试。只有已复现抖动或明确排障需要时才安排额外稳定性复跑，并记录原因，不把多轮复跑作为日常流程。依赖/浏览器缓存共用配置但不包含图片、生产输出或测试结果。覆盖率工件为 `unit-evidence`，截图、HTML、trace 和生产 CSS 清单为 `visual-evidence`。
+本地截图与普通验收分开：生成一次、审阅导入、最终合并组严格比较一次；普通 CI 保持零自动重试。只有已复现抖动或明确排障需要时才安排额外稳定性复跑，并记录原因，不把多轮复跑作为日常流程。依赖/浏览器缓存共用配置但不包含图片、生产输出或测试结果。覆盖率工件为 `unit-evidence`，截图、HTML、trace 和生产 CSS 清单为 `visual-evidence`。
 
 ## 页面覆盖清单门禁
 
-`visual-coverage.json` 是页面、URL 场景、状态、设备、测试标题与活跃 CI 截图的可检查清单。`check:visual-coverage` 比对真实页面文件；新增页面、清单遗留项、缺少证据或 baseline 会失败。候选准备只允许暂缺 PNG，不能绕过清单与测试要求。Dashboard 另核对现有导航 registry 的动态视图；Financial 另核对 Shell 的 URL 分支，新 view/URL 不会因复用同一页面组件而漏掉。
+`visual-coverage.json` 是页面、URL 场景、状态、设备、测试标题与活跃 CI 截图的可检查清单。`check:visual-coverage` 比对真实页面文件；新增页面、清单遗留项、缺少证据或 baseline 会失败。本地初建基线时清单检查可暂缺 PNG，不能绕过清单与测试要求。Dashboard 另核对现有导航 registry 的动态视图；Financial 另核对 Shell 的 URL 分支，新 view/URL 不会因复用同一页面组件而漏掉。
 
 全量 CI 设置 `VISUAL_COVERAGE_GATE=1`，reporter 再核对声明的测试确实在指定设备执行并通过；截图条目必须逐一实际执行清单所列文件名的 `toHaveScreenshot`，单纯 `page.screenshot`、跳过或删去测试不计作覆盖。`test-results/visual-coverage.json` 保留清单、豁免及结果。该清单不是代码覆盖率，单个正常态不代表所有状态；已有缺口必须写明豁免原因，不计入已覆盖，修改相应页面时重新评估。常规有覆盖页面不需要新增重复测试。局部排障可不启用全量门禁，不替代 CI。
 

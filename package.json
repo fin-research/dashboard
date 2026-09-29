@@ -38,7 +38,8 @@
     "auth0:apply": "node --use-env-proxy scripts/auth0-deploy.mjs apply",
     "test:coverage": "mkdir -p coverage && node --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-include='src/**/*.js' --test-coverage-exclude='src/**/generated/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.mjs tests/financing/*.test.mjs",
     "test:visual": "playwright test",
-    "visual:local": "node scripts/local-visual.mjs",
+    "visual:local": "node scripts/visual-linux.mjs",
+    "visual:baseline:import-local": "node scripts/import-local-visual.mjs",
     "direct:push": "node scripts/direct-push.mjs",
     "test:visual:update": "playwright test --update-snapshots=all",
     "test:visual:report": "playwright show-report",
@@ -81,7 +82,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260823.1",
     "@electric-sql/pglite": "^0.3.12",
-    "@playwright/test": "1.62.0",
+    "@playwright/test": "1.63.0",
     "@sveltejs/vite-plugin-svelte": "6.2.4",
     "@tailwindcss/vite": "4.3.3",
     "@types/better-sqlite3": "^7.6.13",
