@@ -64,25 +64,26 @@ test('issuer spread requires every active bond valuation and matched tenor', () 
 test('business metrics use as-of local-workbook LCR and complete daily issuer spread', async () => {
   const db = new PGlite();
   try {
-    await db.exec(`CREATE TABLE public.quant_input(dataset text,entity_key text,field text,observation_date date,numeric_value double precision,source text);
+    await db.exec(`CREATE TABLE public.quant_input(field text,observation_date date,numeric_value double precision);
       CREATE TABLE public.bond_issuance(bond_code text,issuer_name text,issuer_rating text,bond_type text,interest_rate_type text,has_option boolean,original_tenor_years double precision,issue_date date);
-      CREATE TABLE public.bond_history(bond_code text,valuation_date date,chinabond_yield_pct double precision,outstanding_balance_cny double precision,remaining_term_years double precision);
-      CREATE TABLE public.bond_industry_curve(curve_code text,observation_date date,tenor_years double precision,yield_pct double precision);`);
+      CREATE TABLE public.bond_history(bond_code integer,valuation_date date,chinabond_yield_pct double precision,outstanding_balance_cny double precision,remaining_term_years double precision);
+      CREATE TABLE public.bond_industry_curve(curve_code text,observation_date date,tenor_years double precision,yield_pct double precision);
+      CREATE FUNCTION public.exchange_bond_code(code text) RETURNS integer LANGUAGE sql IMMUTABLE AS $$
+        SELECT CASE WHEN code='123456.SH' THEN 10123456 WHEN code='654321.SH' THEN 10654321 END
+      $$;`);
     for (let day = 1; day <= 21; day += 1) {
       const date = `2026-08-${String(day).padStart(2, '0')}`;
       await db.query(`INSERT INTO public.quant_input VALUES
-        ('company','','lcr',$1::date,$2,'local-workbook'),
-        ('company','','nsfr',$1::date,$3,'local-workbook'),
-        ('company_report','','static_gap_1m',$1::date,$4,'r2-fund-report')`, [date, 1 + day / 10, 1 + day / 100, day-30]);
+        ('lcr',$1::date,$2),('nsfr',$1::date,$3),('static_gap_1m',$1::date,$4)`, [date, 1 + day / 10, 1 + day / 100, day-30]);
       await db.query(`INSERT INTO public.bond_history VALUES
-        ('A',$1::date,$2,1000000000,3),('B',$1::date,$2,1000000000,3)`, [date, 1.7 + day/100]);
+        (10123456,$1::date,$2,1000000000,3),(10654321,$1::date,$2,1000000000,3)`, [date, 1.7 + day/100]);
       await db.query(`INSERT INTO public.bond_industry_curve VALUES
         ('5781a1ff7651967e0176978d957b7346',$1::date,1,1.5),
         ('5781a1ff7651967e0176978d957b7346',$1::date,3,1.7)`, [date]);
     }
     await db.query(`INSERT INTO public.bond_issuance VALUES
-      ('A','测试证券股份有限公司','AAA','证券公司债','固息',false,3,'2025-01-01'),
-      ('B','测试证券股份有限公司','AAA','证券公司债','固息',false,12,'2025-01-01');`);
+      ('123456.SH','测试证券股份有限公司','AAA','证券公司债','固息',false,3,'2025-01-01'),
+      ('654321.SH','测试证券股份有限公司','AAA','证券公司债','固息',false,12,'2025-01-01');`);
     const result = await loadIssuanceBusinessMetrics(db, '测试证券股份有限公司', '2026-08-21');
     assert.equal(result.lcr.date, '2026-08-21');
     assert.equal(result.lcr.value_ratio, 3.1);
