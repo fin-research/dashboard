@@ -1071,6 +1071,20 @@
       ]
     },
     {
+      "id": "market-heatmap-sectors",
+      "url": "/market-briefing",
+      "kind": "screenshot",
+      "state": "桌面1920下31个行业的大板块左上排列与至少27个可见名称",
+      "evidence": [
+        {
+          "spec": "tests/visual/desktop-ui.spec.mjs",
+          "test": "desktop industry heatmap keeps names visible across market-cap sizes",
+          "projects": ["desktop"],
+          "snapshots": ["market-heatmap-sectors-desktop.png"]
+        }
+      ]
+    },
+    {
       "id": "clients-toolbar",
       "url": "/financing/clients",
       "kind": "screenshot",

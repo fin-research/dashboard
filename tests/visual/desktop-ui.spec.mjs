@@ -76,6 +76,43 @@ test('desktop market report retains full names and table cells at 1280 pixels', 
   await expect(page.locator('#visual-report-panel')).toHaveScreenshot('market-report-readable.png');
 });
 
+test('desktop industry heatmap keeps names visible across market-cap sizes', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Desktop heatmap audit');
+  await mockResources(page);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const sectors = [
+    ['电子', 16, -4.93], ['银行', 14, -0.16], ['通信', 9, -7.36],
+    ['电力设备', 8, -2.44], ['机械设备', 7, -3.68], ['医药生物', 6, -0.39],
+    ['非银金融', 5.5, -1.76], ['食品饮料', 5, -0.17], ['石油石化', 4.5, 0.89],
+    ['有色金属', 4, -3.77], ['交通运输', 3.8, -0.38], ['国防军工', 3.5, -2.35],
+    ['基础化工', 3.3, -1.12], ['公用事业', 3.1, -0.57], ['汽车', 2.9, -1.03],
+    ['计算机', 2.7, -2.91], ['家用电器', 2.5, -0.64], ['农林牧渔', 2.3, 0.25],
+    ['房地产', 2.1, 0.46], ['煤炭', 1.9, 0.12], ['建筑装饰', 1.7, -0.82],
+    ['建筑材料', 1.5, -1.26], ['钢铁', 1.3, 0.37], ['轻工制造', 1.2, -0.51],
+    ['纺织服饰', 1.1, -0.73], ['社会服务', 1, 0.15], ['传媒', 0.9, -1.43],
+    ['商贸零售', 0.8, 0.29], ['美容护理', 0.7, -0.35], ['环保', 0.6, -0.74],
+    ['综合', 0.5, 0.08],
+  ].map(([name, cap, change_pct]) => ({ name, change_pct, market_cap_yuan: cap * 1e12 }));
+  await page.route('**/api/market-report*', route => route.fulfill({ json: {
+    ...marketSnapshot, industries: sectors,
+  } }));
+  await page.goto('/market-briefing');
+  const heatmap = page.locator('.equity-heatmap-stage');
+  const labels = heatmap.locator('svg text');
+  await expect(labels.filter({ hasText: /^电子$/ })).toHaveCount(1);
+  const renderedLabels = await labels.allTextContents();
+  const visibleSectors = sectors.filter(({ name }) =>
+    renderedLabels.includes(name));
+  expect(visibleSectors.length).toBeGreaterThanOrEqual(27);
+  const bounds = await heatmap.boundingBox();
+  const electronic = await labels.filter({ hasText: /^电子$/ }).boundingBox();
+  const bank = await labels.filter({ hasText: /^银行$/ }).boundingBox();
+  expect(electronic.x).toBeLessThan(bank.x);
+  expect(electronic.y).toBeLessThan(bounds.y + bounds.height / 3);
+  expect(bank.y).toBeLessThan(bounds.y + bounds.height / 3);
+  await expect(heatmap).toHaveScreenshot('market-heatmap-sectors-desktop.png');
+});
+
 
 test('desktop financing data has balanced metrics and a compact financial editor', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop UI audit');
