@@ -1,24 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { installDom, loadComponent } from './helpers/svelte-dom.mjs';
-import { createClientSession } from '../src/lib/client-session.ts';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
-test('portal renders only public cards until authorization is known, then only allowed cards', async () => {
-  const window = installDom();
-  const { mount, unmount, flushSync } = await import('svelte');
-  const session = createClientSession();
-  const Page = await loadComponent('src/routes/+page.svelte');
-  const app = mount(Page, { target: document.body, context: new Map([
-    ['site-session', session], ['site-account', () => null], ['site-account-checking', () => true],
-  ]) });
-  flushSync();
-  const cards = () => [...document.querySelectorAll('.tool-card')].map(card => card.querySelector('h2').textContent);
-  assert.deepEqual(cards(), ['市场点评']);
-  flushSync(() => session.seed({ user: null, account: null, roles: [], permissions: [], expiresAt: null }));
-  assert.deepEqual(cards(), ['市场点评']);
-  flushSync(() => session.seed({ user: { id: 'auth0|test', auth0Id: 'auth0|test', email: 'test@18.cn' },
-    account: { name: '测试', department: '' }, roles: [], permissions: ['credit.institution:read'], expiresAt: Date.now() / 1000 + 3600 }));
-  assert.deepEqual(cards(), ['市场点评', '授信工作台', '管理']);
-  await unmount(app);
-  await window.happyDOM.abort();
+test('portal renders only authorized cards from its first render', async () => {
+  const { stdout } = await promisify(execFile)(process.execPath,
+    ['--conditions=browser', 'tests/helpers/portal-visibility.mjs'],
+    { cwd: new URL('../', import.meta.url), timeout: 60_000 });
+  assert.match(stdout, /Portal visibility checks passed/);
 });
