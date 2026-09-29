@@ -45,8 +45,8 @@ jobs:
       - run: test "$(pnpm exec playwright --version)" = 'Version 1.63.0'
       - run: pnpm test:ci-tools
       - run: pnpm check:visual-coverage
-      - name: Check types and diff
-        run: pnpm check:quick
+      - name: Check application and Worker types
+        run: pnpm typecheck && pnpm worker:typecheck
       - name: Build production bundle
         run: pnpm exec vite build
       - name: Prepare browser bundle with shipping CSS
