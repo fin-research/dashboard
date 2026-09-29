@@ -28,8 +28,9 @@ if (!all && !selected.size) {
 }
 
 const ids = new Set();
+if (all) for (const scenario of manifest.scenarios) ids.add(scenario.id);
 for (const page of manifest.pages) {
-  if (all || selected.has(page.source)) for (const id of page.scenarios ?? []) ids.add(id);
+  if (selected.has(page.source)) for (const id of page.scenarios ?? []) ids.add(id);
 }
 for (const value of selected) {
   if (manifest.scenarios.some(scenario => scenario.id === value)) ids.add(value);
@@ -56,14 +57,16 @@ run('pnpm', ['build:visual']);
 const tasks = new Map();
 for (const scenario of scenarios) for (const evidence of scenario.evidence ?? []) {
   for (const project of evidence.projects ?? []) {
-    const key = JSON.stringify([evidence.spec, evidence.test, project]);
-    tasks.set(key, { ...evidence, project });
+    const key = JSON.stringify([evidence.spec, project]);
+    if (!tasks.has(key)) tasks.set(key, { spec: evidence.spec, project, tests: new Set() });
+    tasks.get(key).tests.add(evidence.test);
   }
 }
-for (const { spec, test, project } of tasks.values()) {
-  run('pnpm', ['exec', 'playwright', 'test', spec, '--project', project, '--grep', test.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), '--update-snapshots=all'], {
-    ...process.env, LOCAL_VISUAL_CAPTURE_DIR: capture,
-  });
+const captureEnv = { ...process.env, LOCAL_VISUAL_CAPTURE_DIR: capture };
+if (all) run('pnpm', ['exec', 'playwright', 'test', '--update-snapshots=all'], { ...captureEnv, VISUAL_COVERAGE_GATE: '1' });
+else for (const { spec, project, tests } of tasks.values()) {
+  const grep = [...tests].map(test => test.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  run('pnpm', ['exec', 'playwright', 'test', spec, '--project', project, '--grep', grep, '--update-snapshots=all'], captureEnv);
 }
 
 let count = 0;

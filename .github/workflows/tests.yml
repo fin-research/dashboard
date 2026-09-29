@@ -36,7 +36,7 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04-arm
     container:
-      image: ghcr.io/hasbai/financial-visual-ci@sha256:c9bf5b87b7fe570b8325227127bda13718071021836560c14924a0c2387b7991
+      image: ghcr.io/hasbai/financial-visual-ci@sha256:7c8b030fa654dfd7acb74db9fbca0fe413ca81024536f6d361712d0920fd6444
       options: --ipc=host
     timeout-minutes: 15
     steps:

@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const image = 'ghcr.io/hasbai/financial-visual-ci@sha256:c9bf5b87b7fe570b8325227127bda13718071021836560c14924a0c2387b7991';
+const image = 'ghcr.io/hasbai/financial-visual-ci@sha256:7c8b030fa654dfd7acb74db9fbca0fe413ca81024536f6d361712d0920fd6444';
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const manifest = JSON.parse(readFileSync(join(root, 'visual-coverage.json'), 'utf8'));
 const git = (...args) => execFileSync('git', args, { cwd: root });
@@ -41,6 +41,11 @@ if (!all && !selected.size) {
 }
 
 const files = tracked();
+const pnpmStore = execFileSync('pnpm', ['store', 'path'], { cwd: root, encoding: 'utf8' }).trim();
+const proxy = process.env.HTTPS_PROXY ? new URL(process.env.HTTPS_PROXY) : null;
+const proxyArgs = proxy && ['localhost', '127.0.0.1'].includes(proxy.hostname) && !proxy.username && !proxy.password
+  ? (proxy.hostname = 'host.docker.internal', ['-e', 'HTTP_PROXY=' + proxy, '-e', 'HTTPS_PROXY=' + proxy,
+    '-e', 'NO_PROXY=localhost,127.0.0.1,::1']) : [];
 const stage = join(root, '.local-visual', 'linux-workspace');
 mkdirSync(stage, { recursive: true });
 const indexFile = join(stage, '.source-files.json');
@@ -53,10 +58,13 @@ for (const path of files) {
 writeFileSync(indexFile, JSON.stringify(files));
 const before = new Set(existsSync(join(stage, '.local-visual')) ? readdirSync(join(stage, '.local-visual')) : []);
 const innerArgs = all ? ['--all'] : [...selected].flatMap(page => ['--page', page]);
-const command = 'pnpm install --frozen-lockfile && node scripts/local-visual.mjs "$@"';
+const command = 'pnpm install --frozen-lockfile --store-dir=/pnpm-store --prefer-offline && node scripts/local-visual.mjs "$@"';
 const result = spawnSync('docker', [
   'run', '--rm', '--init', '--ipc=host', '--platform', 'linux/arm64',
+  '-e', 'CI=true', '-e', 'GITHUB_ACTIONS=true',
+  ...proxyArgs,
   '--mount', 'type=bind,source=' + stage + ',target=/work',
+  '--mount', 'type=bind,source=' + dirname(pnpmStore) + ',target=/pnpm-store',
   '--workdir', '/work', image, 'sh', '-lc', command, 'visual-linux', ...innerArgs,
 ], { cwd: root, stdio: 'inherit' });
 if (result.status !== 0) throw new Error('Pinned Linux visual run failed: ' + (result.status ?? result.error));

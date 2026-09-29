@@ -650,7 +650,19 @@
             "mobile"
           ],
           "snapshots": [
-            "tracking-commentary.png"
+            "tracking-commentary.png",
+            "tracking-commentary-editor.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/tracking-commentary.spec.mjs",
+          "test": "manual edits autosave and print isolates the A4 report",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "tracking-commentary-print.png"
           ]
         },
         {

@@ -20,7 +20,7 @@ pnpm dev
 
 本地默认不重复全量覆盖率；页面视觉改动先用 `pnpm visual:local` 审阅受影响页，生产构建是该命令的准备步骤；其它排障检查按需运行。`pnpm build` 仍包含两类类型检查，已经对同一份改动成功构建时无需另跑类型检查。`check:quick` 不连接业务数据库、不调用线上服务；SvelteKit 类型同步会写入本地生成目录 `.svelte-kit`。本地检查通过后才进入以下流程，不能用本地结果替代 CI。
 
-1. 主代理修改代码并划定本任务文件。前端、共享 UI、API 契约和影响页面输出的改动，每次派新的子代理负责提交、推送任务分支和创建/更新 PR；有意视觉变化先在固定 Linux 镜像中本地审阅、导入基线并提交，随后入队。确认与前端输出无关的独立改动可在本地相关检查后通过 `pnpm direct:push --validated --backend-reviewed` 快进推送 main；纯文档可省略参数。脚本拒绝前端、CI 和混合路径，后端代码须显式确认业务影响。维护者的线上 bypass 权限不限文件路径，因此不能绕过脚本直接推送前端。
+1. 主代理修改代码并划定本任务文件。前端、共享 UI、API 契约和影响页面输出的改动，每次派新的子代理负责提交、推送任务分支和创建/更新 PR；有意视觉变化先在固定 Linux 镜像中本地审阅、导入基线并提交，随后入队。确认与前端输出无关的独立改动可在本地相关检查后通过 `pnpm direct:push --validated --backend-reviewed --reviewed-path=<文件>` 快进推送 main；每个非文档文件各列一次，纯文档可省略参数。脚本拒绝前端、CI 和混合路径，后端代码须显式确认业务影响。维护者的线上 bypass 权限不限文件路径，因此不能绕过脚本直接推送前端。
 2. 普通分支 push 不运行 CI；PR 创建/更新仅执行轻量入队门禁，核对线上已强制启用 merge queue 和 GitHub Actions 来源的 `Dashboard CI`。PR 上的绿色门禁只表示可以入队，不能报告为测试通过。草稿 PR 也不跑全量验收。
 3. 准备合并时使用 `gh pr merge <number> --auto` 加入 GitHub 合并队列（禁止 `--admin`）；完整 `.github/workflows/tests.yml` 只在 `merge_group` 上自动执行，手动 `workflow_dispatch` 留作排障。队列用最新 main 加上待合并改动生成独立提交；无需为其它 PR 先合并反复更新任务分支。真实 Git/视觉冲突仍须修复，禁止直接覆盖其它任务截图。
 4. 全量检查分为并行的两项：Python 与 Node 完整覆盖率；CI 工具/视觉覆盖门禁、类型检查、生产构建、复用生产 CSS 的浏览器构建及严格截图/交互比较。最后统一 `Dashboard CI` 要求两项均成功，失败、取消、跳过和缺失结果都拒绝合并。保留完整测试范围与截图容差，不按文件路径跳过。
@@ -29,7 +29,7 @@ pnpm dev
 
 单元任务继续使用 `.github/actions/setup-ci` 的 pnpm 下载缓存；视觉任务使用固定 digest 的 Linux ARM64 镜像，其中包含 Playwright 1.63.0 浏览器、pnpm 与字体，依赖仍以 frozen lockfile 安装。PR/合并组缓存受 GitHub ref 作用域限制，不能作为其它任务的公共缓存；因此 `dependency-cache.yml` 仅在 main 的依赖/缓存配置变化时预热可共享的默认分支缓存，不执行测试或构建。Python uv 缓存依赖键使用实际声明 PEP 723 依赖的 `tests/test_credit_materials.py`。不缓存构建产物、截图基线、实际截图或测试通过结论。
 
-截图基线、覆盖范围与候选生成规则见 [TESTING](TESTING.md)。`Visual baseline candidates` 只生成待审候选，不能替代 `Dashboard CI`。
+截图基线、覆盖范围与候选生成规则见 [TESTING](TESTING.md)。本地 Linux 截图由作者审阅并导入，合并组的 `Dashboard CI` 严格比较。
 
 ## 专项验证
 

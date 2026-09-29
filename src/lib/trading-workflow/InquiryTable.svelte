@@ -111,7 +111,8 @@
   }
   function pointerMove(event: PointerEvent) {
     if (!drag || Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 4) return;
-    const input = (event.target as Element)?.closest<HTMLElement>('[data-row][data-field]') ?? document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-row][data-field]');
+    const input = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-row][data-field]')
+      ?? (event.target as Element)?.closest<HTMLElement>('[data-row][data-field]');
     if (!input || !root.contains(input)) return;
     const end = { id: input.dataset.row!, field: input.dataset.field as InquiryField };
     selection = { start: drag.cell, end }; dismissed = true;
@@ -171,6 +172,7 @@
             aria-invalid={!!message} aria-describedby={message ? `error-${row.id}-${field}` : undefined} autocomplete="off" readonly={multiple}
             value={active?.id === row.id && active.field === field ? row[field] : displayField(row, field, loan, rates, date, now)}
             onpointerdown={event => pointerDown(event, { id: row.id, field })}
+            ondragstart={event => event.preventDefault()}
             onfocus={event => { active = { id: row.id, field }; selected = 0; dismissed = false; event.currentTarget.value = row[field]; event.currentTarget.select(); }}
             onblur={() => leave(row, field)} oninput={event => update(row, field, event.currentTarget.value)}
             oncompositionstart={() => composing = true} oncompositionend={() => composing = false}

@@ -153,11 +153,10 @@ test('AI 对话侧栏挤压桌面页面并提供会话与工具设置', async ({
   const panel = page.getByRole('complementary', { name: 'AI 助手' });
   await expect(panel.getByRole('heading', { name: '你好。' })).toBeVisible();
   if (!isMobile) {
+    await expect.poll(async () => (await content.boundingBox()).width).toBeLessThan(before.width - 300);
     const after = await content.boundingBox();
-    expect(after.width).toBeLessThan(before.width - 300);
     await panel.getByRole('button', { name: '展开宽面板' }).click();
-    const wide = await content.boundingBox();
-    expect(wide.width).toBeLessThan(after.width - 200);
+    await expect.poll(async () => (await content.boundingBox()).width).toBeLessThan(after.width - 200);
     await panel.getByRole('button', { name: '收起宽面板' }).click();
   }
   await expect(panel).toHaveScreenshot('ai-agent-welcome.png');

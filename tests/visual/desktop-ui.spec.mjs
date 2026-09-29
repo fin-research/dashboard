@@ -11,9 +11,11 @@ test('desktop client search stays on one row and edit dialog restores focus', as
   const create=page.getByRole('button',{name:'新增客户',exact:true});
   for(const width of [1440,1280]){
     await page.setViewportSize({width,height:900});
-    const a=await input.boundingBox(),b=await search.boundingBox(),c=await create.boundingBox();
-    expect(Math.abs(a.y-b.y)).toBeLessThanOrEqual(1);
-    expect(Math.abs(a.y-c.y)).toBeLessThanOrEqual(1);
+    await expect.poll(async()=>{
+      const a=await input.boundingBox(),b=await search.boundingBox(),c=await create.boundingBox();
+      return Math.max(Math.abs(a.y-b.y),Math.abs(a.y-c.y));
+    }).toBeLessThanOrEqual(1);
+    const a=await input.boundingBox();
     expect(a.width).toBeGreaterThan(200);
   }
   await expect(page.locator('.tr-workspace')).toHaveScreenshot('clients-toolbar.png');
@@ -126,9 +128,9 @@ test('desktop financing data has balanced metrics and a compact financial editor
   expect(b.y-a.y-a.height).toBeGreaterThanOrEqual(20);
   for(const width of [1440,1280]){
     await page.setViewportSize({width,height:900});
-    const cards=await financial.getByRole('article').all();
-    const first=await cards[0].boundingBox(),fourth=await cards[3].boundingBox(),last=await cards[7].boundingBox();
-    expect(Math.abs(first.y-fourth.y)).toBeLessThanOrEqual(1);
+    const cards=financial.getByRole('article');
+    await expect.poll(async()=>Math.abs((await cards.nth(0).boundingBox()).y-(await cards.nth(3).boundingBox()).y)).toBeLessThanOrEqual(1);
+    const first=await cards.nth(0).boundingBox(),last=await cards.nth(7).boundingBox();
     expect(last.y).toBeGreaterThan(first.y);
     expect(await page.locator('.parameter-card').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth+1))).toBe(true);
   }
