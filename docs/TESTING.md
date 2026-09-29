@@ -29,7 +29,7 @@ pnpm test:visual:report
 
 工作台业务截图只取 `.tr-workspace`，使页头和侧栏修改不改变各业务页基线；独立新闻、研报和点评详情取 `.detail-main`。交易、授信、融资、管理四个一级工作台分别截取 `.tr-drawer`；只有含标签页或额外操作的代表顶栏截取 `.page-header`，另保留交易标签悬浮态。截图样式统一隐藏固定 AI 入口和浮动新增按钮，其行为仍由交互断言检查。门户、市场点评、AI 面板与打印态没有工作台取景容器，继续采用其专用截图。合并组仍执行完整视觉套件，不按改动路径跳过测试；分区取景用于减少无关基线变化。
 
-默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。新增或有意改变页面时，先在本地通过快速检查并推送任务分支，在加入合并队列前手动触发独立候选 workflow；已有 PR 时也可主动触发，不必先等普通 CI 失败：
+默认 CI 只比较已提交截图，缺少基线也失败；不自动接受新图、不重试失败。失败时生成 actual/expected/diff、HTML 报告和 trace。页面改动后先运行 `pnpm visual:local`，按相对 `origin/main` 的页面文件差异生成桌面和手机截图。共享组件、样式或视觉夹具改动需显式指定 `--page src/routes/.../+page.svelte`（可重复）或 `--all`，脚本不猜测依赖范围。截图写到忽略的 `.local-visual/<时间>/review/`，使用生产 CSS 和固定夹具供本机审阅，不替代 macOS 26 runner 的 `macos-ci` 基线。有意视觉变化仍需在推送分支后、入队前手动触发候选 workflow；已有 PR 时也可主动触发：
 
 ```bash
 gh workflow run visual-baselines.yml --ref <task-branch>

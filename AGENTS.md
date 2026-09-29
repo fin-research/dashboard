@@ -28,8 +28,8 @@
 - 不手动编辑生成文件 `worker-configuration.d.ts`；绑定变化使用 `pnpm worker:typegen`。
 - `pnpm dev` 不自动同步远程 D1。只有任务明确需要本地证据时才运行 `pnpm db:sync:remote`。
 - 保留用户已有改动，不做无关重构，不通过删除测试或关闭检查掩盖错误。
-- 推送前代码变更运行 `pnpm check:quick` 和直接相关的轻量单元测试；纯文档修改只运行 `git diff --check`。完整验收由合并队列的 `Dashboard CI` 执行，本地检查不替代 CI。阶段、截图候选与部署边界见 [DEVELOPMENT](docs/DEVELOPMENT.md) 和 [TESTING](docs/TESTING.md)。
-- 代码交付由新的子代理提交任务分支、推送、创建/更新 PR、加入合并队列并核对 CI；失败证据交回主代理修复。禁止直推 `main` 或绕过必需检查；完整流程见 [DEVELOPMENT](docs/DEVELOPMENT.md)。
+- 推送前代码变更运行 `pnpm check:quick` 和直接相关的轻量单元测试；纯文档修改只运行 `git diff --check`。页面视觉改动在本地以 `pnpm visual:local` 审阅受影响页，完整验收由合并队列的 `Dashboard CI` 执行。阶段、截图候选与部署边界见 [DEVELOPMENT](docs/DEVELOPMENT.md) 和 [TESTING](docs/TESTING.md)。
+- 前端、共享 UI、API 契约和影响页面输出的改动由新的子代理提交任务分支、推送、创建/更新 PR、加入合并队列并核对 CI；失败证据交回主代理修复。只有确认与前端输出无关且已完成相关本地检查的独立改动，允许维护者使用 `pnpm direct:push --validated --backend-reviewed` 快进推送 main；纯文档可省略参数。不得直接推送混合改动或绕过前端必需检查。完整流程见 [DEVELOPMENT](docs/DEVELOPMENT.md)。
 
 
 CI 等待和停止条件见 [CI 等待与收尾](docs/TESTING.md#ci-等待与收尾2026-09-20)。

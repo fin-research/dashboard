@@ -10,7 +10,9 @@ export default defineConfig({
   timeout: 45_000,
   // A missing baseline is a failure; only the explicit update command creates it.
   updateSnapshots: 'none',
-  snapshotPathTemplate: `{testDir}/__screenshots__/${process.env.CI ? 'macos-ci' : '{platform}'}/{projectName}/{arg}{ext}`,
+  snapshotPathTemplate: process.env.LOCAL_VISUAL_CAPTURE_DIR
+    ? `${process.env.LOCAL_VISUAL_CAPTURE_DIR}/{projectName}/{arg}{ext}`
+    : `{testDir}/__screenshots__/${process.env.CI ? 'macos-ci' : '{platform}'}/{projectName}/{arg}{ext}`,
   expect: { timeout: 10_000, toHaveScreenshot: { animations: 'disabled', caret: 'hide', maxDiffPixels: 100,
     stylePath: './tests/visual/screenshot.css' } },
   use: {
