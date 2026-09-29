@@ -92,20 +92,17 @@ export async function loadIssuanceBusinessMetrics(
   }>(`WITH latest AS (
       SELECT DISTINCT ON (field) field, observation_date, numeric_value
       FROM public.quant_input
-      WHERE dataset='company' AND entity_key='' AND field=ANY($1::text[])
-        AND source='local-workbook' AND numeric_value IS NOT NULL
+      WHERE field=ANY($1::text[]) AND numeric_value IS NOT NULL
         AND observation_date <= $2::date
       ORDER BY field, observation_date DESC
     )
     SELECT latest.field, latest.observation_date::text AS date,
       latest.numeric_value AS value_ratio,
       (SELECT count(*)::integer FROM public.quant_input history
-       WHERE history.dataset='company' AND history.entity_key='' AND history.field=latest.field
-         AND history.source='local-workbook' AND history.numeric_value IS NOT NULL
+       WHERE history.field=latest.field AND history.numeric_value IS NOT NULL
          AND history.observation_date <= $2::date) AS sample_count,
       (SELECT count(*)::integer FROM public.quant_input history
-       WHERE history.dataset='company' AND history.entity_key='' AND history.field=latest.field
-         AND history.source='local-workbook' AND history.numeric_value IS NOT NULL
+       WHERE history.field=latest.field AND history.numeric_value IS NOT NULL
          AND history.observation_date <= $2::date AND history.numeric_value <= latest.numeric_value) AS rank_count
     FROM latest`, [['lcr', 'nsfr'], marketDate]);
   const output: IssuanceBusinessMetrics = { lcr: null, nsfr: null, funding_gap: null, issuer_spread: null };
@@ -122,18 +119,15 @@ export async function loadIssuanceBusinessMetrics(
   const gap = await client.query<{date:string;value_yi:number;sample_count:number;rank_count:number}>(
     `WITH latest AS (
       SELECT observation_date,numeric_value FROM public.quant_input
-      WHERE dataset='company_report' AND entity_key='' AND field='static_gap_1m'
-        AND source='r2-fund-report' AND numeric_value IS NOT NULL
+      WHERE field='static_gap_1m' AND numeric_value IS NOT NULL
         AND observation_date <= $1::date
       ORDER BY observation_date DESC LIMIT 1
     ) SELECT latest.observation_date::text AS date,latest.numeric_value AS value_yi,
       (SELECT count(*)::integer FROM public.quant_input history
-       WHERE history.dataset='company_report' AND history.entity_key='' AND history.field='static_gap_1m'
-         AND history.source='r2-fund-report' AND history.numeric_value IS NOT NULL
+       WHERE history.field='static_gap_1m' AND history.numeric_value IS NOT NULL
          AND history.observation_date <= $1::date) AS sample_count,
       (SELECT count(*)::integer FROM public.quant_input history
-       WHERE history.dataset='company_report' AND history.entity_key='' AND history.field='static_gap_1m'
-         AND history.source='r2-fund-report' AND history.numeric_value IS NOT NULL
+       WHERE history.field='static_gap_1m' AND history.numeric_value IS NOT NULL
          AND history.observation_date <= $1::date AND history.numeric_value <= latest.numeric_value) AS rank_count
     FROM latest`, [marketDate],
   );
@@ -168,7 +162,7 @@ export async function loadIssuanceBusinessMetrics(
        FROM unnest($2::date[]) AS dates(date)
        CROSS JOIN public.bond_issuance issuance
        LEFT JOIN public.bond_history history
-         ON history.bond_code=issuance.bond_code AND history.valuation_date=dates.date
+         ON history.bond_code=public.exchange_bond_code(issuance.bond_code) AND history.valuation_date=dates.date
        WHERE issuance.issuer_name=$1 AND issuance.issuer_rating='AAA'
          AND issuance.bond_type='证券公司债' AND issuance.interest_rate_type='固息'
          AND issuance.has_option=false
