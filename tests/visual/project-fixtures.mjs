@@ -1,5 +1,5 @@
 import {managementAudit} from './management-fixtures.mjs';
-export const projectPeople=[{id:'auth0|test',name:'测试用户',email:'test@18.cn',active:true,roles:[{id:'role-project',name:'项目负责人',description:''}]},{id:'auth0|member',name:'测试执行人',email:'member@18.cn',active:true,roles:[{id:'role-staff',name:'融资执行',description:''}]}];
+export const projectPeople=[{id:'auth0|test',name:'测试用户',department:'资金管理部',email:'test@18.cn',active:true,roles:[{id:'role-project',name:'项目负责人',description:''}]},{id:'auth0|member',name:'测试执行人',department:'融资部',email:'member@18.cn',active:true,roles:[{id:'role-staff',name:'融资执行',description:''}]}];
 const tasks=[
  {id:'task-1',name:'发行材料准备与内部审核',status:'completed',scheduleType:'period',plannedStartDate:'2026-09-01',dueDate:'2026-09-08',assigneeId:'auth0|member',assigneeName:'测试执行人',completedAt:'2026-09-08T09:00:00Z',sortOrder:1,notes:'完成发行材料及审批文件核对。'},
  {id:'task-2',name:'簿记前发行询价',status:'in_progress',scheduleType:'period',plannedStartDate:'2026-09-12',dueDate:'2026-09-18',assigneeId:'auth0|test',assigneeName:'测试用户',completedAt:null,sortOrder:2,notes:'与投资者沟通发行期限和认购需求。'},

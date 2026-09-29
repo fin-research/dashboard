@@ -29,7 +29,7 @@
 - Gateway 的同源、方法和 named action 检查发生在转发前；业务仍验证输入白名单、记录归属、乐观锁、文件类型/大小/内容和事务 RLS。上传登录检查、菜单及前端权限只用于交互。
 - Gateway 拥有 `/auth/login`、`/auth/callback`、退出、`/auth/session` 和 `/api/profile`，后端只保留必要的兼容或私有转发。登录响应和包含身份的响应 private/no-store，401 跳登录而 403 保留权限错误；`__data.json` 使用 SvelteKit redirect 数据协议。
 - 新账号的邮箱/姓名/部门和验证流程仍由 Auth0 Actions/Forms 管理；用户字段不授予角色。Auth0 token 的 namespace email 必须与当前账号一致，旧邮箱会话不能修改资料。
-- 个人信息白名单与本人校验由 Gateway 维护；邮箱变更需明确确认，重置验证并退出；密码使用既有重置邮件流程。管理凭据不留在 Dashboard Worker，目录及角色配置通过 `IDENTITY: IdentityService` 取得。
+- 个人信息白名单与本人校验由 Gateway 维护；本人姓名和部门写入 Auth0，邮箱变更需明确确认，重置验证并退出；密码使用既有重置邮件流程。管理员可经私有 IdentityService 更新本组织账号的姓名、部门，Gateway 再次核对 admin、组织成员及连接。管理凭据不留在 Dashboard Worker，目录及角色配置通过 `IDENTITY: IdentityService` 取得。
 
 ## 数据与日志
 
@@ -45,7 +45,7 @@
 
 客户端会话只由根 layout 实例持有，不跨 SSR 请求共享，不写 localStorage。公开首屏经 `/auth/session` 初始化一次，普通导航复用展示快照；过期和明确角色变更时刷新。相同 token 的 SSR 导航不覆盖登录时的权限展示快照，403 不额外刷新会话。角色成员变更后从个人资料页“刷新登录角色”重新走授权码流程取得新 token，或重新登录。其他终端的旧菜单不构成服务端授权；Gateway 使用已签名 JWT 的角色，每个业务请求读取 Gateway 的授权 JSON 缓存（TTL 1 小时，无内测旁路），普通准入不查询 Auth0 Management API。
 
-Dashboard 不持有 `AUTHORIZATION_DB` 或 Auth0 管理 Secret。`/management/people` 经私有 Gateway 服务读取缓存中的角色授权，只读展示并链接 Auth0 管理。个人页与角色页复用 scope/resource/action 权限组件；个人 `GET /auth/permissions` 获取自己的缓存权限，管理员 `POST /auth/permissions/refresh` 在同源及权限检查后更新当前 Cloudflare 节点缓存。其他节点最长 1 小时后按需更新。角色与权限以 Auth0 为唯一来源，内测所有用户持有基础 authenticated 角色，全部角色授予全部本站权限。
+Dashboard 不持有 `AUTHORIZATION_DB` 或 Auth0 管理 Secret。`/management/people` 经私有 Gateway 服务读取人员目录及缓存中的角色授权；人员姓名和部门写回 Auth0，角色与成员关系链接 Auth0 管理。个人页与角色页复用 scope/resource/action 权限组件；个人 `GET /auth/permissions` 获取自己的缓存权限，管理员 `POST /auth/permissions/refresh` 在同源及权限检查后更新当前 Cloudflare 节点缓存。其他节点最长 1 小时后按需更新。角色与权限以 Auth0 为唯一来源，内测所有用户持有基础 authenticated 角色，全部角色授予全部本站权限。
 
 融资数据后台继续使用表/字段白名单、参数化 SQL、完整主键与乐观条件。事务用 Gateway 已确认的 Auth0 ID、permissions 和 operation 设置 `request.auth.*` 后 `SET LOCAL ROLE authenticated`；提交/回滚清除上下文。RLS 保留 read/create/update/delete 及记录归属约束，不接受浏览器提供的权限集合。
 

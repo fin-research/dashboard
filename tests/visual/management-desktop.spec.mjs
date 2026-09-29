@@ -10,6 +10,11 @@ test.beforeEach(async({page},testInfo)=>{
 
 test('desktop role catalog identifies the selected role without changing permissions',async({page})=>{
   await page.goto('/management/people');
+  await expect(page.getByRole('textbox',{name:'姓名',exact:true})).toHaveValue('测试用户');
+  await expect(page.getByRole('textbox',{name:'部门',exact:true})).toHaveValue('资金管理部');
+  await page.getByRole('button',{name:/同事.*colleague@18.cn/}).click();
+  await expect(page.getByRole('textbox',{name:'部门',exact:true})).toHaveValue('研究部');
+  await page.getByRole('button',{name:/测试用户.*test@18.cn/}).click();
   const roles=page.getByRole('list',{name:'角色',exact:true});
   const research=roles.getByRole('button',{name:'研究业务组 13',exact:true});
   await page.getByRole('button',{name:'授信工作台',exact:true}).click();
@@ -31,6 +36,7 @@ test('desktop profile aligns actions and keeps unsaved settings local',async({pa
   });
   await page.goto('/management/me');
   await expect(page.getByRole('textbox',{name:'显示姓名',exact:true})).toHaveValue(profileAudit.name);
+  await expect(page.getByRole('textbox',{name:'部门',exact:true})).toHaveValue(profileAudit.department);
   const buttons=['保存个人资料','更新邮箱并退出登录','发送密码重置邮件','保存个性化配置'];
   const bounds=await Promise.all(buttons.map(name=>page.getByRole('button',{name,exact:true}).boundingBox()));
   expect(Math.abs(bounds[0].y-bounds[1].y)).toBeLessThanOrEqual(1);

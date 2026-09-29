@@ -14,7 +14,7 @@ export const managementViews: readonly WorkbenchPageLink[] = [
   { id: 'permissions', label: '权限', href: '/management/permissions', icon: 'credit' },
   { id: 'notifications', label: '通知', href: '/management/notifications', icon: 'file' },
   { id: 'messenger', label: '通知管理', href: '/management/messenger', icon: 'file', permission: 'admin', separatorBefore: true },
-  { id: 'people', label: '角色权限', href: '/management/people', icon: 'credit', permission: 'admin' },
+  { id: 'people', label: '人员与角色', href: '/management/people', icon: 'credit', permission: 'admin' },
   { id: 'fund-report', label: '资金日报', href: '/fund-report?upload=1', icon: 'file', permission: 'admin' },
 ];
 

@@ -1,7 +1,9 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button/index.js";
   import AuthMenu from '$lib/AuthMenu.svelte';
+  import { permissionVisibility } from '$lib/permission-visibility';
   import { currentReportDate } from "../report-date";
+  const allowed = permissionVisibility();
   const todayFundReportUrl = `/fund-report/${currentReportDate()}.html`;
 </script>
 
@@ -23,7 +25,7 @@
   <main>
     <h1 class="sr-only">市场研究</h1>
     <nav class="tool-grid" aria-label="市场研究内容">
-      <article class="ui-card tool-card tool-card--fund-report">
+      {#if $allowed(undefined, '/fund-report')}<article class="ui-card tool-card tool-card--fund-report">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M4 4h16v16H4zM7 8h10M7 12h4M7 16h6" />
@@ -57,7 +59,7 @@
             </svg>
           </Button>
         </span>
-      </article>
+      </article>{/if}
 
       <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--briefing" href="/market-briefing">
         <span class="tool-icon" aria-hidden="true">
@@ -87,7 +89,7 @@
         </span>
       </a>
 
-      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--trading-research" href="/trading-research">
+      {#if $allowed(undefined, '/trading-research')}<a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--trading-research" href="/trading-research">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -110,9 +112,9 @@
             <path d="M5 12h14m-5-5 5 5-5 5" />
           </svg>
         </span>
-      </a>
+      </a>{/if}
 
-      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--credit-workbench" href="/credit-workbench">
+      {#if $allowed(undefined, '/credit-workbench')}<a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--credit-workbench" href="/credit-workbench">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M12 3 5 6v5c0 4.8 2.7 8.4 7 10 4.3-1.6 7-5.2 7-10V6l-7-3Z" />
@@ -139,9 +141,9 @@
             <path d="M5 12h14m-5-5 5 5-5 5" />
           </svg>
         </span>
-      </a>
+      </a>{/if}
 
-      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--workspace" href="/financing/">
+      {#if $allowed(undefined, '/financing/')}<a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--workspace" href="/financing/">
         <span class="tool-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24">
             <path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8M8 16h5" />
@@ -162,14 +164,14 @@
             <path d="M5 12h14m-5-5 5 5-5 5" />
           </svg>
         </span>
-      </a>
+      </a>{/if}
 
-      <a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--management" href="/management">
+      {#if $allowed(undefined, '/management')}<a data-ui-owner="routes--page-svelte" class="ui-card tool-card tool-card--management" href="/management">
         <span class="tool-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4 3 7 8 9 5-2 8-5 8-9V6z" /><path d="m8 12 3 3 5-6" /></svg></span>
         <span class="card-visual" aria-hidden="true"><svg viewBox="0 0 180 100"><rect x="24" y="14" width="132" height="72" rx="6" /><path d="M24 35h132M65 35v51M80 51h56M80 65h35M36 49h16M36 63h16" /></svg></span>
         <span class="tool-copy"><h2>管理</h2></span>
         <span data-ui-owner="routes--page-svelte" class="ui-button tool-action">打开管理<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg></span>
-      </a>
+      </a>{/if}
 
     </nav>
   </main>
