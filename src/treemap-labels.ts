@@ -6,10 +6,10 @@ export interface TreemapLabelLayout {
   height: number;
 }
 
-export const MIN_TREEMAP_FONT_SIZE = 10;
-const HORIZONTAL_PADDING = 8;
-const VERTICAL_PADDING = 8;
-const LINE_HEIGHT_RATIO = 1.5;
+export const MIN_TREEMAP_FONT_SIZE = 8;
+const HORIZONTAL_PADDING = 6;
+const VERTICAL_PADDING = 4;
+const LINE_HEIGHT_RATIO = 1.25;
 
 export function formatTreemapLabel(
   name: string,

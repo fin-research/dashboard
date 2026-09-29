@@ -274,6 +274,8 @@ export function renderIndustryTreemap(
     series: [
       {
         type: "treemap",
+        squareRatio: 1,
+        sort: "desc",
         roam: false,
         nodeClick: false,
         breadcrumb: { show: false },
@@ -286,8 +288,8 @@ export function renderIndustryTreemap(
         label: {
           show: false,
           fontFamily,
-          fontSize: 10,
-          lineHeight: 15,
+          fontSize: 8,
+          lineHeight: 10,
           fontWeight: 600,
           overflow: "truncate",
           ellipsis: "",
@@ -328,7 +330,7 @@ export function renderIndustryTreemap(
               show: true,
               color: heatTextColor(point.change_pct, maxAbs),
               fontSize,
-              lineHeight: fontSize * 1.5,
+              lineHeight: fontSize * 1.25,
               overflow: "truncate",
               ellipsis: "",
               formatter: labelText,
