@@ -102,7 +102,7 @@ test('only global identity or reminder data is invalidated after relevant deltas
 		readFile(new URL('../../src/routes/financing/+layout.server.ts', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/projects/+page.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/financing/projects/[id]/+page.svelte', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/routes/management/people/+page.svelte', import.meta.url), 'utf8'),
+		readFile(new URL('../../src/lib/management/ManagementPeopleView.svelte', import.meta.url), 'utf8'),
 		readFile(new URL('../../src/routes/management/me/+page.svelte', import.meta.url), 'utf8')
 	]);
 	assert.match(layout, /depends\('financing:identity', 'financing:permissions', 'financing:reminders'\)/);
@@ -116,7 +116,7 @@ test('only global identity or reminder data is invalidated after relevant deltas
 test('role view delegates edits to Auth0 and only refreshes the Gateway cache', async () => {
   const [server, client] = await Promise.all([
     readFile(new URL('../../src/routes/management/people/+page.server.ts', import.meta.url), 'utf8'),
-    readFile(new URL('../../src/routes/management/people/+page.svelte', import.meta.url), 'utf8')
+    readFile(new URL('../../src/lib/management/ManagementPeopleView.svelte', import.meta.url), 'utf8')
   ]);
   assert.doesNotMatch(server, /export const actions|saveRolePermissions/);
   assert.match(server, /depends\('auth:permissions'\)/);

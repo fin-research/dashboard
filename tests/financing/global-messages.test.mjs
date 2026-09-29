@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const mutationSurfaces = [
-	'src/routes/management/people/+page.svelte',
+	'src/lib/management/ManagementPeopleView.svelte',
 	'src/routes/financing/projects/+page.svelte',
 	'src/routes/financing/projects/[id]/+page.svelte',
 	'src/routes/management/me/+page.svelte',
