@@ -96,7 +96,7 @@ Gateway 切换验证后，删除 Dashboard 不再使用的 Auth0 管理 Secret�
 
 按 [共享 AUTH](../../eastmoney/docs/AUTH.md#程序化权限测试) 执行本仓库匿名/测试账号覆盖。权限验收禁止 browser；真实登录统一使用 Dashboard 的 `pnpm auth:verify`，凭据只从项目组根 `.env` 读取，不复制登录实现或密码到各仓库。
 
-Auth0 配置维护在 Gateway 使用 `pnpm auth0:export` / `pnpm auth0:plan` / `pnpm auth0:apply`，必须指定 `--include`。详细参数、机器凭据、套餐限制与测试账号准备见 [共享 AUTH](../../eastmoney/docs/AUTH.md#auth0-配置管理deploy-cli)。
+本地 Auth0 租户管理使用 Auth0 skill 和 `auth0` CLI，先复用已有授权；并行会话按[共享 AUTH](../../eastmoney/docs/AUTH.md#auth0-本地租户管理)协调资源变更。登录验收和测试账号准备也见共享 AUTH。
 
 ## 测试分层与覆盖率
 

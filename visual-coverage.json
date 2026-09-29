@@ -152,7 +152,9 @@
     {
       "source": "src/routes/management/people/+page.svelte",
       "scenarios": [
-        "management-people"
+        "management-people",
+        "management-people-roles",
+        "management-people-loading"
       ]
     },
     {
@@ -1294,6 +1296,26 @@
           "snapshots": [
             "management-people-mobile.png"
           ]
+        }
+      ]
+    },
+    {
+      "id": "management-people-loading",
+      "url": "/management/people?loading=1",
+      "kind": "screenshot",
+      "state": "personnel-loading",
+      "evidence": [
+        {
+          "spec": "tests/visual/management-desktop.spec.mjs",
+          "test": "desktop personnel navigation shows stable loading cards",
+          "projects": ["desktop"],
+          "snapshots": ["management-people-loading-desktop.png"]
+        },
+        {
+          "spec": "tests/visual/management-mobile.spec.mjs",
+          "test": "mobile personnel navigation keeps loading cards in order",
+          "projects": ["mobile"],
+          "snapshots": ["management-people-loading-mobile.png"]
         }
       ]
     },
