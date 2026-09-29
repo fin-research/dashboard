@@ -23,11 +23,22 @@ test('desktop personnel cards align and selected name has one focus indicator',a
   expect(Math.abs(cards[0].height-cards[1].height)).toBeLessThanOrEqual(1);
   await page.keyboard.press('Tab');
   await selected.focus();
-  const focus=await selected.evaluate(el=>({visible:el.matches(':focus-visible'),outline:getComputedStyle(el).outlineStyle,shadow:getComputedStyle(el).boxShadow}));
+  const focus=await selected.evaluate(el=>({visible:el.matches(':focus-visible'),outline:getComputedStyle(el).outlineStyle,
+    border:getComputedStyle(el).borderTopColor,clip:getComputedStyle(el).backgroundClip,shadow:getComputedStyle(el).boxShadow}));
   expect(focus.visible).toBe(true);
   expect(focus.outline).toBe('none');
+  expect(focus.border).toBe('rgba(0, 0, 0, 0)');
+  expect(focus.clip).toBe('border-box');
   expect(focus.shadow).not.toBe('none');
   await expect(page.locator('.tr-workspace')).toHaveScreenshot('management-people-desktop.png');
+});
+
+test('desktop personnel navigation shows stable loading cards',async({page})=>{
+  await page.goto('/management/people?loading=1');
+  await expect(page.getByRole('status',{name:'正在加载人员'})).toBeVisible();
+  const cards=await Promise.all([page.locator('.people-loading__card').nth(0).boundingBox(),page.locator('.people-loading__card').nth(1).boundingBox()]);
+  expect(Math.abs(cards[0].height-cards[1].height)).toBeLessThanOrEqual(1);
+  await expect(page.locator('.tr-workspace')).toHaveScreenshot('management-people-loading-desktop.png');
 });
 
 test('desktop role catalog identifies the selected role without changing permissions',async({page})=>{
