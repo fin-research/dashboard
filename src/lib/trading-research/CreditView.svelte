@@ -416,11 +416,11 @@
     <section aria-labelledby="credit-metrics-title">
       <SectionHeading id="credit-metrics-title" title="授信总览" />
       <div class="tr-metric-grid tr-metric-grid--five tr-credit-metric-grid">
-        <MetricCard label="授信总额" value={report.summary.totalLimit.toFixed(1)} {...weeklyChange(report.summary.totalLimit, report.previousSummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
-        <MetricCard label="已用额度" value={report.summary.totalUsed.toFixed(1)} {...weeklyChange(report.summary.totalUsed, report.previousSummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
-        <MetricCard label="可用额度" value={report.summary.totalAvailable.toFixed(1)} {...weeklyChange(report.summary.totalAvailable, report.previousSummary?.totalAvailable, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
-        <MetricCard label="30日内到期" value={String(report.summary.expiringWithin30Days)} unit="笔" {...weeklyChange(report.summary.expiringWithin30Days, report.previousSummary?.expiringWithin30Days, '笔', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="red" compact />
-        <MetricCard label="额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" {...weeklyChange(report.summary.utilization, report.previousSummary?.utilization, '个百分点', 1)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact />
+        <MetricCard label="授信总额" value={report.summary.totalLimit.toFixed(1)} {...weeklyChange(report.summary.totalLimit, report.previousSummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact smallIcon />
+        <MetricCard label="已用额度" value={report.summary.totalUsed.toFixed(1)} {...weeklyChange(report.summary.totalUsed, report.previousSummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact smallIcon />
+        <MetricCard label="可用额度" value={report.summary.totalAvailable.toFixed(1)} {...weeklyChange(report.summary.totalAvailable, report.previousSummary?.totalAvailable, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact smallIcon />
+        <MetricCard label="30日内到期" value={String(report.summary.expiringWithin30Days)} unit="笔" {...weeklyChange(report.summary.expiringWithin30Days, report.previousSummary?.expiringWithin30Days, '笔', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="red" compact smallIcon />
+        <MetricCard label="额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" {...weeklyChange(report.summary.utilization, report.previousSummary?.utilization, '个百分点', 1)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact smallIcon />
       </div>
     </section>
 
@@ -577,11 +577,11 @@
       <section aria-labelledby="credit-weekly-title">
         <SectionHeading id="credit-weekly-title" title="授信周报" />
         <div class="tr-metric-grid tr-metric-grid--five">
-          <MetricCard label="授信总额" value={formatAmount(report.weeklySummary.totalLimit)} {...weeklyChange(report.weeklySummary.totalLimit, report.previousWeeklySummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
-          <MetricCard label="已用额度" value={formatAmount(report.weeklySummary.totalUsed)} {...weeklyChange(report.weeklySummary.totalUsed, report.previousWeeklySummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
-          <MetricCard label="可用额度" value={formatAmount(report.weeklySummary.totalAvailable)} {...weeklyChange(report.weeklySummary.totalAvailable, report.previousWeeklySummary?.totalAvailable, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
-          <MetricCard label="新增授信" value={String(report.weeklySummary.addedInstitutionCount)} unit="家" {...weeklyChange(report.weeklySummary.addedInstitutionCount, report.previousWeeklySummary?.addedInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="purple" compact />
-          <MetricCard label="到期" value={String(report.weeklySummary.expiredInstitutionCount)} unit="家" {...weeklyChange(report.weeklySummary.expiredInstitutionCount, report.previousWeeklySummary?.expiredInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="red" compact />
+          <MetricCard label="授信总额" value={formatAmount(report.weeklySummary.totalLimit)} {...weeklyChange(report.weeklySummary.totalLimit, report.previousWeeklySummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact smallIcon />
+          <MetricCard label="已用额度" value={formatAmount(report.weeklySummary.totalUsed)} {...weeklyChange(report.weeklySummary.totalUsed, report.previousWeeklySummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact smallIcon />
+          <MetricCard label="可用额度" value={formatAmount(report.weeklySummary.totalAvailable)} {...weeklyChange(report.weeklySummary.totalAvailable, report.previousWeeklySummary?.totalAvailable, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact smallIcon />
+          <MetricCard label="新增授信" value={String(report.weeklySummary.addedInstitutionCount)} unit="家" {...weeklyChange(report.weeklySummary.addedInstitutionCount, report.previousWeeklySummary?.addedInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="purple" compact smallIcon />
+          <MetricCard label="到期" value={String(report.weeklySummary.expiredInstitutionCount)} unit="家" {...weeklyChange(report.weeklySummary.expiredInstitutionCount, report.previousWeeklySummary?.expiredInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="red" compact smallIcon />
         </div>
       </section>
 
