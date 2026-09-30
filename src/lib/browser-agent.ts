@@ -17,6 +17,14 @@ export interface AgentEvent {
 }
 export type ApproveTool = (item: { name: string; title: string; input: unknown }) => Promise<boolean>;
 
+function modelToolSchema(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(modelToolSchema);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key, entry]) => key !== 'pattern' || typeof entry !== 'string')
+    .map(([key, entry]) => [key, modelToolSchema(entry)]));
+}
+
 function sourceLinks(value: unknown): Array<{ title: string; url: string }> {
   if (!value || typeof value !== 'object' || !('sources' in value) || !Array.isArray(value.sources)) return [];
   return value.sources.filter((item: unknown): item is { title: string; url: string } =>
@@ -67,7 +75,7 @@ export async function runBrowserAgent(options: {
   const tools = Object.fromEntries(options.tools.filter(item => options.selectedNames.has(item.name) &&
     (!options.readOnly || item.annotations?.readOnlyHint)).map(item => [item.name, tool({
     description: item.description || item.title || item.name,
-    inputSchema: jsonSchema(item.inputSchema),
+    inputSchema: jsonSchema(modelToolSchema(item.inputSchema) as Record<string, unknown>),
     execute: async (input, call) => {
       if (!item.annotations?.readOnlyHint) {
         const approved = await options.approve({ name: item.name, title: item.title || item.name, input });

@@ -44,7 +44,10 @@ test('browser ToolLoopAgent streams, calls a user-authorized MCP tool, and resum
   const oldLocation = globalThis.location;
   globalThis.location = new URL('https://eastmoney.hasbai.xyz/credit-workbench');
   const tool = { name: 'credit_public_search', title: '检索公开授信材料', description: '检索授信 PDF',
-    inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'], additionalProperties: false },
+    inputSchema: { type: 'object', properties: { query: { type: 'string', pattern: '^.+$' } }, required: ['query'], additionalProperties: false },
+    annotations: { readOnlyHint: true } };
+  const article = { name: 'article', title: '读取研报正文',
+    inputSchema: { type: 'object', properties: { id: { type: 'string', pattern: '^[\\p{L}\\p{N}_|.-]+$' } }, required: ['id'], additionalProperties: false },
     annotations: { readOnlyHint: true } };
   let modelCalls = 0, toolCalls = 0;
   const events = [];
@@ -53,7 +56,7 @@ test('browser ToolLoopAgent streams, calls a user-authorized MCP tool, and resum
     if (url.endsWith('/api/mcp')) {
       const rpc = JSON.parse(init.body);
       assert.equal(init.credentials, 'same-origin');
-      if (rpc.method === 'tools/list') return Response.json({ jsonrpc: '2.0', id: rpc.id, result: { tools: [tool] } });
+      if (rpc.method === 'tools/list') return Response.json({ jsonrpc: '2.0', id: rpc.id, result: { tools: [tool, article] } });
       toolCalls++;
       assert.equal(rpc.method, 'tools/call');
       assert.deepEqual(rpc.params, { name: tool.name, arguments: { query: '授信' } });
@@ -64,6 +67,9 @@ test('browser ToolLoopAgent streams, calls a user-authorized MCP tool, and resum
     assert.equal(new Headers(init.headers).has('authorization'), false);
     const body = JSON.parse(init.body);
     assert.equal(body.model, AI_GATEWAY_MODEL);
+    assert.deepEqual(body.tools.map(item => item.name).sort(), ['article', 'credit_public_search']);
+    assert.equal(JSON.stringify(body.tools).includes('"pattern"'), false);
+    assert.equal(article.inputSchema.properties.id.pattern, '^[\\p{L}\\p{N}_|.-]+$');
     modelCalls++;
     if (modelCalls === 2) assert.ok(body.input.some(item => item.type === 'function_call_output'));
     return sse(modelCalls === 1 ? toolEvents() : textEvents('依据公开报告，授信余额为 10 亿元。'));
@@ -71,7 +77,7 @@ test('browser ToolLoopAgent streams, calls a user-authorized MCP tool, and resum
   try {
     const available = await listBrowserTools();
     const result = await runBrowserAgent({ messages: [{ role: 'user', content: '查询授信' }], tools: available,
-      selectedNames: new Set([tool.name]), readOnly: true, maxSteps: 3, signal: new AbortController().signal,
+      selectedNames: new Set([tool.name, article.name]), readOnly: true, maxSteps: 3, signal: new AbortController().signal,
       approve: async () => { throw new Error('read-only tool must not request approval'); },
       onEvent: event => events.push(event),
     });
