@@ -29,6 +29,7 @@
     iconProps = {},
     iconPosition = "start",
     compact = false,
+    smallIcon = false,
     variant = "default",
   }: {
     label: string;
@@ -44,6 +45,7 @@
     iconProps?: Record<string, unknown>;
     iconPosition?: "start" | "end";
     compact?: boolean;
+    smallIcon?: boolean;
     variant?: "default" | "report";
   } = $props();
 </script>
@@ -52,6 +54,7 @@
   class={[
     `research-metric-card research-metric-card--${tone} ring-0 overflow-visible`,
     compact && "research-metric-card--compact",
+    smallIcon && "research-metric-card--small-icon",
     variant === "report" && "research-metric-card--report",
     Boolean(IconComponent) && iconPosition === "end" && "research-metric-card--icon-end"
   ]}
@@ -114,6 +117,16 @@
   :global(.research-metric-card--compact) {
     justify-content: flex-start;
     padding-block: 6px;
+  }
+
+  :global(.research-metric-card--small-icon) .research-metric-card__icon,
+  :global(.research-metric-card--small-icon) .research-metric-card__icon :global(svg) {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  :global(.research-metric-card--small-icon) .research-metric-card__icon {
+    flex-basis: 2.5rem;
   }
 
   :global(.research-metric-card--report) {

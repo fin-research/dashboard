@@ -1223,12 +1223,35 @@ body:has(.tr-workbench) {
 }
 
 .credit-application-dialog .dialog-body form { display: grid; gap: 16px; }
+[data-slot="dialog-content"].credit-application-dialog {
+  width: min(64rem, calc(100vw - 2rem));
+  min-width: 0;
+  max-width: min(64rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+}
+.credit-application-dialog .dialog-body {
+  max-height: calc(100dvh - 6rem);
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-color: var(--tr-border) transparent;
+  scrollbar-width: thin;
+}
 .tr-credit-application-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
 .tr-credit-application-current { color: var(--tr-text-2); font-size: 0.875rem; }
 .tr-credit-application-current strong { color: var(--tr-text); }
-.tr-credit-application-confirm, .tr-credit-application-notes { display: flex; gap: 8px; align-items: center; }
-.tr-credit-application-notes { display: grid; align-items: stretch; color: var(--tr-muted); font-size: 0.875rem; }
+.tr-credit-application-confirm { display: flex; gap: 8px; align-items: center; }
 .tr-credit-application-error { color: var(--tr-red); font-size: 0.875rem; }
+
+@media (min-width: 900px) {
+  .credit-application-dialog .tr-credit-editor-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 600px) and (max-width: 899px) {
+  .credit-application-dialog .tr-credit-editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .tr-credit-table {
   min-width: 0;
@@ -1281,13 +1304,22 @@ body:has(.tr-workbench) {
   font-size: 1rem;
 }
 
-.tr-credit-editor-head span {
-  color: var(--tr-green);
+.tr-credit-record-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--tr-muted);
   font-size: 0.875rem;
 }
 
-.tr-credit-editor-head span.error {
-  color: var(--tr-red);
+.tr-credit-record-date input {
+  width: 11rem;
+}
+
+@media (max-width: 720px) {
+  .tr-credit-editor-head { flex-wrap: wrap; }
+  .tr-credit-record-date { order: 3; width: 100%; margin-left: 0; }
 }
 
 .tr-credit-editor-grid,
@@ -1349,9 +1381,21 @@ body:has(.tr-workbench) {
 
 .tr-credit-notes-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.tr-credit-notes-grid label {
+  grid-template-rows: auto 1fr;
+}
+
+.tr-credit-notes-grid--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .tr-credit-notes-grid textarea {
+  height: auto;
+  min-height: 44px;
+  field-sizing: content;
   resize: vertical;
 }
 
@@ -1361,7 +1405,12 @@ body:has(.tr-workbench) {
 }
 .tr-credit-detail :is(input, select, textarea):disabled { opacity: 1; }
 
-.tr-credit-item-grid textarea { resize: vertical; }
+.tr-credit-item-grid textarea {
+  height: 44px;
+  min-height: 44px;
+  field-sizing: fixed;
+  resize: vertical;
+}
 
 .tr-credit-calendar-panel {
   overflow-x: auto;
@@ -1499,15 +1548,40 @@ body:has(.tr-workbench) {
 }
 
 .tr-credit-news-list {
+  display: grid;
+  gap: 8px;
   margin: 0;
-  padding-left: 1.3rem;
+  padding: 0;
   color: var(--tr-text-2);
   font-size: 1rem;
-  line-height: 1.6;
+  line-height: 1.5;
+  list-style: none;
+  counter-reset: credit-news;
 }
 
-.tr-credit-news-list li + li {
-  margin-top: 7px;
+.tr-credit-news-list li {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--tr-border);
+  border-radius: var(--tr-radius-control);
+  background: var(--tr-surface);
+  counter-increment: credit-news;
+}
+
+.tr-credit-news-list li::before {
+  content: counter(credit-news);
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--tr-primary-deep);
+  background: var(--tr-primary-soft);
+  font-size: 0.875rem;
+  font-weight: bold;
 }
 
 .tr-credit-weekly-report {
@@ -1528,6 +1602,22 @@ body:has(.tr-workbench) {
 
 .tr-credit-weekly-detail-table th[scope="rowgroup"] {
   vertical-align: middle;
+}
+
+.tr-credit-weekly-detail-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.tr-credit-weekly-detail-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--tr-surface-muted);
+}
+
+.tr-credit-weekly-detail-table thead th {
+  position: static;
 }
 
 .tr-credit-weekly-detail-table .is-centered {

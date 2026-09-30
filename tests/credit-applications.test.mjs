@@ -3,7 +3,7 @@ import test from 'node:test';
 import {applyCreditMigration,creditDatabase,seedCredit} from './helpers/credit-database.mjs';
 import {loadCreditReport,saveCreditInstitution} from '../src/lib/server/credit-repository.ts';
 
-test('历史同机构同日变更合并，保留原记录并写入续期及扩额类型',async t=>{
+test('历史同日续期兼扩额归为扩额并保留原事件归档',async t=>{
   const db=await creditDatabase(t,false,false,true);
   await seedCredit(db,'2026-08-21','浙江萧山农商行',{
     total:8,effective_date:'2025-09-22',expiry_date:'2026-09-21',
@@ -15,16 +15,21 @@ test('历史同机构同日变更合并，保留原记录并写入续期及扩�
   const state=async date=>(await db.query("SELECT total::float8,effective_date::text,expiry_date::text FROM credit.state_as_of($1::date) WHERE institution_name='浙江萧山农商行'",[date])).rows[0];
   const before=[await state('2026-09-21'),await state('2026-09-24')];
   await applyCreditMigration(db,'0013_explicit_credit_applications.sql');
+  assert.equal((await db.query("SELECT type FROM credit.diff WHERE institution_name='浙江萧山农商行' AND effective_on='2026-09-24'")).rows[0].type,'renewal_increase');
+  await applyCreditMigration(db,'0014_retire_credit_item_fields.sql');
+  await applyCreditMigration(db,'0015_credit_increase_event.sql');
   assert.deepEqual([await state('2026-09-21'),await state('2026-09-24')],before);
   const rows=(await db.query("SELECT id,type,total::float8,expiry_date::text FROM credit.diff WHERE institution_name='浙江萧山农商行' AND effective_on='2026-09-24'")).rows;
   assert.equal(rows.length,1);
-  assert.equal(rows[0].type,'renewal_increase');
+  assert.equal(rows[0].type,'increase');
   assert.equal(rows[0].total,9);
-  assert.equal((await db.query('SELECT count(*)::int n FROM credit.diff_merge_archive')).rows[0].n,2);
+  assert.equal((await db.query('SELECT count(*)::int n FROM credit.diff_merge_archive')).rows[0].n,3);
+  assert.equal((await db.query("SELECT original_row->>'type' AS type FROM credit.diff_merge_archive WHERE changed_by='migration:0015_credit_increase_event'")).rows[0].type,'renewal_increase');
+  await assert.rejects(db.query("SELECT credit.append_diff('2026-09-25','浙江萧山农商行','{\"total\":10}'::jsonb,'auth0|test','renewal_increase')"),/Invalid credit diff input/);
   const report=await loadCreditReport(db,'2026-09-24','2026-09');
-  assert.deepEqual(report.weeklyNews.map(row=>row.eventType),['renewal_increase']);
+  assert.deepEqual(report.weeklyNews.map(row=>row.eventType),['increase']);
   assert.equal(report.calendarEvents.some(row=>row.date==='2026-09-21'&&row.kind==='expiry'),false);
-  assert.ok(report.calendarEvents.some(row=>row.date==='2026-09-24'&&row.label==='授信续作及扩额 · 9亿元'));
+  assert.ok(report.calendarEvents.some(row=>row.date==='2026-09-24'&&row.label==='授信扩额 · 9亿元'));
 });
 
 test('申请按操作校验，同日续期和扩额形成一条可追溯事件',async t=>{
@@ -47,10 +52,10 @@ test('申请按操作校验，同日续期和扩额形成一条可追溯事件',
   await saveCreditInstitution(db,{operation:'increase',reportDate:'2026-09-24',institutionName:'甲银行',
     changes:{institution:{totalLimit:9}}},'auth0|test');
   const rows=(await db.query("SELECT type FROM credit.diff WHERE institution_name='甲银行' AND effective_on='2026-09-24'")).rows;
-  assert.deepEqual(rows.map(row=>row.type),['renewal_increase']);
+  assert.deepEqual(rows.map(row=>row.type),['increase']);
   assert.equal((await db.query('SELECT count(*)::int n FROM credit.diff_merge_archive')).rows[0].n,1);
   const report=await loadCreditReport(db,'2026-09-24','2026-09');
-  assert.deepEqual(report.weeklyNews.map(row=>row.eventType),['renewal_increase']);
+  assert.deepEqual(report.weeklyNews.map(row=>row.eventType),['increase']);
   assert.equal(report.weeklySummary.expiredInstitutionCount,0);
   assert.equal(report.calendarEvents.some(row=>row.date==='2026-09-21'&&row.kind==='expiry'),false);
 });

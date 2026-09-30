@@ -193,15 +193,15 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
         const current = after.get(row.institution_name);
         const previous = before.get(row.institution_name);
         if (!current || row.type === 'new' && current.status !== 'approved') return [];
-        return [creditNewsItem(row.type as CreditEventType,current,previous,date,addDays(date,-1))];
+        const eventType = row.type === 'renewal_increase' ? 'increase' : row.type as CreditEventType;
+        return [creditNewsItem(eventType,current,previous,date,addDays(date,-1))];
       });
     if (date <= reportDate) {
       for (const previous of before.values()) {
         if (previous.status !== 'approved' || previous.expiryDate !== date) continue;
         const latest = current.find(row => row.institutionName === previous.institutionName);
         if (latest?.expiryDate !== date) continue;
-        if (news.some(event => event.institutionName === previous.institutionName &&
-          (event.eventType === 'renewal' || event.eventType === 'renewal_increase'))) continue;
+        if (news.some(event => event.institutionName === previous.institutionName && isRenewalEvent(event))) continue;
         news.push(creditNewsItem('expiry',after.get(previous.institutionName),previous,date,addDays(date,-1)));
       }
     }
@@ -243,18 +243,22 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
       }
     }
   }
-  const weeklyStart = previousDate ?? addDays(firstDate,-1);
-  const weeklyNews=allNews.filter(event => event.reportDate>weeklyStart && event.reportDate<=reportDate)
-    .filter(event => event.eventType !== 'expiry' || !allNews.some(other => other.institutionName===event.institutionName &&
-      other.reportDate>weeklyStart && other.reportDate<=reportDate &&
-      (other.eventType==='renewal' || other.eventType==='renewal_increase')));
+  const weeklyEvents = (start: string, end: string): CreditWeeklyNewsItem[] =>
+    allNews.filter(event => event.reportDate > start && event.reportDate <= end)
+      .filter(event => event.eventType !== 'expiry' || !allNews.some(other => other.institutionName === event.institutionName &&
+        other.reportDate > start && other.reportDate <= end &&
+        isRenewalEvent(other)));
+  const weeklyNews = weeklyEvents(previousDate ?? addDays(firstDate,-1), reportDate);
+  const previousWeeklyNews = previousDate ? weeklyEvents(addDays(previousDate,-7),previousDate) : [];
   const sixMonths = new Date(`${reportDate}T00:00:00Z`); sixMonths.setUTCMonth(sixMonths.getUTCMonth()-6);
   const recentApprovals=allNews.filter(event => event.reportDate>=sixMonths.toISOString().slice(0,10) && event.reportDate<=reportDate && isApprovalEvent(event)).reverse();
   const summary=toSummary(reportDate,current);
   return {availableDates,previousDate,summary,previousSummary:previousDate?toSummary(previousDate,previous):null,
     weeklySummary:{...summary,addedInstitutionCount:weeklyNews.filter(event=>event.eventType==='new').length,
       expiredInstitutionCount:weeklyNews.filter(event=>event.eventType==='expiry'||event.eventType==='revocation').length},
-    previousWeeklySummary:previousDate?{...toSummary(previousDate,previous),addedInstitutionCount:0,expiredInstitutionCount:0}:null,
+    previousWeeklySummary:previousDate?{...toSummary(previousDate,previous),
+      addedInstitutionCount:previousWeeklyNews.filter(event=>event.eventType==='new').length,
+      expiredInstitutionCount:previousWeeklyNews.filter(event=>event.eventType==='expiry'||event.eventType==='revocation').length}:null,
     institutions:current,weeklyNews,recentApprovals,limitChanges:weeklyNews.filter(isApprovalEvent).map(toLimitChange),
     usageChanges:previousDate?compareCreditSnapshots(current,previous,'usage'):[],
     calendarEvents:calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)||a.institutionName.localeCompare(b.institutionName,'zh-CN')||a.id.localeCompare(b.id))};
@@ -303,7 +307,7 @@ export async function saveCreditInstitution(client: DatabaseClient,input: Credit
       }
     }
     const eventType = operation === 'renewal' && fields.totalLimit != null && Number(fields.totalLimit)>Number(before.total ?? 0)
-      ? 'renewal_increase' : operation === 'maintenance' && before.status === 'applying' && fields.status === 'approved'
+      ? 'increase' : operation === 'maintenance' && before.status === 'applying' && fields.status === 'approved'
         ? 'new' : operation;
     if (eventType === 'maintenance') {
       await client.query('SELECT credit.append_diff($1::date,$2,$3::jsonb,$4) AS id',
@@ -331,7 +335,7 @@ function calendarState(date:string,asOf:string,kind:string):Pick<CreditCalendarE
   return {status:date>asOf?'upcoming':date===asOf?'due':'completed',statusLabel:date>asOf?'待生效':kind==='expiry'?'已到期':'已生效'};
 }
 function calendarCreditEvent(event:CreditWeeklyNewsItem,asOf:string):CreditCalendarEvent {
-  const labels:Record<CreditEventType,string>={new:'授信新增',renewal:'授信续作',increase:'授信扩额',renewal_increase:'授信续作及扩额',decrease:'授信缩额',amendment:'授信分项额度变更',expiry:'授信到期',revocation:'授信撤销'};
+  const labels:Record<CreditEventType,string>={new:'授信新增',renewal:'授信续作',increase:'授信扩额',decrease:'授信缩额',amendment:'授信分项额度变更',expiry:'授信到期',revocation:'授信撤销'};
   return {id:`credit:${event.eventType}:${event.institutionName}:${event.reportDate}`,date:event.reportDate,
     type:event.eventType==='expiry'||event.eventType==='revocation'?'expiry':'added',kind:event.eventType==='revocation'?'revoked':event.eventType,
     institutionName:event.institutionName,label:`${labels[event.eventType]} · ${formatCalendarAmount(event.currentAmount)}亿元`,
@@ -546,7 +550,7 @@ function toLimitChange(news: CreditWeeklyNewsItem): CreditAmountChange {
   if (news.eventType === "new") {
     details.push("新增授信主体");
   }
-  if (news.eventType === "increase" || news.eventType === "renewal_increase") {
+  if (news.eventType === "increase") {
     details.push(`授信总额 ${amountTransition(news.previousAmount, news.currentAmount)}`);
   }
   if (news.eventType === "renewal") {
@@ -566,7 +570,13 @@ function toLimitChange(news: CreditWeeklyNewsItem): CreditAmountChange {
 }
 
 function isApprovalEvent(news: CreditWeeklyNewsItem): boolean {
-  return news.eventType === "new" || news.eventType === "renewal" || news.eventType === "increase" || news.eventType === "renewal_increase";
+  return news.eventType === "new" || news.eventType === "renewal" || news.eventType === "increase";
+}
+
+function isRenewalEvent(news: CreditWeeklyNewsItem): boolean {
+  return news.eventType === 'renewal' ||
+    (news.eventType === 'increase' && news.currentExpiryDate != null &&
+      news.previousExpiryDate != null && news.currentExpiryDate > news.previousExpiryDate);
 }
 
 function toSummary(
