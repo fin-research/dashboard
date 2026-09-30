@@ -11,13 +11,12 @@
     type CreditItemType, type CreditStatus } from '../credit/types.ts';
   import type { CreditInstitutionChanges, CreditInstitutionUpdateInput, CreditItemChanges } from '../credit/update.ts';
 
-  let { institutions, reportDate, onapplied }: {
+  let { institutions, onapplied }: {
     institutions: CreditInstitutionView[];
-    reportDate: string;
     onapplied: (date: string) => Promise<void>;
   } = $props();
 
-  type ItemDraft = { limitAmount: number | null; details: string; usedAmount: number | null; secondaryUsedAmount: number | null };
+  type ItemDraft = { limitAmount: number | null };
   type Draft = {
     institutionType: string; status: CreditStatus; confidentialityStatus: boolean;
     totalLimit: number | null; effectiveDate: string; expiryDate: string;
@@ -29,7 +28,7 @@
     new: '新增', renewal: '续期', increase: '扩额', revocation: '撤销', maintenance: '维护',
   };
   const operations: CreditApplicationType[] = ['new','renewal','increase','revocation'];
-  const applicationItemOrder: CreditItemType[] = ['bond_investment','yield_certificate','interbank_lending','legal_overdraft','other'];
+  const limitItemOrder: CreditItemType[] = ['bond_investment','yield_certificate','interbank_lending','legal_overdraft'];
   let dialog: Modal;
   let operation = $state<CreditApplicationType>('new');
   let institutionName = $state('');
@@ -47,8 +46,7 @@
       institutionType:'', status:'approved', confidentialityStatus:false, totalLimit:null,
       effectiveDate:'', expiryDate:'', bankOffice:'', applyingDepartment:'', handler:'',
       detail:'', bondPreference:'', notes:'',
-      items:Object.fromEntries(creditItemTypes.map(type => [type,
-        {limitAmount:null,details:'',usedAmount:null,secondaryUsedAmount:null}])) as Draft['items'],
+      items:Object.fromEntries(creditItemTypes.map(type => [type,{limitAmount:null}])) as Draft['items'],
     };
   }
 
@@ -61,14 +59,15 @@
       detail:row.detail ?? '',bondPreference:row.bondPreference ?? '',notes:row.notes ?? '',
       items:Object.fromEntries(creditItemTypes.map(type => {
         const item = row.items.find(value => value.type === type);
-        return [type,{limitAmount:item?.limitAmount ?? null,details:item?.details ?? '',
-          usedAmount:item?.usedAmount ?? null,secondaryUsedAmount:item?.secondaryUsedAmount ?? null}];
+        return [type,{limitAmount:item?.limitAmount ?? null}];
       })) as Draft['items'],
     };
   }
 
   export function open(): void {
-    businessDate = reportDate;
+    businessDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
     selectOperation('new');
     dialog.showModal();
   }
@@ -120,16 +119,11 @@
       if (draft.notes !== (original.notes ?? '')) institution.notes = draft.notes;
     }
     if (operation === 'new' || operation === 'increase') {
-      for (const type of creditItemTypes) {
+      for (const type of limitItemOrder) {
         const before = original?.items.find(item => item.type === type);
         const item = draft.items[type];
         const change: CreditItemChanges = {type};
-        if (type !== 'other' && item.limitAmount !== (before?.limitAmount ?? null)) change.limitAmount = item.limitAmount;
-        if (operation === 'new') {
-          if ((type === 'bond_investment' || type === 'other') && item.details !== (before?.details ?? '')) change.details = item.details;
-          if ((type === 'legal_overdraft' || type === 'other') && item.usedAmount !== (before?.usedAmount ?? null))
-            change.usedAmount = item.usedAmount;
-        }
+        if (item.limitAmount !== (before?.limitAmount ?? null)) change.limitAmount = item.limitAmount;
         if (Object.keys(change).length > 1) items.push(change);
       }
     }
@@ -183,18 +177,27 @@
           </NativeSelect></label>
         {/if}
         <label><span>业务生效日</span><Input required type="date" bind:value={businessDate} /></label>
-      </div>
-
-      {#if operation === 'new'}
-        <div class="tr-credit-editor-grid">
+        {#if selected && operation === 'increase'}
+          <label><span>扩额后总额（亿元）</span><Input required type="number" min="0" step="0.000001" value={draft.totalLimit ?? ''} oninput={event => draft.totalLimit = numberInput(event)} /></label>
+          <label><span>原总额（亿元）</span><Input value={selected.totalLimit ?? '—'} disabled /></label>
+        {/if}
+        {#if operation === 'new'}
           <label><span>机构性质</span><Input required maxlength={100} bind:value={draft.institutionType} /></label>
           <label><span>审批状态</span><NativeSelect bind:value={draft.status}><option value="approved">已获批</option><option value="applying">申请中</option></NativeSelect></label>
-          <label class="tr-credit-checkbox"><Checkbox checked={draft.confidentialityStatus} onCheckedChange={value => draft.confidentialityStatus = value === true} /><span>已签署保密协议</span></label>
+          <label><span>保密协议</span><NativeSelect value={draft.confidentialityStatus ? 'true' : 'false'}
+            onchange={event => draft.confidentialityStatus = (event.currentTarget as HTMLSelectElement).value === 'true'}>
+            <option value="true">已签署</option><option value="false">未签署</option>
+          </NativeSelect></label>
           <label><span>授信总额（亿元）</span><Input type="number" min="0" step="0.000001" value={draft.totalLimit ?? ''} oninput={event => draft.totalLimit = numberInput(event)} /></label>
           <label><span>生效日</span><Input type="date" bind:value={draft.effectiveDate} /></label>
           <label><span>到期日</span><Input type="date" bind:value={draft.expiryDate} /></label>
-        </div>
-      {:else if selected && operation === 'renewal'}
+          <label><span>银行经办机构</span><Input maxlength={500} bind:value={draft.bankOffice} /></label>
+          <label><span>我司申请部门</span><Input maxlength={500} bind:value={draft.applyingDepartment} /></label>
+          <label><span>我司经办人</span><Input maxlength={200} bind:value={draft.handler} /></label>
+        {/if}
+      </div>
+
+      {#if selected && operation === 'renewal'}
         <div class="tr-credit-application-current">原期限 <strong>{selected.effectiveDate ?? '—'} 至 {selected.expiryDate ?? '—'}</strong> · 原总额 <strong>{selected.totalLimit ?? '—'}亿元</strong></div>
         <div class="tr-credit-editor-grid">
           <label><span>新生效日</span><Input required type="date" bind:value={draft.effectiveDate} /></label>
@@ -202,44 +205,35 @@
           <label><span>续期后总额（亿元）</span><Input type="number" min="0" step="0.000001" value={draft.totalLimit ?? ''} oninput={event => draft.totalLimit = numberInput(event)} /></label>
         </div>
       {:else if selected && operation === 'increase'}
-        <div class="tr-credit-application-current">原总额 <strong>{selected.totalLimit ?? '—'}亿元</strong></div>
-        <div class="tr-credit-editor-grid">
-          <label><span>扩额后总额（亿元）</span><Input required type="number" min="0" step="0.000001" value={draft.totalLimit ?? ''} oninput={event => draft.totalLimit = numberInput(event)} /></label>
+        <div class="tr-credit-editor-grid tr-credit-increase-grid">
+          {#each limitItemOrder as type}
+            <label><span>{creditItemLabels[type]}（亿元）</span><Input type="number" min="0" step="0.000001" value={draft.items[type].limitAmount ?? ''} oninput={event => draft.items[type].limitAmount = numberInput(event)} /></label>
+          {/each}
         </div>
       {:else if selected && operation === 'revocation'}
         <div class="tr-credit-application-current">{selected.institutionName} · {selected.totalLimit ?? '—'}亿元 · 到期日 {selected.expiryDate ?? '—'}</div>
         <label class="tr-credit-application-confirm"><Checkbox checked={confirmedRevocation} onCheckedChange={value => confirmedRevocation = value === true} /><span>确认撤销该机构授信</span></label>
       {/if}
 
-      {#if operation === 'new' || operation === 'increase'}
-        <div class="tr-credit-item-grid">
-          {#each applicationItemOrder as type}
-            {#if operation === 'new' || type !== 'other'}
-            <fieldset class:tr-credit-item-other={type === 'other'}>
-              <legend>{creditItemLabels[type]}</legend>
-              {#if type !== 'other'}<label><span>额度（亿元）</span><Input type="number" min="0" step="0.000001" value={draft.items[type].limitAmount ?? ''} oninput={event => draft.items[type].limitAmount = numberInput(event)} /></label>{/if}
-              {#if operation !== 'increase'}
-                {#if type === 'legal_overdraft' || type === 'other'}
-                  <label><span>已用（亿元）</span><Input type="number" step="0.000001" value={draft.items[type].usedAmount ?? ''} oninput={event => draft.items[type].usedAmount = numberInput(event)} /></label>
-                {/if}
-                {#if type === 'bond_investment' || type === 'other'}<label><span>说明</span><Textarea rows={2} bind:value={draft.items[type].details} /></label>{/if}
-              {/if}
-            </fieldset>
-            {/if}
+      {#if operation === 'new'}
+        <div class="tr-credit-editor-grid tr-credit-application-limit-grid">
+          {#each limitItemOrder as type}
+            <label><span>{creditItemLabels[type]}（亿元）</span><Input type="number" min="0" step="0.000001" value={draft.items[type].limitAmount ?? ''} oninput={event => draft.items[type].limitAmount = numberInput(event)} /></label>
           {/each}
         </div>
       {/if}
 
       {#if operation === 'new'}
         <div class="tr-credit-notes-grid">
-          <label><span>授信额度描述</span><Textarea rows={2} bind:value={draft.detail} /></label>
-          <label><span>债券投资偏好</span><Textarea rows={2} bind:value={draft.bondPreference} /></label>
-          <label><span>银行经办机构</span><Input bind:value={draft.bankOffice} /></label>
-          <label><span>我司申请部门</span><Input bind:value={draft.applyingDepartment} /></label>
-          <label><span>我司经办人</span><Input bind:value={draft.handler} /></label>
+          <label><span>授信额度明细</span><Textarea rows={1} bind:value={draft.detail} /></label>
+          <label><span>债券投资偏好</span><Textarea rows={1} bind:value={draft.bondPreference} /></label>
+          <label><span>备注</span><Textarea rows={1} bind:value={draft.notes} /></label>
+        </div>
+      {:else}
+        <div class="tr-credit-notes-grid tr-credit-notes-grid--single">
+          <label><span>备注</span><Textarea rows={1} bind:value={draft.notes} /></label>
         </div>
       {/if}
-      <label class="tr-credit-application-notes"><span>备注</span><Textarea rows={2} bind:value={draft.notes} /></label>
       {#if errorText}<p class="tr-credit-application-error" role="alert">{errorText}</p>{/if}
       <div class="dialog-actions">
         <Button type="button" variant="outline" disabled={submitting} onclick={() => dialog.close()}>取消</Button>

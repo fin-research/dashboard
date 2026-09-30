@@ -27,6 +27,10 @@ const app=mount(View,{context,target:document.querySelector('#host'),props:{tab:
 flushSync(()=>document.querySelector('.tr-credit-table tbody tr button').click());await settle();
 const detail=document.querySelector('.tr-credit-detail');
 assert.ok(detail);
+const recordDate=[...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='记录日期').querySelector('input');
+assert.equal(recordDate.value,new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
+recordDate.value='2026-09-12';recordDate.dispatchEvent(new window.Event('input',{bubbles:true}));
+recordDate.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
 const date=[...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='到期日').querySelector('input');
 assert.equal(date.disabled,false);
 assert.equal([...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='可用额度（亿元）').querySelector('input').disabled,true);
@@ -37,6 +41,7 @@ const save=[...detail.querySelectorAll('button')].find(button=>button.textConten
 assert.ok(save);detail.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
 assert.equal(writes.length,1);
 assert.equal(writes[0].operation,'maintenance');
+assert.equal(writes[0].reportDate,'2026-09-12');
 assert.equal(writes[0].changes.institution.expiryDate,'2027-08-31');
 assert.equal(institution.expiryDate,'2027-08-31');
 assert.match(document.body.textContent,/授信申请/);

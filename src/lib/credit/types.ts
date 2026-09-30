@@ -114,7 +114,6 @@ export const creditEventTypes = [
   "new",
   "renewal",
   "increase",
-  "renewal_increase",
   "expiry",
   "revocation",
   "decrease",
@@ -154,7 +153,7 @@ export interface CreditCalendarEvent {
   id: string;
   date: string;
   type: "expiry" | "added" | "usage";
-  kind: "expiry" | "revoked" | "new" | "renewal" | "increase" | "renewal_increase" | "decrease" | "amendment" | "usage";
+  kind: "expiry" | "revoked" | "new" | "renewal" | "increase" | "decrease" | "amendment" | "usage";
   institutionName: string;
   label: string;
   itemType?: CreditItemType;

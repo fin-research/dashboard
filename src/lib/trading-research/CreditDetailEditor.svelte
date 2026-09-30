@@ -17,7 +17,13 @@
   const canEdit = $derived($allowed('credit.institution:update'));
   const itemOrder: CreditItemType[] = ['bond_investment', 'yield_certificate', 'interbank_lending', 'legal_overdraft', 'other'];
   let draft = $state<CreditMaintenanceDraft>(null!);
-  $effect.pre(() => { draft = creditMaintenanceDraft(institution); });
+  let recordDate = $state('');
+  $effect.pre(() => {
+    draft = creditMaintenanceDraft(institution);
+    recordDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
+  });
   let saving = $state(false);
   const amounts = $derived(creditMaintenanceAmounts(institution, draft));
 
@@ -31,6 +37,10 @@
   async function save(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (!canEdit || saving) return;
+    if (!recordDate) {
+      globalMessages.error('请选择记录日期');
+      return;
+    }
     if (draft.effectiveDate && draft.expiryDate && draft.effectiveDate > draft.expiryDate) {
       globalMessages.error('授信到期日不能早于生效日');
       return;
@@ -42,9 +52,9 @@
     }
     saving = true;
     try {
-      await updateCreditInstitution({ operation: 'maintenance', reportDate: institution.reportDate,
+      await updateCreditInstitution({ operation: 'maintenance', reportDate: recordDate,
         institutionName: institution.institutionName, changes }, fetch);
-      await onapplied(institution.reportDate, institution.institutionName);
+      await onapplied(recordDate, institution.institutionName);
       globalMessages.success('授信维护已保存');
     } catch (error) {
       globalMessages.error(error instanceof Error ? error.message : '授信维护保存失败');
@@ -56,7 +66,8 @@
 
 <form class="tr-credit-detail" onsubmit={save}>
   <div class="tr-credit-editor-head">
-    <strong>{institution.institutionName} · {institution.reportDate}</strong>
+    <strong>{institution.institutionName}</strong>
+    <label class="tr-credit-record-date"><span>记录日期</span><Input required type="date" bind:value={recordDate} disabled={!canEdit || saving} /></label>
     <Button permission="credit.institution:update" type="submit" disabled={saving}>{saving ? '保存中' : '保存'}</Button>
   </div>
   <div class="tr-credit-editor-grid">
@@ -102,14 +113,14 @@
           <label><span>可用（亿元）</span><Input value={formatAmount(amounts.remaining[type])} disabled /></label>
         {/if}
         {#if type === 'bond_investment' || type === 'other'}
-          <label><span>说明</span><Textarea rows={2} maxlength={4000} bind:value={draft.items[type].details} disabled={!canEdit || saving} /></label>
+          <label><span>说明</span><Textarea rows={1} maxlength={4000} bind:value={draft.items[type].details} disabled={!canEdit || saving} /></label>
         {/if}
       </fieldset>
     {/each}
   </div>
   <div class="tr-credit-notes-grid">
-    <label><span>授信额度明细</span><Textarea rows={3} maxlength={4000} bind:value={draft.detail} disabled={!canEdit || saving} /></label>
-    <label><span>债券投资偏好</span><Textarea rows={3} maxlength={4000} bind:value={draft.bondPreference} disabled={!canEdit || saving} /></label>
-    <label><span>备注</span><Textarea rows={3} maxlength={8000} bind:value={draft.notes} disabled={!canEdit || saving} /></label>
+    <label><span>授信额度明细</span><Textarea rows={1} maxlength={4000} bind:value={draft.detail} disabled={!canEdit || saving} /></label>
+    <label><span>债券投资偏好</span><Textarea rows={1} maxlength={4000} bind:value={draft.bondPreference} disabled={!canEdit || saving} /></label>
+    <label><span>备注</span><Textarea rows={1} maxlength={8000} bind:value={draft.notes} disabled={!canEdit || saving} /></label>
   </div>
 </form>

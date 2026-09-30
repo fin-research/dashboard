@@ -150,19 +150,34 @@ test("初始截面不生成周度变化且单个数据库连接顺序执行", as
   assert.deepEqual(report.usageChanges,[]);assert.ok(report.calendarEvents.some(event=>event.type==='expiry'));
 });
 
+test('周报对比期包含真实的上一周新增和到期事件数', async t => {
+  const db=await creditDatabase(t);
+  await seedCredit(db,'2026-08-01','基准银行');
+  await seedCredit(db,'2026-08-03','前周新增一',{expiry_date:'2027-08-30'},'new');
+  await seedCredit(db,'2026-08-07','前周新增二',{expiry_date:'2027-08-30'},'new');
+  await db.query("SELECT credit.append_diff('2026-08-07','基准银行','{\"status\":\"revoked\"}'::jsonb,'auth0|test','revocation')");
+  await seedCredit(db,'2026-08-15','本周新增',{expiry_date:'2027-08-30'},'new');
+  const report=await loadCreditReport(db,'2026-08-15');
+  assert.equal(report.previousDate,'2026-08-08');
+  assert.equal(report.weeklySummary.addedInstitutionCount,1);
+  assert.equal(report.previousWeeklySummary.addedInstitutionCount,2);
+  assert.equal(report.weeklySummary.expiredInstitutionCount,0);
+  assert.equal(report.previousWeeklySummary.expiredInstitutionCount,1);
+});
+
 test("周报读取申请事件并筛选近六个月批复", async t => {
   const db=await creditDatabase(t);
   await seedCredit(db,'2026-08-14','甲银行',{expiry_date:'2026-12-31'});
   await seedCredit(db,'2026-08-14','乙银行',{total:2,bond_investment_secondary_used:1,expiry_date:'2026-08-20'});
-  await db.query("SELECT credit.append_diff('2026-08-21','甲银行','{\"total\":12,\"bond_investment_secondary_used\":4,\"expiry_date\":\"2027-12-31\"}', 'auth0|test','renewal_increase')");
+  await db.query("SELECT credit.append_diff('2026-08-21','甲银行','{\"total\":12,\"bond_investment_secondary_used\":4,\"expiry_date\":\"2027-12-31\"}', 'auth0|test','increase')");
   await db.query("SELECT credit.append_diff('2026-08-21','乙银行','{\"status\":\"revoked\"}', 'auth0|test','revocation')");
   await seedCredit(db,'2026-08-21','丙银行',{total:5,bond_investment_secondary_used:0,effective_date:'2026-08-21'},'new');
   const report=await loadCreditReport(db,'2026-08-21');
   assert.equal(report.summary.totalLimit,17);assert.equal(report.summary.totalUsed,4);
   assert.equal(report.weeklySummary.addedInstitutionCount,1);assert.equal(report.weeklySummary.expiredInstitutionCount,2);
-  assert.deepEqual(report.weeklyNews.map(x=>x.eventType).sort(),['expiry','new','renewal_increase','revocation']);
+  assert.deepEqual(report.weeklyNews.map(x=>x.eventType).sort(),['expiry','increase','new','revocation']);
   assert.deepEqual(report.recentApprovals.map(x=>x.institutionName).sort(),['丙银行','甲银行'].sort());
-  assert.ok(report.calendarEvents.some(e=>e.label==='授信续作及扩额 · 12亿元'));
+  assert.ok(report.calendarEvents.some(e=>e.label==='授信扩额 · 12亿元'));
   assert.ok(report.calendarEvents.some(e=>e.label==='债券投资——二级买卖 · 增加1亿元'));
   assert.equal(report.calendarEvents.some(e=>e.kind==='renewal'),false);
 });

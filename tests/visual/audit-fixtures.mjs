@@ -2,6 +2,8 @@ import {credit,today} from './fixtures.mjs';
 import {creditItemTypes,creditItemLabels} from '../../src/lib/credit/types.ts';
 export const creditFull=structuredClone(credit);
 creditFull.previousDate='2026-09-08';
+creditFull.previousSummary={...creditFull.summary,reportDate:'2026-09-08',totalLimit:28,totalUsed:9,totalAvailable:19,utilization:32.14,expiringWithin30Days:0};
+creditFull.previousWeeklySummary={...creditFull.previousSummary,addedInstitutionCount:2,expiredInstitutionCount:1};
 for(const institution of creditFull.institutions){
   institution.updatedAt='2026-09-15T08:00:00Z';
   institution.clients=[{id:'fixture-client',name:'测试关联客户'}];

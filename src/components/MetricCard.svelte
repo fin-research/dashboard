@@ -116,6 +116,16 @@
     padding-block: 6px;
   }
 
+  :global(.research-metric-card--compact) .research-metric-card__icon,
+  :global(.research-metric-card--compact) .research-metric-card__icon :global(svg) {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  :global(.research-metric-card--compact) .research-metric-card__icon {
+    flex-basis: 2.5rem;
+  }
+
   :global(.research-metric-card--report) {
     --metric-report-background: #f8fafc;
     min-height: 78px;

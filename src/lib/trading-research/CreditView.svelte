@@ -323,11 +323,20 @@
     return value == null ? "—" : value.toFixed(2);
   }
 
+  function weeklyChange(current: number, previous: number | null | undefined, unit: string, digits = 2) {
+    if (previous == null) return { detailPrefix: '较上周', detail: `—${unit}`, detailTone: '' };
+    const change = Number((current - previous).toFixed(digits));
+    return {
+      detailPrefix: '较上周',
+      detail: `${change > 0 ? '+' : ''}${change}${unit}`,
+      detailTone: change > 0 ? 'tone-withdraw' : change < 0 ? 'tone-inject' : '',
+    };
+  }
+
   function creditEventLabel(eventType: CreditWeeklyNewsItem["eventType"]): string {
     return {
       new: "新增",
       renewal: "续作",
-      renewal_increase: "续作及扩额",
       increase: "扩额",
       expiry: "到期",
       revocation: "撤销",
@@ -340,7 +349,7 @@
     eventType: CreditWeeklyNewsItem["eventType"],
   ): "info" | "success" | "warning" | "neutral" {
     if (eventType === "new") return "success";
-    if (eventType === "increase" || eventType === "renewal_increase") return "warning";
+    if (eventType === "increase") return "warning";
     if (eventType === "renewal") return "info";
     return "neutral";
   }
@@ -389,7 +398,7 @@
   </div>
 
   {#if report && activeTab === "overview"}
-    <CreditApplicationDialog bind:this={applicationDialog} institutions={report.institutions} reportDate={report.summary.reportDate} onapplied={async (date) => loadReport(date)} />
+    <CreditApplicationDialog bind:this={applicationDialog} institutions={report.institutions} onapplied={async (date) => loadReport(date)} />
   {/if}
 
   {#if loading}
@@ -407,11 +416,11 @@
     <section aria-labelledby="credit-metrics-title">
       <SectionHeading id="credit-metrics-title" title="授信总览" />
       <div class="tr-metric-grid tr-metric-grid--five tr-credit-metric-grid">
-        <MetricCard label="授信总额" value={report.summary.totalLimit.toFixed(1)} unit="亿元" detail={`${report.summary.institutionCount}家机构`} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
-        <MetricCard label="已用额度" value={report.summary.totalUsed.toFixed(1)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
-        <MetricCard label="可用额度" value={report.summary.totalAvailable.toFixed(1)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
-        <MetricCard label="30日内到期" value={String(report.summary.expiringWithin30Days)} unit="笔" iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="red" compact />
-        <MetricCard label="额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" detail={report.previousSummary ? `${report.summary.utilization - report.previousSummary.utilization >= 0 ? "+" : ""}${(report.summary.utilization - report.previousSummary.utilization).toFixed(1)}个百分点较上期` : `${report.summary.approvedCount}家已获批`} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact />
+        <MetricCard label="授信总额" value={report.summary.totalLimit.toFixed(1)} {...weeklyChange(report.summary.totalLimit, report.previousSummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
+        <MetricCard label="已用额度" value={report.summary.totalUsed.toFixed(1)} {...weeklyChange(report.summary.totalUsed, report.previousSummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
+        <MetricCard label="可用额度" value={report.summary.totalAvailable.toFixed(1)} {...weeklyChange(report.summary.totalAvailable, report.previousSummary?.totalAvailable, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
+        <MetricCard label="30日内到期" value={String(report.summary.expiringWithin30Days)} unit="笔" {...weeklyChange(report.summary.expiringWithin30Days, report.previousSummary?.expiringWithin30Days, '笔', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="red" compact />
+        <MetricCard label="额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" {...weeklyChange(report.summary.utilization, report.previousSummary?.utilization, '个百分点', 1)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact />
       </div>
     </section>
 
@@ -568,11 +577,11 @@
       <section aria-labelledby="credit-weekly-title">
         <SectionHeading id="credit-weekly-title" title="授信周报" />
         <div class="tr-metric-grid tr-metric-grid--five">
-          <MetricCard label="授信总额" value={formatAmount(report.weeklySummary.totalLimit)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" />
-          <MetricCard label="已用额度" value={formatAmount(report.weeklySummary.totalUsed)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" />
-          <MetricCard label="可用额度" value={formatAmount(report.weeklySummary.totalAvailable)} unit="亿元" iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" />
-          <MetricCard label="新增授信" value={String(report.weeklySummary.addedInstitutionCount)} unit="家" iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="purple" />
-          <MetricCard label="到期" value={String(report.weeklySummary.expiredInstitutionCount)} unit="家" iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="red" />
+          <MetricCard label="授信总额" value={formatAmount(report.weeklySummary.totalLimit)} {...weeklyChange(report.weeklySummary.totalLimit, report.previousWeeklySummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact />
+          <MetricCard label="已用额度" value={formatAmount(report.weeklySummary.totalUsed)} {...weeklyChange(report.weeklySummary.totalUsed, report.previousWeeklySummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact />
+          <MetricCard label="可用额度" value={formatAmount(report.weeklySummary.totalAvailable)} {...weeklyChange(report.weeklySummary.totalAvailable, report.previousWeeklySummary?.totalAvailable, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact />
+          <MetricCard label="新增授信" value={String(report.weeklySummary.addedInstitutionCount)} unit="家" {...weeklyChange(report.weeklySummary.addedInstitutionCount, report.previousWeeklySummary?.addedInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="purple" compact />
+          <MetricCard label="到期" value={String(report.weeklySummary.expiredInstitutionCount)} unit="家" {...weeklyChange(report.weeklySummary.expiredInstitutionCount, report.previousWeeklySummary?.expiredInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="red" compact />
         </div>
       </section>
 
