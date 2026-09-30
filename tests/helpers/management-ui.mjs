@@ -62,6 +62,24 @@ assert.ok(document.querySelector('.scope-section[aria-label="市场研究"]'),'c
 assert.equal(search.value,'市场','changing scope preserves the search');
 await unmount(rolesApp);
 const LoadingPage=await loadComponent('src/routes/management/people/+page.svelte');
+let peopleReads=0;
+globalThis.fetch=async url=>{
+  if(url==='/api/management/people'){
+    peopleReads++;
+    return peopleReads===1 ? Response.json({detail:'暂时不可用'},{status:503}) : Response.json(people);
+  }
+  return Response.json({user:null,account:null});
+};
+const directApp=mount(LoadingPage,{context,target:document.body,props:{data:{tab:'people',view:null,permissions:[]}}});
+flushSync();
+for(let i=0;i<5;i++){await new Promise(resolve=>setTimeout(resolve,0));flushSync();}
+assert.equal(peopleReads,1);
+assert.match(document.querySelector('[role="alert"]').textContent,/人员资料加载失败/);
+flushSync(()=>[...document.querySelectorAll('button')].find(button=>button.textContent==='重试').click());
+for(let i=0;i<5;i++){await new Promise(resolve=>setTimeout(resolve,0));flushSync();}
+assert.equal(peopleReads,2);
+assert.match(document.querySelector('.people-list').textContent,/测试人员/);
+await unmount(directApp);
 let resolveView;
 const pendingView=new Promise(resolve=>{resolveView=resolve;});
 const loadingApp=mount(LoadingPage,{context,target:document.body,props:{data:{tab:'people',view:pendingView,permissions:['auth.permission:update']}}});

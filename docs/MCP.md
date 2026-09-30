@@ -37,4 +37,4 @@
 - 构建后 `GATEWAY_CHECKOUT=<gateway-worktree> node scripts/verify-mcp-integration.mjs` 覆盖实际 Gateway → 构建 SvelteKit → 私有授权桥接 → 原业务 handler，验证页面读取、交易进度写入回读、named action 校验和权限撤销；外部数据使用内存夹具。
 - Gateway `tests/dashboard-mcp.test.mjs` 覆盖用户/机器/匿名与 CSRF 边界、凭据移除、当前权限撤销、路由/命名 action 再授权及拒绝外部/递归目标。
 - Gateway 先发布授权桥接，再经 Dashboard 合并队列验证和 Git 自动部署。Portal 配置与程序化 Auth0 验收见 [Gateway MCP](../../gateway/docs/MCP.md)。
-- 真实门户验收：通过项目组 `scripts/cloudflare_env.py` 运行 Gateway 的 `scripts/configure-mcp-portal.mjs dashboard` 与 `scripts/verify-managed-mcp.mjs --dashboard --check-catalog`。只对测试账号逐用户授权；不替换 Data/研究库配置。
+- 真实门户验收：在 Gateway 仓库通过 `node --env-file=../eastmoney/.env` 运行 `scripts/configure-mcp-portal.mjs dashboard` 与 `scripts/verify-managed-mcp.mjs --dashboard --check-catalog`。只对测试账号逐用户授权；不替换 Data/研究库配置。
