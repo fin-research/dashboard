@@ -89,3 +89,17 @@ test('absolute hit rate round-trips without relabelling historical sigma success
   assert.equal((await loadIssuanceModelReport(db,id)).snapshot.validation.metrics[0].hit_rate_5bp,.6);
  }finally{await db.close();}
 });
+
+
+test('composite market and coupon attribution round-trips without weakening additive validation',async()=>{
+ const db=await database();try{
+  const value=snapshot();value.explanation.method='additive_market_coupon';
+  const id=await publish(db,value),report=await loadIssuanceModelReport(db,id);
+  assert.equal(report.snapshot.explanation.method,'additive_market_coupon');
+  assert.deepEqual(report.snapshot.explanation.features,value.explanation.features);
+  const broken=structuredClone(value);broken.generated_at='2026-08-24T05:00:00Z';broken.explanation.features[0].shap_bp+=1;
+  await assert.rejects(publish(db,broken),/Invalid coupon SHAP/);
+  const unknown=structuredClone(value);unknown.explanation.method='unknown';
+  await assert.rejects(publish(db,unknown),/Invalid coupon SHAP/);
+ }finally{await db.close();}
+});
