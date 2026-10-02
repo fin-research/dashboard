@@ -23,6 +23,7 @@ test('issuance publication round-trips coupon and SHAP while retaining daily man
   assert.deepEqual(report.snapshot.product_scenarios,first.product_scenarios);
   assert.equal(report.snapshot.validation.metrics.length,2);
   assert.equal(report.snapshot.validation.metrics[0].win_rate,.68);
+  assert.equal(report.snapshot.validation.metrics[0].hit_rate_5bp,.625);
   assert.equal(report.snapshot.market_forecast.length,11);
   assert.equal((await db.query('SELECT predicted_deviation_bp FROM financing_model.model_run')).rows[0].predicted_deviation_bp,null);
   await saveFinancingModelConclusion(db,{runId:id,verdict:'人工结论',preferredWindow:'下周',narrative:'保留人工判断'});
@@ -68,5 +69,23 @@ test('unified coupon bundle preserves the report and rejects superseded model pa
   assert.deepEqual(report.snapshot.decision.low_rate_dates,value.decision.low_rate_dates);
   assert.equal(report.conclusion.narrative,'等待');
   assert.equal((await db.query('SELECT model_name,online_feature_version FROM financing_model.model_run WHERE id=$1',[id])).rows[0].model_name,'issuance-coupon');
+ }finally{await db.close();}
+});
+
+
+test('absolute hit rate round-trips without relabelling historical sigma success', async () => {
+ const db=await database();try {
+  const old=snapshot();for(const row of old.validation.metrics)delete row.hit_rate_5bp;
+  const id=await publish(db,old);
+  const legacy=(await loadIssuanceModelReport(db,id)).snapshot.validation.metrics;
+  assert.equal(legacy[0].hit_rate_5bp,null);assert.equal(legacy[0].win_rate,.68);
+  const fresh=structuredClone(old);fresh.generated_at='2026-08-24T05:00:00Z';
+  for(const row of fresh.validation.metrics){row.hit_rate_5bp=.6;row.win_rate=null;}
+  await publish(db,fresh);
+  const current=(await loadIssuanceModelReport(db,id)).snapshot.validation.metrics;
+  assert.equal(current[0].hit_rate_5bp,.6);assert.equal(current[0].win_rate,null);assert.equal(current[0].error_std_bp,5);
+  fresh.generated_at='2026-08-24T06:00:00Z';fresh.validation.metrics[0].hit_rate_5bp=1.1;
+  await assert.rejects(publish(db,fresh),/check constraint/);
+  assert.equal((await loadIssuanceModelReport(db,id)).snapshot.validation.metrics[0].hit_rate_5bp,.6);
  }finally{await db.close();}
 });

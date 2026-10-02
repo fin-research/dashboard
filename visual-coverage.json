@@ -586,7 +586,7 @@
       "id": "financing-model",
       "url": "/trading-research/financing-model",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "market-only Chinese factor contributions and absolute 5bp accuracy",
       "evidence": [
         {
           "spec": "tests/visual/reports.spec.mjs",

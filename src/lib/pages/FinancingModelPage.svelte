@@ -418,7 +418,7 @@
       {label:"训练样本",value:first ? String(first.market_training_samples) : "—"},
       {label:"训练截止",value:first?.market_train_label_end ?? "—"},
       {label:`${year}检验样本`,value:observed ? String(observed.samples) : "—"},
-      {label:`${year}预测胜率（1σ）`,value:observed?.win_rate == null ? "—" : `${(observed.win_rate*100).toFixed(1)}%`},
+      {label:`${year}预测命中率（±5bp）`,value:observed?.hit_rate_5bp == null ? "—" : `${(observed.hit_rate_5bp*100).toFixed(1)}%`},
       {label:"平均误差",value:observed ? `${observed.mae_bp.toFixed(1)} bp` : "—"},
     ];
   })() : []);

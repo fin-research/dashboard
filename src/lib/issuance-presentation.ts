@@ -21,27 +21,78 @@ export function issuanceDecisionNarrative(snapshot: IssuanceSnapshot): string | 
 }
 
 export type ShapGroup = { display_name: string; absolute_bp: number; net_bp: number };
-const groups = [
-  '利率', '信用', '资金', '宏观', '一级发行', '二级成交', '日历', '其他',
-] as const;
-
-function shapGroup(feature: string): typeof groups[number] {
-  if (feature.startsWith('macro_')) return '宏观';
-  if (/^(supply_|issue_count_|weighted_cost|net_financing|maturity_wall|redemption_pressure)/.test(feature)) return '一级发行';
-  if (/^(bond_volume_|credit_bond_volume_ratio|credit_volume_chg_|rate_credit_volume_ratio)/.test(feature)) return '二级成交';
-  if (/^(funding_|dr007|r007|shibor|omo)/.test(feature)) return '资金';
-  if (/^(rate_|gov)|cdb|policy_bond|term_spread|curve_curvature|short_term_spread/.test(feature)) return '利率';
-  if (/aaa|credit/.test(feature)) return '信用';
-  if (/weekday|day_of_week|month|quarter|year|calendar/.test(feature)) return '日历';
-  return '其他';
+const groups = ['利率', '信用', '资金', '宏观', '一级发行', '二级成交'] as const;
+type MarketGroup = typeof groups[number];
+type MarketFeature = { name: string; group: MarketGroup };
+/** Explicit market registry: issuer, terms, calendar and quality metadata stay in the API only. */
+export const issuanceMarketFeatures: Record<string, MarketFeature> = {};
+function register(group: MarketGroup, names: Record<string, string>) {
+  for (const [feature, name] of Object.entries(names)) issuanceMarketFeatures[feature] = { name, group };
+}
+register('资金', {
+  dr007:'存款类机构7天回购利率', dr007_vs_policy:'资金与政策利率差', r007_dr007_spread:'银行间与存款类回购利差',
+  shibor_3m:'上海银行间3个月拆借利率', dr007_ma5:'7天回购利率·5日均值', dr007_ma20:'7天回购利率·20日均值',
+  dr007_chg_5d:'7天回购利率·5日变化', dr007_chg_20d:'7天回购利率·20日变化',
+  dr007_vol_5d:'7天回购利率·5日波动', dr007_vol_20d:'7天回购利率·20日波动',
+  dr007_pctile_60d:'7天回购利率·60日分位', dr007_vs_ma5_dev:'7天回购利率·5日偏离',
+  dr007_vol_trend:'7天回购利率波动趋势', funding_credit_stress:'资金与信用压力',
+});
+register('利率', {
+  gov_10y:'10年国债收益率', known_treasury_bp:'同期限国债收益率', term_spread:'期限利差',
+  term_spread_chg_5d:'期限利差·5日变化', term_spread_chg_20d:'期限利差·20日变化',
+  term_spread_pctile_60d:'期限利差·60日分位', term_spread_slope_chg:'期限利差斜率变化',
+  gov_10y_chg_20d:'10年国债·20日变化', gov_10y_pctile_60d:'10年国债·60日分位',
+  cdb_gov_spread:'国开与国债利差', curve_curvature:'曲线曲率', short_term_spread:'短端期限利差',
+});
+register('信用', {
+  credit_spread:'信用利差', credit_spread_chg_5d:'信用利差·5日变化', credit_spread_chg_20d:'信用利差·20日变化',
+  credit_spread_pctile_60d:'信用利差·60日分位', credit_spread_vol_20d:'信用利差·20日波动',
+  yield_vol_5d:'券商债收益率·5日波动', industry_aaa_tenor_bp:'同期限券商行业收益率',
+  industry_aaa_minus_treasury_bp:'券商行业与国债利差',
+});
+for (const [key, title] of Object.entries({gov_1y:'1年国债',gov_3y:'3年国债',gov_10y:'10年国债',aaa_3y:'3年最高评级券商债'})) {
+  const group = key === 'aaa_3y' ? '信用' : '利率';
+  register(group, {[`rate_${key}_level`]:`${title}收益率`});
+  for (const lag of [1,5,20,60]) register(group, {[`rate_${key}_change_${lag}`]:`${title}变化`});
+  for (const period of [20,60]) register(group, {[`rate_${key}_deviation_${period}`]:`${title}偏离`});
+  register(group, {[`rate_${key}_volatility_20`]:`${title}波动率`});
+}
+for (const [key, title] of Object.entries({GDP:'国内生产总值',CPI:'居民消费价格',PPI:'工业生产者价格',PMI:'制造业采购经理指数',SOCIAL_FINANCE:'社融',M2:'广义货币'})) {
+  for (const [part, label] of Object.entries({level:'水平',change_1m:'1月变化',change_3m:'3月变化'})) register('宏观', {[`macro_${key}_${part}`]:`${title}·${label}`});
+}
+register('一级发行', {
+  weighted_cost:'一级加权融资成本', weighted_cost_chg_5d:'一级融资成本·5日变化', weighted_cost_chg_20d:'一级融资成本·20日变化',
+  net_financing_zscore:'净融资标准分', maturity_wall_20d:'到期偿还·20日', redemption_pressure:'偿付压力',
+  supply_funding_pressure:'发行与资金压力', peer_premium_mean_bp:'同业发行平均溢价', peer_premium_latest_bp:'同业最近发行溢价',
+  peer_weighted_premium_bp:'同业发行加权溢价', peer_weighted_latest_bp:'同业最近加权发行溢价',
+  peer_industry_basis_bp:'同业发行与行业利差', peer_industry_basis_latest_bp:'同业最近发行与行业利差',
+});
+for (const period of [5,20]) register('一级发行', {
+  [`supply_${period}d`]:`发行额·${period}日`, [`supply_${period}d_zscore`]:`发行额·${period}日标准分`,
+  [`issue_count_${period}d`]:`发行只数·${period}日`, [`net_financing_${period}d`]:`净融资额·${period}日`,
+});
+register('二级成交', {
+  bond_volume_20d_avg:'债券成交量·20日均值', bond_volume_chg_5d:'债券成交量·5日变化',
+  bond_volume_pctile_60d:'债券成交量·60日分位', credit_bond_volume_ratio:'信用债成交比',
+  credit_volume_chg_5d:'信用债成交量·5日变化', rate_credit_volume_ratio:'利率与信用成交比',
+});
+export function issuanceFeatureName(feature: string): string {
+  return issuanceMarketFeatures[feature]?.name ?? '未登记特征';
+}
+function shapGroup(feature: string): MarketGroup | undefined {
+  return issuanceMarketFeatures[feature]?.group;
+}
+function isObservedMarketFeature(row: NonNullable<IssuanceSnapshot['explanation']>['features'][number]) {
+  return shapGroup(row.feature) !== undefined && row.value !== null && Number.isFinite(row.value)
+    && Number.isFinite(row.shap_bp) && row.shap_bp !== 0;
 }
 
-/** Aggregate every actual tree SHAP contribution; the bar chart shows the top individual features. */
+/** Aggregate observed market SHAP contributions; the bar chart shows the top individual features. */
 export function groupIssuanceShap(features: NonNullable<IssuanceSnapshot['explanation']>['features']): ShapGroup[] {
   const totals = new Map<string, ShapGroup>();
   for (const feature of features) {
-    if (!Number.isFinite(feature.shap_bp) || feature.shap_bp === 0) continue;
-    const name = shapGroup(feature.feature);
+    if (!isObservedMarketFeature(feature)) continue;
+    const name = shapGroup(feature.feature)!;
     const group = totals.get(name) ?? { display_name: name, absolute_bp: 0, net_bp: 0 };
     group.net_bp += feature.shap_bp;
     totals.set(name, group);
@@ -51,7 +102,7 @@ export function groupIssuanceShap(features: NonNullable<IssuanceSnapshot['explan
 
 /** Keep real macro, issuance and trading contributors visible beside the top bars. */
 export function selectIssuanceShapDrivers(features: NonNullable<IssuanceSnapshot['explanation']>['features']) {
-  const ranked = features.filter(row => Number.isFinite(row.shap_bp) && row.shap_bp !== 0)
+  const ranked = features.filter(isObservedMarketFeature)
     .sort((left, right) => Math.abs(right.shap_bp) - Math.abs(left.shap_bp));
   const selected = new Map(ranked.slice(0, 8).map(row => [row.feature, row]));
   for (const group of ['宏观', '一级发行', '二级成交']) {

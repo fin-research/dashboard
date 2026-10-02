@@ -29,7 +29,7 @@ export const issuanceSnapshotSchema = z.object({
   explanation:z.object({method:z.enum(['tree_path_dependent','linear']),unit:z.literal('bp'),base_coupon_bp:number,prediction_coupon_bp:number,market_anchor_bp:number,issuer_premium_bp:number,horizon_drift_bp:number,tree_expected_change_bp:number,
     features:z.array(z.object({feature:z.string(),value:nullable,shap_bp:number}))}).nullable(),
   validation:z.object({sample_count:z.number().int(),prediction_start:z.string().date(),prediction_end:z.string().date(),
-    metrics:z.array(z.object({lead_days:z.number().int(),year:z.number().int(),samples:z.number().int(),mae_bp:number,rmse_bp:number,flat_market_mae_bp:number,mae_skill_vs_flat_market:nullable,win_rate:number.min(0).max(1).nullable(),error_std_bp:nullable,bias_bp:number}))}),
+    metrics:z.array(z.object({lead_days:z.number().int(),year:z.number().int(),samples:z.number().int(),mae_bp:number,rmse_bp:number,flat_market_mae_bp:number,mae_skill_vs_flat_market:nullable,win_rate:number.min(0).max(1).nullable(),hit_rate_5bp:number.min(0).max(1).nullable().default(null),error_std_bp:nullable,bias_bp:number}))}),
   base_conclusion:z.object({verdict:z.string(),preferred_window:z.string(),narrative:z.string()}),
 });
 const liquidityMetricSchema=z.object({date:z.string().date(),value_ratio:number,historical_percentile:number.min(0).max(100).nullable(),sample_count:z.number().int().nonnegative()});

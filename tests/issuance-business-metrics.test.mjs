@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { balanceWeightedIssuerSpread, loadIssuanceBusinessMetrics } from '../src/lib/server/issuance-business-metrics.ts';
-import { groupIssuanceShap, selectIssuanceShapDrivers, issuanceDecisionLabel, issuanceDecisionNarrative } from '../src/lib/issuance-presentation.ts';
+import { groupIssuanceShap, selectIssuanceShapDrivers, issuanceDecisionLabel, issuanceDecisionNarrative, issuanceFeatureName, issuanceMarketFeatures } from '../src/lib/issuance-presentation.ts';
 import { issuanceSnapshot } from './fixtures/issuance.mjs';
 
 test('published actions have one explicit business label', () => {
@@ -39,10 +39,10 @@ test('radar groups all actual tree contributions while retaining signs', () => {
     {feature:'rate_gov_10y_change_5',value:1,shap_bp:-.8},
   ])[0].absolute_bp, 0.19999999999999996);
   const expanded = [
-    ...Array.from({length: 8}, (_, index) => ({feature: `rate_gov_3y_change_${index}`, value: index, shap_bp: .2-index*.01})),
+    ...Array.from({length: 8}, (_, index) => ({feature: `rate_gov_${index < 4 ? '3y' : '10y'}_change_${[1,5,20,60][index%4]}`, value: index, shap_bp: .2-index*.01})),
     {feature:'macro_PMI_change_1m',value:.6,shap_bp:-.006},
     {feature:'net_financing_zscore',value:1.2,shap_bp:.004},
-    {feature:'credit_bond_volume_ratio',value:null,shap_bp:.002},
+    {feature:'credit_bond_volume_ratio',value:1,shap_bp:.002},
   ];
   assert.deepEqual(groupIssuanceShap(expanded).filter(row => ['宏观','一级发行','二级成交'].includes(row.display_name)).map(row=>row.display_name), ['宏观','一级发行','二级成交']);
   assert.deepEqual(selectIssuanceShapDrivers(expanded).filter(row => ['macro_PMI_change_1m','net_financing_zscore','credit_bond_volume_ratio'].includes(row.feature)).map(row=>row.feature), ['macro_PMI_change_1m','net_financing_zscore','credit_bond_volume_ratio']);
@@ -99,4 +99,18 @@ test('business metrics use as-of local-workbook LCR and complete daily issuer sp
   } finally {
     await db.close();
   }
+});
+
+
+test('factor presentation admits only observed registered market features with Chinese names', () => {
+  const excluded = ['issuer','issuer_secondary_spread_bp','issuer_shrunk_premium_bp','lead_days','tenor','issue_size','pricing_month','days_to_quarter_end','peer_observations','peer_weighted_neff','peer_industry_basis_age_days','industry_aaa_available','macro_PMI_release_age_days','unknown_credit'];
+  const rows = excluded.map(feature => ({feature,value:1,shap_bp:100}));
+  rows.push({feature:'peer_premium_mean_bp',value:12,shap_bp:-2.754},
+    {feature:'known_treasury_bp',value:170,shap_bp:1},
+    {feature:'industry_aaa_minus_treasury_bp',value:20,shap_bp:-.5},
+    {feature:'bond_volume_20d_avg',value:null,shap_bp:1},
+    {feature:'dr007',value:NaN,shap_bp:1});
+  assert.deepEqual(selectIssuanceShapDrivers(rows).map(row => row.feature), ['peer_premium_mean_bp','known_treasury_bp','industry_aaa_minus_treasury_bp']);
+  assert.deepEqual(groupIssuanceShap(rows).map(row => [row.display_name,row.net_bp]), [['利率',1],['信用',-.5],['一级发行',-2.754]]);
+  for (const key of Object.keys(issuanceMarketFeatures)) assert.doesNotMatch(issuanceFeatureName(key), /[a-zA-Z_]/);
 });
