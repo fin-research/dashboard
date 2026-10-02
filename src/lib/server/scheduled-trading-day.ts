@@ -24,11 +24,16 @@ export async function scheduledTradingDay(env: Pick<Env, "DATA">, date: string):
     let offset = 0;
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     const calendar = tradingDaySchema.parse(JSON.parse(new TextDecoder().decode(bytes)));
-    if (calendar.date !== date || calendar.previousTradingDate >= date) throw new Error("Trading calendar date mismatch");
+    if (calendar.date !== date || !validDate(calendar.previousTradingDate) || calendar.previousTradingDate >= date) throw new Error("Trading calendar date mismatch");
     if (!calendar.isTradingDay) console.log(JSON.stringify({ event: "market_briefing_cron_skipped", date, reason: "market_closed" }));
     return calendar.isTradingDay;
   } catch (error) {
     console.error(JSON.stringify({ event: "market_briefing_calendar_unavailable", date }));
     throw error;
   }
+}
+
+function validDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value))
+    && new Date(value).toISOString().slice(0, 10) === value;
 }

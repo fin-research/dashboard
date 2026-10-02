@@ -23,6 +23,8 @@ for (const [payload, status] of [
   [{ date: "2026-09-30", isTradingDay: true, previousTradingDate: "2026-09-29" }, 200],
   [{ date: "2026-10-01", isTradingDay: "false", previousTradingDate: "2026-09-30" }, 200],
   [{ date: "2026-10-01", isTradingDay: true, previousTradingDate: "2026-10-01" }, 200],
+  [{ date: "2026-10-01", isTradingDay: true, previousTradingDate: "" }, 200],
+  [{ date: "2026-10-01", isTradingDay: true, previousTradingDate: "2026-02-30" }, 200],
   [{}, 503],
 ]) test(`calendar failure does not create a workflow: ${JSON.stringify(payload)}/${status}`, async () => {
   const h = harness(payload, status);
