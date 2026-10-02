@@ -165,7 +165,7 @@ test('今日聚焦模块内新闻详情并发上限五；AI失败重放不重新
 for (const reportDate of ['2026-09-25', '2026-08-23']) {
   test(`${reportDate}非交易日直接跳过，不创建Workflow或step`, async () => {
     let created = 0;
-    const env = { MARKET_BRIEFING: { create: async () => { created++; throw new Error('must not enter Workflow'); } } };
+    const env = { DATA: { fetch: async () => Response.json({ date: reportDate, isTradingDay: false, previousTradingDate: '2026-08-21' }) }, MARKET_BRIEFING: { create: async () => { created++; throw new Error('must not enter Workflow'); } } };
     assert.equal(await startMarketBriefing(env, Date.parse(`${reportDate}T09:00:00Z`)), undefined);
     assert.equal(created, 0);
   });
@@ -197,7 +197,7 @@ test('跨日的未完成实时采集失败，不保存错日行情', async t => 
 test('重复Cron使用上海日确定性ID且只确认真实存在的实例', async () => {
   let id;
   const instance = { status: async () => ({ status: 'running' }) };
-  const env = { MARKET_BRIEFING: { create: async options => { id = options.id; throw new Error('exists'); }, get: async () => instance } };
+  const env = { DATA: { fetch: async () => Response.json({ date: '2026-08-25', isTradingDay: true, previousTradingDate: '2026-08-24' }) }, MARKET_BRIEFING: { create: async options => { id = options.id; throw new Error('exists'); }, get: async () => instance } };
   assert.equal(await startMarketBriefing(env, Date.parse('2026-08-25T09:00:00Z')), instance);
   assert.equal(id, 'market-briefing-2026-08-25');
   instance.status = async () => { throw new Error('not found'); };

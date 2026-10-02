@@ -1,5 +1,5 @@
 import type { WorkflowStep } from "cloudflare:workers";
-import { knownMarketClosure } from "../src/lib/server/market-calendar.ts";
+import { scheduledTradingDay } from "../src/lib/server/scheduled-trading-day.ts";
 import { currentReportDate } from "../src/report-date.ts";
 import { generateMarketBriefingFromNews } from "../src/lib/server/market-briefing.ts";
 import {
@@ -14,7 +14,7 @@ export const MARKET_BRIEFING_CRON = "0 9 * * MON-FRI";
 
 export async function startMarketBriefing(env: Env, scheduledTime: number) {
   const reportDate = currentReportDate(new Date(scheduledTime));
-  if (knownMarketClosure(reportDate) === true) return;
+  if (!await scheduledTradingDay(env, reportDate)) return;
   const id = `market-briefing-${reportDate}`;
   // create is atomic by ID; get only confirms a duplicate after an uncertain create.
   try { return await env.MARKET_BRIEFING.create({ id, params: { reportDate } }); }

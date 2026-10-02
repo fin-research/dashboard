@@ -6,7 +6,7 @@
 
 - Dashboard 的 `0 9 * * MON-FRI`（UTC）Cron 在北京时间工作日 17:00 启动市场点评；融资和交易提醒由 Messenger 集中扫描。Data 与 Ingest 各自维护其采集调度。
 - `MARKET_BRIEFING` 绑定 `MarketBriefingWorkflow`，平台名称固定 `market-briefing`。实例 ID 为 `market-briefing-YYYY-MM-DD`，同日重复 Cron 不重复创建。
-- Cron 在创建 Workflow 实例前判断 workday；`knownMarketClosure(reportDate) === true` 时立即返回，完全不进入 Workflow。Workflow 内不再判断或返回非交易日 skipped 状态，当前内置2026年公告。`collect-equity` 与 `collect-primary` 各自要求 DATA `/data/industry` 的 `tradingDates` 包含当天，否则视为行情滞后，由 step 重试并失败，不能误判假期。未知年度只允许有当日行情证据时生成；每年须按交易所公告更新休市日。
+- Cron 在创建 Workflow 实例前按计划触发时间的上海日期检查周末，再经 DATA / InternalData 查询 `/data/trading-days`（Choice 上交所日历）。只有日期一致、`isTradingDay=true` 才创建；休市正常跳过，日历超时、HTTP/Schema/日期错误则记录 `market_briefing_calendar_unavailable` 并停止本轮，不视为休市。日历失败可能使当日定时生成漏跑，需要在服务恢复后人工补发。Workflow 内不增加休市 step；`collect-equity` 与 `collect-primary` 仍独立校验交易日与行情日期，行情滞后由 step 重试。
 - Workflow 只保留一组七个并行模块 step，直接写在 `worker/market-briefing-runner.ts` 的原生 `await Promise.allSettled([...])` 中：今日聚焦 `collect-focus-news`、公开市场操作 `collect-open-market`、固收市场 `collect-fixed-income`、权益市场 `collect-equity`、一级发行 `collect-primary`、二级行情 `collect-secondary`、东财债券 `collect-inventory`。
 - 每个模块自己完成抓取、DTO 校验、解析、业务换算和结果组装，返回已校验的报告字段；不依赖其他模块 step 的输出。一级发行独立读取交易日期；二级与东财各自补全所需债券信息，东财另自取今日成交作收益率回退。共享接口可由不同模块独立请求，不设跨模块缓存或前置步骤。
 - 今日聚焦只抓取 DM 新闻列表和详情，在模块内完成正文合并、筛选及提示材料组装，详情最多五个并发。股票收评由权益模块负责，不作为今日聚焦的依赖。模块内部不创建子 step，不做业务重试。
