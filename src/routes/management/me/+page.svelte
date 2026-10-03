@@ -11,6 +11,7 @@
   import { onMount } from 'svelte';
   import ModuleCard from '../../../components/ModuleCard.svelte';
   import { globalMessages } from '$lib/global-messages';
+  import { logoutBearer } from '$lib/bearer-auth';
   import { isLoginRedirecting } from '$lib/auth-client';
   import { type AccountProfile } from '$lib/profile';
   import { readPreferences, savePreferences, type MarketColorConvention } from '$lib/preferences';
@@ -59,7 +60,7 @@
         if (current?.user) session.seed({ ...current, account: { name: result.name, department: result.department } });
       }
       globalMessages.success(result.message, { key: 'profile-action', duration: 10000 });
-      if (result.logout) { window.location.assign('/auth/logout'); return; }
+      if (result.logout) { void logoutBearer(); return; }
     } catch (error) {
       if (!isLoginRedirecting()) globalMessages.error(error instanceof Error ? error.message : '个人信息保存失败', { key: 'profile-action' });
     } finally { pending = null; }
@@ -138,6 +139,6 @@
         </form>
       </ModuleCard>
     </div>
-    <div class="profile-footer"><form method="post" action="/auth/logout"><Button data-ui-owner="routes-profile--page-svelte" variant="outline" class={"ui-button  profile-button"} type="submit">退出登录</Button></form></div>
+    <div class="profile-footer"><form onsubmit={(event) => { event.preventDefault(); void logoutBearer(); }}><Button data-ui-owner="routes-profile--page-svelte" variant="outline" class={"ui-button  profile-button"} type="submit">退出登录</Button></form></div>
   </div>
 </div>

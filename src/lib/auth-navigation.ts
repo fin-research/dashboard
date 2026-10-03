@@ -2,7 +2,7 @@
 export function pageRequiresLogin(path: string): boolean {
   try {
     const normalized = decodeURIComponent(path).replace(/\/__data\.json$/, '').replace(/\/$/, '') || '/';
-    return !['/', '/market-briefing', '/market-briefing/text', '/auth/verify-email', '/auth/logout', '/auth/session'].includes(normalized)
+    return !['/', '/market-briefing', '/market-briefing/text', '/auth/verify-email', '/auth/login', '/auth/callback', '/auth/logout', '/financing/login'].includes(normalized)
       && !normalized.startsWith('/_app/');
   } catch { return true; }
 }

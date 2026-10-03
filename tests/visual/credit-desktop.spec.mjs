@@ -43,6 +43,7 @@ test('credit weekly detail keeps the complete grouped header while scrolling',as
 
 test('desktop credit metrics and expanded records stay within the workspace',async({page},testInfo)=>{
   test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
+  await page.clock.setFixedTime(new Date('2026-09-30T04:00:00Z'));
   await mockResources(page);
   await page.route('**/api/credit**',route=>route.fulfill({json:creditFull}));
   await page.setViewportSize({width:1280,height:900});
@@ -83,6 +84,7 @@ test('desktop credit metrics and expanded records stay within the workspace',asy
 
 test('credit application separates requests from editable maintenance details',async({page},testInfo)=>{
   test.skip(testInfo.project.name!=='desktop','Desktop credit application');
+  await page.clock.setFixedTime(new Date('2026-09-30T04:00:00Z'));
   await mockResources(page);
   const report=structuredClone(creditFull);
   let saved;

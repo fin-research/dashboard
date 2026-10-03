@@ -22,13 +22,13 @@
 
 ## 请求保护与私有入口
 
-- Gateway 是本站唯一公网入口，Auth0 JWT、JWKS、会话、账号状态、角色及路由权限全部由 Gateway 处理。详细协议见 [共享 AUTH](../../eastmoney/docs/AUTH.md)。
+- Gateway 是本站唯一公网入口，Auth0 JWT 验签、JWKS、账号状态、角色及路由权限全部由 Gateway 处理。详细协议见 [共享 AUTH](../../eastmoney/docs/AUTH.md)。
 - Dashboard `routes=[]`、`workers_dev=false`、`preview_urls=false`，没有 Custom Domain，默认 fetch 固定 404；静态资产 `run_worker_first=true`，不能绕开默认入口。
 - 只有 `GatewayDashboard` 命名 Service Binding 接收 Gateway 的 Base64URL 上下文，解析后移入请求内 `env.GATEWAY_CONTEXT` 并删除身份头。`hooks.server.ts` 仅从该元数据设置 `locals.user` 和 permissions，不读取 Cookie、外部身份头，不验证 JWT，也不调用 Auth0/权限库。缺少元数据失败关闭。
 - 独立授信助手 HTTP 从同一私有入口取得已验证 `user`，按用户隔离会话。DO 不新增公网旁路。
 - Gateway 的同源、方法和 named action 检查发生在转发前；业务仍验证输入白名单、记录归属、乐观锁、文件类型/大小/内容和事务 RLS。上传登录检查、菜单及前端权限只用于交互。
-- Gateway 拥有 `/auth/login`、`/auth/callback`、退出、`/auth/session` 和 `/api/profile`，后端只保留必要的兼容或私有转发。登录响应和包含身份的响应 private/no-store，401 跳登录而 403 保留权限错误；`__data.json` 使用 SvelteKit redirect 数据协议。
-- 新账号的邮箱/姓名/部门和验证流程仍由 Auth0 Actions/Forms 管理；用户字段不授予角色。Auth0 token 的 namespace email 必须与当前账号一致，旧邮箱会话不能修改资料。
+- Dashboard 的 `/auth/login`、`/auth/callback`、`/auth/logout` 是公开 CSR 页面，使用 Auth0 SPA SDK 授权码 + PKCE。SDK 令牌只存内存；浏览器所有业务请求使用 `Authorization: Bearer`，不读取登录 Cookie。`/auth/session` 已移除。Gateway 只匿名放行实际 CSR 页面 HTML 壳，页面的 `__data.json`、actions、API 与文件输出仍校验 Bearer。
+- 新账号的邮箱/姓名/部门和验证流程仍由 Auth0 Actions/Forms 管理；用户字段不授予角色。Auth0 token 的 email 必须与当前账号一致，旧邮箱会话不能修改资料。
 - 个人信息白名单与本人校验由 Gateway 维护；本人姓名和部门写入 Auth0，邮箱变更需明确确认，重置验证并退出；密码使用既有重置邮件流程。管理员可经私有 IdentityService 更新本组织账号的姓名、部门，Gateway 再次核对 admin、组织成员及连接。管理凭据不留在 Dashboard Worker，目录及角色配置通过 `IDENTITY: IdentityService` 取得。
 
 ## 数据与日志
@@ -43,7 +43,9 @@
 
 `src/lib/permissions.ts` 与 `route-permissions.ts` 是 Gateway 生成的前端展示契约，供菜单与导航使用；不可作为服务端授权输入。修改权限在 Gateway 完成，再同步契约。`locals.user.id` 与 `auth0Id` 均为 Auth0 subject，业务负责人只用 Auth0 ID，不能按邮箱/姓名关联。
 
-客户端会话只由根 layout 实例持有，不跨 SSR 请求共享，不写 localStorage。公开首屏经 `/auth/session` 初始化一次，普通导航复用展示快照；过期和明确角色变更时刷新。相同 token 的 SSR 导航不覆盖登录时的权限展示快照，403 不额外刷新会话。角色成员变更后从个人资料页“刷新登录角色”重新走授权码流程取得新 token，或重新登录。其他终端的旧菜单不构成服务端授权；Gateway 使用已签名 JWT 的角色，每个业务请求读取 Gateway 的授权 JSON 缓存（TTL 1 小时，无内测旁路），普通准入不查询 Auth0 Management API。
+客户端展示由 Auth0 SPA SDK 当前 access token 的 `username/email/department/picture/role/_roles` 派生；`role` 为数据库字符串，`_roles` 为业务角色名称数组，不接受旧 namespace 或 `roles` 声明。解码不执行授权：只有 Gateway 的 `GET /auth/permissions` 验证 Bearer 并返回 `{ permissions, updatedAt }` 后，客户端才建立登录展示。令牌不写 localStorage、不放 URL、不发送给外部 origin。根 layout 复用展示状态，受保护直达在 SvelteKit 启动前静默恢复，失败立即走 SDK redirect；回调先完成 code 交换再恢复。公开市场报告保留既有渲染方式。角色变化通过重新登录取得新 token。业务服务端继续只消费 Gateway 的 `locals.user` 和权限，不从客户端展示做授权。
+
+原生 GET 筛选走 SvelteKit 导航，POST actions 使用 enhance/fetch；下载使用认证 fetch 和 Blob，资金日报 HTML 使用 `sandbox="allow-scripts allow-downloads"`、无 referrer 并禁止摄像头/麦克风/定位的 iframe 预览，不给同源能力。SSE 继续使用现有 fetch 流，不把 Bearer 放 URL。
 
 Dashboard 不持有 `AUTHORIZATION_DB` 或 Auth0 管理 Secret。`/management/people` 经私有 Gateway 服务读取人员目录及缓存中的角色授权；人员姓名和部门写回 Auth0，角色与成员关系链接 Auth0 管理。个人页与角色页复用 scope/resource/action 权限组件；个人 `GET /auth/permissions` 获取自己的缓存权限，管理员 `POST /auth/permissions/refresh` 在同源及权限检查后更新当前 Cloudflare 节点缓存。其他节点最长 1 小时后按需更新。角色与权限以 Auth0 为唯一来源，内测所有用户持有基础 authenticated 角色，全部角色授予全部本站权限。
 

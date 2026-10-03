@@ -10,6 +10,7 @@
   import { installAuthControls } from '$lib/auth-controls';
   import { globalMessages } from '$lib/global-messages';
 
+  import ProtectedReportPreview from '$lib/ProtectedReportPreview.svelte';
   import LoginDialog from "$lib/LoginDialog.svelte";
   let loginDialog: LoginDialog;
 
@@ -25,7 +26,7 @@
   setContext(CLIENT_SESSION_CONTEXT, session);
   setContext('site-account', () => $session?.account ?? null);
   setContext('site-account-checking', () => $session === null);
-  $effect(() => { if (data.session) session.seedFromServer(data.session); });
+
   $effect(() => {
     const nextIdentity = $session?.user?.id ?? null;
     if (nextIdentity !== aiIdentity) {
@@ -45,7 +46,7 @@
 
   onMount(() => {
     const uninstall = installAuthInteraction({ session, login: () => loginDialog.open(), error: message => globalMessages.error(message) });
-    const uninstallControls = installAuthControls(session, document, message => globalMessages.error(message));
+    const uninstallControls = installAuthControls(session, document, message => globalMessages.error(message), url => goto(url));
     applyPreferences(readPreferences());
     if ('serviceWorker' in navigator) void navigator.serviceWorker.register('/service-worker.js', {scope:'/'}).catch(() => {});
     // Authenticated SSR already seeded this store. Public pages bootstrap once in
@@ -60,6 +61,7 @@
 </script>
 
 <GlobalMessages />
+<ProtectedReportPreview />
 <LoginDialog bind:this={loginDialog} {session} />
 <div class="site-with-ai">
   <div class="site-content">{@render children()}</div>

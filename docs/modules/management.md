@@ -22,7 +22,7 @@
 
 ## 个人信息
 
-- `GET /auth/session` 返回一次性前端会话快照：原有 `user`、`enabled`，以及 `account`、最小角色 `roles`、有效权限 `permissions` 和到期秒数 `expiresAt`。匿名返回 null 身份、空角色/权限，不查询 Auth0；已登录快照通过统一授权入口解析，不另建角色权限系统。不返回 JWT、Cookie、密钥或内部 metadata。
+- 身份展示直接来自当前 access token 的 `username/email/department/picture/role/_roles`，角色名称数组只用 `_roles`，`role` 保留数据库字符串。`GET /auth/permissions` 仅返回权限及更新时间并确认 Bearer 有效；不再使用 `/auth/session` 或旧 token 格式。
 - `/profile` 和 `GET /api/profile` 使用 `account.profile:read`；`POST /api/profile` 使用 `account.profile:update`。
 - 个人信息仅操作已验证的 Auth0 ID。每次读写核对当前账号、邮箱和连接；本人可修改姓名及 `user_metadata.department`，不接受目标用户 ID、角色、权限或 app_metadata。
 - 管理员人员资料由浏览器同源请求 Gateway 公网 `/api/management/people` 读取和写入，需 admin，目标必须是本站 Auth0 组织成员和 `eastmoney-email` 连接；写入只接受 ID、姓名、部门。Gateway 先核对组织成员，再以 Auth0 用户聚合搜索取姓名和部门；搜索缺漏时才逐个回退。完整目录契约仍提供角色给融资等调用方。
@@ -34,16 +34,16 @@
 
 - 首页提供独立“管理”模块；管理总览采用角色权限、个人管理、资金日报三张入口卡片。管理使用全站工作台外壳和 shadcn-svelte Maia，不依赖融资模块的样式作用域。
 - 角色标签页为角色目录加只读权限区，仅在打开时加载角色配置；人员标签页的名单只显示姓名，右侧编辑姓名和部门，两张面板在桌面等高，名单内部滚动。人员资料由浏览器直接从 Gateway 加载，期间保持等高占位，失败时提供重试。窄屏按目录、资料顺序单列排列。
-- 全站个人入口显示图标、姓名和部门，只读取根 layout 的会话 context。受保护首屏直接使用服务端快照；公共页由根 layout 后台初始化一次。菜单重建、标签切换、上传前检查均复用同一快照，不再独立请求 `/auth/session`。
+- 全站个人入口显示图标、姓名和部门，读取根 layout 的客户端 context。受保护页面 CSR，SDK 在首次业务数据加载前静默恢复内存 token；菜单、标签切换和操作复用当前展示。
 - 个人管理页可编辑姓名和部门，继续提供既有邮箱、密码及行情偏好操作。资料保存后更新当前浏览器的账号展示；完整重载仍按登录时签名的资料声明显示，重新登录后获取最新声明。
 
 ## 原页面登录与操作预检
 
 - 根 layout 挂载唯一 `LoginDialog`。匿名点击受保护页面、原生表单或已登记 API 操作时，前端先读取共享会话快照；需要登录则打开站内提示框，权限不足则通过全局消息提示。
-- 提示框按钮同步打开 Auth0 Universal Login 窗口，继续使用 Gateway 授权码 + PKCE。登录结束后只回传绑定事务的完成信号，根 layout 强制读取 `/auth/session` 更新姓名、部门及权限，再通过 `goto` 继续目标页面；不调用 `location.assign/reload` 或失效全部业务数据。
-- 弹窗被拦截、取消、失败或超时时保留原页和输入，可重新打开；同一时刻的登录请求共用一个提示框。`postMessage` 校验本站 origin、窗口来源及事务 ID；同源 BroadcastChannel 兼容登录方隔离 opener，所有信号都必须经服务器会话核实。
+- 提示框按钮同步打开登录弹窗，Auth0 SPA SDK 完成授权码 + PKCE，再用 Bearer 请求 `/auth/permissions` 校验登录。成功更新共享展示并通过 `goto` 继续原页面，保留输入。
+- 弹窗被拦截、取消、失败或超时时保留原页和输入，可重新打开；SDK 管理 state、PKCE 和 popup origin 校验。受保护直达静默恢复失败时通过 SDK redirect，不等待尚未挂载的提示框。
 - 操作预检复用 Gateway 生成的路径、方法和 named action 权限契约，不替代服务端实时授权。未发送的请求可在登录后继续；后台返回 401 时读取最多重试一次，写入不自动重发。后台 403 就地提示并更新权限快照。
-- 浏览器会话和本站 Auth0 API 令牌设为 24 小时，Cookie 仍不晚于令牌到期。既有已签发会话不会被追溯延长，重新登录后生效。
+- access token 只在 SDK 内存缓存；本站不使用登录 Cookie。刷新后由 Auth0 SSO 静默恢复，失败重新授权；退出由 SDK 清除内存并退出 Auth0。
 
 ## 我的、权限与通知
 

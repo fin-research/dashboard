@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import ModuleCard from '../../components/ModuleCard.svelte';
   import PanelHeading from '$lib/trading-research/PanelHeading.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -45,7 +46,7 @@
 </div>
 <AlertDialog.Root open={!!retryTarget} onOpenChange={(open)=>{if(!open)retryTarget=null;}}>
   <AlertDialog.Content><AlertDialog.Header><AlertDialog.Title>重试消息</AlertDialog.Title><AlertDialog.Description>{retryTarget?.status==='uncertain'?'上次发送结果不确定，重试可能重复发送。':'确认重新发送此消息？'}</AlertDialog.Description></AlertDialog.Header>
-    <form method="POST" action="?/retry"><input type="hidden" name="id" value={retryTarget?.id??''}/><input type="hidden" name="confirmUncertain" value="yes"/>
+    <form method="POST" action="?/retry" use:enhance><input type="hidden" name="id" value={retryTarget?.id??''}/><input type="hidden" name="confirmUncertain" value="yes"/>
       <AlertDialog.Footer><AlertDialog.Cancel type="button">取消</AlertDialog.Cancel><Button type="submit">确认重试</Button></AlertDialog.Footer>
     </form>
   </AlertDialog.Content>

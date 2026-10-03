@@ -7,6 +7,6 @@ export class AccessError extends Error {
 export function accessFailure(error: unknown): Response {
   const failure = error instanceof AccessError ? error : new AccessError(503, '身份服务暂时不可用');
   return Response.json({ detail: failure.message, code: failure.status === 401 ? 'LOGIN_REQUIRED' : 'ACCESS_DENIED', loginUrl: '/auth/login' }, {
-    status: failure.status, headers: { 'Cache-Control': 'no-store, private', Vary: 'Cookie, Authorization' },
+    status: failure.status, headers: { 'Cache-Control': 'no-store, private', Vary: 'Authorization' },
   });
 }

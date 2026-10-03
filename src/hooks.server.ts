@@ -33,7 +33,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
     if (event.locals.user || event.locals.permissions.length) {
       response.headers.set('Cache-Control', 'no-store, private');
-      response.headers.append('Vary', 'Cookie, Authorization');
+      response.headers.append('Vary', 'Authorization');
     }
     return response;
   } finally { await closeDatabase(event); }

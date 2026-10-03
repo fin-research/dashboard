@@ -226,6 +226,18 @@
       "scenarios": [
         "clients-toolbar"
       ]
+    },
+    {
+      "source": "src/routes/auth/login/+page.svelte",
+      "exemption": "Auth0 SDK 浏览器跳转入口；认证验收仅程序化 HTTP、单元测试与 CLI，不进行浏览器权限登录验收"
+    },
+    {
+      "source": "src/routes/auth/callback/+page.svelte",
+      "exemption": "Auth0 SDK 浏览器跳转入口；认证验收仅程序化 HTTP、单元测试与 CLI，不进行浏览器权限登录验收"
+    },
+    {
+      "source": "src/routes/auth/logout/+page.svelte",
+      "exemption": "Auth0 SDK 浏览器跳转入口；认证验收仅程序化 HTTP、单元测试与 CLI，不进行浏览器权限登录验收"
     }
   ],
   "registries": [

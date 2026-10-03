@@ -1,9 +1,10 @@
+import { protectedReport } from './protected-report.ts';
 import { clientRequestPermission } from './route-permissions.ts';
 import { requireClientPermission, sessionAllows, requestLogin } from './auth-client.ts';
 import type { ClientSession } from './client-session';
 
 /** Capture native submits and non-SPA links before the browser can unload the document. */
-export function installAuthControls(state: ClientSession, document: Document, reportError: (message: string) => void) {
+export function installAuthControls(state: ClientSession, document: Document, reportError: (message: string) => void, navigate?: (url: string) => Promise<unknown>) {
   const replay = new WeakSet<Element>();
   const pending = new WeakSet<Element>();
   function preflight(event: Event, element: Element, url: URL, method: string, resume: () => void) {
@@ -28,13 +29,22 @@ export function installAuthControls(state: ClientSession, document: Document, re
     const action = button?.hasAttribute('formaction') ? button.formAction : form.action;
     const method = button?.hasAttribute('formmethod') ? button.formMethod : form.method;
     if (method.toLowerCase() === 'dialog') return;
+    if (form.getAttribute('method')?.toLowerCase() === 'get' && method.toLowerCase() === 'get' && navigate && new URL(action).origin === document.location.origin) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      const url = new URL(action);
+      url.search = new URLSearchParams([...new FormData(form).entries()].filter((entry): entry is [string, string] => typeof entry[1] === 'string')).toString();
+      void navigate(url.pathname + url.search).catch(error => reportError(error.message));
+      return;
+    }
     preflight(event, form, new URL(action, document.location.href), method, () => form.requestSubmit(button));
   }
   function click(event: MouseEvent) {
-    if (event.button !== 0 || !(event.target instanceof Element)) return;
+    const auxiliary = event.type === 'auxclick' && event.button === 1;
+    if ((!auxiliary && event.button !== 0) || !(event.target instanceof Element)) return;
     const anchor = event.target.closest<HTMLAnchorElement>('a[href]');
     if (!anchor) return;
     const url = new URL(anchor.href, document.location.href);
+    if (auxiliary && !anchor.hasAttribute('download') && !/\.html$/.test(url.pathname) && !url.pathname.startsWith('/api/')) return;
     if (url.origin === document.location.origin && url.pathname === '/auth/login') {
       event.preventDefault(); event.stopImmediatePropagation();
       void requestLogin(document.location.pathname);
@@ -42,8 +52,30 @@ export function installAuthControls(state: ClientSession, document: Document, re
     }
     // Normal same-tab SvelteKit links use beforeNavigate and resume via goto.
     if (!anchor.target && !anchor.hasAttribute('download') && !anchor.hasAttribute('data-sveltekit-reload')
-      && !/\.html$/.test(url.pathname) && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) return;
-    preflight(event, anchor, url, 'GET', () => anchor.click());
+      && !/\.html$/.test(url.pathname) && !url.pathname.startsWith('/api/') && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) return;
+    const permission = clientRequestPermission(url, 'GET');
+    if (!permission || permission === 'public' || url.origin !== document.location.origin) return;
+    // Protected documents and downloads use fetch; native navigations cannot attach Bearer.
+    event.preventDefault(); event.stopImmediatePropagation();
+    void requireClientPermission(permission, document.location.pathname, state).then(async allowed => {
+      if (!allowed) return;
+      if (!anchor.hasAttribute('download') && !/\.html$/.test(url.pathname) && !url.pathname.startsWith('/api/')) {
+        if (navigate) await navigate(url.pathname + url.search + url.hash);
+        return;
+      }
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('文件读取失败');
+      if (/^text\/html/i.test(response.headers.get('Content-Type') ?? '')) {
+        protectedReport.set(await response.text());
+        return;
+      }
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = anchor.download || response.headers.get('Content-Disposition')?.match(/filename="?([^";]+)/)?.[1] || url.pathname.split('/').pop() || 'download';
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    }).catch(error => reportError(error.message));
   }
   function protectPreload(event: Event) {
     if (!(event.target instanceof Element)) return;
@@ -85,9 +117,10 @@ export function installAuthControls(state: ClientSession, document: Document, re
   for (const type of ['mousemove', 'mousedown', 'touchstart']) document.addEventListener(type, protectPreload, true);
   document.addEventListener('submit', submit, true);
   document.addEventListener('click', click, true);
+  document.addEventListener('auxclick', click, true);
   return () => {
     observer.disconnect(); unsubscribe();
-    document.removeEventListener('submit', submit, true); document.removeEventListener('click', click, true);
+    document.removeEventListener('submit', submit, true); document.removeEventListener('click', click, true); document.removeEventListener('auxclick', click, true);
     for (const type of ['mousemove', 'mousedown', 'touchstart']) document.removeEventListener(type, protectPreload, true);
   };
 }

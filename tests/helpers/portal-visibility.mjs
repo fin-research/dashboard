@@ -12,10 +12,10 @@ const app = mount(Page, { target: document.body, context: new Map([
 flushSync();
 const cards = () => [...document.querySelectorAll('.tool-card')].map(card => card.querySelector('h2').textContent);
 assert.deepEqual(cards(), ['市场点评']);
-flushSync(() => session.seed({ user: null, account: null, roles: [], permissions: [], expiresAt: null }));
+flushSync(() => session.seed({ user: null, account: null, _roles: [], role: '', picture: '', permissions: [], expiresAt: null }));
 assert.deepEqual(cards(), ['市场点评']);
 flushSync(() => session.seed({ user: { id: 'auth0|test', auth0Id: 'auth0|test', email: 'test@18.cn' },
-  account: { name: '测试', department: '' }, roles: [], permissions: ['credit.institution:read'], expiresAt: Date.now() / 1000 + 3600 }));
+  account: { name: '测试', department: '' }, _roles: [], role: '', picture: '', permissions: ['credit.institution:read'], expiresAt: Date.now() / 1000 + 3600 }));
 assert.deepEqual(cards(), ['市场点评', '授信工作台', '管理']);
 await unmount(app);
 await window.happyDOM.abort();

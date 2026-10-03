@@ -38,7 +38,6 @@
     <h2 id="site-login-title">{waiting ? '等待登录' : '登录后继续'}</h2>
     <div class="dialog-actions">
       <Button data-ui-owner="lib-LoginDialog-svelte" variant="ghost" type="button" class={"ui-button "} onclick={() => finish(false)}>取消</Button>
-      {#if waiting}<Button data-ui-owner="lib-LoginDialog-svelte" variant="ghost" type="button" class={"ui-button "} onclick={() => popup?.verify()}>已完成登录</Button>{/if}
       <Button data-ui-owner="lib-LoginDialog-svelte" variant="default" type="button" class={"ui-button "} onclick={() => popup?.open()}>{waiting ? '重新打开登录窗口' : '登录 / 注册'}</Button>
     </div>
   </div>

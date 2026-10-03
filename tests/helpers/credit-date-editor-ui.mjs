@@ -4,7 +4,7 @@ const window=installDom();
 const {mount,unmount,flushSync,tick}=await import('svelte');
 const {PERMISSION_CODES}=await import('../../src/lib/permissions.ts');
 const {createClientSession}=await import('../../src/lib/client-session.ts');
-const session=createClientSession({user:{id:'auth0|test',email:'test@18.cn'},account:{name:'测试人员',department:'资金管理部'},roles:[{id:'rol_TestAdmin',name:'admin'}],permissions:[...PERMISSION_CODES],expiresAt:Date.now()/1000+3600});
+const session=createClientSession({user:{id:'auth0|test',email:'test@18.cn'},account:{name:'测试人员',department:'资金管理部'},_roles:['admin'],role:'admin',picture:'',permissions:[...PERMISSION_CODES],expiresAt:Date.now()/1000+3600});
 const context=new Map([['site-session',session]]);
 
 document.body.innerHTML='<div id="tr-topbar-actions"></div><div id="host"></div>';
@@ -47,7 +47,7 @@ assert.equal(institution.expiryDate,'2027-08-31');
 assert.match(document.body.textContent,/授信申请/);
 await unmount(app);await tick();
 document.body.innerHTML='<div id="tr-topbar-actions"></div><div id="host"></div>';
-const reader=createClientSession({user:{id:'auth0|reader',email:'reader@18.cn'},account:{name:'只读人员',department:'资金管理部'},roles:[{id:'rol_Reader',name:'authenticated'}],permissions:['credit.institution:read'],expiresAt:Date.now()/1000+3600});
+const reader=createClientSession({user:{id:'auth0|reader',email:'reader@18.cn'},account:{name:'只读人员',department:'资金管理部'},_roles:['authenticated'],role:'authenticated',picture:'',permissions:['credit.institution:read'],expiresAt:Date.now()/1000+3600});
 const readonly=mount(View,{context:new Map([['site-session',reader]]),target:document.querySelector('#host'),props:{tab:'overview'}});await settle();
 flushSync(()=>document.querySelector('.tr-credit-table tbody tr button').click());await settle();
 const readonlyDetail=document.querySelector('.tr-credit-detail');

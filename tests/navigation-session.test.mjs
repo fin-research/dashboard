@@ -8,11 +8,11 @@ import { pagePermission, ROUTE_PERMISSIONS } from '../src/lib/route-permissions.
 import { PERMISSION_CODES } from '../src/lib/permissions.ts';
 
 const origin = 'https://eastmoney.hasbai.xyz';
-const anonymous = { user: null, account: null, roles: [], permissions: [], expiresAt: null };
+const anonymous = { user: null, account: null, _roles: [], role: '', picture: '', permissions: [], expiresAt: null };
 const authenticated = {
   user: { id: 'access-test', auth0Id: 'auth0|test', email: 'test@18.cn' },
   account: { name: '测试账号', department: '测试' },
-  roles: [{ id: 'rol_test', name: '测试角色' }],
+  _roles: ['测试角色'], role: '测试角色', picture: '',
   permissions: [...PERMISSION_CODES], expiresAt: 2000,
 };
 const navigation = (path, id = '/trading-research/[view]') => ({
@@ -52,8 +52,8 @@ test('SSR bootstrap allows repeated tab switches and upload preflight without re
 test('public bootstrap, navigation and menu subscribers share one request; the last clicked tab wins', async () => {
   let complete; let requests = 0;
   const response = new Promise(resolve => { complete = resolve; });
-  const state = createClientSession(null, async (path, init) => {
-    requests++; assert.equal(path, '/auth/session'); assert.equal(init.cache, 'no-store'); return response;
+  const state = createClientSession(null, async (force) => {
+    requests++; assert.equal(force, false); return response;
   }, () => 1000000);
   const values = [];
   const unsubscribe = state.subscribe(value => values.push(value));
@@ -62,7 +62,7 @@ test('public bootstrap, navigation and menu subscribers share one request; the l
   assert.equal(visit('/trading-research/research').cancelled, true);
   assert.equal(visit('/trading-research/market-hotspots').cancelled, true);
   assert.equal(state.load(), mount);
-  complete(Response.json(authenticated));
+  complete(authenticated);
   await mount; await setImmediate();
   assert.equal(requests, 1);
   assert.deepEqual(calls.resumed, [origin + '/trading-research/market-hotspots']);
@@ -78,7 +78,7 @@ test('public or external navigation supersedes a pending protected navigation', 
     const { calls, visit } = setupGuard(state);
     visit('/trading-research/research');
     assert.equal(visit(path, id).cancelled, undefined);
-    complete(Response.json(authenticated)); await state.load(); await setImmediate();
+    complete(authenticated); await state.load(); await setImmediate();
     assert.deepEqual(calls, { resumed: [], errors: [], logins: [] });
   }
 });
@@ -102,7 +102,7 @@ test('expired snapshots refresh once, handle logout and never authorize with sta
   for (const status of [200, 503]) {
     let requests = 0;
     const state = createClientSession(authenticated, async () => {
-      requests++; return status === 200 ? Response.json(anonymous) : new Response(null, { status });
+      requests++; if (status !== 200) throw new Error('unavailable'); return anonymous;
     }, () => 2000000);
     const { calls, visit } = setupGuard(state);
     assert.equal(visit('/trading-research/research').cancelled, true);
@@ -119,7 +119,7 @@ test('expired snapshots refresh once, handle logout and never authorize with sta
 test('permission changes can refresh the shared snapshot explicitly without refreshing unrelated page data', async () => {
   let requests = 0;
   const updated = { ...authenticated, permissions: ['account.profile:read'] };
-  const state = createClientSession(authenticated, async () => { requests++; return Response.json(updated); }, () => 1000000);
+  const state = createClientSession(authenticated, async () => { requests++; return updated; }, () => 1000000);
   await Promise.all([state.load(true), state.load(true)]);
   assert.equal(requests, 1);
   assert.deepEqual(state.current(), updated);
@@ -128,7 +128,7 @@ test('permission changes can refresh the shared snapshot explicitly without refr
 
 test('an already-expired bootstrap response redirects once instead of entering a refresh/navigation loop', async () => {
   let requests = 0;
-  const state = createClientSession(null, async () => { requests++; return Response.json(authenticated); }, () => 2000000);
+  const state = createClientSession(null, async () => { requests++; return authenticated; }, () => 2000000);
   const { calls, visit } = setupGuard(state);
   visit('/trading-research/research');
   await state.load(); await setImmediate();
@@ -143,7 +143,7 @@ test('a late bootstrap cannot overwrite a newer profile snapshot and separate SS
   const state = createClientSession(null, () => new Promise(resolve => { complete = resolve; }), () => 1000000);
   const request = state.load();
   state.seed(authenticated);
-  complete(Response.json(anonymous));
+  complete(anonymous);
   assert.deepEqual(await request, authenticated);
   const other = createClientSession();
   assert.equal(other.current(), null);
@@ -152,8 +152,8 @@ test('a late bootstrap cannot overwrite a newer profile snapshot and separate SS
 test('session DTO includes only presentation claims, roles and resolved permissions, never JWTs or metadata', () => {
   const identity = { ...authenticated.user, issuedAt: 1000, expiresAt: 2000,
     token: 'must-not-leak', metadata: { secret: 'must-not-leak' },
-    authorization: { ...authenticated.account, roles: authenticated.roles, permissions: authenticated.permissions, mode: 'beta-open', picture: 'must-not-leak' } };
-  assert.deepEqual(publicSession(identity), authenticated);
+    authorization: { ...authenticated.account, roles: authenticated._roles.map(name => ({id: 'test', name})), permissions: authenticated.permissions, mode: 'beta-open', picture: '' } };
+  assert.deepEqual(publicSession(identity), { ...authenticated, role: '' });
   assert.deepEqual(publicSession(null), anonymous);
 });
 
