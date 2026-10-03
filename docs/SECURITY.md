@@ -43,7 +43,7 @@
 
 `src/lib/permissions.ts` 与 `route-permissions.ts` 是 Gateway 生成的前端展示契约，供菜单与导航使用；不可作为服务端授权输入。修改权限在 Gateway 完成，再同步契约。`locals.user.id` 与 `auth0Id` 均为 Auth0 subject，业务负责人只用 Auth0 ID，不能按邮箱/姓名关联。
 
-客户端展示由 Auth0 SPA SDK 当前 access token 的 `username/email/department/picture/role/_roles` 派生；`role` 为数据库字符串，`_roles` 为业务角色名称数组，不接受旧 namespace 或 `roles` 声明。解码不执行授权：只有 Gateway 的 `GET /auth/permissions` 验证 Bearer 并返回 `{ permissions, updatedAt }` 后，客户端才建立登录展示。令牌不写 localStorage、不放 URL、不发送给外部 origin。根 layout 复用展示状态，受保护直达在 SvelteKit 启动前静默恢复，失败立即走 SDK redirect；回调先完成 code 交换再恢复。公开市场报告保留 SSR。角色变化通过重新登录取得新 token。业务服务端继续只消费 Gateway 的 `locals.user` 和权限，不从客户端展示做授权。
+客户端展示由 Auth0 SPA SDK 当前 access token 的 `username/email/department/picture/role/_roles` 派生；`role` 为数据库字符串，`_roles` 为业务角色名称数组，不接受旧 namespace 或 `roles` 声明。解码不执行授权：只有 Gateway 的 `GET /auth/permissions` 验证 Bearer 并返回 `{ permissions, updatedAt }` 后，客户端才建立登录展示。令牌不写 localStorage、不放 URL、不发送给外部 origin。根 layout 复用展示状态，受保护直达在 SvelteKit 启动前静默恢复，失败立即走 SDK redirect；回调先完成 code 交换再恢复。公开市场报告保留既有渲染方式。角色变化通过重新登录取得新 token。业务服务端继续只消费 Gateway 的 `locals.user` 和权限，不从客户端展示做授权。
 
 原生 GET 筛选走 SvelteKit 导航，POST actions 使用 enhance/fetch；下载使用认证 fetch 和 Blob，资金日报 HTML 使用 `sandbox="allow-scripts allow-downloads"`、无 referrer 并禁止摄像头/麦克风/定位的 iframe 预览，不给同源能力。SSE 继续使用现有 fetch 流，不把 Bearer 放 URL。
 
