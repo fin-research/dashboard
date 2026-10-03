@@ -7,7 +7,10 @@ export type ClientSession = ReturnType<typeof createClientSession>;
 /** Owned by one root layout, so SSR requests never share a user's snapshot. */
 export function createClientSession(
   initial: ClientSessionData | null = null,
-  fetcher: typeof fetch = (...args) => fetch(...args),
+  loader: (force: boolean) => Promise<ClientSessionData> = async force => {
+    const { loadBearerSession } = await import('./bearer-auth.ts');
+    return loadBearerSession(force);
+  },
   now: () => number = Date.now,
 ) {
   let value = initial;
@@ -35,13 +38,7 @@ export function createClientSession(
     if (pending) return pending;
     const startedAt = revision;
     pending = (async () => {
-      const response = await fetcher('/auth/session', { cache: 'no-store' });
-      if (!response.ok) throw new Error('登录状态暂时无法读取，请稍后重试');
-      let session = await response.json() as ClientSessionData;
-      if (!Array.isArray(session.permissions) || !Array.isArray(session.roles)
-        || (session.user && (!session.user.email || !Number.isFinite(session.expiresAt)))) {
-        throw new Error('登录状态暂时无法读取，请稍后重试');
-      }
+      let session = await loader(force);
       // JWT verification has clock tolerance; never resume navigation with an
       // already-expired snapshot and enter an endless refresh/goto cycle.
       if (session.user && session.expiresAt! * 1000 <= now()) session = publicSession(null);

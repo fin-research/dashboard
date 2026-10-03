@@ -7,8 +7,8 @@ import { AccessError } from '../src/lib/server/access.ts';
 import { createClientSession } from '../src/lib/client-session.ts';
 
 const current = 'https://eastmoney.hasbai.xyz/fund-report?upload=1#history';
-const anonymous = { user: null, account: null, roles: [], permissions: [], expiresAt: null };
-const authenticated = { ...anonymous, user: { email: 'test@18.cn' }, roles:[{id:'rol_TestAdmin',name:'admin'}], permissions: ['credit.institution:read', 'fund.report:upload'], expiresAt: Date.now() / 1000 + 3600 };
+const anonymous = { user: null, account: null, _roles: [], role: '', picture: '', permissions: [], expiresAt: null };
+const authenticated = { ...anonymous, user: { email: 'test@18.cn' }, _roles:['admin'], permissions: ['credit.institution:read', 'fund.report:upload'], expiresAt: Date.now() / 1000 + 3600 };
 
 test('anonymous writes wait for login, recheck permission and send exactly once', async () => {
   const state = createClientSession(anonymous);
@@ -22,7 +22,7 @@ test('anonymous writes wait for login, recheck permission and send exactly once'
 });
 
 test('cancelled login and denied permissions never send the protected operation', async () => {
-  for (const session of [anonymous, { ...authenticated, roles:[], permissions: [] }]) {
+  for (const session of [anonymous, { ...authenticated, _roles:[], permissions: [] }]) {
     const errors = [];
     const cleanup = installAuthInteraction({ session: createClientSession(session), login: async () => false, error: message => errors.push(message) });
     try {
@@ -54,7 +54,7 @@ test('expired read and SvelteKit login redirect recover with one retry; writes a
 test('public and external requests, session bootstrap and unrelated errors are not intercepted', async () => {
   const cleanup = installAuthInteraction({ session: createClientSession(anonymous), login: async () => assert.fail('must not login'), error: assert.fail });
   try {
-    for (const [url, status] of [['/api/market-report', 200], ['/auth/session', 401], ['https://external.test/api', 401], ['/api/market-report', 503]]) {
+    for (const [url, status] of [['/api/market-report', 200], ['/auth/permissions', 401], ['https://external.test/api', 401], ['/api/market-report', 503]]) {
       const response = Response.json({ status }, { status });
       assert.equal(await withAuthInteraction(async () => response, () => current)(url), response);
     }
@@ -66,7 +66,7 @@ test('private page guard covers child routes and agrees with the server', () => 
     assert.equal(pageRequiresLogin(path), true, path);
     assert.equal(dashboardRequiresLogin(new Request(`https://eastmoney.hasbai.xyz${path}`)), true, path);
   }
-  for (const path of ['/', '/market-briefing', '/market-briefing/text', '/market-briefing/__data.json', '/market-briefing/text/', '/auth/session', '/auth/verify-email']) assert.equal(pageRequiresLogin(path), false, path);
+  for (const path of ['/', '/market-briefing', '/market-briefing/text', '/market-briefing/__data.json', '/market-briefing/text/', '/auth/login', '/auth/callback', '/auth/logout', '/financing/login', '/auth/verify-email']) assert.equal(pageRequiresLogin(path), false, path);
   assert.equal(dashboardRequiresLogin(new Request('https://eastmoney.hasbai.xyz/api/profile')), true);
 });
 
@@ -94,7 +94,7 @@ test('preflight login checks fail closed and recover in-place through the instal
     assert.equal(await requireClientLogin('/fund-report?upload=1', state), true);
     assert.equal(await requestLogin('/profile'), true);
     assert.equal(logins, 2);
-    await assert.rejects(requireClientLogin('/profile', createClientSession(null, async () => new Response(null, { status: 503 }))), /登录状态暂时无法读取/);
+    await assert.rejects(requireClientLogin('/profile', createClientSession(null, async () => { throw Error('登录状态暂时无法读取'); })), /登录状态暂时无法读取/);
   } finally { cleanup(); }
 });
 

@@ -58,7 +58,7 @@ async function savePerson() {
     personDepartment = result.department;
     const current = session.current();
     if (current && current.user && current.user.id === result.id)
-      session.seed({ user: current.user, roles: current.roles, permissions: current.permissions, expiresAt: current.expiresAt,
+      session.seed({ ...current,
         account: { name: result.name, department: result.department } });
     globalMessages.success('人员资料已保存');
   } catch (error) { globalMessages.error(error instanceof Error ? error.message : '人员资料保存失败'); }

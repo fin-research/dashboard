@@ -40,7 +40,9 @@ export function publicIdentity(identity: SiteIdentity | null) {
 export interface ClientSessionData {
   user: ReturnType<typeof publicIdentity>;
   account: AccountSummary | null;
-  roles: { id: string; name: string }[];
+  _roles: string[];
+  role: string;
+  picture: string;
   permissions: string[];
   expiresAt: number | null;
 }
@@ -50,7 +52,9 @@ export function publicSession(identity: SiteIdentity | null): ClientSessionData 
   return {
     user: publicIdentity(identity),
     account: authorization ? { name: authorization.name, department: authorization.department ?? '' } : null,
-    roles: authorization?.roles.map(({ id, name }) => ({ id, name })) ?? [],
+    _roles: authorization?.roles.map(({ name }) => name) ?? [],
+    role: '',
+    picture: authorization?.picture ?? '',
     permissions: authorization?.permissions ?? [],
     expiresAt: identity?.expiresAt ?? null,
   };

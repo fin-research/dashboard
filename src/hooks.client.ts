@@ -1,7 +1,9 @@
 import type { HandleClientError } from '@sveltejs/kit';
 import { requestLogin, withAuthInteraction } from '$lib/auth-client';
 
-export function init() {
+export async function init() {
+  const { initializeBearer } = await import('$lib/bearer-auth');
+  await initializeBearer(window.fetch.bind(window));
   window.fetch = withAuthInteraction(window.fetch.bind(window), () => window.location.href);
 }
 

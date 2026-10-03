@@ -1,62 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setImmediate } from 'node:timers/promises';
-import { createLoginPopup, isLoginPopupMessage } from '../src/lib/login-popup.ts';
+import { createLoginPopup } from '../src/lib/login-popup.ts';
 import { createClientSession } from '../src/lib/client-session.ts';
-
-const anonymous = { user: null, account: null, roles: [], permissions: [], expiresAt: null };
-const authenticated = { ...anonymous, user: { email: 'test@18.cn' }, expiresAt: Date.now() / 1000 + 3600 };
-function hostFixture(blocked = false) {
-  const handlers = new Map();
-  const child = { focus() {}, close() {} };
-  const host = { location: { origin: 'https://eastmoney.hasbai.xyz' }, addEventListener: (type, fn) => handlers.set(type, fn), removeEventListener: type => handlers.delete(type),
-    open(url) { this.url = url; return blocked ? null : child; } };
-  return { host, child, handlers, message(data, origin = host.location.origin, source = child) { handlers.get('message')?.({ data, origin, source }); } };
+import { publicSession } from '../src/lib/identity.ts';
+const anonymous = publicSession(null);
+const authenticated = { ...anonymous, user: { id: 'auth0|test', email: 'test@18.cn', auth0Id: 'auth0|test' }, expiresAt: Date.now()/1000 + 3600 };
+function fixture(blocked = false) {
+  const child = { close() {} };
+  return { child, open: () => blocked ? null : child };
 }
-
-test('popup ignores wrong origin/window/transaction and verifies a matching hint before completion', async () => {
-  const f = hostFixture();
-  let requests = 0, completed = 0;
-  const state = createClientSession(anonymous, async () => { requests++; return Response.json(authenticated); });
-  const popup = createLoginPopup(state, { complete: () => completed++, error: assert.fail, waiting() {} }, f.host);
-  try {
-    popup.open();
-    const id = new URL(f.host.url, f.host.location.origin).searchParams.get('popup');
-    const data = { type: 'eastmoney:login', id, ok: true };
-    for (const bad of [null, {}, { ...data, id: 'old' }, { ...data, ok: 'yes' }]) assert.equal(isLoginPopupMessage(bad, id), false);
-    f.message(data, 'https://evil.test'); f.message(data, f.host.location.origin, {}); f.message({ ...data, id: 'old' });
-    await setImmediate(); assert.equal(requests, 0); assert.equal(completed, 0);
-    f.message(data); await setImmediate();
-    assert.equal(requests, 1); assert.equal(completed, 1); assert.equal(state.current().user.email, 'test@18.cn');
-    assert.equal(f.handlers.size, 0);
-  } finally { popup.stop(); }
+test('SDK popup is opened synchronously and only a Gateway validated snapshot completes login', async () => {
+  const host = fixture(); const state = createClientSession(anonymous); let complete = 0, opened = false;
+  host.open = () => { opened = true; return host.child; };
+  const popup = createLoginPopup(state, { complete: () => complete++, error: assert.fail, waiting() {} }, host, async child => {
+    assert.equal(opened, true); assert.equal(child, host.child); return authenticated;
+  });
+  await popup.open(); assert.equal(complete, 1); assert.deepEqual(state.current(), authenticated);
 });
-
-test('a matching forged success cannot manufacture identity and cancelled verification cannot resume', async () => {
-  const f = hostFixture(); let completed = 0;
-  const state = createClientSession(anonymous, async () => Response.json(anonymous));
-  const popup = createLoginPopup(state, { complete: () => completed++, error: assert.fail, waiting() {} }, f.host);
-  try {
-    popup.open();
-    const id = new URL(f.host.url, f.host.location.origin).searchParams.get('popup');
-    f.message({ type: 'eastmoney:login', id, ok: true });
-    await setImmediate(); assert.equal(completed, 0);
-    const attempt = popup.verify(); popup.stop(); await attempt;
-    assert.equal(completed, 0);
-  } finally { popup.stop(); }
+test('cancelled popup cannot seed a late result; anonymous and SDK failures do not authenticate', async () => {
+  let resolve; const state = createClientSession(anonymous); let complete = 0; const errors = [];
+  const popup = createLoginPopup(state, { complete: () => complete++, error: error => errors.push(error), waiting() {} }, fixture(), () => new Promise(done => resolve = done));
+  const pending = popup.open(); popup.stop(); resolve(authenticated); await pending;
+  assert.equal(complete, 0); assert.equal(state.current().user, null);
+  for (const authenticate of [async () => anonymous, async () => { throw Error('cancelled'); }]) {
+    await createLoginPopup(state, { complete: assert.fail, error: error => errors.push(error), waiting() {} }, fixture(), authenticate).open();
+  }
+  assert.equal(errors.length, 2); assert.equal(state.current().user, null);
 });
-
-test('blocked popup stays on the current page and allows retry without leaving listeners or timers', () => {
-  const f = hostFixture(true); const errors = [];
-  const popup = createLoginPopup(createClientSession(anonymous), { complete: assert.fail, error: value => errors.push(value), waiting() {} }, f.host);
-  popup.open();
-  assert.match(errors[0], /拦截/); assert.equal(f.handlers.size, 0);
-  popup.stop();
-});
-
-test('the mounted dialog shares pending login, preserves successful completion through close events and retains the page', async () => {
-  const { execFile } = await import('node:child_process');
-  const { promisify } = await import('node:util');
-  const { stdout } = await promisify(execFile)(process.execPath, ['--conditions=browser', 'tests/helpers/login-dialog.mjs'], { cwd: new URL('../', import.meta.url), timeout: 30000 });
-  assert.match(stdout, /Login dialog cancellation, retry and completion preserve the page/);
+test('blocked popup reports error without calling the SDK', async () => {
+  const errors = [];
+  await createLoginPopup(createClientSession(anonymous), { complete: assert.fail, error: value => errors.push(value), waiting() {} }, fixture(true), async () => assert.fail()).open();
+  assert.equal(errors.length, 1);
 });

@@ -28,7 +28,7 @@
   function refreshReports() {
     void invalidate('app:fund-reports').catch(() => globalMessages.error('日报已保存，列表刷新失败，请重新加载'));
   }
-  onMount(() => { if ($session?.roles.some(role=>role.name==='admin') && page.url.searchParams.get('upload') === '1') void openUpload(); });
+  onMount(() => { if ($session?._roles.includes('admin') && page.url.searchParams.get('upload') === '1') void openUpload(); });
 
   function formatReportDate(date: string): string {
     const [year, month, day] = date.split("-");

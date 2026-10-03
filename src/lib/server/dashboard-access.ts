@@ -10,8 +10,7 @@ export function dashboardRequiresLogin(request: Request): boolean {
   catch { throw new AccessError(403, '请求路径无效'); }
   if (path === '/auth/logout') return false;
   return !SAFE_METHODS.has(request.method)
-    || pageRequiresLogin(path) || apiRequiresLogin(path)
-    || path === '/auth/login';
+    || pageRequiresLogin(path) || apiRequiresLogin(path);
 }
 
 export function dashboardAccessFailure(request: Request, error: unknown): Response {
