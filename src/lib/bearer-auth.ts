@@ -3,6 +3,7 @@ import { decodeJwt } from 'jose';
 import { publicSession, type ClientSessionData } from './identity.ts';
 import { clientRequestPermission } from './route-permissions.ts';
 import { safeReturnTo, pageRequiresLogin } from './auth-navigation.ts';
+import { loginFailure, type LoginFailure } from './login-failure.ts';
 
 let client: Auth0Client;
 let token: string | null = null;
@@ -11,6 +12,8 @@ let rawFetch: typeof fetch;
 let pending: Promise<ClientSessionData> | null = null;
 let restored = false;
 let restorationError: Error | null = null;
+let callbackFailure: LoginFailure | null = null;
+export function getLoginCallbackFailure() { return callbackFailure; }
 
 /** JWT decoding is presentation only. Gateway validates it before this becomes a login. */
 export function sessionFromJwt(jwt: string, permissions: string[], now = Date.now()): ClientSessionData {
@@ -82,6 +85,7 @@ export async function initializeBearer(fetcher: typeof fetch, host: Window = win
   token = null;
   restored = false;
   restorationError = null;
+  callbackFailure = null;
   snapshot = publicSession(null);
   rawFetch = fetcher;
   client = createClient({ domain: 'auth.hasbai.xyz', clientId: '16vMxoYpr5AdPRiW1PkwIiHuRWszii6m',
@@ -95,10 +99,12 @@ export async function initializeBearer(fetcher: typeof fetch, host: Window = win
       const result = await client.handleRedirectCallback();
       host.history.replaceState({}, '', safeReturnTo(result.appState?.returnTo ?? '/'));
     } catch (error) {
-      restorationError = new Error('登录回调未完成，请重试');
+      const failure = loginFailure(error);
+      callbackFailure = failure;
+      restorationError = new Error(failure.message);
       const appState = error && typeof error === 'object' && 'appState' in error ? error.appState : null;
       const returnTo = appState && typeof appState === 'object' && 'returnTo' in appState && typeof appState.returnTo === 'string' ? safeReturnTo(appState.returnTo) : '/';
-      host.history.replaceState({}, '', '/auth/login?error=callback&returnTo=' + encodeURIComponent(returnTo));
+      host.history.replaceState({}, '', '/auth/login?error=' + failure.kind + '&returnTo=' + encodeURIComponent(returnTo));
     }
   }
   host.fetch = withBearer(fetcher, () => host.location.origin, async () => {
@@ -119,13 +125,16 @@ export async function initializeBearer(fetcher: typeof fetch, host: Window = win
 }
 
 export function loginRedirect(returnTo = '/') {
+  callbackFailure = null;
   return client.loginWithRedirect({ appState: { returnTo: safeReturnTo(returnTo) } });
 }
 export async function loginPopup(popup?: Window) {
+  callbackFailure = null;
   await client.loginWithPopup({}, popup ? { popup } : undefined);
   token = null;
   restored = false;
   restorationError = null;
+  callbackFailure = null;
   snapshot = publicSession(null);
   return loadBearerSession();
 }

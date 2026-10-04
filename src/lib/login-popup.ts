@@ -1,9 +1,10 @@
 import type { ClientSession } from './client-session';
+import { loginFailure, loginFailureFromCode, type LoginFailure } from './login-failure.ts';
 
 
 /** SDK owns PKCE, state, popup origin checks and the in-memory token cache. */
 export function createLoginPopup(state: ClientSession, options: {
-  complete: () => void; error: (message: string) => void; waiting: (value: boolean) => void;
+  complete: () => void; error: (failure: LoginFailure) => void; waiting: (value: boolean) => void;
 }, host: Window = window, authenticate: (popup: Window) => Promise<import('./identity.ts').ClientSessionData> = async popup => {
   const { loginPopup } = await import('./bearer-auth.ts');
   return loginPopup(popup);
@@ -16,7 +17,7 @@ export function createLoginPopup(state: ClientSession, options: {
     const attempt = revision;
     // Open synchronously from the user gesture before the SDK awaits anything.
     popup = host.open('', 'eastmoney-login', 'popup,width=480,height=720');
-    if (!popup) { options.error('登录窗口被拦截，请允许弹出窗口后重试'); return; }
+    if (!popup) { options.error(loginFailureFromCode('popup_blocked')); return; }
     options.waiting(true);
     try {
       const session = await authenticate(popup);
@@ -25,7 +26,7 @@ export function createLoginPopup(state: ClientSession, options: {
       state.seed(session);
       stop(); options.complete();
     } catch (error) {
-      if (attempt === revision) { stop(); options.error(error instanceof Error ? error.message : '登录未完成，请重试'); }
+      if (attempt === revision) { stop(); options.error(loginFailure(error)); }
     }
   }
   return { open, stop };

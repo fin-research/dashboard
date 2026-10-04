@@ -229,7 +229,10 @@
     },
     {
       "source": "src/routes/auth/login/+page.svelte",
-      "exemption": "Auth0 SDK 浏览器跳转入口；认证验收仅程序化 HTTP、单元测试与 CLI，不进行浏览器权限登录验收"
+      "scenarios": [
+        "login-verification-modal",
+        "login-verification-redirect"
+      ]
     },
     {
       "source": "src/routes/auth/callback/+page.svelte",
@@ -1643,6 +1646,44 @@
           ],
           "snapshots": [
             "header-fund-report-actions.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "login-verification-modal",
+      "url": "/auth/login?error=callback&modal=1",
+      "kind": "screenshot",
+      "state": "静态验证反馈展示，不执行认证或权限登录",
+      "evidence": [
+        {
+          "spec": "tests/visual/login-feedback.spec.mjs",
+          "test": "verification feedback remains readable in the original page modal",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "login-verification-modal.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "login-verification-redirect",
+      "url": "/auth/login?error=callback",
+      "kind": "screenshot",
+      "state": "静态验证反馈展示，不执行认证或权限登录",
+      "evidence": [
+        {
+          "spec": "tests/visual/login-feedback.spec.mjs",
+          "test": "redirect verification feedback offers an explicit retry without automatic login",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "login-verification-redirect.png"
           ]
         }
       ]
