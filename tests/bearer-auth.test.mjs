@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sessionFromJwt, withBearer } from '../src/lib/bearer-auth.ts';
+import { AuthenticationError } from '@auth0/auth0-spa-js';
 const jwt = claims => `eyJhbGciOiJSUzI1NiJ9.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
 const claims = { sub: 'auth0|test', username: '测试', email: 'test@18.cn', role: 'database-role', _roles: ['admin', 'handler'], department: '业务', picture: 'https://example.com/avatar', exp: 2000 };
 test('presentation uses the new claims without role IDs or legacy namespaced fallbacks', () => {
@@ -71,6 +72,25 @@ test('callback errors enter a finite login retry state without silent restore or
     async loginWithRedirect() { assert.fail('callback failure must not redirect'); },
   }));
   assert.equal(url.pathname, '/auth/login'); assert.equal(url.searchParams.get('error'), 'callback'); assert.equal(url.searchParams.get('returnTo'), '/financing/projects?q=keep');
+});
+
+test('unverified email callback keeps verification feedback and a safe returnTo without leaking OAuth details', async () => {
+  const { initializeBearer } = await import('../src/lib/bearer-auth.ts');
+  for (const [destination, expected] of [['/financing/projects?q=keep', '/financing/projects?q=keep'], ['https://evil.test', '/']]) {
+    let url = new URL('https://eastmoney.hasbai.xyz/auth/callback?error=access_denied&error_description=private&state=private-state');
+    const host = { get location() { return url; }, history: { replaceState(_, __, path) { url = new URL(path, url); } } };
+    await initializeBearer(async () => assert.fail('must not validate an unauthenticated token'), host, () => ({
+      async handleRedirectCallback() { throw new AuthenticationError('access_denied', '请先验证注册邮箱，再返回登录', 'private-state', { returnTo: destination }); },
+      async getTokenSilently() { assert.fail('denied callback must not restore'); },
+      async loginWithRedirect() { assert.fail('denied callback must wait for explicit retry'); },
+    }));
+    assert.equal(url.pathname, '/auth/login'); assert.equal(url.searchParams.get('error'), 'callback');
+    assert.equal(url.searchParams.get('returnTo'), expected);
+    assert.equal(url.searchParams.has('state'), false); assert.equal(url.searchParams.has('error_description'), false);
+    assert.ok(!url.href.includes('private'));
+    const { getLoginCallbackFailure } = await import('../src/lib/bearer-auth.ts');
+    assert.deepEqual(getLoginCallbackFailure(), {kind:'callback',code:'access_denied',message:'请先验证注册邮箱，再返回登录'});
+  }
 });
 test('operational restore failure preserves protected returnTo and leaves public resources available', async () => {
   const { initializeBearer } = await import('../src/lib/bearer-auth.ts');

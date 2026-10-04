@@ -6,6 +6,8 @@ import { createHash } from 'node:crypto';
 
 const nodeDirectory = '.svelte-kit/generated/client-optimized/nodes';
 const routes = new Map();
+const clientRoutes = new Map();
+const clientManifest = JSON.parse(await readFile('.svelte-kit/output/client/.vite/manifest.json', 'utf8'));
 for (const name of await readdir(nodeDirectory)) {
   if (!name.endsWith('.js')) continue;
   const entry = await readFile(join(nodeDirectory, name), 'utf8');
@@ -16,6 +18,7 @@ for (const name of await readdir(nodeDirectory)) {
   const styles = serverNode.match(/export const stylesheets = (\[[^;]*\]);/)?.[1];
   if (!styles) throw new Error(`Missing production stylesheet metadata: ${source}`);
   routes.set(source, JSON.parse(styles));
+  clientRoutes.set(source, clientManifest[`${nodeDirectory}/${name}`]?.css ?? []);
 }
 function stylesFor(...sources) {
   return [...new Set(sources.flatMap(source => {
@@ -27,11 +30,12 @@ const layout = 'src/routes/+layout.svelte';
 const financing = 'src/routes/financing/+layout.svelte';
 // Schedule is a component fixture: its ModuleCard wrapper is not on the SOP
 // route itself. Include that component's shipping chunk, never harness CSS.
-const clientManifest = JSON.parse(await readFile('.svelte-kit/output/client/.vite/manifest.json', 'utf8'));
 const moduleCardStyles = Object.values(clientManifest).filter(chunk => chunk.name === 'ModuleCard').flatMap(chunk => chunk.css ?? []);
 if (!moduleCardStyles.length) throw new Error('Missing production ModuleCard CSS for the schedule fixture');
 const map = {
   '/': stylesFor(layout, 'src/routes/+page.svelte'),
+  // The login route is CSR-only: its CSS is on the client entry, not the SSR node.
+  '/auth/login': [...new Set([...stylesFor(layout, 'src/routes/auth/login/+page.svelte'), ...clientRoutes.get('src/routes/auth/login/+page.svelte')])],
   '/auth/verify-email': stylesFor(layout, 'src/routes/auth/verify-email/+page.svelte'),
   '/trading-research': stylesFor(layout, 'src/routes/trading-research/+page.svelte', 'src/routes/trading-research/[view]/+page.svelte'),
   '/credit-workbench': stylesFor(layout, 'src/routes/credit-workbench/[[view]]/+page.svelte'),
