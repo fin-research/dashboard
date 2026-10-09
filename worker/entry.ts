@@ -1,3 +1,4 @@
+import { scheduledTasks } from './scheduled-tasks.ts';
 import { MARKET_BRIEFING_CRON, startMarketBriefing } from "./market-briefing-runner.ts";
 import svelteKitWorker from "../.svelte-kit/cloudflare/_worker.js";
 import { creditAssistantHttp } from "./credit-assistant-http.ts";
@@ -27,6 +28,10 @@ export class NotificationSource extends WorkerEntrypoint<Cloudflare.Env> {
 
 export { MarketBriefingWorkflow } from "./market-briefing-workflow.ts";
 export { CreditAgent } from "./credit-agent.ts";
+
+export class ScheduledTasks extends WorkerEntrypoint<Cloudflare.Env> {
+  override fetch(request: Request) { return scheduledTasks(request, this.env); }
+}
 
 const worker: ExportedHandler<Cloudflare.Env> = {
   fetch() { return new Response('Not Found', { status: 404 }); },
