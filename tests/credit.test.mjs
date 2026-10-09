@@ -1,3 +1,4 @@
+import {buildCreditReport} from '../src/lib/credit/build-report.ts';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -202,7 +203,7 @@ test("同日维护直接合并主体字段并保留创建信息", async t => {
   const db=await creditDatabase(t);await seedCredit(db);
   const before=(await db.query('SELECT to_jsonb(d) value FROM credit.diff d')).rows[0];
   const result=await saveCreditInstitution(db,{reportDate:'2026-08-21',institutionName:'甲银行',changes:{institution:{notes:'已更新'}}},'auth0|test');
-  assert.equal(result.institution.notes,'已更新');assert.equal(result.institution.totalLimit,10);
+  assert.equal(buildCreditReport(result.data).institutions[0].notes,'已更新');assert.equal(buildCreditReport(result.data).institutions[0].totalLimit,10);
   assert.notDeepEqual((await db.query('SELECT to_jsonb(d) value FROM credit.diff d ORDER BY id LIMIT 1')).rows[0],before);
   const row=(await db.query('SELECT * FROM credit.diff ORDER BY id DESC LIMIT 1')).rows[0];
   assert.equal(row.created_by,'auth0|test');assert.ok(row.updated_at);assert.equal(Number(row.total),10);
@@ -213,7 +214,7 @@ test("同日维护直接合并主体字段并保留创建信息", async t => {
 test("分项维护只追加该字段并在同一事务返回重建后的截面", async t => {
   const db=await creditDatabase(t);await seedCredit(db);
   const result=await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{items:[{type:'bond_investment',secondaryUsedAmount:2}]}},'auth0|test');
-  assert.equal(result.institution.totalUsed,2);assert.equal(result.institution.totalLimit,10);
+  assert.equal(buildCreditReport(result.data).institutions[0].totalUsed,2);assert.equal(buildCreditReport(result.data).institutions[0].totalLimit,10);
   assert.equal((await loadCreditReport(db,'2026-08-21')).institutions[0].totalUsed,3);
   const row=(await db.query('SELECT * FROM credit.diff ORDER BY id DESC LIMIT 1')).rows[0];
   assert.equal(Number(row.bond_investment_secondary_used),2);assert.equal(row.bond_investment_limit,null);assert.equal(row.status,null);
@@ -268,7 +269,7 @@ test("授信 schema、API 与页面保留只读详情及申请入口", async () 
   assert.match(repository, /credit\.append_diff/);
   assert.match(
     repository,
-    /await loadCreditSummaries[\s\S]*?await client\.query\('COMMIT'\)/,
+    /await loadCreditData[\s\S]*?await client\.query\('COMMIT'\)/,
   );
   assert.match(route, /HYPERDRIVE/);
   assert.match(route, /export const PATCH/);

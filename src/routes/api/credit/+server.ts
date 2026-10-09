@@ -4,7 +4,7 @@ import { creditInstitutionUpdateSchema } from "$lib/credit/update.ts";
 import { BondLedgerUploadError, validateSameOrigin } from "$lib/server/bond-ledger.ts";
 import {
   CreditDatabaseError,
-  loadCreditReport,
+  loadCreditData,
   saveCreditInstitution,
 } from "$lib/server/credit-repository.ts";
 import { withPostgres } from "$lib/server/postgres.ts";
@@ -27,7 +27,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
       async (client) => {
         await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
         try {
-          const report = await loadCreditReport(client, date, month ?? undefined);
+          const report = await loadCreditData(client, date, month ?? undefined);
           await client.query('COMMIT');
           return report;
         } catch (error) {

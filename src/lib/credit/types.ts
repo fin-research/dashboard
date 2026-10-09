@@ -180,21 +180,6 @@ export interface CreditReportResponse {
 }
 
 export interface CreditInstitutionUpdateResponse {
-  comparison?: Pick<CreditReportResponse, 'weeklyNews' | 'previousWeeklyNews' | 'limitChanges' | 'usageChanges'>;
-  calendarRemovals?: string[];
-  calendarAdditions?: CreditCalendarEvent[];
-  institution: CreditInstitutionView | null;
-  institutionName: string;
-  viewDate: string;
-  calendarMonth: string;
-  availableDates: string[];
-  previousDate: string | null;
-  previousSummary: CreditSummaryView | null;
-  summary: CreditSummaryView;
-  weeklyNews: CreditWeeklyNewsItem[];
-  previousWeeklyNews?: CreditWeeklyNewsItem[];
-  recentApprovals: CreditWeeklyNewsItem[];
-  limitChanges: CreditAmountChange[];
-  usageChanges: CreditAmountChange[];
-  calendarEvents: CreditCalendarEvent[];
+  institutionName:string;viewDate:string;calendarMonth:string;
+  scope:'institution'|'context';data:import('./data.ts').CreditDataset;
 }

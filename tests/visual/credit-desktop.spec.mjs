@@ -1,3 +1,4 @@
+import {creditDataFixture,creditDataPatch} from '../helpers/credit-data-fixture.mjs';
 import {test,expect} from '@playwright/test';
 import {mockResources} from './fixtures.mjs';
 import {creditFull} from './audit-fixtures.mjs';
@@ -6,10 +7,13 @@ test('desktop credit weekly report presents nonempty news and five product detai
  test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
  await mockResources(page);
  const report=structuredClone(creditFull);
+ report.institutions=['甲','乙','丙','丁'].map((suffix,index)=>({...structuredClone(creditFull.institutions[index%2]),institutionName:`银行${suffix}`,totalLimit:index?5:15,expiryDate:'2026-09-30'}));
+ report.previousInstitutions=report.institutions.map((institution,index)=>({...structuredClone(institution),reportDate:report.previousDate,totalLimit:[10,8,5,5][index],expiryDate:'2026-09-14'}));
  report.weeklyNews=Array.from({length:4},(_,index)=>({
-   ...report.weeklyNews[0],institutionName:`银行${['甲','乙','丙','丁'][index]}`,
+   ...report.weeklyNews[0],institutionName:report.institutions[index].institutionName,eventType:index?'renewal':'increase',previousAmount:report.previousInstitutions[index].totalLimit,currentAmount:report.institutions[index].totalLimit,
  }));
- await page.route('**/api/credit**',route=>route.fulfill({json:report}));
+ report.recentApprovals=report.weeklyNews;
+ await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
  await page.setViewportSize({width:1280,height:900});await page.goto('/credit-workbench/weekly');
  await expect(page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article')).toHaveCount(5);
  for (const card of await page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article').all()) await expect(card).toContainText('较上周');
@@ -28,7 +32,7 @@ test('credit weekly detail keeps the complete grouped header while scrolling',as
    ...structuredClone(creditFull.institutions[index%2]),
    institutionName:`银行${String(index+1).padStart(2,'0')}`,
  }));
- await page.route('**/api/credit**',route=>route.fulfill({json:report}));
+ await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
  await page.setViewportSize({width:1280,height:900});await page.goto('/credit-workbench/weekly');
  const workspace=page.locator('.tr-workspace');
  const table=page.locator('.tr-credit-weekly-detail-table');
@@ -45,7 +49,7 @@ test('desktop credit metrics and detail dialog stay within the viewport',async({
   test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
   await page.clock.setFixedTime(new Date('2026-09-30T04:00:00Z'));
   await mockResources(page);
-  await page.route('**/api/credit**',route=>route.fulfill({json:creditFull}));
+  await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(creditFull)}));
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/credit-workbench');
   await expect(page.getByRole('rowheader',{name:'银行甲',exact:true})).toBeVisible();
@@ -106,9 +110,9 @@ test('credit application separates requests from editable maintenance details',a
     if(route.request().method()==='PATCH'){
       saved=route.request().postDataJSON();
       report.institutions[0].bankOffice=saved.changes.institution.bankOffice;
-      return route.fulfill({json:{...report,institution:report.institutions[0],institutionName:report.institutions[0].institutionName,viewDate:saved.viewDate,calendarMonth:saved.calendarMonth,previousWeeklyNews:[]}});
+      return route.fulfill({json:creditDataPatch(report,saved)});
     }
-    return route.fulfill({json:report});
+    return route.fulfill({json:creditDataFixture(report)});
   });
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/credit-workbench');
@@ -174,7 +178,7 @@ test('credit report dates and quarter final badges support keyboard and mobile d
   await page.route('**/api/credit**',route=>{
     const date=new URL(route.request().url()).searchParams.get('date') ?? source.summary.reportDate;
     const report={...source,summary:{...source.summary,reportDate:date},institutions:source.institutions.map(row=>({...row,reportDate:date}))};
-    return route.fulfill({json:report});
+    return route.fulfill({json:creditDataFixture(report)});
   });
   await page.goto('/credit-workbench');
   await page.getByRole('button',{name:`报告日：${source.summary.reportDate}`,exact:true}).click();

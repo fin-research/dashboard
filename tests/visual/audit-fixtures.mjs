@@ -5,16 +5,20 @@ creditFull.previousDate='2026-09-08';
 creditFull.previousSummary={...creditFull.summary,reportDate:'2026-09-08',totalLimit:28,totalUsed:9,totalAvailable:19,utilization:32.14,expiringWithin30Days:0};
 creditFull.previousWeeklySummary={...creditFull.previousSummary,addedInstitutionCount:2,expiredInstitutionCount:1};
 for(const institution of creditFull.institutions){
+  institution.effectiveDate='2026-01-01';
   institution.updatedAt='2026-09-15T08:00:00Z';
   institution.clients=[{id:'fixture-client',name:'测试关联客户'}];
   institution.bankOffice='总行金融市场部';institution.applyingDepartment='资金管理部';institution.handler='测试经办人';
   institution.items=creditItemTypes.map((type,i)=>({type,limitAmount:3,usedAmount:[2,1,.5,.5,0][i],remainingAmount:3-[2,1,.5,.5,0][i],details:i?'按协议约定使用':'债券投资额度，一级与二级分别登记',primaryUsedAmount:type==='bond_investment'?1.5:null,secondaryUsedAmount:type==='bond_investment'?.5:null,usageSource:['bond_investment','yield_certificate','interbank_lending'].includes(type)?'financing':'credit'}));
 }
+creditFull.previousInstitutions=creditFull.institutions.map((row,i)=>({...structuredClone(row),
+  reportDate:'2026-09-08',totalLimit:i?18:10,totalUsed:i?4:5,
+  items:row.items.map(item=>({...item,usedAmount:item.type==='other'&&!i?1:item.usedAmount}))}));
 creditFull.calendarEvents=[
   ...['new','expiry','renewal','increase','revoked'].map((kind,i)=>({id:kind,type:kind==='expiry'||kind==='revoked'?'expiry':'added',kind,institutionName:i%2?'银行乙':'银行甲',label:['授信新增 · 15亿元','授信到期 · 15亿元','授信续作 · 15亿元','授信扩额 · 20亿元','授信撤销 · 15亿元'][i],date:`2026-09-${String(14+i).padStart(2,'0')}`,status:'completed',statusLabel:'已生效'})),
   ...creditItemTypes.map((itemType,i)=>({id:itemType,type:'usage',kind:'usage',itemType,institutionName:'银行甲',label:`${creditItemLabels[itemType]} · 增加1亿元`,date:`2026-09-${String(14+i).padStart(2,'0')}`,status:'completed',statusLabel:'已生效'})),
 ];
-creditFull.weeklyNews=[{reportDate:today,previousReportDate:'2026-09-08',institutionName:'银行甲',institutionType:'商业银行',eventType:'increase',previousStatus:'approved',currentStatus:'approved',previousAmount:10,currentAmount:15,deltaAmount:5,previousEffectiveDate:'2025-09-15',currentEffectiveDate:'2026-09-15',previousExpiryDate:'2026-09-14',currentExpiryDate:'2027-09-14',creditDetails:creditFull.institutions[0].items.map(item=>({type:item.type,limitAmount:item.limitAmount,details:item.details}))}];
+creditFull.weeklyNews=[{reportDate:today,previousReportDate:'2026-09-08',institutionName:'银行甲',institutionType:'商业银行',eventType:'increase',previousStatus:'approved',currentStatus:'approved',previousAmount:10,currentAmount:15,deltaAmount:5,previousEffectiveDate:'2026-01-01',currentEffectiveDate:'2026-01-01',previousExpiryDate:'2026-09-14',currentExpiryDate:'2026-09-30',creditDetails:creditFull.institutions[0].items.map(item=>({type:item.type,limitAmount:item.limitAmount,details:item.details}))}];
 creditFull.recentApprovals=creditFull.weeklyNews;
 
 export const hotspotAudit={date:today,generatedAt:`${today}T10:00:00+08:00`,model:'fixture',cached:true,

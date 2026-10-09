@@ -15,8 +15,9 @@
   import { creditLimitFilterLabels, matchesCreditCalendarEvent } from "../credit/calendar.ts";
   import { portal } from "../portal.ts";
   import { scrollableRegion } from "../scrollable-region";
-  import { applyCreditUpdate } from "../credit/apply-update.ts";
-  import { fetchCreditReport } from "../credit/client.ts";
+  import {applyCreditDataUpdate,type CreditDataset} from "../credit/data.ts";
+  import {buildCreditReport} from "../credit/build-report.ts";
+  import { fetchCreditData } from "../credit/client.ts";
   import {
     creditItemLabels,
     creditItemTypes,
@@ -60,7 +61,8 @@
 
   let { tab = "overview", onreport }: { tab?: CreditTab; onreport?: (report: CreditReportResponse) => void } = $props();
   const activeTab = $derived(tab);
-  let report = $state<CreditReportResponse | null>(null);
+  let sourceData=$state<CreditDataset|null>(null);
+  let report=$derived(sourceData?buildCreditReport(sourceData):null);
   $effect(() => { if (report) onreport?.(report); });
   let loading = $state(true);
   let errorMessage = $state("");
@@ -80,7 +82,7 @@
 
   function applyUpdate(result: CreditInstitutionUpdateResponse, version: number): void {
     if (!report || loading || version !== loadSequence) return;
-    report = applyCreditUpdate(report,result,calendarMonth);
+    if(sourceData)sourceData=applyCreditDataUpdate(sourceData,result,calendarMonth);
   }
 
   const filteredInstitutions = $derived.by(() => {
@@ -235,10 +237,10 @@
     detailDialog?.close();
     selectedInstitutionName = null;
     try {
-      const result = await fetchCreditReport(reportDate,fetch,month);
+      const result = await fetchCreditData(reportDate,fetch,month);
       if (sequence !== loadSequence) return;
-      report = result;
-      calendarMonth = month ?? report.summary.reportDate.slice(0, 7);
+      sourceData = result;
+      calendarMonth = month ?? result.reportDate.slice(0, 7);
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : "授信数据加载失败";
     } finally {

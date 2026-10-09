@@ -1,3 +1,4 @@
+import {buildCreditReport} from '../src/lib/credit/build-report.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { creditQuarterDates, isCreditFinalized } from '../src/lib/credit/report-date.ts';
@@ -23,9 +24,9 @@ test('backfilled textual maintenance marks its report day and PATCH and GET agre
   await seedCredit(db,'2026-08-21','乙银行',{expiry_date:'2027-12-31'});
   assert.equal(isCreditFinalized((await loadCreditReport(db,'2026-09-30')).institutions[0],'2026-09-30'),false);
   const saved=await saveCreditInstitution(db,{operation:'maintenance',reportDate:'2026-09-30',viewDate:'2026-09-30',calendarMonth:'2026-09',institutionName:'甲银行',changes:{institution:{notes:'季末确认'}}},'auth0|test');
-  assert.equal(saved.institution.lastChangedOn,'2026-09-30');
-  assert.equal(isCreditFinalized(saved.institution,'2026-09-30'),true);
-  assert.equal(saved.calendarEvents.some(e=>e.kind==='amendment'),false);
+  assert.equal(buildCreditReport(saved.data).institutions[0].lastChangedOn,'2026-09-30');
+  assert.equal(isCreditFinalized(buildCreditReport(saved.data).institutions[0],'2026-09-30'),true);
+  assert.equal(buildCreditReport(saved.data).calendarEvents.some(e=>e.kind==='amendment'),false);
   const report=await loadCreditReport(db,'2026-09-30');
   assert.deepEqual(report.institutions.map(row=>[row.institutionName,isCreditFinalized(row,'2026-09-30')]).sort(),[['乙银行',false],['甲银行',true]].sort());
   assert.equal((await loadCreditReport(db,'2026-09-29')).institutions.find(row=>row.institutionName==='甲银行').lastChangedOn,'2026-08-21');

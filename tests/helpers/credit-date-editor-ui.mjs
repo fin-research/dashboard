@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {creditDataFixture,creditDataPatch} from './credit-data-fixture.mjs';
 import {installDom,loadComponent} from './svelte-dom.mjs';
 const window=installDom();
 const {mount,unmount,flushSync,tick}=await import('svelte');
@@ -9,7 +10,7 @@ const context=new Map([['site-session',session]]);
 
 document.body.innerHTML='<div id="tr-topbar-actions"></div><div id="host"></div>';
 const summary={reportDate:'2026-09-11',institutionCount:1,approvedCount:1,totalLimit:8,totalUsed:1,totalAvailable:7,utilization:12.5,expiringWithin30Days:0};
-let institution={reportDate:summary.reportDate,institutionName:'上海农商行（金市）',institutionType:'农商行',status:'approved',confidentialityStatus:false,totalLimit:8,totalUsed:1,totalRemaining:7,availableAmount:7,utilization:12.5,effectiveDate:'2025-08-31',expiryDate:'2026-08-31',items:[],clients:[],notes:null};
+let institution={reportDate:summary.reportDate,institutionName:'上海农商行（金市）',institutionType:'农商行',status:'approved',confidentialityStatus:false,totalLimit:8,totalUsed:1,totalRemaining:7,availableAmount:7,utilization:12.5,effectiveDate:'2025-08-31',expiryDate:'2026-08-31',items:[],clients:[{id:'fixture-client',name:'测试关联客户'}],notes:null};
 const report=()=>({availableDates:['2026-08-21'],previousDate:null,summary,previousSummary:null,weeklySummary:{...summary,addedInstitutionCount:0,expiredInstitutionCount:0},previousWeeklySummary:null,institutions:[institution],weeklyNews:[],recentApprovals:[],limitChanges:[],usageChanges:[],calendarEvents:[]});
 const writes=[];let reads=0;
 globalThis.fetch=async(url,options={})=>{
@@ -17,9 +18,9 @@ globalThis.fetch=async(url,options={})=>{
     const body=JSON.parse(options.body);
     writes.push(body);
     institution={...institution,expiryDate:body.changes.institution.expiryDate};
-    return Response.json({...report(),institution,institutionName:institution.institutionName,viewDate:body.viewDate,calendarMonth:body.calendarMonth,previousWeeklyNews:[]});
+    return Response.json(creditDataPatch(report(),body));
   }
-  reads++;return Response.json(report());
+  reads++;return Response.json(creditDataFixture(report()));
 };
 async function settle(){for(let i=0;i<5;i++){await new Promise(r=>setImmediate(r));flushSync();await tick();}}
 const View=await loadComponent('src/lib/trading-research/CreditView.svelte');

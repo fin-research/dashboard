@@ -34,12 +34,12 @@ Worker 通过 `HYPERDRIVE` 访问 Neon `credit` schema，migration 只放 `credi
 
 ## 接口与维护
 
-- 报表直接读取当前/对比 SQL 截面；周报、近半年批复和所选日历只查询消费范围内的日期、机构。提前续作的旧有效期限仍从 SQL 历史事实计算。日历已用变化读取受影响机构，未来到期日只在所选日历范围内参与查询。中文排序复用 Collator。
-- `GET /api/credit?date=YYYY-MM-DD&month=YYYY-MM` 返回所选日期截面、前期汇总、周报事件、六个月批复和日历。`month` 可省略，默认所选日期所在月；返回该月及周边日历格中的额度与已用事件。非法日期/月为 400，早于历史覆盖起点或无记录为 404，连接异常为 503。
+- 后端直接查询当前/对比 SQL 截面、客户关联、用量、申请事实及所需事件日期的截面，显式投影业务字段，不返回内部作者或审计 ID。当前/对比日期保留完整余额，其余日期仅返回相关机构用量。提前续作的旧有效期限从 SQL 历史事实读取；不在 Worker 构造机构展示对象或拼装报表。
+- `GET /api/credit?date=YYYY-MM-DD&month=YYYY-MM` 返回 `CreditDataset` 原始业务数据与日期上下文。浏览器共用 `buildCreditReport(data)` 生成一览表、总额、使用率、周报与日历；后端 GET/PATCH 不调用该函数。CLI/Excel 核对适配器复用同一纯函数，不保留第二套公式。`month` 默认所选日期所在月；非法日期/月为 400，早于历史覆盖起点或无记录为 404，连接异常为 503。
 - 周环比优先采用七天前的截面；历史不足七天时取更早的最近变更日。周报申请事件由 `diff.type` 决定，续期与扩额同日归为扩额；本周内续期的机构不再列到期。到期日期从当前期限生成，旧期限被续期覆盖后不再提醒。首次历史导入作为基准，不虚构当日新增批复。
-- `PATCH /api/credit` 必须以 `operation`、`reportDate`（本次变更业务日）、`institutionName` 和 `changes` 写入申请；不再接受省略操作类型的旧请求。`changes.institution` / `changes.items` 仅传修改字段。`viewDate` / `calendarMonth` 指定当前页面上下文，省略时沿用业务日及其月份。客户端另传 `viewFirstDate` / `viewPreviousDate`；历史起点或比较期变化时返回比较集合重置及失效日历基准事件 ID，仍不刷新全机构列表。保存响应只含该机构的确认行、该机构事件替换集，以及 SQL 权威汇总和日期元数据，不重建全机构详情；返回的 `institution` 在所选截面尚不存在时为 NULL。前端按机构合并响应，保留筛选、排序、详情弹窗和日历月份，不再发起全表 GET；保存途中切换报告日或月份时，旧上下文响应不得覆盖新页面。续期须延长到期日，扩额须增加总额，撤销须明确更改状态；维护不产生授信申请事件。用户 ID 由 `locals.user.auth0Id` 注入，客户端不能指定作者或审计字段。
+- `PATCH /api/credit` 以 `operation`、`reportDate`、`institutionName` 和 `changes` 写入申请，`changes` 仅传修改字段。`viewDate` / `calendarMonth` 指定当前页面上下文，省略时沿用业务日及其月份。普通响应 `scope=institution`，只返回目标机构的原始数据替换集；空数组可删除已失效的数据。浏览器替换该机构的数据并响应式重算报表，保留筛选、排序、详情弹窗及日历月份，无额外 GET。历史起点或比较期变化时 `scope=context` 补齐事件及比较截面，当前日仍只返回目标机构；前端保留其他机构的当前截面，重算受影响部分。保存途中切换日期/月时，通过上下文和请求序号拒绝旧响应。续期、扩额、撤销、字段白名单、期限约束、事务及审计继续由后端验证；前端派生值不作为写入依据。用户 ID 来自 `locals.user.auth0Id`。
 - `POST /api/credit` 使用相同结构新增机构，至少包含机构性质、状态、保密协议状态。主体重复返回 409；成功后可继续维护全部详情。
-- 一级发行存续额、收益凭证、拆借及总已用由服务器提供。债券分项的 `secondaryUsedAmount` 可编辑，`primaryUsedAmount` 由服务器提供；禁止通过 `usedAmount` 覆盖派生债券合计。所有写入校验同源、身份与 `credit.institution:update` 权限；GET 使用 `credit.institution:read`。所有响应 `Cache-Control: no-store`。
+- 一级发行存续额、收益凭证、拆借原始用量由服务器提供；浏览器派生债券分项及总已用。债券 `secondaryUsedAmount` 可编辑；禁止通过 `usedAmount` 覆盖派生债券合计。所有写入校验同源、身份与 `credit.institution:update` 权限；GET 使用 `credit.institution:read`。所有响应 `Cache-Control: no-store`。
 - 已登记金额传 NULL 不能清零，API 返回400并提示填0，避免页面清空后误报保存成功；尚未登记的金额仍允许缺失。导入空白不覆盖原值，若四项额度继续继承非零值，返回逐机构警告；dry-run明确提示空白与零的区别。
 
 ## 导入
