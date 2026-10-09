@@ -8,12 +8,13 @@
   import { globalMessages } from '../global-messages.ts';
   import { updateCreditInstitution } from '../credit/client.ts';
   import { creditItemLabels, creditItemTypes, type CreditApplicationType, type CreditInstitutionView,
-    type CreditItemType, type CreditStatus } from '../credit/types.ts';
+    type CreditItemType, type CreditStatus, type CreditInstitutionUpdateResponse } from '../credit/types.ts';
   import type { CreditInstitutionChanges, CreditInstitutionUpdateInput, CreditItemChanges } from '../credit/update.ts';
 
-  let { institutions, onapplied }: {
+  let { institutions, reportDate, calendarMonth, firstDate, previousDate, contextVersion, onapplied }: {
     institutions: CreditInstitutionView[];
-    onapplied: (date: string) => Promise<void>;
+    reportDate: string; calendarMonth: string; firstDate?: string; previousDate: string | null; contextVersion: number;
+    onapplied: (result: CreditInstitutionUpdateResponse, contextVersion: number) => void;
   } = $props();
 
   type ItemDraft = { limitAmount: number | null };
@@ -65,9 +66,7 @@
   }
 
   export function open(): void {
-    businessDate = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date());
+    businessDate = reportDate;
     selectOperation('new');
     dialog.showModal();
   }
@@ -148,10 +147,11 @@
     const changes = changesForSubmission();
     if (!Object.keys(changes.institution ?? {}).length && !changes.items?.length) { errorText = '没有需要提交的变更'; return; }
     submitting = true; errorText = '';
+    const version = contextVersion;
     try {
-      await updateCreditInstitution({operation,reportDate:businessDate,institutionName:institutionName.trim(),changes},fetch,operation === 'new');
+      const result = await updateCreditInstitution({operation,reportDate:businessDate,viewDate:reportDate,viewFirstDate:firstDate,viewPreviousDate:previousDate,calendarMonth,institutionName:institutionName.trim(),changes},fetch,operation === 'new');
       dialog.close();
-      await onapplied(businessDate);
+      onapplied(result,version);
       globalMessages.success(`授信${labels[operation]}已提交`);
     } catch (error) { errorText = error instanceof Error ? error.message : '授信申请提交失败'; }
     finally { submitting = false; }

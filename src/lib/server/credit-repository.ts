@@ -7,8 +7,10 @@ import type { CreditInstitutionUpdateInput } from '../credit/update.ts';
 import { compareCreditInstitutionOrder } from '../credit/presentation.ts';
 import { creditEffectiveStatus, isCreditEffective } from '../credit/validity.ts';
 import type { DatabaseClient } from './postgres.ts';
+import { loadCreditStates, loadCreditSummaries } from './credit-snapshots.ts';
 
 const AMOUNT_TOLERANCE = 0.000001;
+const creditDateFormatter = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});
 export class CreditDatabaseError extends Error {
   readonly status: number;
   constructor(status: number, message: string) { super(message); this.status = status; this.name = 'CreditDatabaseError'; }
@@ -81,28 +83,35 @@ type DiffRow = Record<string, unknown> & {
 };
 type ClientLink = { institution_name: string; id: string; name: string };
 type UsageRow = { date: string; institution_name: string; item_type: CreditItemType; amount: number };
-const auditFields = new Set(['id','institution_name','effective_on','created_at','created_by','updated_at','type']);
+
+function itemUsage(state: DiffRow, date: string, type: CreditItemType, linked: boolean, usage: Map<string,number>) {
+  const bond = type === 'bond_investment';
+  const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
+  const primaryUsedAmount = linked ? usage.get(`${date}:${state.institution_name}:${type}`) ?? 0 : null;
+  const secondaryUsedAmount = nullableNumber(state.bond_investment_secondary_used) ?? 0;
+  const usedAmount = financing ? (primaryUsedAmount == null ? null : sumAmounts([primaryUsedAmount,bond ? secondaryUsedAmount : 0]))
+    : nullableNumber(state[`${type}_used`]);
+  return {usedAmount,primaryUsedAmount,secondaryUsedAmount};
+}
 
 function institutionView(state: DiffRow, date: string, clients: Array<{id:string;name:string}>, usage: Map<string,number>, previousPeriod?: CreditInstitutionView['previousPeriod']): CreditInstitutionView {
   const items = creditItemTypes.map(type => {
     const bond = type === 'bond_investment';
     const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
     const limitAmount = type === 'other' ? null : nullableNumber(state[`${type}_limit`]);
-    const onlineAmount = clients.length ? usage.get(`${date}:${state.institution_name}:${type}`) ?? 0 : null;
-    const secondaryUsedAmount = nullableNumber(state.bond_investment_secondary_used) ?? 0;
-    const usedAmount = financing ? (onlineAmount == null ? null : sumAmounts([onlineAmount,bond ? secondaryUsedAmount : 0]))
-      : nullableNumber(state[`${type}_used`]);
-    return { type,limitAmount,usedAmount,remainingAmount:limitAmount == null || (financing && usedAmount == null) ? null : limitAmount-(usedAmount ?? 0),
+    const {usedAmount,primaryUsedAmount,secondaryUsedAmount} = itemUsage(state,date,type,clients.length > 0,usage);
+    const item: CreditInstitutionView['items'][number] = { type,limitAmount,usedAmount,remainingAmount:limitAmount == null || (financing && usedAmount == null) ? null : limitAmount-(usedAmount ?? 0),
       details: (type === 'bond_investment' || type === 'other' ? state[`${type}_detail`] as string | null : null) ?? null,
-      usageSource:bond ? 'bond_investors' as const : financing ? 'financing' as const : 'credit' as const,linkedClientCount:clients.length,
-      ...(bond ? {primaryUsedAmount:onlineAmount,secondaryUsedAmount} : {}) };
+      usageSource:bond ? 'bond_investors' : financing ? 'financing' : 'credit',linkedClientCount:clients.length };
+    if (bond) { item.primaryUsedAmount = primaryUsedAmount; item.secondaryUsedAmount = secondaryUsedAmount; }
+    return item;
   });
   const totalLimit = nullableNumber(state.total);
   const totalUsed = clients.length ? sumAmounts(items.map(item => item.usedAmount)) : null;
   const availableAmount = totalLimit == null || totalUsed == null ? null : totalLimit-totalUsed;
   const period = {reportDate:date,previousPeriod,status:state.status as CreditInstitutionView['status'],
     effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null};
-  return { ...period,effectiveStatus:creditEffectiveStatus(period),institutionName:state.institution_name,institutionType:state.institution_type as string,
+  return { reportDate:date,previousPeriod,effectiveStatus:creditEffectiveStatus(period),institutionName:state.institution_name,institutionType:state.institution_type as string,
     confidentialityStatus:state.confidentiality_status === true,status:state.status as CreditInstitutionView['status'],
     totalLimit,totalUsed,totalRemaining:availableAmount,availableAmount,utilization:totalLimit && totalUsed != null ? totalUsed/totalLimit*100 : null,
     effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null,
@@ -112,97 +121,134 @@ function institutionView(state: DiffRow, date: string, clients: Array<{id:string
 }
 
 export async function loadCreditReport(client: DatabaseClient, requestedDate: string | null = null, calendarMonth?: string): Promise<CreditReportResponse> {
-  const diffResult = await client.query<{ data: DiffRow }>(`SELECT to_jsonb(d) AS data FROM credit.diff d ORDER BY effective_on,created_at,id`);
-  const rows = diffResult.rows.map(row => row.data);
-  const availableDates = [...new Set(rows.map(row => row.effective_on))];
-  const reportDate = requestedDate ?? new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  return readCreditReportData(client,requestedDate,calendarMonth);
+}
+
+async function readCreditReportData(client: DatabaseClient, requestedDate: string | null = null, calendarMonth?: string, selectedName?: string, comparisonOnly = false, calendarDay?: string): Promise<CreditReportResponse> {
+  const availableDates = (await client.query<{date:string}>("SELECT DISTINCT to_char(effective_on,'YYYY-MM-DD') AS date FROM credit.diff ORDER BY date")).rows.map(row => row.date);
+  const reportDate = requestedDate ?? creditDateFormatter.format(new Date());
   const firstDate = availableDates[0];
   if (!firstDate || reportDate < firstDate) throw new CreditDatabaseError(404,requestedDate ? `${requestedDate} 授信记录不存在` : '暂无授信记录');
   const previousDate = addDays(reportDate,-7) >= firstDate ? addDays(reportDate,-7) : availableDates.filter(date => date < reportDate).at(-1) ?? null;
   const monthStart = `${calendarMonth ?? reportDate.slice(0,7)}-01`;
-  const calendarStart = addDays(monthStart,-6);
-  const calendarEnd = addDays(monthStart,41);
+  const calendarStart = calendarDay ?? (comparisonOnly ? '0001-01-01' : addDays(monthStart,-6));
+  const calendarEnd = calendarDay ?? (comparisonOnly ? '0001-01-01' : addDays(monthStart,41));
+  const sixMonths = new Date(`${reportDate}T00:00:00Z`);
+  if (!comparisonOnly) sixMonths.setUTCMonth(sixMonths.getUTCMonth()-6);
+  const newsStart = [sixMonths.toISOString().slice(0,10),previousDate ? addDays(previousDate,-7) : firstDate].sort()[0];
+  const rows = (await client.query<DiffRow>(`SELECT id,institution_name,to_char(effective_on,'YYYY-MM-DD') AS effective_on,type,expiry_date::text
+    FROM credit.diff WHERE ($1::text IS NULL OR institution_name=$1)
+      AND (effective_on BETWEEN $2::date AND $3::date OR effective_on BETWEEN $4::date AND $5::date
+        OR expiry_date BETWEEN $2::date AND $3::date OR expiry_date BETWEEN $4::date AND $5::date)
+    ORDER BY effective_on,created_at,id`,[selectedName ?? null,newsStart,reportDate,calendarStart,calendarEnd])).rows;
   const links = (await client.query<ClientLink>(`SELECT m.institution_name,c.id::text AS id,c.name
-    FROM credit.institution_client m JOIN public.client c ON c.id=m.client_id ORDER BY m.institution_name,c.name`)).rows;
-  const usageDates = (await client.query<{date:string}>(`SELECT DISTINCT to_char(v.date,'YYYY-MM-DD') AS date
+    FROM credit.institution_client m JOIN public.client c ON c.id=m.client_id WHERE ($1::text IS NULL OR m.institution_name=$1) ORDER BY m.institution_name,c.name`,[selectedName ?? null])).rows;
+  const usageEventRows = (await client.query<{date:string;institution_name:string}>(`SELECT DISTINCT to_char(v.date,'YYYY-MM-DD') AS date,m.institution_name
     FROM financing.debt d JOIN credit.institution_client m ON m.client_id=d.client_id
     CROSS JOIN LATERAL (VALUES(d.activated_at),(d.maturity_date),(d.settled_at),(d.closed_at)) v(date)
-    WHERE d.debt_type IN ('收益凭证','同业拆借') AND v.date BETWEEN $1::date AND $2::date
-    UNION SELECT DISTINCT to_char(v.date,'YYYY-MM-DD') AS date
+    WHERE d.debt_type IN ('收益凭证','同业拆借') AND v.date BETWEEN $1::date AND $2::date AND ($3::text IS NULL OR m.institution_name=$3)
+    UNION SELECT DISTINCT to_char(v.date,'YYYY-MM-DD') AS date,m.institution_name
     FROM financing.bond b JOIN financing.bond_investors i ON i.bond_id=b.id
     JOIN credit.institution_client m ON m.client_id=i.investor_id
     CROSS JOIN LATERAL (VALUES(b.issue_date),(b.maturity_date),(b.settled_at),(b.closed_at)) v(date)
-    WHERE v.date BETWEEN $1::date AND $2::date ORDER BY date`,[calendarStart,calendarEnd])).rows.map(row => row.date);
-  const eventDates = new Set(availableDates.filter(date => date <= reportDate || date >= calendarStart && date <= calendarEnd));
-  for (const row of rows) if (row.expiry_date) eventDates.add(String(row.expiry_date));
-  const snapshotDates = new Set([reportDate,...eventDates,...usageDates,...(previousDate ? [previousDate] : [])]);
-  for (const date of [...eventDates,...usageDates]) snapshotDates.add(addDays(date,-1));
+    WHERE v.date BETWEEN $1::date AND $2::date AND ($3::text IS NULL OR m.institution_name=$3) ORDER BY date`,[calendarStart,calendarEnd,selectedName ?? null])).rows;
+  const usageDates = usageEventRows.map(row => row.date);
+  const eventDates = new Set(rows.filter(row=>row.type !== 'maintenance').map(row=>row.effective_on));
+  // Historical expiries feed news; future expiries only feed the selected calendar.
+  // Do not materialize full institution/item views for unrelated future dates.
+  for (const row of rows) if (row.expiry_date) {
+    const date = String(row.expiry_date);
+    if (date <= reportDate || date >= calendarStart && date <= calendarEnd) eventDates.add(date);
+  }
+  const usageEventDates = [...new Set([...usageDates,...rows.filter(row => row.effective_on>=calendarStart && row.effective_on<=calendarEnd).map(row=>row.effective_on)])].sort();
+  const snapshotDates = new Set([reportDate,...eventDates,...usageEventDates,...(previousDate ? [previousDate] : [])]);
+  for (const date of [...eventDates,...usageEventDates]) snapshotDates.add(addDays(date,-1));
   const financeDates = [...new Set([reportDate,...(previousDate ? [previousDate] : []),
     ...[...snapshotDates].filter(date => date >= addDays(calendarStart,-1) && date <= calendarEnd)])].sort();
   const usage = (await client.query<UsageRow>(`SELECT to_char(d.date,'YYYY-MM-DD') AS date,m.institution_name,
     CASE u.debt_type WHEN '收益凭证' THEN 'yield_certificate' ELSE 'interbank_lending' END AS item_type,
     (sum(u.amount)/100000000)::float8 AS amount
     FROM unnest($1::date[]) d(date) CROSS JOIN LATERAL financing.credit_usage_as_of(d.date) u
-    JOIN credit.institution_client m ON m.client_id=u.client_id GROUP BY d.date,m.institution_name,u.debt_type
+    JOIN credit.institution_client m ON m.client_id=u.client_id WHERE ($2::text IS NULL OR m.institution_name=$2) GROUP BY d.date,m.institution_name,u.debt_type
     UNION ALL SELECT to_char(d.date,'YYYY-MM-DD'),u.institution_name,'bond_investment',(u.amount/100000000)::float8
-    FROM unnest($1::date[]) d(date) CROSS JOIN LATERAL credit.bond_primary_usage_as_of(d.date) u`,[financeDates])).rows;
+    FROM unnest($1::date[]) d(date) CROSS JOIN LATERAL credit.bond_primary_usage_as_of(d.date) u WHERE ($2::text IS NULL OR u.institution_name=$2)`,[financeDates,selectedName ?? null])).rows;
   const clientsByInstitution = new Map<string,Array<{id:string;name:string}>>();
   for (const {institution_name,id,name} of links) {
     const group = clientsByInstitution.get(institution_name) ?? [];
     group.push({id,name}); clientsByInstitution.set(institution_name,group);
   }
   const usageByKey = new Map(usage.map(row => [`${row.date}:${row.institution_name}:${row.item_type}`,row.amount]));
-  // Walk sparse changes once in date order. Each rendered view is independent of later states.
-  const cache = new Map<string,CreditInstitutionView[]>();
-  const states = new Map<string,DiffRow>();
-  const priorPeriods = new Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>();
-  let rowIndex = 0;
-  for (const date of [...snapshotDates].sort()) {
-    while (rowIndex < rows.length) {
-      const row = rows[rowIndex];
-      if (!row || row.effective_on > date) break;
-      rowIndex++;
-      const state = states.get(row.institution_name) ?? {} as DiffRow;
-      if (state.status === 'approved' && state.effective_date && state.expiry_date &&
-        (row.effective_date != null && row.effective_date !== state.effective_date || row.expiry_date != null && row.expiry_date !== state.expiry_date)) {
-        const periods = priorPeriods.get(row.institution_name) ?? [];
-        periods.push({effectiveDate:String(state.effective_date),expiryDate:String(state.expiry_date)});
-        priorPeriods.set(row.institution_name,periods);
-      }
-      if (row.status === 'revoked' || row.status === 'applying') priorPeriods.delete(row.institution_name);
-      for (const [key,value] of Object.entries(row)) {
-        if (auditFields.has(key) || value != null) state[key] = value;
-      }
-      states.set(row.institution_name,state);
-    }
-    cache.set(date,[...states.values()].map(state => institutionView(state,date,clientsByInstitution.get(state.institution_name) ?? [],usageByKey,
-      priorPeriods.get(state.institution_name)?.slice().reverse().find(period => period.effectiveDate <= date && period.expiryDate >= date))));
+  // Current/comparison tables are SQL snapshots. Event dates request only affected names.
+  const requested = new Map<string,Set<string>|null>();
+  const addRequest = (date:string,names:string[]|null) => {
+    if (requested.has(date) && requested.get(date) === null) return;
+    if (names === null) { requested.set(date,null); return; }
+    const group = requested.get(date) ?? new Set<string>();
+    for (const name of names) group.add(name);
+    requested.set(date,group);
+  };
+  addRequest(reportDate,selectedName ? [selectedName] : null);
+  if (previousDate) addRequest(previousDate,selectedName ? [selectedName] : null);
+  for (const date of eventDates) {
+    if (date < firstDate || date > reportDate && (date < calendarStart || date > calendarEnd)) continue;
+    const names = rows.filter(row => row.effective_on === date || row.expiry_date === date).map(row => row.institution_name);
+    addRequest(date,names); addRequest(addDays(date,-1),names);
   }
-  const snapshot = (date:string) => cache.get(date) ?? [];
-  const current = snapshot(reportDate).sort(compareCreditInstitutionOrder);
-  const previous = previousDate ? snapshot(previousDate) : [];
+  for (const date of usageEventDates) {
+    const names = [...usageEventRows.filter(row=>row.date===date),...rows.filter(row=>row.effective_on===date)].map(row=>row.institution_name);
+    addRequest(date,names); addRequest(addDays(date,-1),names);
+  }
+  const savedStates = await loadCreditStates(client,[...requested].map(([date,names])=>({date,names:names === null ? null : [...names],include_details:date===reportDate && !comparisonOnly})));
+  const cache = new Map<string,{states:Map<string,DiffRow>;periods:Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>}>();
+  for (const row of savedStates) {
+    const saved = cache.get(row.date) ?? {states:new Map<string,DiffRow>(),periods:new Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>()};
+    const state = row.data as DiffRow;
+    saved.states.set(state.institution_name,state);
+    if (row.previous_period) saved.periods.set(state.institution_name,[row.previous_period]);
+    cache.set(row.date,saved);
+  }
+  const views = new Map<string,Map<string,CreditInstitutionView>>();
+  const institutionSnapshot = (date:string,name:string):CreditInstitutionView|undefined => {
+    const saved = cache.get(date);
+    const state = saved?.states.get(name);
+    if (!saved || !state) return undefined;
+    const dateViews = views.get(date) ?? new Map<string,CreditInstitutionView>();
+    views.set(date,dateViews);
+    let view = dateViews.get(name);
+    if (!view) {
+      view = institutionView(state,date,clientsByInstitution.get(name) ?? [],usageByKey,
+        saved.periods.get(name)?.slice().reverse().find(period => period.effectiveDate <= date && period.expiryDate >= date));
+      dateViews.set(name,view);
+    }
+    return view;
+  };
+  const snapshot = (date:string) => [...(cache.get(date)?.states.keys() ?? [])].map(name => institutionSnapshot(date,name)!);
+  const current = (selectedName ? [institutionSnapshot(reportDate,selectedName)].filter((row):row is CreditInstitutionView=>Boolean(row)) : snapshot(reportDate)).sort(compareCreditInstitutionOrder);
+  const currentByInstitution = cache.get(reportDate)?.states ?? new Map<string,DiffRow>();
+  const previous = previousDate ? (selectedName ? [institutionSnapshot(previousDate,selectedName)].filter((row):row is CreditInstitutionView=>Boolean(row)) : snapshot(previousDate)) : [];
   const allNews: CreditWeeklyNewsItem[] = [];
   const calendarEvents: CreditCalendarEvent[] = [];
   for (const date of [...eventDates].sort()) {
     if (date < firstDate || date > reportDate && (date < calendarStart || date > calendarEnd)) continue;
     // A diff's stored type is the event fact. Amount/date differences alone are maintenance.
-    const after = new Map(snapshot(date).map(row => [row.institutionName,row]));
-    const before = new Map(snapshot(addDays(date,-1)).map(row => [row.institutionName,row]));
+    const beforeDate = addDays(date,-1);
+    const before = cache.get(beforeDate)?.states;
     const news = rows.filter(row => row.effective_on === date && row.type && row.type !== 'maintenance')
       .flatMap(row => {
-        const current = after.get(row.institution_name);
-        const previous = before.get(row.institution_name);
+        const current = institutionSnapshot(date,row.institution_name);
+        const previous = institutionSnapshot(beforeDate,row.institution_name);
         if (!current || row.type === 'new' && current.status !== 'approved') return [];
         const eventType = row.type === 'renewal_increase' ? 'increase' : row.type as CreditEventType;
         return [creditNewsItem(eventType,current,previous,date,addDays(date,-1))];
       });
     if (date <= reportDate) {
-      for (const previous of before.values()) {
-        if (previous.status !== 'approved' || previous.expiryDate !== date) continue;
-        const latest = current.find(row => row.institutionName === previous.institutionName);
-        if (latest?.expiryDate !== date) continue;
-        if (news.some(event => event.institutionName === previous.institutionName && isRenewalEvent(event))) continue;
-        news.push(creditNewsItem('expiry',after.get(previous.institutionName),previous,date,addDays(date,-1)));
+      for (const previous of before?.values() ?? []) {
+        if (previous.status !== 'approved' || previous.expiry_date !== date) continue;
+        const latest = currentByInstitution.get(previous.institution_name);
+        if (latest?.expiry_date !== date) continue;
+        if (news.some(event => event.institutionName === previous.institution_name && isRenewalEvent(event))) continue;
+        news.push(creditNewsItem('expiry',institutionSnapshot(date,previous.institution_name),
+          institutionSnapshot(beforeDate,previous.institution_name),date,beforeDate));
       }
     }
     allNews.push(...news);
@@ -211,7 +257,7 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
     }
   }
   // Only the currently recorded maturity is shown: a renewed old term disappears.
-  for (const institution of current) {
+  for (const institution of snapshot(reportDate)) {
     const dates: Array<[string | null,'new'|'expiry']> = [[institution.effectiveDate,'new'],[institution.expiryDate,'expiry']];
     for (const [date,kind] of dates) {
       if (!date || date < calendarStart || date > calendarEnd || institution.status !== 'approved') continue;
@@ -222,24 +268,32 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
         ...calendarState(date,reportDate,kind)});
     }
   }
-  for (const date of [...new Set([...usageDates,...availableDates.filter(date => date>=calendarStart && date<=calendarEnd)])].sort()) {
+  for (const date of usageEventDates) {
     if (date <= firstDate) continue;
-    const before = new Map(snapshot(addDays(date,-1)).map(row => [row.institutionName,row]));
-    for (const institution of snapshot(date)) for (const item of institution.items) {
-      const prior = before.get(institution.institutionName)?.items.find(row => row.type===item.type);
-      // Missing client associations are unknown, not a zero balance.
-      if (item.usedAmount == null || prior && prior.usedAmount == null) continue;
-      const components = item.type === 'bond_investment'
-        ? [{kind:'primary' as const,label:'债券投资——一级发行',delta:(item.primaryUsedAmount ?? 0)-(prior?.primaryUsedAmount ?? 0)},
-          {kind:'secondary' as const,label:'债券投资——二级买卖',delta:(item.secondaryUsedAmount ?? 0)-(prior?.secondaryUsedAmount ?? 0)}]
-        : [{kind:undefined,label:creditItemLabels[item.type],delta:item.usedAmount-(prior?.usedAmount ?? 0)}];
-      for (const component of components) {
-        const delta = component.delta;
-        if (Math.abs(delta)<=AMOUNT_TOLERANCE) continue;
-        calendarEvents.push({id:`usage:${institution.institutionName}:${item.type}:${component.kind ?? 'total'}:${date}`,date,type:'usage',kind:'usage',itemType:item.type,
-          ...(component.kind ? {usageComponent:component.kind} : {}),institutionName:institution.institutionName,
-          label:`${component.label} · ${delta>=0?'增加':'减少'}${formatCalendarAmount(Math.abs(delta))}亿元`,
-          ...calendarState(date,reportDate,'usage')});
+    const beforeDate = addDays(date,-1);
+    const before = cache.get(beforeDate)?.states;
+    const affectedNames = new Set([...usageEventRows.filter(row=>row.date===date),...rows.filter(row=>row.effective_on===date)].map(row=>row.institution_name));
+    for (const state of cache.get(date)?.states.values() ?? []) {
+      if (!affectedNames.has(state.institution_name)) continue;
+      for (const type of creditItemTypes) {
+        const linked = Boolean(clientsByInstitution.get(state.institution_name)?.length);
+        const item = itemUsage(state,date,type,linked,usageByKey);
+        const priorState = before?.get(state.institution_name);
+        const prior = priorState ? itemUsage(priorState,beforeDate,type,linked,usageByKey) : undefined;
+        // Missing client associations are unknown, not a zero balance.
+        if (item.usedAmount == null || prior && prior.usedAmount == null) continue;
+        const components = type === 'bond_investment'
+          ? [{kind:'primary' as const,label:'债券投资——一级发行',delta:(item.primaryUsedAmount ?? 0)-(prior?.primaryUsedAmount ?? 0)},
+            {kind:'secondary' as const,label:'债券投资——二级买卖',delta:(item.secondaryUsedAmount ?? 0)-(prior?.secondaryUsedAmount ?? 0)}]
+          : [{kind:undefined,label:creditItemLabels[type],delta:item.usedAmount-(prior?.usedAmount ?? 0)}];
+        for (const component of components) {
+          const delta = component.delta;
+          if (Math.abs(delta)<=AMOUNT_TOLERANCE) continue;
+          calendarEvents.push({id:`usage:${state.institution_name}:${type}:${component.kind ?? 'total'}:${date}`,date,type:'usage',kind:'usage',itemType:type,
+            ...(component.kind ? {usageComponent:component.kind} : {}),institutionName:state.institution_name,
+            label:`${component.label} · ${delta>=0?'增加':'减少'}${formatCalendarAmount(Math.abs(delta))}亿元`,
+            ...calendarState(date,reportDate,'usage')});
+        }
       }
     }
   }
@@ -250,17 +304,17 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
         isRenewalEvent(other)));
   const weeklyNews = weeklyEvents(previousDate ?? addDays(firstDate,-1), reportDate);
   const previousWeeklyNews = previousDate ? weeklyEvents(addDays(previousDate,-7),previousDate) : [];
-  const sixMonths = new Date(`${reportDate}T00:00:00Z`); sixMonths.setUTCMonth(sixMonths.getUTCMonth()-6);
   const recentApprovals=allNews.filter(event => event.reportDate>=sixMonths.toISOString().slice(0,10) && event.reportDate<=reportDate && isApprovalEvent(event)).reverse();
   const summary=toSummary(reportDate,current);
-  return {availableDates,previousDate,summary,previousSummary:previousDate?toSummary(previousDate,previous):null,
+  const comparison = previous;
+  return {availableDates,previousDate,summary,previousSummary:previousDate?toSummary(previousDate,comparison):null,
     weeklySummary:{...summary,addedInstitutionCount:weeklyNews.filter(event=>event.eventType==='new').length,
       expiredInstitutionCount:weeklyNews.filter(event=>event.eventType==='expiry'||event.eventType==='revocation').length},
-    previousWeeklySummary:previousDate?{...toSummary(previousDate,previous),
+    previousWeeklySummary:previousDate?{...toSummary(previousDate,comparison),
       addedInstitutionCount:previousWeeklyNews.filter(event=>event.eventType==='new').length,
       expiredInstitutionCount:previousWeeklyNews.filter(event=>event.eventType==='expiry'||event.eventType==='revocation').length}:null,
-    institutions:current,weeklyNews,recentApprovals,limitChanges:weeklyNews.filter(isApprovalEvent).map(toLimitChange),
-    usageChanges:previousDate?compareCreditSnapshots(current,previous,'usage'):[],
+    institutions:current,weeklyNews,previousWeeklyNews,recentApprovals,limitChanges:weeklyNews.filter(isApprovalEvent).map(toLimitChange),
+    usageChanges:previousDate?compareCreditSnapshots(current,comparison,'usage'):[],
     calendarEvents:calendarEvents.sort((a,b)=>a.date.localeCompare(b.date)||a.institutionName.localeCompare(b.institutionName,'zh-CN')||a.id.localeCompare(b.id))};
 }
 
@@ -268,7 +322,8 @@ export async function saveCreditInstitution(client: DatabaseClient,input: Credit
   await client.query('BEGIN');
   try {
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('credit.excel_import',0))");
-    const existing = await client.query('SELECT * FROM credit.state_as_of($1::date) WHERE institution_name=$2',[input.reportDate,input.institutionName]);
+    const beforeDates=(await client.query<{date:string}>("SELECT DISTINCT to_char(effective_on,'YYYY-MM-DD') AS date FROM credit.diff ORDER BY date")).rows.map(row=>row.date);
+    const existing = await client.query('SELECT * FROM credit.state_as_of($1::date,ARRAY[$2::text])',[input.reportDate,input.institutionName]);
     if (!create && !existing.rows.length) throw new CreditDatabaseError(404,'该授信记录不存在');
     if (create && existing.rows.length) throw new CreditDatabaseError(409,'该授信机构已存在，请选择对应授信申请操作');
     const operation = input.operation ?? (create ? 'new' : 'maintenance');
@@ -316,10 +371,37 @@ export async function saveCreditInstitution(client: DatabaseClient,input: Credit
       await client.query('SELECT credit.append_diff($1::date,$2,$3::jsonb,$4,$5) AS id',
         [input.reportDate,input.institutionName,JSON.stringify(patch),createdBy,eventType]);
     }
-    const report=await loadCreditReport(client,input.reportDate);
+    const report=await readCreditReportData(client,input.viewDate ?? input.reportDate,input.calendarMonth,input.institutionName);
+    const viewDate=report.summary.reportDate;
+    const beforeFirstDate=input.viewFirstDate ?? beforeDates[0];
+    const firstDateChanged=beforeFirstDate!==report.availableDates[0];
+    const beforePreviousDate=input.viewPreviousDate !== undefined ? input.viewPreviousDate
+      : addDays(viewDate,-7)>=(beforeDates[0] ?? viewDate) ? addDays(viewDate,-7) : beforeDates.filter(date=>date<viewDate).at(-1) ?? null;
+    const comparisonChanged=firstDateChanged || beforePreviousDate!==report.previousDate;
+    const reset=comparisonChanged ? await readCreditReportData(client,viewDate,input.calendarMonth,undefined,true) : null;
+    const calendarRemovals=firstDateChanged && beforeFirstDate ? (await client.query<{institution_name:string;date:string}>(`
+      SELECT s.institution_name,to_char(s.effective_date,'YYYY-MM-DD') AS date
+      FROM credit.state_as_of($1::date) s WHERE s.status='approved'
+        AND s.effective_date>$2::date AND s.effective_date<=$3::date
+        AND NOT EXISTS(SELECT 1 FROM credit.diff d WHERE d.institution_name=s.institution_name
+          AND d.effective_on=s.effective_date AND d.type='new')
+    `,[viewDate,report.availableDates[0],beforeFirstDate])).rows.map(row=>`credit:new:${row.institution_name}:${row.date}`) : [];
+    const calendarStart=addDays(`${input.calendarMonth ?? viewDate.slice(0,7)}-01`,-6);
+    const calendarEnd=addDays(calendarStart,47);
+    const baselineDay=firstDateChanged && beforeFirstDate && beforeFirstDate>=calendarStart && beforeFirstDate<=calendarEnd
+      ? await readCreditReportData(client,viewDate,input.calendarMonth,undefined,true,beforeFirstDate) : null;
+    const calendarAdditions=baselineDay?.calendarEvents.filter(event=>event.type==='usage' && event.date===beforeFirstDate) ?? [];
+    const aggregates=await loadCreditSummaries(client,[report.summary.reportDate,...(report.previousDate ? [report.previousDate] : [])]);
+    const summary=aggregates.find(row=>row.reportDate===report.summary.reportDate)!;
+    const previousSummary=aggregates.find(row=>row.reportDate===report.previousDate) ?? null;
     await client.query('COMMIT');
-    return {institution:report.institutions.find(row=>row.institutionName===input.institutionName)!,summary:report.summary,
-      weeklySummary:report.weeklySummary,weeklyNews:report.weeklyNews,recentApprovals:report.recentApprovals,
+    return {institution:report.institutions.find(row=>row.institutionName===input.institutionName) ?? null,institutionName:input.institutionName,
+      viewDate:report.summary.reportDate,calendarMonth:input.calendarMonth ?? report.summary.reportDate.slice(0,7),
+      availableDates:report.availableDates,previousDate:report.previousDate,previousSummary,summary,
+      ...(reset ? {comparison:{weeklyNews:reset.weeklyNews,previousWeeklyNews:reset.previousWeeklyNews ?? [],limitChanges:reset.limitChanges,usageChanges:reset.usageChanges}} : {}),
+      ...(calendarRemovals.length ? {calendarRemovals} : {}),
+      ...(calendarAdditions.length ? {calendarAdditions} : {}),
+      weeklyNews:report.weeklyNews,previousWeeklyNews:report.previousWeeklyNews ?? [],recentApprovals:report.recentApprovals,
       limitChanges:report.limitChanges,usageChanges:report.usageChanges,calendarEvents:report.calendarEvents};
   } catch(error) {
     await client.query('ROLLBACK').catch(()=>undefined);

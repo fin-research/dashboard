@@ -17,10 +17,10 @@ export async function fetchCreditReport(
     headers: { Accept: "application/json" },
   });
   const payload = await response.json().catch(() => ({})) as Partial<CreditReportResponse> & {
-    error?: string;
+    error?: string; detail?: string;
   };
   if (!response.ok) {
-    throw new Error(payload.error || "授信数据加载失败");
+    throw new Error(payload.error || payload.detail || "授信数据加载失败");
   }
   if (
     !payload.summary ||
@@ -49,16 +49,21 @@ export async function updateCreditInstitution(
     body: JSON.stringify(input),
   });
   const payload = await response.json().catch(() => ({})) as
-    Partial<CreditInstitutionUpdateResponse> & { error?: string };
+    Partial<CreditInstitutionUpdateResponse> & { error?: string; detail?: string };
   if (!response.ok) {
-    throw new Error(payload.error || "授信数据保存失败");
+    throw new Error(payload.error || payload.detail || "授信数据保存失败");
   }
   if (
-    !payload.institution ||
+    !payload.institutionName ||
+    typeof payload.viewDate !== 'string' ||
+    typeof payload.calendarMonth !== 'string' ||
+    !(payload.institution === null || payload.institution) ||
     !payload.summary ||
-    !payload.weeklySummary ||
     !Array.isArray(payload.weeklyNews) ||
-    !Array.isArray(payload.recentApprovals)
+    !Array.isArray(payload.recentApprovals) ||
+    !Array.isArray(payload.previousWeeklyNews) ||
+    !Array.isArray(payload.calendarEvents) ||
+    !Array.isArray(payload.availableDates)
   ) {
     throw new Error("授信保存接口返回的数据结构无效");
   }

@@ -67,6 +67,10 @@ const creditItemChangesSchema = z.object({
 export const creditInstitutionUpdateSchema = z.object({
   operation: z.enum(creditApplicationTypes),
   reportDate: isoDate,
+  viewDate: isoDate.optional(),
+  viewFirstDate: isoDate.optional(),
+  viewPreviousDate: isoDate.nullable().optional(),
+  calendarMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
   institutionName: z.string().trim().min(1).max(200),
   changes: z.object({
     institution: creditInstitutionChangesSchema.optional(),

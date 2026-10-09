@@ -92,7 +92,7 @@ test('credit application separates requests from editable maintenance details',a
     if(route.request().method()==='PATCH'){
       saved=route.request().postDataJSON();
       report.institutions[0].bankOffice=saved.changes.institution.bankOffice;
-      return route.fulfill({json:{...report,institution:report.institutions[0]}});
+      return route.fulfill({json:{...report,institution:report.institutions[0],institutionName:report.institutions[0].institutionName,viewDate:saved.viewDate,calendarMonth:saved.calendarMonth,previousWeeklyNews:[]}});
     }
     return route.fulfill({json:report});
   });
@@ -108,6 +108,8 @@ test('credit application separates requests from editable maintenance details',a
   await region.getByRole('button',{name:'保存',exact:true}).click();
   await expect(region.getByRole('textbox',{name:'银行经办机构'})).toHaveValue('分行金融市场部');
   expect(saved.operation).toBe('maintenance');
+  expect(saved.reportDate).toBe(report.summary.reportDate);
+  expect(saved.viewDate).toBe(report.summary.reportDate);
   expect(saved.changes.institution.bankOffice).toBe('分行金融市场部');
   await page.getByRole('button',{name:'关闭通知'}).click();
   await page.getByRole('button',{name:'授信申请',exact:true}).click();

@@ -7,11 +7,12 @@
   import { globalMessages } from '../global-messages.ts';
   import { updateCreditInstitution } from '../credit/client.ts';
   import { creditMaintenanceAmounts, creditMaintenanceChanges, creditMaintenanceDraft, type CreditMaintenanceDraft } from '../credit/maintenance.ts';
-  import { creditItemLabels, type CreditInstitutionView, type CreditItemType } from '../credit/types.ts';
+  import { creditItemLabels, type CreditInstitutionView, type CreditInstitutionUpdateResponse, type CreditItemType } from '../credit/types.ts';
 
-  let { institution, onapplied }: {
+  let { institution, reportDate, calendarMonth, firstDate, previousDate, contextVersion, onapplied }: {
     institution: CreditInstitutionView;
-    onapplied: (date: string, name: string) => Promise<void>;
+    reportDate: string; calendarMonth: string; firstDate?: string; previousDate: string | null; contextVersion: number;
+    onapplied: (result: CreditInstitutionUpdateResponse, contextVersion: number) => void;
   } = $props();
   const allowed = permissionVisibility();
   const canEdit = $derived($allowed('credit.institution:update'));
@@ -20,9 +21,7 @@
   let recordDate = $state('');
   $effect.pre(() => {
     draft = creditMaintenanceDraft(institution);
-    recordDate = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(new Date());
+    recordDate = reportDate;
   });
   let saving = $state(false);
   const amounts = $derived(creditMaintenanceAmounts(institution, draft));
@@ -51,10 +50,11 @@
       return;
     }
     saving = true;
+    const version = contextVersion;
     try {
-      await updateCreditInstitution({ operation: 'maintenance', reportDate: recordDate,
+      const result = await updateCreditInstitution({ operation: 'maintenance', reportDate: recordDate, viewDate:reportDate, viewFirstDate:firstDate, viewPreviousDate:previousDate, calendarMonth,
         institutionName: institution.institutionName, changes }, fetch);
-      await onapplied(recordDate, institution.institutionName);
+      onapplied(result,version);
       globalMessages.success('授信维护已保存');
     } catch (error) {
       globalMessages.error(error instanceof Error ? error.message : '授信维护保存失败');
