@@ -24,13 +24,10 @@ globalThis.fetch=async(url,options={})=>{
 async function settle(){for(let i=0;i<5;i++){await new Promise(r=>setImmediate(r));flushSync();await tick();}}
 const View=await loadComponent('src/lib/trading-research/CreditView.svelte');
 const app=mount(View,{context,target:document.querySelector('#host'),props:{tab:'overview'}});await settle();
-flushSync(()=>document.querySelector('.tr-credit-table tbody tr button').click());await settle();
+flushSync(()=>document.querySelector('.tr-credit-table tbody tr').click());await settle();
 const detail=document.querySelector('.tr-credit-detail');
 assert.ok(detail);
-const recordDate=[...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='记录日期').querySelector('input');
-assert.equal(recordDate.value,summary.reportDate);
-recordDate.value='2026-09-12';recordDate.dispatchEvent(new window.Event('input',{bubbles:true}));
-recordDate.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
+assert.equal([...detail.querySelectorAll('label')].some(label=>label.textContent.trim()==='记录日期'),false);
 const date=[...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='到期日').querySelector('input');
 assert.equal(date.disabled,false);
 assert.equal([...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='可用额度（亿元）').querySelector('input').disabled,true);
@@ -41,7 +38,7 @@ const save=[...detail.querySelectorAll('button')].find(button=>button.textConten
 assert.ok(save);detail.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
 assert.equal(writes.length,1);
 assert.equal(writes[0].operation,'maintenance');
-assert.equal(writes[0].reportDate,'2026-09-12');
+assert.equal(writes[0].reportDate,summary.reportDate);
 assert.equal(writes[0].viewDate,summary.reportDate);
 assert.equal(writes[0].calendarMonth,'2026-09');
 assert.equal(reads,1,'save must not reload the report');
@@ -52,7 +49,7 @@ await unmount(app);await tick();
 document.body.innerHTML='<div id="tr-topbar-actions"></div><div id="host"></div>';
 const reader=createClientSession({user:{id:'auth0|reader',email:'reader@18.cn'},account:{name:'只读人员',department:'资金管理部'},_roles:['authenticated'],role:'authenticated',picture:'',permissions:['credit.institution:read'],expiresAt:Date.now()/1000+3600});
 const readonly=mount(View,{context:new Map([['site-session',reader]]),target:document.querySelector('#host'),props:{tab:'overview'}});await settle();
-flushSync(()=>document.querySelector('.tr-credit-table tbody tr button').click());await settle();
+flushSync(()=>document.querySelector('.tr-credit-table tbody tr').click());await settle();
 const readonlyDetail=document.querySelector('.tr-credit-detail');
 assert.ok([...readonlyDetail.querySelectorAll('input,select,textarea')].every(input=>input.disabled));
 assert.equal([...readonlyDetail.querySelectorAll('button')].some(button=>button.textContent.trim()==='保存'),false);

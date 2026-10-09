@@ -79,6 +79,7 @@ export async function persistCreditWorkbook(client: DatabaseClient, input: Persi
   } catch (error) { await client.query('ROLLBACK').catch(() => undefined); throw error; }
 }
 
+
 export async function loadCreditReport(client: DatabaseClient, requestedDate: string | null = null, calendarMonth?: string): Promise<CreditReportResponse> {
   return buildCreditReport(await loadCreditData(client,requestedDate,calendarMonth));
 }

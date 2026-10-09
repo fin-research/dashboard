@@ -13,7 +13,8 @@ const stateSql = (summaryOnly = false) => `
   ), states AS MATERIALIZED (
     SELECT r.date,(SELECT jsonb_object_agg(field.key,field.value) FROM jsonb_each(to_jsonb(s)) field
       WHERE field.key=ANY('{institution_name,institution_type,confidentiality_status,status,total,effective_date,expiry_date,bond_investment_limit,bond_investment_detail,bond_investment_secondary_used,yield_certificate_limit,legal_overdraft_limit,legal_overdraft_used,interbank_lending_limit,other_detail,other_used}'::text[])
-        OR r.include_details AND field.key=ANY('{notes,bank_office,applying_department,handler,detail,bond_preference,updated_at,created_at}'::text[])) AS data FROM requested r
+        OR r.include_details AND field.key=ANY('{notes,bank_office,applying_department,handler,detail,bond_preference,updated_at,created_at}'::text[])) || jsonb_build_object('last_changed_on',(SELECT to_char(d.effective_on,'YYYY-MM-DD') FROM credit.diff d WHERE d.id=s.id)) AS data FROM requested r
+
     CROSS JOIN LATERAL credit.state_as_of(r.date,r.names) s
     WHERE r.names IS NULL OR s.institution_name=ANY(r.names)
   ), term_changes AS MATERIALIZED (

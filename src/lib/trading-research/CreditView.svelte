@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Modal from '$lib/components/Modal.svelte';
+  import CreditReportDatePicker from './CreditReportDatePicker.svelte';
+  import { isCreditFinalized } from '../credit/report-date.ts';
   import { Input } from "$lib/components/ui/input/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { NativeSelect } from "$lib/components/ui/native-select/index.js";
@@ -66,7 +69,9 @@
   let query = $state("");
   let statusFilter = $state<CreditStatus | "active" | "all">("active");
   let riskFilter = $state("all");
-  let expandedInstitution = $state<string | null>(null);
+  let selectedInstitutionName = $state<string | null>(null);
+  let detailDialog: Modal;
+  const selectedInstitution = $derived(report?.institutions.find(row => row.institutionName === selectedInstitutionName));
   let sortKey = $state<SortKey>("institutionType");
   let sortDirection = $state<"ascending" | "descending">("ascending");
   let calendarLimitFilters = $state<string[]>([]);
@@ -229,7 +234,8 @@
     const sequence = ++loadSequence;
     loading = true;
     errorMessage = "";
-    expandedInstitution = null;
+    detailDialog?.close();
+    selectedInstitutionName = null;
     try {
       const result = await fetchCreditData(reportDate,fetch,month);
       if (sequence !== loadSequence) return;
@@ -242,12 +248,9 @@
     }
   }
 
-  function handleReportDateChange(event: Event): void {
-    void loadReport((event.currentTarget as HTMLSelectElement).value);
-  }
-
-  function toggleInstitution(institution: CreditInstitutionView): void {
-    expandedInstitution = expandedInstitution === institution.institutionName ? null : institution.institutionName;
+  function openInstitution(institution: CreditInstitutionView): void {
+    selectedInstitutionName = institution.institutionName;
+    detailDialog.showModal();
   }
 
   function toggleSort(key: SortKey): void {
@@ -394,10 +397,7 @@
   >
     {#if report}
       <div class="tr-credit-toolbar__actions">
-        <label>
-          <span>数据日期</span>
-          <Input data-ui-owner="lib-trading-research-CreditView-svelte" class={"ui-input"} type="date" min={report.availableDates[0]} value={report.summary.reportDate} onchange={handleReportDateChange} />
-        </label>
+        <CreditReportDatePicker value={report.summary.reportDate} min={report.availableDates[0]} onchange={date => void loadReport(date)} />
         {#if activeTab === "weekly"}
           <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-credit-print"} type="button" onclick={printWeeklyReport}>打印 / 导出 PDF</Button>
         {/if}
@@ -409,6 +409,15 @@
   {#if report && activeTab === "overview"}
     <CreditApplicationDialog bind:this={applicationDialog} institutions={report.institutions} reportDate={report.summary.reportDate} {calendarMonth} firstDate={report.availableDates[0]} previousDate={report.previousDate} contextVersion={loadSequence} onapplied={applyUpdate} />
   {/if}
+
+  <Modal bind:this={detailDialog} aria-label="授信详情" class="credit-detail-dialog" onclose={() => selectedInstitutionName = null}>
+    {#if report && selectedInstitution}
+      <div class="dialog-body">
+        <div class="tr-credit-dialog-head"><h2>授信详情</h2><Button type="button" variant="ghost" aria-label="关闭授信详情" onclick={() => detailDialog.close()}>关闭</Button></div>
+        <CreditDetailEditor institution={selectedInstitution} reportDate={report.summary.reportDate} {calendarMonth} firstDate={report.availableDates[0]} previousDate={report.previousDate} contextVersion={loadSequence} onapplied={applyUpdate} />
+      </div>
+    {/if}
+  </Modal>
 
   {#if loading}
     <section class="tr-empty-panel" aria-live="polite">
@@ -514,14 +523,15 @@
               <th class="is-numeric" aria-sort={ariaSort("utilization")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("utilization")}>使用率<span aria-hidden="true">{sortIndicator("utilization")}</span></Button></th>
               <th aria-sort={ariaSort("effectiveDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("effectiveDate")}>生效日<span aria-hidden="true">{sortIndicator("effectiveDate")}</span></Button></th>
               <th aria-sort={ariaSort("expiryDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("expiryDate")}>到期日<span aria-hidden="true">{sortIndicator("expiryDate")}</span></Button></th>
-              <th><span class="sr-only">操作</span></th>
             </tr>
           </thead>
           <tbody>
             {#each filteredInstitutions as institution, index (institution.institutionName)}
-              <tr>
+              <tr class="tr-credit-institution-row" tabindex="0" aria-label={`${institution.institutionName}授信详情`}
+                onclick={() => openInstitution(institution)}
+                onkeydown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openInstitution(institution); } }}>
                 <td>{index + 1}</td>
-                <th scope="row">{institution.institutionName}</th>
+                <th scope="row"><span class="tr-credit-bank-event">{institution.institutionName}{#if isCreditFinalized(institution, report.summary.reportDate)}<Badge tone="success">定稿</Badge>{/if}</span></th>
                 <td>{institution.institutionType}</td>
                 <td><Badge tone={statusTone(institution.status)}>{statusLabel(institution.status)}</Badge></td>
                 <td class="is-numeric">{formatAmount(institution.totalLimit)}</td>
@@ -530,17 +540,9 @@
                 <td class="is-numeric">{institution.utilization == null ? "—" : `${institution.utilization.toFixed(1)}%`}</td>
                 <td>{institution.effectiveDate ?? "—"}</td>
                 <td>{institution.expiryDate ?? "—"}</td>
-                <td><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-credit-detail-toggle"} type="button" aria-expanded={expandedInstitution === institution.institutionName} onclick={() => toggleInstitution(institution)}>{expandedInstitution === institution.institutionName ? "收起" : "详情"}</Button></td>
               </tr>
-              {#if expandedInstitution === institution.institutionName}
-                <tr class="tr-credit-detail-row">
-                  <td colspan="11">
-                    <CreditDetailEditor {institution} reportDate={report.summary.reportDate} {calendarMonth} firstDate={report.availableDates[0]} previousDate={report.previousDate} contextVersion={loadSequence} onapplied={applyUpdate} />
-                  </td>
-                </tr>
-              {/if}
             {:else}
-              <tr><td class="tr-empty-cell" colspan="11">没有符合当前筛选条件的授信记录</td></tr>
+              <tr><td class="tr-empty-cell" colspan="10">没有符合当前筛选条件的授信记录</td></tr>
             {/each}
           </tbody>
         </table>

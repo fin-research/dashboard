@@ -75,6 +75,7 @@ export interface CreditInstitutionView
   extends ParsedCreditInstitution {
   reportDate: string;
   updatedAt: string;
+  lastChangedOn?: string;
   effectiveStatus?: import('./validity.ts').CreditEffectiveStatus;
   previousPeriod?: { effectiveDate: string; expiryDate: string };
   items: CreditItemView[];

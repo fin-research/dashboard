@@ -182,7 +182,7 @@ test("周报读取申请事件并筛选近六个月批复", async t => {
   assert.equal(report.calendarEvents.some(e=>e.kind==='renewal'),false);
 });
 
-test("同日报表重复导入无变更不增加行，变化合并且存档旧值", async t => {
+test("同日报表重复导入无变更不增加行，变化直接合并原行", async t => {
   const db=await creditDatabase(t);
   const parsed=parseCreditWorkbook(workbookBuffer(),{reportDate:'2026-08-21',originalFileName:'授信周报.xlsx'});
   for (const row of parsed.institutions) await db.query("INSERT INTO public.client(name,type) VALUES ($1,'银行')",[row.institutionName]);
@@ -195,10 +195,10 @@ test("同日报表重复导入无变更不增加行，变化合并且存档旧�
   assert.equal((await db.query('SELECT count(*)::int n FROM credit.diff')).rows[0].n,before.length);
   const row=(await db.query('SELECT * FROM credit.diff WHERE institution_name=$1',[parsed.institutions[0].institutionName])).rows[0];
   assert.equal(Number(row.total),11);assert.ok(row.institution_type);assert.equal(row.type,'maintenance');
-  assert.ok((await db.query('SELECT count(*)::int n FROM credit.diff_merge_archive')).rows[0].n>0);
+  assert.equal((await db.query("SELECT to_regclass('credit.diff_merge_archive') AS name")).rows[0].name,null);
 });
 
-test("同日维护合并主体字段并保留原值审计", async t => {
+test("同日维护直接合并主体字段并保留创建信息", async t => {
   const db=await creditDatabase(t);await seedCredit(db);
   const before=(await db.query('SELECT to_jsonb(d) value FROM credit.diff d')).rows[0];
   const result=await saveCreditInstitution(db,{reportDate:'2026-08-21',institutionName:'甲银行',changes:{institution:{notes:'已更新'}}},'auth0|test');
@@ -206,7 +206,8 @@ test("同日维护合并主体字段并保留原值审计", async t => {
   assert.notDeepEqual((await db.query('SELECT to_jsonb(d) value FROM credit.diff d ORDER BY id LIMIT 1')).rows[0],before);
   const row=(await db.query('SELECT * FROM credit.diff ORDER BY id DESC LIMIT 1')).rows[0];
   assert.equal(row.created_by,'auth0|test');assert.ok(row.updated_at);assert.equal(Number(row.total),10);
-  assert.equal((await db.query('SELECT original_row FROM credit.diff_merge_archive ORDER BY id DESC LIMIT 1')).rows[0].original_row.notes,null);
+  assert.equal(row.id,before.value.id);
+  assert.equal(new Date(row.created_at).toISOString(),new Date(before.value.created_at).toISOString());
 });
 
 test("分项维护只追加该字段并在同一事务返回重建后的截面", async t => {
