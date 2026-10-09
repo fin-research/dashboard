@@ -12,7 +12,8 @@ const stateSql = (summaryOnly = false) => `
     SELECT r.date::date AS date,r.names,coalesce(r.include_details,true) AS include_details FROM jsonb_to_recordset($1::jsonb) r(date text,names text[],include_details boolean)
   ), states AS MATERIALIZED (
     SELECT r.date,CASE WHEN r.include_details THEN to_jsonb(s) ELSE to_jsonb(s) -
-      '{notes,bank_office,applying_department,handler,detail,bond_preference,updated_at,created_at,created_by,bond_investment_used}'::text[] END AS data FROM requested r
+      '{notes,bank_office,applying_department,handler,detail,bond_preference,updated_at,created_at,created_by,bond_investment_used}'::text[] END || jsonb_build_object('last_changed_on',
+      (SELECT to_char(d.effective_on,'YYYY-MM-DD') FROM credit.diff d WHERE d.id=s.id)) AS data FROM requested r
     CROSS JOIN LATERAL credit.state_as_of(r.date,r.names) s
     WHERE r.names IS NULL OR s.institution_name=ANY(r.names)
   ), term_changes AS MATERIALIZED (

@@ -63,3 +63,13 @@ export function creditMaintenanceChanges(row: CreditInstitutionView, draft: Cred
   }
   return { ...(Object.keys(institution).length ? { institution } : {}), ...(items.length ? { items } : {}) };
 }
+
+/** Reverse the bond total into the only manually maintained usage component. */
+export function setCreditBondUsage(row: CreditInstitutionView, draft: CreditMaintenanceDraft,
+  field: 'used' | 'remaining', value: number | null): void {
+  const primary = row.items.find(item => item.type === 'bond_investment')?.primaryUsedAmount;
+  const bond = draft.items.bond_investment;
+  if (primary == null || field === 'remaining' && bond.limitAmount == null) return;
+  bond.secondaryUsedAmount = value == null ? null : Math.round(
+    ((field === 'remaining' ? bond.limitAmount! - value : value) - primary) * 1_000_000) / 1_000_000;
+}
