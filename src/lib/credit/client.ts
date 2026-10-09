@@ -66,6 +66,5 @@ function isCreditDataset(value:unknown):value is CreditDataset {
     &&Array.isArray(p.links)&&p.links.every(r=>object(r)&&typeof r.institution_name==='string'&&typeof r.id==='string'&&typeof r.name==='string')
     &&Array.isArray(p.usageEventRows)&&p.usageEventRows.every(r=>object(r)&&date(r.date)&&typeof r.institution_name==='string')
     &&Array.isArray(p.usage)&&p.usage.every(r=>object(r)&&date(r.date)&&typeof r.institution_name==='string'&&typeof r.item_type==='string'&&typeof r.amount==='number'&&Number.isFinite(r.amount))
-    &&Array.isArray(p.savedStates)&&p.savedStates.every(r=>object(r)&&date(r.date)&&object(r.data)&&typeof r.data.institution_name==='string'
-      &&(r.previous_period===null||object(r.previous_period)&&date(r.previous_period.effectiveDate)&&date(r.previous_period.expiryDate)));
+    &&Array.isArray(p.savedStates)&&p.savedStates.every(r=>object(r)&&date(r.date)&&object(r.data)&&typeof r.data.institution_name==='string');
 }

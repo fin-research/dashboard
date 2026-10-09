@@ -35,8 +35,9 @@ async function database(t, legacy = false, through = null) {
 
 async function institution(db, date='2026-09-04', name='合并授信') {
   const current=(await db.query("SELECT to_regclass('credit.diff') AS name")).rows[0].name;
-  if (current) {
-    await db.query('SELECT credit.append_diff($1,$2,$3,$4)',[date,name,JSON.stringify({institution_type:'银行',confidentiality_status:false,status:'approved',total:20,
+  const entries=(await db.query("SELECT to_regclass('credit.entry') AS name")).rows[0].name;
+  if (current||entries) {
+    await db.query(`SELECT credit.${entries?'append_entry':'append_diff'}($1,$2,$3,$4)`,[date,name,JSON.stringify({institution_type:'银行',confidentiality_status:false,status:'approved',total:20,
       ...Object.fromEntries(creditItemTypes.filter(type=>type!=='other').map(type=>[type+'_limit',20])),other_used:2,bond_investment_used:0,legal_overdraft_used:0}),'auth0|test']);
   } else {
     await db.query(`INSERT INTO credit.institution(report_date,institution_name,institution_type,confidentiality_status,status,total_limit,total_used)
@@ -65,8 +66,8 @@ test('customer matching keeps actual investors, supports prefixes, and never gue
 
 test('static combined credit sums clients once and excludes matured, future and closed debt',async t=>{
   const db=await database(t);
-  await db.exec(`INSERT INTO credit.institution_client(institution_name,client_id,notes) VALUES ('合并授信',1,'明确合并'),('合并授信',2,'明确合并')`);
   await institution(db);
+  await db.exec(`INSERT INTO credit.institution_client(institution_id,institution_name,client_id,notes) SELECT i.id,i.name,c.id,'明确合并' FROM credit.institution i CROSS JOIN public.client c WHERE i.name='合并授信' AND c.id IN(1,2)`);
   await db.exec(`INSERT INTO financing.income_certificate(debt_type,subtype,name,client_id,amount,issue_date,activated_at,maturity_date) VALUES
     ('收益凭证','固定收益凭证','存续甲',1,100000000,'2026-08-01','2026-08-01','2027-08-01'),
     ('收益凭证','固定收益凭证','存续乙',2,200000000,'2026-08-01','2026-08-01','2027-08-01'),
@@ -82,9 +83,9 @@ test('static combined credit sums clients once and excludes matured, future and 
   assert.equal(row.clients.length,2);
   assert.equal(row.items.find(i=>i.type==='yield_certificate').usedAmount,3);
   assert.equal(row.items.find(i=>i.type==='yield_certificate').importedUsedAmount,undefined);
-  assert.equal((await db.query("SELECT to_regclass('credit.institution') old")).rows[0].old,null);
+  assert.ok((await db.query("SELECT to_regclass('credit.institution') current")).rows[0].current);
   await institution(db,'2026-09-04','重复授信');
-  await assert.rejects(db.query(`INSERT INTO credit.institution_client(institution_name,client_id,notes) VALUES ('重复授信',1,'重复测试')`),/unique/);
+  await assert.rejects(db.query(`INSERT INTO credit.institution_client(institution_id,institution_name,client_id,notes) SELECT id,name,1,'重复测试' FROM credit.institution WHERE name='重复授信'`),/unique/);
   const unknown=(await loadCreditReport(db,'2026-09-04')).institutions.find(i=>i.institutionName==='重复授信');
   assert.equal(unknown.totalUsed,null);
   assert.equal(unknown.availableAmount,null);
@@ -168,17 +169,17 @@ test('note cleanup removes only empty note records and parsing never recreates t
   assert.equal(transformWorkbook(parsed).debts.length,0);
 });
 
-test('diff changes preserve component sums and prohibit direct mutation', async t => {
+test('entry changes preserve component sums, typed values and controlled historical corrections', async t => {
   const db=await database(t);await institution(db,'2026-08-21','乙银行');
   const total=async date=>(await loadCreditReport(db,date)).institutions[0].totalUsed;
   assert.equal(await total('2026-08-21'),2);
-  await assert.rejects(db.query('UPDATE credit.diff SET other_used=99'),/append only/);
-  await assert.rejects(db.query('DELETE FROM credit.diff'),/cannot be deleted/);
+  await assert.rejects(db.query("UPDATE credit.entry SET v_num=99 WHERE field_id='other_used'"),/append only/);
+  await assert.rejects(db.query('DELETE FROM credit.entry'),/cannot be deleted/);
   await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'乙银行',changes:{items:[{type:'other',usedAmount:0.0245}]}},'auth0|test');
   assert.equal(await total('2026-08-22'),0.0245);assert.equal(await total('2026-08-21'),2);
-  await db.exec("BEGIN; SET LOCAL credit.correct_history='on'; UPDATE credit.diff SET other_used=0.5 WHERE effective_on='2026-08-21'; COMMIT");
+  await db.exec("BEGIN; SET LOCAL credit.correct_history='on'; UPDATE credit.entry SET v_num=0.5 WHERE report_date='2026-08-21' AND field_id='other_used'; COMMIT");
   assert.equal(await total('2026-08-21'),0.5);assert.equal(await total('2026-08-22'),0.0245);
-  assert.ok((await db.query('SELECT updated_at FROM credit.diff ORDER BY id LIMIT 1')).rows[0].updated_at);
+  assert.ok((await db.query("SELECT updated_at FROM credit.entry WHERE field_id='other_used' ORDER BY report_date LIMIT 1")).rows[0].updated_at);
   assert.equal((await db.query('SELECT count(*) n FROM credit.institution_client')).rows[0].n,1);
 });
 

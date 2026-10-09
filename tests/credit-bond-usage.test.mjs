@@ -35,9 +35,9 @@ test('一级和二级同日抵消仍逐项展示，二级编辑进入总已用�
   await allocate(db,'新发行',2,'2026-08-21','2027-08-21');
   const patch={reportDate:'2026-08-21',institutionName:'甲银行',changes:{items:[{type:'bond_investment',secondaryUsedAmount:-2}]}};
   await saveCreditInstitution(db,patch,'auth0|test');
-  const before=(await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n;
+  const before=(await db.query('SELECT count(*) n FROM credit.entry')).rows[0].n;
   await saveCreditInstitution(db,patch,'auth0|test');
-  assert.equal((await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n,before);
+  assert.equal((await db.query('SELECT count(*) n FROM credit.entry')).rows[0].n,before);
   const r=await loadCreditReport(db,'2026-08-21');assert.equal(r.summary.totalUsed,0);
   assert.equal(r.calendarEvents.filter(e=>e.date==='2026-08-21'&&e.type==='usage').length,2);
   assert.ok(r.calendarEvents.some(e=>e.usageComponent==='secondary'&&e.label==='债券投资——二级买卖 · 减少2亿元'));
@@ -91,9 +91,9 @@ test('旧台账导入按真实值登记残差；无客户关联非零值拒绝�
   const current=await loadCreditReport(db,'2026-08-21');assert.equal(bond(current).secondaryUsedAmount,-2);assert.equal(bond(current).usedAmount,3);
   assert.equal((await persistCreditWorkbook(db,{parsed,createdBy:'auth0|test'})).addedDiffCount,0);
   const missing={...source,institutionName:'未维护客户'};
-  const before=(await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n;
+  const before=(await db.query('SELECT count(*) n FROM credit.entry')).rows[0].n;
   await assert.rejects(persistCreditWorkbook(db,{parsed:{...parsed,institutions:[missing]}}),/缺少客户关联/);
-  assert.equal((await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n,before);
+  assert.equal((await db.query('SELECT count(*) n FROM credit.entry')).rows[0].n,before);
 });
 
 test('API 只允许债券二级净余额输入，移除两融收益权转让并拒绝非有限数值',()=>{

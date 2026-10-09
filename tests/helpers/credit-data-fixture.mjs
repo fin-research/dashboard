@@ -17,7 +17,7 @@ export function creditDataFixture(report) {
       state[item.type+'_used']=item.usedAmount;if(item.type==='bond_investment')state.bond_investment_secondary_used=item.secondaryUsedAmount??0;
       if(['bond_investment','yield_certificate','interbank_lending'].includes(item.type))usage.push({date,institution_name:institution.institutionName,item_type:item.type,amount:item.primaryUsedAmount??(item.type==='bond_investment'?(item.usedAmount??0)-(item.secondaryUsedAmount??0):item.usedAmount??0)});
     }
-    const record={date,data:state,previous_period:institution.previousPeriod??null};states.set(date+':'+institution.institutionName,record);return state;
+    const record={date,data:state};states.set(date+':'+institution.institutionName,record);return state;
   };
   const institutions=report.institutions;
   for(const institution of institutions){rowFor(institution,reportDate);if(previousDate)rowFor(report.previousInstitutions?.find(i=>i.institutionName===institution.institutionName)??institution,previousDate);
@@ -51,14 +51,14 @@ export function creditCalendarDataFixture(report,month,itemTypes){
   const monthStart=new Date(month+'-01T00:00:00Z'),shift=n=>{const day=new Date(monthStart);day.setUTCDate(day.getUTCDate()+n);return day.toISOString().slice(0,10);};
   Object.assign(data,{availableDates:['2026-08-01',...data.availableDates],calendarMonth:month,calendarStart:shift(-6),calendarEnd:shift(41),rows:[],links:[],savedStates:[],usage:[],usageEventRows:[]});
   const state=name=>({institution_name:name,institution_type:'商业银行',status:'approved',total:10,effective_date:'2026-01-01',expiry_date:'2027-12-31',bond_investment_secondary_used:0,legal_overdraft_used:0,other_used:0});
-  const add=(on,record)=>data.savedStates.push({date:on,data:record,previous_period:null});
+  const add=(on,record)=>data.savedStates.push({date:on,data:{...record,status:record.expiry_date==='1970-01-01'?'revoked':record.expiry_date?(on<=record.expiry_date?'approved':'applying'):record.status}});
   for(const kind of ['new','expiry','renewal','increase','revoked']){
     const before=state(kind),after={...before};
     if(kind==='new'){before.status='applying';before.total=0;after.effective_date=date;}
     if(kind==='expiry')before.expiry_date=after.expiry_date=date;
     if(kind==='renewal')before.expiry_date='2026-08-01';
     if(kind==='increase')after.total=15;
-    if(kind==='revoked')after.status='revoked';
+    if(kind==='revoked'){after.status='revoked';after.expiry_date='1970-01-01';}
     add(beforeDate,before);add(date,after);
     if(data.reportDate!==beforeDate&&data.reportDate!==date)add(data.reportDate,date<=data.reportDate?after:before);
     data.rows.push({institution_name:kind,effective_on:kind==='expiry'?'2026-01-01':date,type:kind==='expiry'?'maintenance':kind==='revoked'?'revocation':kind,expiry_date:after.expiry_date});

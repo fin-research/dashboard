@@ -36,11 +36,12 @@ try {
     JOIN public.client c ON c.name=x."clientName"
     WHERE public.resolve_client_by_rules(x.alias) IS DISTINCT FROM c.id
     ON CONFLICT(alias) DO UPDATE SET client_id=EXCLUDED.client_id`, [JSON.stringify(manifest.aliases)]);
-  await database.query(`INSERT INTO credit.institution_client(institution_name,client_id,notes)
-    SELECT x."institutionName",c.id,x.notes
+  await database.query(`INSERT INTO credit.institution_client(institution_id,institution_name,client_id,notes)
+    SELECT i.id,x."institutionName",c.id,x.notes
     FROM jsonb_to_recordset($1::jsonb) AS x("institutionName" text,"clientName" text,notes text)
     JOIN public.client c ON c.name=x."clientName"
-    ON CONFLICT(institution_name,client_id) DO UPDATE SET notes=EXCLUDED.notes`, [JSON.stringify(manifest.creditMappings)]);
+    JOIN credit.institution i ON i.name=x."institutionName"
+    ON CONFLICT(institution_id,client_id) DO UPDATE SET notes=EXCLUDED.notes`, [JSON.stringify(manifest.creditMappings)]);
   const linked = await database.query(`WITH names AS MATERIALIZED (SELECT counterparty,public.resolve_client(counterparty) AS client_id
       FROM (SELECT DISTINCT counterparty FROM financing.debt WHERE client_id IS NULL) names)
     UPDATE financing.debt d SET client_id=n.client_id FROM names n
@@ -51,7 +52,7 @@ try {
     (SELECT count(*) FROM financing.debt WHERE client_id IS NOT NULL) AS linked_debts,
     (SELECT count(*) FROM financing.debt WHERE client_id IS NULL) AS unlinked_debts,
     (SELECT count(*) FROM credit.institution_client) AS credit_links,
-    (SELECT count(*) FROM credit.state_as_of((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date) s
+    (SELECT count(*) FROM credit.entry_as_of((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date) s
       WHERE NOT EXISTS(SELECT 1 FROM credit.institution_client m WHERE m.institution_name=s.institution_name)) AS latest_unlinked`);
   await database.query(process.argv.includes('--apply') ? 'COMMIT' : 'ROLLBACK');
   console.log(JSON.stringify({ mode: process.argv.includes('--apply') ? 'applied' : 'rollback-preview', linkedNow: linked.rowCount, ...rows[0] },null,2));

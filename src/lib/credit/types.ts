@@ -77,7 +77,6 @@ export interface CreditInstitutionView
   updatedAt: string;
   lastChangedOn?: string;
   effectiveStatus?: import('./validity.ts').CreditEffectiveStatus;
-  previousPeriod?: { effectiveDate: string; expiryDate: string };
   items: CreditItemView[];
   importedTotalUsed?: number | null;
   clients?: Array<{ id: string; name: string }>;

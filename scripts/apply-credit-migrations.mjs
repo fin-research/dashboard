@@ -14,6 +14,10 @@ const migrationDirectory = path.join(repositoryRoot, "credit-migrations");
 const migrationNames = (await readdir(migrationDirectory))
   .filter((name) => /^\d+_.+\.sql$/.test(name))
   .sort();
+const finalize = process.argv.includes('--finalize');
+// The additive stage is safe for the running old Worker. Finalization removes
+// its write entry point and therefore requires verified new production traffic.
+const runnableNames = migrationNames.filter(name => finalize || name < '0019_');
 const client = new Client({
   connectionString,
   application_name: "eastmoney-credit-migration",
@@ -34,7 +38,7 @@ try {
   const applied = await client.query("SELECT name FROM credit.schema_migration");
   const appliedNames = new Set(applied.rows.map((row) => row.name));
   const newlyApplied = [];
-  for (const name of migrationNames) {
+  for (const name of runnableNames) {
     if (appliedNames.has(name)) continue;
     const sql = await readFile(path.join(migrationDirectory, name), "utf8");
     await client.query("BEGIN");
@@ -58,6 +62,7 @@ try {
         schema: "credit",
         applied: newlyApplied,
         alreadyApplied: migrationNames.filter((name) => appliedNames.has(name)),
+        deferred: migrationNames.filter(name => !runnableNames.includes(name) && !appliedNames.has(name)),
       },
       null,
       2,

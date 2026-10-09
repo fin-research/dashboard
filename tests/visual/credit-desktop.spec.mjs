@@ -100,7 +100,7 @@ test('desktop credit metrics and detail dialog stay within the viewport',async({
   await expect(region.getByRole('rowheader',{name:'银行乙',exact:true})).toBeVisible();
 });
 
-test('credit application separates requests from editable maintenance details',async({page},testInfo)=>{
+test('credit application separates requests from editable maintenance details and derives dated status',async({page},testInfo)=>{
   test.skip(testInfo.project.name!=='desktop','Desktop credit application');
   await page.clock.setFixedTime(new Date('2026-09-30T04:00:00Z'));
   await mockResources(page);
@@ -121,6 +121,7 @@ test('credit application separates requests from editable maintenance details',a
   const detail=page.getByRole('dialog',{name:'授信详情',exact:true});
   await expect(detail.getByRole('textbox',{name:'机构性质',exact:true})).toBeEnabled();
   await expect(detail.getByRole('textbox',{name:'已用额度（亿元）',exact:true})).toBeDisabled();
+  await expect(detail.getByRole('textbox',{name:'状态',exact:true})).toBeDisabled();
   await expect(detail.getByRole('button',{name:'保存',exact:true})).toBeVisible();
   await expect(detail.getByRole('group',{name:'其它'}).getByRole('spinbutton')).toHaveCount(1);
   await detail.getByRole('textbox',{name:'银行经办机构'}).fill('分行金融市场部');
@@ -154,6 +155,12 @@ test('credit application separates requests from editable maintenance details',a
   await expect(dialog.getByRole('button',{name:'维护',exact:true})).toHaveCount(0);
   await dialog.getByRole('button',{name:'新增',exact:true}).click();
   await expect(dialog.getByRole('textbox',{name:'机构名称'})).toBeVisible();
+  await expect(dialog.getByRole('combobox',{name:'审批状态',exact:true})).toBeVisible();
+  await dialog.getByLabel('到期日',{exact:true}).fill('2027-09-30');
+  await expect(dialog.getByRole('textbox',{name:'审批状态',exact:true})).toHaveValue('已获批');
+  await expect(dialog.getByRole('textbox',{name:'审批状态',exact:true})).toBeDisabled();
+  await dialog.getByLabel('到期日',{exact:true}).fill('');
+  await expect(dialog.getByRole('combobox',{name:'审批状态',exact:true})).toBeVisible();
   await expect(dialog.getByRole('spinbutton',{name:'债券投资（亿元）'})).toBeVisible();
   await expect(dialog.getByText('已用（亿元）',{exact:true})).toHaveCount(0);
   await expect(dialog.getByText('说明',{exact:true})).toHaveCount(0);

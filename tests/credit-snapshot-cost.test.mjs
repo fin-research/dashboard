@@ -20,17 +20,17 @@ test('lazy snapshots retain historical renewal periods and independent amount/ca
       updated_at: null, type: 'renewal', effective_date: '2026-10-01', expiry_date: '2030-01-31' }];
   for (const row of rows) {
     const {id,institution_name,effective_on,created_at,created_by,updated_at,type,...patch}=row;
-    await db.query('SELECT credit.append_diff($1::date,$2,$3::jsonb,$4,$5)',[effective_on,institution_name,JSON.stringify(patch),created_by,type]);
+    await db.query('SELECT credit.append_entry($1::date,$2,$3::jsonb,$4,$5)',[effective_on,institution_name,JSON.stringify(patch),created_by,type]);
   }
   const august = await loadCreditReport(db, '2026-08-26');
   assert.equal(august.institutions[0].totalLimit, 12);
   assert.equal(august.institutions[0].totalUsed, 4);
-  assert.deepEqual(august.institutions[0].previousPeriod, { effectiveDate: '2026-08-01', expiryDate: '2026-08-31' });
+  assert.equal(august.institutions[0].status,'approved');
   assert.equal(august.previousSummary.totalLimit, 10);
   assert.equal(august.previousSummary.totalUsed, 2);
   assert.ok(august.calendarEvents.some(e => e.date === '2026-08-25' && e.usageComponent === 'secondary' && /增加2亿元/.test(e.label)));
   const september = await loadCreditReport(db, '2026-09-15');
-  assert.deepEqual(september.institutions[0].previousPeriod, { effectiveDate: '2026-09-01', expiryDate: '2026-09-30' });
+  assert.equal(september.institutions[0].status,'approved');
   const futureCalendar = await loadCreditReport(db, '2026-09-15', '2030-01');
   assert.ok(futureCalendar.calendarEvents.some(e => e.kind === 'expiry' && e.date === '2030-01-31'));
   assert.equal(september.calendarEvents.some(e => e.date === '2030-01-31'), false);
