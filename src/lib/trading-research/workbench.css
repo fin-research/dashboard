@@ -20,7 +20,8 @@ body:has(.tr-workbench) {
   line-height: 1.5;
 }
 
-.tr-workbench {
+.tr-workbench,
+.credit-detail-dialog {
   --tr-page: var(--bg-page);
   --tr-header: var(--bg-card);
   --tr-sidebar: #202a38;
@@ -50,6 +51,9 @@ body:has(.tr-workbench) {
   --tr-radius-control: var(--radius-control);
   --tr-nav-radius: 12px;
   --tr-motion: 200ms ease;
+}
+
+.tr-workbench {
   height: 100%;
   min-height: 0;
   color: var(--tr-text);
@@ -1398,12 +1402,7 @@ body:has(.tr-workbench) {
   overflow: hidden;
   resize: none;
 }
-.tr-credit-item-grid { align-items: start; }
-.tr-credit-item-grid fieldset { align-content: start; }
 .tr-credit-bond-components { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-@media (min-width: 900px) {
-  .credit-detail-dialog .tr-credit-item-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
 
 .tr-credit-calendar-panel {
   overflow-x: auto;

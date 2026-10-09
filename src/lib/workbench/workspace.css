@@ -1,6 +1,7 @@
 /* Content refinements never restyle the shared header or navigation.
    Report canvases retain their own typography and controls. */
-.tr-shell--workspace .tr-workspace {
+.tr-shell--workspace .tr-workspace,
+.credit-detail-dialog {
   --radius-card: 16px;
   --radius-control: 24px;
   --radius-tag: 12px;
@@ -52,10 +53,14 @@
 
 @media (min-width: 1200px) {
   .tr-shell--workspace .tr-credit-editor-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .tr-shell--workspace .tr-credit-item-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
-  .tr-shell--workspace .tr-credit-item-grid fieldset { align-content: start; }
-  .tr-shell--workspace .tr-credit-item-grid fieldset:first-child { grid-row: span 2; }
-  .tr-shell--workspace .tr-credit-item-grid .tr-credit-item-other { grid-column: 2 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tr-shell--workspace .tr-credit-item-grid,
+  .credit-detail-dialog .tr-credit-item-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
+  .tr-shell--workspace .tr-credit-item-grid fieldset,
+  .credit-detail-dialog .tr-credit-item-grid fieldset { align-content: start; }
+  .tr-shell--workspace .tr-credit-item-grid fieldset:first-child,
+  .credit-detail-dialog .tr-credit-item-grid fieldset:first-child { grid-row: span 2; }
+  .tr-shell--workspace .tr-credit-item-grid .tr-credit-item-other,
+  .credit-detail-dialog .tr-credit-item-grid .tr-credit-item-other { grid-column: 2 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Keep the last action row reachable above the fixed AI launcher on desktop. */
