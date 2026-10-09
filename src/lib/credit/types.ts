@@ -171,6 +171,7 @@ export interface CreditReportResponse {
   previousWeeklySummary: CreditWeeklySummaryView | null;
   institutions: CreditInstitutionView[];
   weeklyNews: CreditWeeklyNewsItem[];
+  previousWeeklyNews?: CreditWeeklyNewsItem[];
   recentApprovals: CreditWeeklyNewsItem[];
   limitChanges: CreditAmountChange[];
   usageChanges: CreditAmountChange[];
@@ -178,10 +179,19 @@ export interface CreditReportResponse {
 }
 
 export interface CreditInstitutionUpdateResponse {
-  institution: CreditInstitutionView;
+  comparison?: Pick<CreditReportResponse, 'weeklyNews' | 'previousWeeklyNews' | 'limitChanges' | 'usageChanges'>;
+  calendarRemovals?: string[];
+  calendarAdditions?: CreditCalendarEvent[];
+  institution: CreditInstitutionView | null;
+  institutionName: string;
+  viewDate: string;
+  calendarMonth: string;
+  availableDates: string[];
+  previousDate: string | null;
+  previousSummary: CreditSummaryView | null;
   summary: CreditSummaryView;
-  weeklySummary: CreditWeeklySummaryView;
   weeklyNews: CreditWeeklyNewsItem[];
+  previousWeeklyNews?: CreditWeeklyNewsItem[];
   recentApprovals: CreditWeeklyNewsItem[];
   limitChanges: CreditAmountChange[];
   usageChanges: CreditAmountChange[];

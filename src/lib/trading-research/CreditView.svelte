@@ -12,11 +12,13 @@
   import { creditLimitFilterLabels, matchesCreditCalendarEvent } from "../credit/calendar.ts";
   import { portal } from "../portal.ts";
   import { scrollableRegion } from "../scrollable-region";
+  import { applyCreditUpdate } from "../credit/apply-update.ts";
   import { fetchCreditReport } from "../credit/client.ts";
   import {
     creditItemLabels,
     creditItemTypes,
     type CreditInstitutionView,
+    type CreditInstitutionUpdateResponse,
     type CreditItemType,
     type CreditReportResponse,
     type CreditStatus,
@@ -69,7 +71,12 @@
   let calendarUsageFilters = $state<string[]>([]);
   let calendarMonth = $state("");
   let applicationDialog = $state<CreditApplicationDialog | null>(null);
-  let loadSequence = 0;
+  let loadSequence = $state(0);
+
+  function applyUpdate(result: CreditInstitutionUpdateResponse, version: number): void {
+    if (!report || loading || version !== loadSequence) return;
+    report = applyCreditUpdate(report,result,calendarMonth);
+  }
 
   const filteredInstitutions = $derived.by(() => {
     const currentReport = report;
@@ -398,7 +405,7 @@
   </div>
 
   {#if report && activeTab === "overview"}
-    <CreditApplicationDialog bind:this={applicationDialog} institutions={report.institutions} onapplied={async (date) => loadReport(date)} />
+    <CreditApplicationDialog bind:this={applicationDialog} institutions={report.institutions} reportDate={report.summary.reportDate} {calendarMonth} firstDate={report.availableDates[0]} previousDate={report.previousDate} contextVersion={loadSequence} onapplied={applyUpdate} />
   {/if}
 
   {#if loading}
@@ -526,7 +533,7 @@
               {#if expandedInstitution === institution.institutionName}
                 <tr class="tr-credit-detail-row">
                   <td colspan="11">
-                    <CreditDetailEditor {institution} onapplied={async (date, name) => { await loadReport(date); expandedInstitution = name; }} />
+                    <CreditDetailEditor {institution} reportDate={report.summary.reportDate} {calendarMonth} firstDate={report.availableDates[0]} previousDate={report.previousDate} contextVersion={loadSequence} onapplied={applyUpdate} />
                   </td>
                 </tr>
               {/if}

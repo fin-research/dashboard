@@ -262,12 +262,12 @@ test("授信 schema、API 与页面保留只读详情及申请入口", async () 
   assert.match(eventMigration, /SELECT credit\.refresh_institution_events\(\)/);
   assert.doesNotMatch(repository, /daily_summary|institution_daily|item_daily|import_run|_snapshot/);
   assert.doesNotMatch(repository, /expectedUpdatedAt|updated_at = \$3::timestamptz/);
-  assert.match(repository, /to_jsonb\(d\)/);
+  assert.match(repository, /loadCreditStates/);
   assert.doesNotMatch(repository, /SS\.MS/);
   assert.match(repository, /credit\.append_diff/);
   assert.match(
     repository,
-    /report=await loadCreditReport\(client,input\.reportDate\);\s+await client\.query\('COMMIT'\)/,
+    /await loadCreditSummaries[\s\S]*?await client\.query\('COMMIT'\)/,
   );
   assert.match(route, /HYPERDRIVE/);
   assert.match(route, /export const PATCH/);

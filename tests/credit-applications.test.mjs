@@ -18,6 +18,7 @@ test('历史同日续期兼扩额归为扩额并保留原事件归档',async t=>
   assert.equal((await db.query("SELECT type FROM credit.diff WHERE institution_name='浙江萧山农商行' AND effective_on='2026-09-24'")).rows[0].type,'renewal_increase');
   await applyCreditMigration(db,'0014_retire_credit_item_fields.sql');
   await applyCreditMigration(db,'0015_credit_increase_event.sql');
+  await applyCreditMigration(db,'0016_filtered_credit_state.sql');
   assert.deepEqual([await state('2026-09-21'),await state('2026-09-24')],before);
   const rows=(await db.query("SELECT id,type,total::float8,expiry_date::text FROM credit.diff WHERE institution_name='浙江萧山农商行' AND effective_on='2026-09-24'")).rows;
   assert.equal(rows.length,1);

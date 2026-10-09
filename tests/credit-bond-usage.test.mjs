@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { creditDatabase, seedCredit } from './helpers/credit-database.mjs';
+import { creditDatabase, seedCredit, finishCreditMigrations } from './helpers/credit-database.mjs';
 import { loadCreditReport, persistCreditWorkbook, saveCreditInstitution } from '../src/lib/server/credit-repository.ts';
 import { creditInstitutionUpdateSchema } from '../src/lib/credit/update.ts';
 
@@ -60,19 +60,26 @@ test('非空历史迁移逐期保持真实余额，未变真实值也在到期�
   // Test rollback as well as successful application against populated rows.
   await db.exec('BEGIN');
   await db.exec(fs.readFileSync(new URL('../credit-migrations/0009_bond_usage_and_other.sql',import.meta.url),'utf8'));
-  assert.equal(bond(await loadCreditReport(db,'2026-08-21')).secondaryUsedAmount,1);
+  assert.equal(Number((await db.query("SELECT bond_investment_secondary_used FROM credit.state_as_of('2026-08-21') WHERE institution_name='甲银行'")).rows[0].bond_investment_secondary_used),1);
   await db.exec('ROLLBACK');
   assert.deepEqual((await db.query('SELECT to_jsonb(d) data FROM credit.diff d ORDER BY id')).rows,original);
   await db.exec(fs.readFileSync(new URL('../credit-migrations/0009_bond_usage_and_other.sql',import.meta.url),'utf8'));
-  for(const [date,primary,secondary,other] of [['2026-08-21',2,1,1.5],['2026-08-28',0,3,0.5]]) {
-    const r=await loadCreditReport(db,date);assert.equal(bond(r).usedAmount,3);
-    assert.equal(bond(r).primaryUsedAmount,primary);assert.equal(bond(r).secondaryUsedAmount,secondary);
-    const item=r.institutions[0].items.find(i=>i.type==='other');assert.equal(item.usedAmount,other);assert.equal(item.limitAmount,null);
-    assert.equal(item.details,'原其它；两融收益权转让：两融旧说明');
-    assert.equal(r.institutions[0].items.some(i=>i.type==='margin_income_rights'),false);
-  }
   const retained=(await db.query('SELECT to_jsonb(d) data FROM credit.diff d WHERE id<=2 ORDER BY id')).rows;
   for(let i=0;i<retained.length;i++) {delete retained[i].data.bond_investment_secondary_used;assert.deepEqual(retained[i],original[i]);}
+  // Verify 0009 itself against its historical schema before applying later corrections.
+  for(const [date,primary,secondary,other] of [['2026-08-21',2,1,1.5],['2026-08-28',0,3,0.5]]) {
+    const state=(await db.query('SELECT * FROM credit.state_as_of($1::date) WHERE institution_name=$2',[date,'甲银行'])).rows[0];
+    const usage=(await db.query('SELECT amount::float8/100000000 AS amount FROM credit.bond_primary_usage_as_of($1::date) WHERE institution_name=$2',[date,'甲银行'])).rows[0]?.amount ?? 0;
+    assert.equal(usage,primary);assert.equal(Number(state.bond_investment_secondary_used),secondary);
+    assert.equal(usage+Number(state.bond_investment_secondary_used),3);
+    assert.equal(Number(state.other_used),other);assert.equal(state.other_detail,'原其它；两融收益权转让：两融旧说明');
+  }
+  await finishCreditMigrations(db,'0009_bond_usage_and_other.sql');
+  const current=await loadCreditReport(db,'2026-08-21');
+  const item=current.institutions[0].items.find(i=>i.type==='other');
+  assert.equal(item.limitAmount,null);assert.equal(item.details,'原其它；两融收益权转让：两融旧说明');
+  assert.equal(current.institutions[0].items.some(i=>i.type==='margin_income_rights'),false);
+
 });
 
 test('旧台账导入按真实值登记残差；无客户关联非零值拒绝且回滚，不伪造为零',async t=>{

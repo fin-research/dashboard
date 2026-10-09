@@ -43,3 +43,11 @@ export async function applyCreditMigration(db,name) {
     await db.exec('COMMIT');
   } catch(error) { await db.exec('ROLLBACK');throw error; }
 }
+
+/** Finish historical migration fixtures before exercising the current API. */
+export async function finishCreditMigrations(db,after) {
+  const applied=new Set((await db.query('SELECT name FROM credit.schema_migration')).rows.map(row=>row.name));
+  for(const name of fs.readdirSync(new URL('../../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
+    if(name>after && !applied.has(name))await applyCreditMigration(db,name);
+  }
+}
