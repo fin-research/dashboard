@@ -1218,19 +1218,23 @@ body:has(.tr-workbench) {
   padding-inline: 14px;
 }
 
-.tr-credit-detail-toggle {
-  padding-inline: 10px;
-}
+.tr-credit-institution-row { cursor: pointer; }
+.tr-credit-institution-row:hover { background: var(--tr-primary-soft); }
+.tr-credit-institution-row:focus-visible { outline: 2px solid var(--tr-primary); outline-offset: -2px; }
+.tr-credit-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tr-credit-dialog-head h2 { margin: 0; font-size: 1.25rem; font-weight: bold; }
 
 .credit-application-dialog .dialog-body form { display: grid; gap: 16px; }
-[data-slot="dialog-content"].credit-application-dialog {
+[data-slot="dialog-content"].credit-application-dialog,
+[data-slot="dialog-content"].credit-detail-dialog {
   width: min(64rem, calc(100vw - 2rem));
   min-width: 0;
   max-width: min(64rem, calc(100vw - 2rem));
   max-height: calc(100dvh - 2rem);
   overflow: hidden;
 }
-.credit-application-dialog .dialog-body {
+.credit-application-dialog .dialog-body,
+.credit-detail-dialog .dialog-body {
   max-height: calc(100dvh - 6rem);
   overflow-y: auto;
   padding-right: 8px;
@@ -1244,13 +1248,15 @@ body:has(.tr-workbench) {
 .tr-credit-application-error { color: var(--tr-red); font-size: 0.875rem; }
 
 @media (min-width: 900px) {
-  .credit-application-dialog .tr-credit-editor-grid {
+  .credit-application-dialog .tr-credit-editor-grid,
+  .credit-detail-dialog .tr-credit-editor-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 600px) and (max-width: 899px) {
-  .credit-application-dialog .tr-credit-editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .credit-application-dialog .tr-credit-editor-grid,
+  .credit-detail-dialog .tr-credit-editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .tr-credit-table {
@@ -1278,12 +1284,6 @@ body:has(.tr-workbench) {
   color: var(--tr-primary);
 }
 
-.tr-credit-detail-row > td {
-  height: auto;
-  padding: 0 !important;
-  white-space: normal !important;
-}
-
 .tr-credit-detail {
   display: grid;
   gap: 16px;
@@ -1304,22 +1304,8 @@ body:has(.tr-workbench) {
   font-size: 1rem;
 }
 
-.tr-credit-record-date {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  color: var(--tr-muted);
-  font-size: 0.875rem;
-}
-
-.tr-credit-record-date input {
-  width: 11rem;
-}
-
 @media (max-width: 720px) {
   .tr-credit-editor-head { flex-wrap: wrap; }
-  .tr-credit-record-date { order: 3; width: 100%; margin-left: 0; }
 }
 
 .tr-credit-editor-grid,
@@ -1406,10 +1392,17 @@ body:has(.tr-workbench) {
 .tr-credit-detail :is(input, select, textarea):disabled { opacity: 1; }
 
 .tr-credit-item-grid textarea {
-  height: 44px;
+  height: auto;
   min-height: 44px;
-  field-sizing: fixed;
-  resize: vertical;
+  field-sizing: content;
+  overflow: hidden;
+  resize: none;
+}
+.tr-credit-item-grid { align-items: start; }
+.tr-credit-item-grid fieldset { align-content: start; }
+.tr-credit-bond-components { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 900px) {
+  .credit-detail-dialog .tr-credit-item-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .tr-credit-calendar-panel {

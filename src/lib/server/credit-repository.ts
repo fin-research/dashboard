@@ -111,7 +111,7 @@ function institutionView(state: DiffRow, date: string, clients: Array<{id:string
   const availableAmount = totalLimit == null || totalUsed == null ? null : totalLimit-totalUsed;
   const period = {reportDate:date,previousPeriod,status:state.status as CreditInstitutionView['status'],
     effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null};
-  return { reportDate:date,previousPeriod,effectiveStatus:creditEffectiveStatus(period),institutionName:state.institution_name,institutionType:state.institution_type as string,
+  return { reportDate:date,lastChangedOn:state.last_changed_on as string,previousPeriod,effectiveStatus:creditEffectiveStatus(period),institutionName:state.institution_name,institutionType:state.institution_type as string,
     confidentialityStatus:state.confidentiality_status === true,status:state.status as CreditInstitutionView['status'],
     totalLimit,totalUsed,totalRemaining:availableAmount,availableAmount,utilization:totalLimit && totalUsed != null ? totalUsed/totalLimit*100 : null,
     effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null,

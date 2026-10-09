@@ -395,7 +395,7 @@
       "id": "credit",
       "url": "/credit-workbench",
       "kind": "screenshot",
-      "state": "normal/editable-maintenance/application-new/application-increase",
+      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -410,12 +410,12 @@
         },
         {
           "spec": "tests/visual/credit-desktop.spec.mjs",
-          "test": "desktop credit metrics and expanded records stay within the workspace",
+          "test": "desktop credit metrics and detail dialog stay within the viewport",
           "projects": [
             "desktop"
           ],
           "snapshots": [
-            "credit-record-expanded.png"
+            "credit-detail-dialog.png"
           ]
         },
         {
@@ -427,6 +427,17 @@
           "snapshots": [
             "credit-application-new.png",
             "credit-application-increase.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "credit report dates and quarter final badges support keyboard and mobile dialogs",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-report-date-picker.png"
           ]
         }
       ]

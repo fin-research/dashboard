@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { creditMaintenanceAmounts, creditMaintenanceChanges, creditMaintenanceDraft } from '../src/lib/credit/maintenance.ts';
+import { creditMaintenanceAmounts, creditMaintenanceChanges, creditMaintenanceDraft, setCreditBondUsage } from '../src/lib/credit/maintenance.ts';
 
 const row = {
   institutionName:'甲银行',institutionType:'股份行',status:'approved',confidentialityStatus:true,
@@ -46,4 +46,27 @@ test('unlinked clients keep derived finance usage and available amount unknown',
   assert.equal(amount.remaining.bond_investment,null);
   assert.equal(amount.totalUsed,null);
   assert.equal(amount.available,null);
+});
+
+
+test('bond used and available inputs reverse into signed secondary usage and preserve the primary source',()=>{
+  const draft=creditMaintenanceDraft(row);
+  setCreditBondUsage(row,draft,'used',1);
+  assert.equal(draft.items.bond_investment.secondaryUsedAmount,-1);
+  assert.equal(creditMaintenanceAmounts(row,draft).remaining.bond_investment,4);
+  setCreditBondUsage(row,draft,'remaining',0);
+  assert.equal(draft.items.bond_investment.secondaryUsedAmount,3);
+  assert.equal(creditMaintenanceAmounts(row,draft).used.bond_investment,5);
+  draft.items.bond_investment.limitAmount=8;
+  assert.equal(creditMaintenanceAmounts(row,draft).remaining.bond_investment,3);
+  setCreditBondUsage(row,draft,'used',0);
+  assert.equal(draft.items.bond_investment.secondaryUsedAmount,-2);
+  assert.deepEqual(creditMaintenanceChanges(row,draft).items,[{type:'bond_investment',limitAmount:8,secondaryUsedAmount:-2}]);
+  setCreditBondUsage(row,draft,'used',2.123456);
+  assert.equal(draft.items.bond_investment.secondaryUsedAmount,.123456);
+  const unlinked={...row,clients:[],items:row.items.map(item=>({...item,primaryUsedAmount:null}))};
+  const missing=creditMaintenanceDraft(unlinked);
+  setCreditBondUsage(unlinked,missing,'used',8);
+  assert.equal(missing.items.bond_investment.secondaryUsedAmount,1);
+  assert.equal(creditMaintenanceAmounts(unlinked,missing).used.bond_investment,null);
 });

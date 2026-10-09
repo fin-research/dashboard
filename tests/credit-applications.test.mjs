@@ -54,7 +54,7 @@ test('申请按操作校验，同日续期和扩额形成一条可追溯事件',
     changes:{institution:{totalLimit:9}}},'auth0|test');
   const rows=(await db.query("SELECT type FROM credit.diff WHERE institution_name='甲银行' AND effective_on='2026-09-24'")).rows;
   assert.deepEqual(rows.map(row=>row.type),['increase']);
-  assert.equal((await db.query('SELECT count(*)::int n FROM credit.diff_merge_archive')).rows[0].n,1);
+  assert.equal((await db.query("SELECT to_regclass('credit.diff_merge_archive') AS name")).rows[0].name,null);
   const report=await loadCreditReport(db,'2026-09-24','2026-09');
   assert.deepEqual(report.weeklyNews.map(row=>row.eventType),['increase']);
   assert.equal(report.weeklySummary.expiredInstitutionCount,0);
