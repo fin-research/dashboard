@@ -7,9 +7,12 @@ test('desktop credit weekly report presents nonempty news and five product detai
  test.skip(testInfo.project.name!=='desktop','Desktop UI audit');
  await mockResources(page);
  const report=structuredClone(creditFull);
+ report.institutions=['甲','乙','丙','丁'].map((suffix,index)=>({...structuredClone(creditFull.institutions[index%2]),institutionName:`银行${suffix}`,totalLimit:index?5:15,expiryDate:'2026-09-30'}));
+ report.previousInstitutions=report.institutions.map((institution,index)=>({...structuredClone(institution),reportDate:report.previousDate,totalLimit:[10,8,5,5][index],expiryDate:'2026-09-14'}));
  report.weeklyNews=Array.from({length:4},(_,index)=>({
-   ...report.weeklyNews[0],institutionName:`银行${['甲','乙','丙','丁'][index]}`,
+   ...report.weeklyNews[0],institutionName:report.institutions[index].institutionName,eventType:index?'renewal':'increase',previousAmount:report.previousInstitutions[index].totalLimit,currentAmount:report.institutions[index].totalLimit,
  }));
+ report.recentApprovals=report.weeklyNews;
  await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
  await page.setViewportSize({width:1280,height:900});await page.goto('/credit-workbench/weekly');
  await expect(page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article')).toHaveCount(5);

@@ -110,13 +110,13 @@ test('raw credit responses reject incomplete dates, malformed records and out-of
   const report={summary:{reportDate:'2026-08-15'},availableDates:['2026-08-01'],previousDate:null,
     institutions:[institution('甲银行'),institution('乙银行')],recentApprovals:[{institutionName:'乙银行',reportDate:'2026-08-12',eventType:'increase',previousAmount:8,currentAmount:10}]};
   const raw=creditDataFixture(report),input={operation:'maintenance',institutionName:'甲银行',reportDate:'2026-08-15',viewDate:'2026-08-15',calendarMonth:'2026-08',changes:{institution:{notes:'x'}}};
-  assert.deepEqual(await fetchCreditData(null,async()=>Response.json(raw)),raw);
+  assert.deepEqual(await fetchCreditData(null,async()=>Response.json(raw)),JSON.parse(JSON.stringify(raw)));
   for(const invalid of [{...raw,calendarStart:undefined},{...raw,savedStates:[{date:raw.reportDate,data:null,previous_period:null}]},{...raw,usage:[{date:raw.reportDate,institution_name:'甲银行',item_type:'other',amount:'0'}]}])
     await assert.rejects(fetchCreditData(null,async()=>Response.json(invalid)),/数据结构无效/);
   const patch=creditDataPatch(report,input);
   assert.ok([...patch.data.rows,...patch.data.links,...patch.data.usageEventRows,...patch.data.usage].every(row=>row.institution_name===input.institutionName));
   assert.ok(patch.data.savedStates.every(row=>row.data.institution_name===input.institutionName));
-  assert.deepEqual(await updateCreditInstitution(input,async()=>Response.json(patch)),patch);
+  assert.deepEqual(await updateCreditInstitution(input,async()=>Response.json(patch)),JSON.parse(JSON.stringify(patch)));
   await assert.rejects(updateCreditInstitution(input,async()=>Response.json({...patch,data:raw})),/数据范围无效/);
   await assert.rejects(updateCreditInstitution(input,async()=>Response.json({...patch,viewDate:'2026-08-16'})),/数据结构无效/);
 });

@@ -42,3 +42,36 @@ export function creditDataPatch(report,input){
   data.savedStates=data.savedStates.filter(row=>row.data.institution_name===name);
   return {institutionName:name,viewDate:input.viewDate,calendarMonth:input.calendarMonth,scope:'institution',data};
 }
+
+// Independent credit facts and usage facts exercise the calendar's two filters.
+export function creditCalendarDataFixture(report,month,itemTypes){
+  const data=creditDataFixture(report),date=month+'-04';
+  const dayBefore=new Date(date+'T00:00:00Z');dayBefore.setUTCDate(dayBefore.getUTCDate()-1);
+  const beforeDate=dayBefore.toISOString().slice(0,10);
+  const monthStart=new Date(month+'-01T00:00:00Z'),shift=n=>{const day=new Date(monthStart);day.setUTCDate(day.getUTCDate()+n);return day.toISOString().slice(0,10);};
+  Object.assign(data,{availableDates:['2026-08-01',...data.availableDates],calendarMonth:month,calendarStart:shift(-6),calendarEnd:shift(41),rows:[],links:[],savedStates:[],usage:[],usageEventRows:[]});
+  const state=name=>({institution_name:name,institution_type:'商业银行',status:'approved',total:10,effective_date:'2026-01-01',expiry_date:'2027-12-31',bond_investment_secondary_used:0,legal_overdraft_used:0,other_used:0});
+  const add=(on,record)=>data.savedStates.push({date:on,data:record,previous_period:null});
+  for(const kind of ['new','expiry','renewal','increase','revoked']){
+    const before=state(kind),after={...before};
+    if(kind==='new'){before.status='applying';before.total=0;after.effective_date=date;}
+    if(kind==='expiry')before.expiry_date=after.expiry_date=date;
+    if(kind==='renewal')before.expiry_date='2026-08-01';
+    if(kind==='increase')after.total=15;
+    if(kind==='revoked')after.status='revoked';
+    add(beforeDate,before);add(date,after);
+    if(data.reportDate!==beforeDate&&data.reportDate!==date)add(data.reportDate,date<=data.reportDate?after:before);
+    data.rows.push({institution_name:kind,effective_on:kind==='expiry'?'2026-01-01':date,type:kind==='expiry'?'maintenance':kind==='revoked'?'revocation':kind,expiry_date:after.expiry_date});
+  }
+  for(const type of itemTypes){
+    const before=state(type),after={...before};
+    data.links.push({institution_name:type,id:type,name:type});
+    if(type==='bond_investment')after.bond_investment_secondary_used=1;
+    else if(['legal_overdraft','other'].includes(type))after[type+'_used']=1;
+    else {data.usage.push({date,institution_name:type,item_type:type,amount:1});data.usageEventRows.push({date,institution_name:type});}
+    if(!['yield_certificate','interbank_lending'].includes(type))data.rows.push({institution_name:type,effective_on:date,type:'maintenance',expiry_date:after.expiry_date});
+    add(beforeDate,before);add(date,after);
+    if(data.reportDate!==beforeDate&&data.reportDate!==date){add(data.reportDate,date<=data.reportDate?after:before);if(date<=data.reportDate&&['yield_certificate','interbank_lending'].includes(type))data.usage.push({date:data.reportDate,institution_name:type,item_type:type,amount:1});}
+  }
+  return data;
+}

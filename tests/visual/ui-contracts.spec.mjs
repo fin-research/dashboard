@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mockResources, credit } from './fixtures.mjs';
-import { creditItemTypes, creditItemLabels } from '../../src/lib/credit/types.ts';
+import { creditItemTypes } from '../../src/lib/credit/types.ts';
+import { creditCalendarDataFixture } from '../helpers/credit-data-fixture.mjs';
 
 let errors, requests;
 test.beforeEach(async ({page}) => {
@@ -67,13 +68,9 @@ test('Bits dialog traps focus, blocks cancellation during save and restores trig
 });
 
 test('credit calendar supports independent multiselect and retains filters across months',async({page})=>{
-  const events=month=>[
-    ...['new','expiry','renewal','increase','revoked'].map(kind=>({id:kind,type:kind==='expiry'||kind==='revoked'?'expiry':'added',kind,institutionName:kind,label:kind})),
-    ...creditItemTypes.map(itemType=>({id:itemType,type:'usage',kind:'usage',itemType,institutionName:itemType,label:`${creditItemLabels[itemType]} · 增加1亿元`}))
-  ].map(event=>({...event,date:`${month}-04`,status:'completed',statusLabel:'已生效'}));
   await page.route('**/api/credit**',route=>{
     const month=new URL(route.request().url()).searchParams.get('month')??'2026-09';
-    return route.fulfill({json:{...credit,calendarEvents:events(month)}});
+    return route.fulfill({json:creditCalendarDataFixture(credit,month,creditItemTypes)});
   });
   await page.goto('/credit-workbench/calendar');
   const visible=page.locator('.tr-credit-calendar-event strong');
@@ -87,7 +84,7 @@ test('credit calendar supports independent multiselect and retains filters acros
   await toggle('额度','新增'); await expect(visible).toHaveCount(6);
   await toggle('额度','到期'); await expect(visible).toHaveCount(7);
   await page.keyboard.press('Escape');
-  await toggle('已用','债券投资'); await expect(visible).toHaveText(['new','expiry','bond_investment']);
+  await toggle('已用','债券投资'); await expect(visible).toHaveText(['bond_investment','expiry','new']);
   await toggle('已用','收益凭证'); await expect(visible).toHaveCount(4);
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'下一个月',exact:true}).click();
@@ -96,7 +93,7 @@ test('credit calendar supports independent multiselect and retains filters acros
   await all('已用'); await expect(visible).toHaveCount(7);
   await all('额度'); await expect(visible).toHaveCount(10);
   await toggle('额度','续作/扩额'); await expect(visible).toHaveCount(7);
-  await expect(visible).toContainText(['renewal','increase']);
+  await expect(visible).toContainText(['increase','renewal']);
   await expect(visible.filter({hasText:/^new$/})).toHaveCount(0);
 });
 
