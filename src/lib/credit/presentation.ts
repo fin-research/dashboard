@@ -11,10 +11,13 @@ const typeOrder: Record<string, number> = {
   '民营银行': 5,
   '外资行': 6, '境外行及外资行': 6,
 };
+const typeCollator = new Intl.Collator('zh-CN');
+const nameCollator = new Intl.Collator('zh-CN', { numeric: true });
 
 export function compareCreditInstitutionTypes(left: string, right: string): number {
+  if (left === right) return 0;
   return (typeOrder[left] ?? 7) - (typeOrder[right] ?? 7)
-    || left.localeCompare(right, 'zh-CN');
+    || typeCollator.compare(left, right);
 }
 
 export function compareCreditInstitutionOrder(
@@ -22,7 +25,7 @@ export function compareCreditInstitutionOrder(
   right: Pick<CreditInstitutionView, 'institutionType' | 'institutionName'>,
 ): number {
   return compareCreditInstitutionTypes(left.institutionType, right.institutionType)
-    || left.institutionName.localeCompare(right.institutionName, 'zh-CN', { numeric: true });
+    || nameCollator.compare(left.institutionName, right.institutionName);
 }
 
 export function matchesCreditStatus(status: CreditEffectiveStatus, filter: CreditEffectiveStatus | 'active' | 'all' = 'active'): boolean {

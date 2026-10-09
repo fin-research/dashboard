@@ -83,26 +83,34 @@ type ClientLink = { institution_name: string; id: string; name: string };
 type UsageRow = { date: string; institution_name: string; item_type: CreditItemType; amount: number };
 const auditFields = new Set(['id','institution_name','effective_on','created_at','created_by','updated_at','type']);
 
+function itemUsage(state: DiffRow, date: string, type: CreditItemType, linked: boolean, usage: Map<string,number>) {
+  const bond = type === 'bond_investment';
+  const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
+  const primaryUsedAmount = linked ? usage.get(`${date}:${state.institution_name}:${type}`) ?? 0 : null;
+  const secondaryUsedAmount = nullableNumber(state.bond_investment_secondary_used) ?? 0;
+  const usedAmount = financing ? (primaryUsedAmount == null ? null : sumAmounts([primaryUsedAmount,bond ? secondaryUsedAmount : 0]))
+    : nullableNumber(state[`${type}_used`]);
+  return {usedAmount,primaryUsedAmount,secondaryUsedAmount};
+}
+
 function institutionView(state: DiffRow, date: string, clients: Array<{id:string;name:string}>, usage: Map<string,number>, previousPeriod?: CreditInstitutionView['previousPeriod']): CreditInstitutionView {
   const items = creditItemTypes.map(type => {
     const bond = type === 'bond_investment';
     const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
     const limitAmount = type === 'other' ? null : nullableNumber(state[`${type}_limit`]);
-    const onlineAmount = clients.length ? usage.get(`${date}:${state.institution_name}:${type}`) ?? 0 : null;
-    const secondaryUsedAmount = nullableNumber(state.bond_investment_secondary_used) ?? 0;
-    const usedAmount = financing ? (onlineAmount == null ? null : sumAmounts([onlineAmount,bond ? secondaryUsedAmount : 0]))
-      : nullableNumber(state[`${type}_used`]);
-    return { type,limitAmount,usedAmount,remainingAmount:limitAmount == null || (financing && usedAmount == null) ? null : limitAmount-(usedAmount ?? 0),
+    const {usedAmount,primaryUsedAmount,secondaryUsedAmount} = itemUsage(state,date,type,clients.length > 0,usage);
+    const item: CreditInstitutionView['items'][number] = { type,limitAmount,usedAmount,remainingAmount:limitAmount == null || (financing && usedAmount == null) ? null : limitAmount-(usedAmount ?? 0),
       details: (type === 'bond_investment' || type === 'other' ? state[`${type}_detail`] as string | null : null) ?? null,
-      usageSource:bond ? 'bond_investors' as const : financing ? 'financing' as const : 'credit' as const,linkedClientCount:clients.length,
-      ...(bond ? {primaryUsedAmount:onlineAmount,secondaryUsedAmount} : {}) };
+      usageSource:bond ? 'bond_investors' : financing ? 'financing' : 'credit',linkedClientCount:clients.length };
+    if (bond) { item.primaryUsedAmount = primaryUsedAmount; item.secondaryUsedAmount = secondaryUsedAmount; }
+    return item;
   });
   const totalLimit = nullableNumber(state.total);
   const totalUsed = clients.length ? sumAmounts(items.map(item => item.usedAmount)) : null;
   const availableAmount = totalLimit == null || totalUsed == null ? null : totalLimit-totalUsed;
   const period = {reportDate:date,previousPeriod,status:state.status as CreditInstitutionView['status'],
     effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null};
-  return { ...period,effectiveStatus:creditEffectiveStatus(period),institutionName:state.institution_name,institutionType:state.institution_type as string,
+  return { reportDate:date,previousPeriod,effectiveStatus:creditEffectiveStatus(period),institutionName:state.institution_name,institutionType:state.institution_type as string,
     confidentialityStatus:state.confidentiality_status === true,status:state.status as CreditInstitutionView['status'],
     totalLimit,totalUsed,totalRemaining:availableAmount,availableAmount,utilization:totalLimit && totalUsed != null ? totalUsed/totalLimit*100 : null,
     effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null,
@@ -134,7 +142,12 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
     CROSS JOIN LATERAL (VALUES(b.issue_date),(b.maturity_date),(b.settled_at),(b.closed_at)) v(date)
     WHERE v.date BETWEEN $1::date AND $2::date ORDER BY date`,[calendarStart,calendarEnd])).rows.map(row => row.date);
   const eventDates = new Set(availableDates.filter(date => date <= reportDate || date >= calendarStart && date <= calendarEnd));
-  for (const row of rows) if (row.expiry_date) eventDates.add(String(row.expiry_date));
+  // Historical expiries feed news; future expiries only feed the selected calendar.
+  // Do not materialize full institution/item views for unrelated future dates.
+  for (const row of rows) if (row.expiry_date) {
+    const date = String(row.expiry_date);
+    if (date <= reportDate || date >= calendarStart && date <= calendarEnd) eventDates.add(date);
+  }
   const snapshotDates = new Set([reportDate,...eventDates,...usageDates,...(previousDate ? [previousDate] : [])]);
   for (const date of [...eventDates,...usageDates]) snapshotDates.add(addDays(date,-1));
   const financeDates = [...new Set([reportDate,...(previousDate ? [previousDate] : []),
@@ -152,8 +165,8 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
     group.push({id,name}); clientsByInstitution.set(institution_name,group);
   }
   const usageByKey = new Map(usage.map(row => [`${row.date}:${row.institution_name}:${row.item_type}`,row.amount]));
-  // Walk sparse changes once in date order. Each rendered view is independent of later states.
-  const cache = new Map<string,CreditInstitutionView[]>();
+  // Keep immutable sparse states; create full item views only when an output uses them.
+  const cache = new Map<string,{states:Map<string,DiffRow>;periods:Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>}>();
   const states = new Map<string,DiffRow>();
   const priorPeriods = new Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>();
   let rowIndex = 0;
@@ -162,11 +175,11 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
       const row = rows[rowIndex];
       if (!row || row.effective_on > date) break;
       rowIndex++;
-      const state = states.get(row.institution_name) ?? {} as DiffRow;
+      const state = { ...states.get(row.institution_name) } as DiffRow;
       if (state.status === 'approved' && state.effective_date && state.expiry_date &&
         (row.effective_date != null && row.effective_date !== state.effective_date || row.expiry_date != null && row.expiry_date !== state.expiry_date)) {
-        const periods = priorPeriods.get(row.institution_name) ?? [];
-        periods.push({effectiveDate:String(state.effective_date),expiryDate:String(state.expiry_date)});
+        const periods = [...(priorPeriods.get(row.institution_name) ?? []),
+          {effectiveDate:String(state.effective_date),expiryDate:String(state.expiry_date)}];
         priorPeriods.set(row.institution_name,periods);
       }
       if (row.status === 'revoked' || row.status === 'applying') priorPeriods.delete(row.institution_name);
@@ -175,34 +188,50 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
       }
       states.set(row.institution_name,state);
     }
-    cache.set(date,[...states.values()].map(state => institutionView(state,date,clientsByInstitution.get(state.institution_name) ?? [],usageByKey,
-      priorPeriods.get(state.institution_name)?.slice().reverse().find(period => period.effectiveDate <= date && period.expiryDate >= date))));
+    cache.set(date,{states:new Map(states),periods:new Map(priorPeriods)});
   }
-  const snapshot = (date:string) => cache.get(date) ?? [];
+  const views = new Map<string,Map<string,CreditInstitutionView>>();
+  const institutionSnapshot = (date:string,name:string):CreditInstitutionView|undefined => {
+    const saved = cache.get(date);
+    const state = saved?.states.get(name);
+    if (!saved || !state) return undefined;
+    const dateViews = views.get(date) ?? new Map<string,CreditInstitutionView>();
+    views.set(date,dateViews);
+    let view = dateViews.get(name);
+    if (!view) {
+      view = institutionView(state,date,clientsByInstitution.get(name) ?? [],usageByKey,
+        saved.periods.get(name)?.slice().reverse().find(period => period.effectiveDate <= date && period.expiryDate >= date));
+      dateViews.set(name,view);
+    }
+    return view;
+  };
+  const snapshot = (date:string) => [...(cache.get(date)?.states.keys() ?? [])].map(name => institutionSnapshot(date,name)!);
   const current = snapshot(reportDate).sort(compareCreditInstitutionOrder);
+  const currentByInstitution = new Map(current.map(row => [row.institutionName,row]));
   const previous = previousDate ? snapshot(previousDate) : [];
   const allNews: CreditWeeklyNewsItem[] = [];
   const calendarEvents: CreditCalendarEvent[] = [];
   for (const date of [...eventDates].sort()) {
     if (date < firstDate || date > reportDate && (date < calendarStart || date > calendarEnd)) continue;
     // A diff's stored type is the event fact. Amount/date differences alone are maintenance.
-    const after = new Map(snapshot(date).map(row => [row.institutionName,row]));
-    const before = new Map(snapshot(addDays(date,-1)).map(row => [row.institutionName,row]));
+    const beforeDate = addDays(date,-1);
+    const before = cache.get(beforeDate)?.states;
     const news = rows.filter(row => row.effective_on === date && row.type && row.type !== 'maintenance')
       .flatMap(row => {
-        const current = after.get(row.institution_name);
-        const previous = before.get(row.institution_name);
+        const current = institutionSnapshot(date,row.institution_name);
+        const previous = institutionSnapshot(beforeDate,row.institution_name);
         if (!current || row.type === 'new' && current.status !== 'approved') return [];
         const eventType = row.type === 'renewal_increase' ? 'increase' : row.type as CreditEventType;
         return [creditNewsItem(eventType,current,previous,date,addDays(date,-1))];
       });
     if (date <= reportDate) {
-      for (const previous of before.values()) {
-        if (previous.status !== 'approved' || previous.expiryDate !== date) continue;
-        const latest = current.find(row => row.institutionName === previous.institutionName);
+      for (const previous of before?.values() ?? []) {
+        if (previous.status !== 'approved' || previous.expiry_date !== date) continue;
+        const latest = currentByInstitution.get(previous.institution_name);
         if (latest?.expiryDate !== date) continue;
-        if (news.some(event => event.institutionName === previous.institutionName && isRenewalEvent(event))) continue;
-        news.push(creditNewsItem('expiry',after.get(previous.institutionName),previous,date,addDays(date,-1)));
+        if (news.some(event => event.institutionName === previous.institution_name && isRenewalEvent(event))) continue;
+        news.push(creditNewsItem('expiry',institutionSnapshot(date,previous.institution_name),
+          institutionSnapshot(beforeDate,previous.institution_name),date,beforeDate));
       }
     }
     allNews.push(...news);
@@ -224,20 +253,24 @@ export async function loadCreditReport(client: DatabaseClient, requestedDate: st
   }
   for (const date of [...new Set([...usageDates,...availableDates.filter(date => date>=calendarStart && date<=calendarEnd)])].sort()) {
     if (date <= firstDate) continue;
-    const before = new Map(snapshot(addDays(date,-1)).map(row => [row.institutionName,row]));
-    for (const institution of snapshot(date)) for (const item of institution.items) {
-      const prior = before.get(institution.institutionName)?.items.find(row => row.type===item.type);
+    const beforeDate = addDays(date,-1);
+    const before = cache.get(beforeDate)?.states;
+    for (const state of cache.get(date)?.states.values() ?? []) for (const type of creditItemTypes) {
+      const linked = Boolean(clientsByInstitution.get(state.institution_name)?.length);
+      const item = itemUsage(state,date,type,linked,usageByKey);
+      const priorState = before?.get(state.institution_name);
+      const prior = priorState ? itemUsage(priorState,beforeDate,type,linked,usageByKey) : undefined;
       // Missing client associations are unknown, not a zero balance.
       if (item.usedAmount == null || prior && prior.usedAmount == null) continue;
-      const components = item.type === 'bond_investment'
+      const components = type === 'bond_investment'
         ? [{kind:'primary' as const,label:'债券投资——一级发行',delta:(item.primaryUsedAmount ?? 0)-(prior?.primaryUsedAmount ?? 0)},
           {kind:'secondary' as const,label:'债券投资——二级买卖',delta:(item.secondaryUsedAmount ?? 0)-(prior?.secondaryUsedAmount ?? 0)}]
-        : [{kind:undefined,label:creditItemLabels[item.type],delta:item.usedAmount-(prior?.usedAmount ?? 0)}];
+        : [{kind:undefined,label:creditItemLabels[type],delta:item.usedAmount-(prior?.usedAmount ?? 0)}];
       for (const component of components) {
         const delta = component.delta;
         if (Math.abs(delta)<=AMOUNT_TOLERANCE) continue;
-        calendarEvents.push({id:`usage:${institution.institutionName}:${item.type}:${component.kind ?? 'total'}:${date}`,date,type:'usage',kind:'usage',itemType:item.type,
-          ...(component.kind ? {usageComponent:component.kind} : {}),institutionName:institution.institutionName,
+        calendarEvents.push({id:`usage:${state.institution_name}:${type}:${component.kind ?? 'total'}:${date}`,date,type:'usage',kind:'usage',itemType:type,
+          ...(component.kind ? {usageComponent:component.kind} : {}),institutionName:state.institution_name,
           label:`${component.label} · ${delta>=0?'增加':'减少'}${formatCalendarAmount(Math.abs(delta))}亿元`,
           ...calendarState(date,reportDate,'usage')});
       }
