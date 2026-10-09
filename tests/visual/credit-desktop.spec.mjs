@@ -156,11 +156,9 @@ test('credit application separates requests from editable maintenance details',a
 test('credit report dates and quarter final badges support keyboard and mobile dialogs',async({page})=>{
   await mockResources(page);
   const source=structuredClone(creditFull);
-  let writes=0;
   source.institutions[0].lastChangedOn='2026-09-30';
   source.institutions[1].lastChangedOn='2026-09-15';
   await page.route('**/api/credit**',route=>{
-    if (route.request().method() === 'PATCH') writes++;
     const date=new URL(route.request().url()).searchParams.get('date') ?? source.summary.reportDate;
     const report={...source,summary:{...source.summary,reportDate:date},institutions:source.institutions.map(row=>({...row,reportDate:date}))};
     return route.fulfill({json:report});
@@ -190,13 +188,7 @@ test('credit report dates and quarter final badges support keyboard and mobile d
   await bond.getByRole('spinbutton',{name:'可用（亿元）',exact:true}).fill('0');
   await expect(bond.getByRole('spinbutton',{name:'二级买卖（亿元）',exact:true})).toHaveValue('1.5');
   await expect(bond.getByRole('spinbutton',{name:'已用（亿元）',exact:true})).toHaveValue('3');
-  await detail.getByLabel('记录日期',{exact:true}).fill('2026-10-01');
-  await expect(bond.getByRole('spinbutton',{name:'已用（亿元）',exact:true})).toBeDisabled();
-  await expect(bond.getByRole('spinbutton',{name:'可用（亿元）',exact:true})).toBeDisabled();
-  await detail.getByRole('button',{name:'保存',exact:true}).click();
-  expect(writes).toBe(0);
-  await expect(page.getByText('已用或可用的修改须保存至报告日',{exact:true})).toBeVisible();
-  await detail.getByLabel('记录日期',{exact:true}).fill('2026-09-30');
+  await expect(detail.getByLabel('记录日期',{exact:true})).toHaveCount(0);
   const note=bond.getByRole('textbox',{name:'说明',exact:true});
   const before=(await note.boundingBox()).height;
   await note.fill('第一行\n第二行\n第三行\n第四行\n第五行');

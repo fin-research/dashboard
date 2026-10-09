@@ -18,18 +18,10 @@
   const canEdit = $derived($allowed('credit.institution:update'));
   const itemOrder: CreditItemType[] = ['bond_investment', 'yield_certificate', 'interbank_lending', 'legal_overdraft', 'other'];
   let draft = $state<CreditMaintenanceDraft>(null!);
-  let recordDate = $state('');
-  let reversedBondUsage = $state(false);
   $effect.pre(() => {
     draft = creditMaintenanceDraft(institution);
-    recordDate = reportDate;
-    reversedBondUsage = false;
   });
   let saving = $state(false);
-  function reverseBondUsage(field: 'used' | 'remaining', event: Event) {
-    setCreditBondUsage(institution, draft, field, numberInput(event));
-    reversedBondUsage = true;
-  }
   const amounts = $derived(creditMaintenanceAmounts(institution, draft));
 
   function numberInput(event: Event): number | null {
@@ -42,16 +34,8 @@
   async function save(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (!canEdit || saving) return;
-    if (!recordDate) {
-      globalMessages.error('请选择记录日期');
-      return;
-    }
     if (draft.effectiveDate && draft.expiryDate && draft.effectiveDate > draft.expiryDate) {
       globalMessages.error('授信到期日不能早于生效日');
-      return;
-    }
-    if (reversedBondUsage && recordDate !== reportDate) {
-      globalMessages.error('已用或可用的修改须保存至报告日');
       return;
     }
     const changes = creditMaintenanceChanges(institution, draft);
@@ -62,7 +46,7 @@
     saving = true;
     const version = contextVersion;
     try {
-      const result = await updateCreditInstitution({ operation: 'maintenance', reportDate: recordDate, viewDate:reportDate, viewFirstDate:firstDate, viewPreviousDate:previousDate, calendarMonth,
+      const result = await updateCreditInstitution({ operation: 'maintenance', reportDate, viewDate:reportDate, viewFirstDate:firstDate, viewPreviousDate:previousDate, calendarMonth,
         institutionName: institution.institutionName, changes }, fetch);
       onapplied(result,version);
       globalMessages.success('授信维护已保存');
@@ -77,7 +61,6 @@
 <form class="tr-credit-detail" onsubmit={save}>
   <div class="tr-credit-editor-head">
     <strong>{institution.institutionName}</strong>
-    <label class="tr-credit-record-date"><span>记录日期</span><Input required type="date" bind:value={recordDate} disabled={!canEdit || saving} /></label>
     <Button permission="credit.institution:update" type="submit" disabled={saving}>{saving ? '保存中' : '保存'}</Button>
   </div>
   <div class="tr-credit-editor-grid">
@@ -112,17 +95,17 @@
           <label><span>额度（亿元）</span><Input type="number" min="0" step="0.000001" value={draft.items[type].limitAmount ?? ''} disabled={!canEdit || saving} oninput={event => draft.items[type].limitAmount = numberInput(event)} /></label>
         {/if}
         {#if type === 'bond_investment'}
-          <label><span>已用（亿元）</span><Input type="number" step="0.000001" value={amounts.used[type] ?? ''} disabled={!canEdit || saving || recordDate !== reportDate || item?.primaryUsedAmount == null} oninput={event => reverseBondUsage('used', event)} /></label>
+          <label><span>已用（亿元）</span><Input type="number" step="0.000001" value={amounts.used[type] ?? ''} disabled={!canEdit || saving || item?.primaryUsedAmount == null} oninput={event => setCreditBondUsage(institution, draft, 'used', numberInput(event))} /></label>
         {:else if type === 'legal_overdraft' || type === 'other'}
           <label><span>已用（亿元）</span><Input type="number" step="0.000001" value={draft.items[type].usedAmount ?? ''} disabled={!canEdit || saving} oninput={event => draft.items[type].usedAmount = numberInput(event)} /></label>
         {:else}
           <label><span>已用（亿元）</span><Input value={formatAmount(amounts.used[type])} disabled /></label>
         {/if}
         {#if type === 'bond_investment'}
-          <label><span>可用（亿元）</span><Input type="number" step="0.000001" value={amounts.remaining[type] ?? ''} disabled={!canEdit || saving || recordDate !== reportDate || item?.primaryUsedAmount == null || draft.items[type].limitAmount == null} oninput={event => reverseBondUsage('remaining', event)} /></label>
+          <label><span>可用（亿元）</span><Input type="number" step="0.000001" value={amounts.remaining[type] ?? ''} disabled={!canEdit || saving || item?.primaryUsedAmount == null || draft.items[type].limitAmount == null} oninput={event => setCreditBondUsage(institution, draft, 'remaining', numberInput(event))} /></label>
           <div class="tr-credit-bond-components">
             <label><span>一级发行</span><Input aria-label="一级发行（亿元）" value={formatAmount(item?.primaryUsedAmount)} disabled /></label>
-            <label><span>二级买卖</span><Input aria-label="二级买卖（亿元）" type="number" step="0.000001" value={draft.items[type].secondaryUsedAmount ?? ''} disabled={!canEdit || saving} oninput={event => { draft.items[type].secondaryUsedAmount = numberInput(event); reversedBondUsage = false; }} /></label>
+            <label><span>二级买卖</span><Input aria-label="二级买卖（亿元）" type="number" step="0.000001" value={draft.items[type].secondaryUsedAmount ?? ''} disabled={!canEdit || saving} oninput={event => draft.items[type].secondaryUsedAmount = numberInput(event)} /></label>
           </div>
         {:else if type !== 'other'}
           <label><span>可用（亿元）</span><Input value={formatAmount(amounts.remaining[type])} disabled /></label>

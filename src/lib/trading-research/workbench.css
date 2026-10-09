@@ -1304,22 +1304,8 @@ body:has(.tr-workbench) {
   font-size: 1rem;
 }
 
-.tr-credit-record-date {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  color: var(--tr-muted);
-  font-size: 0.875rem;
-}
-
-.tr-credit-record-date input {
-  width: 11rem;
-}
-
 @media (max-width: 720px) {
   .tr-credit-editor-head { flex-wrap: wrap; }
-  .tr-credit-record-date { order: 3; width: 100%; margin-left: 0; }
 }
 
 .tr-credit-editor-grid,
