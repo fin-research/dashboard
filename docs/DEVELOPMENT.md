@@ -55,7 +55,10 @@ pnpm dev
 
 - `pnpm worker:dev` 用于构建后本地 Worker 检查。
 - 默认将 PR 加入合并队列，队列完整 CI 成功后自动合并到 GitHub `main`，由 Cloudflare Git 自动构建部署 `eastmoney-dashboard`；核对对应提交的构建状态和线上受影响路由。
-- 自动部署不可用、失败或有其他必要时，可执行 `pnpm worker:deploy` 手动部署同一份已验证代码。自动构建与手动部署全程无需再次向用户申请授权；不得覆盖其他任务尚未集成的改动。
+- 合并后先运行 `pnpm worker:status -- --commit=<main完整SHA> --wait=600`，通过当前 deployment 的实际流量版本关联 Cloudflare Build，再核对 `build_trigger_metadata.commit_hash`。合并队列 SHA、最终 main SHA 与 Worker UUID 是不同标识；版本缺少 SHA tag 或 `source=wrangler` 不能证明自动部署失败。命令只读取发布记录，未证明成功时返回非零；API 失败或没有关联记录属于未知状态。
+- Cloudflare 生产触发器仍执行 `pnpm run build` 与 `npx wrangler deploy`。自动构建的 Vite 进程使用 4GB 堆，避免默认约 2GB 堆在完整构建时偶发 OOM；这不修改 Worker 运行 CPU 预算或付费订阅。
+- 只有明确的自动构建失败才使用 `pnpm worker:deploy -- --reason=<失败原因>` 发布同一份已验证 main。手动入口在本地构建前及上传前分别核对发布记录、最新 main、干净 checkout 和该提交的 `Dashboard CI`；已部署则直接退出，构建等待中或状态未知则停止补发。手动版本附 `git:<完整SHA>` tag 供后续核验。不要因等待时间短或标识不同而重复发布；先修复失败原因并优先重试自动构建。发布无需再次授权，不得覆盖其它任务改动。
+- 手动补发需要目标 main SHA 上成功的 `Dashboard CI`。若合并队列使用不同 SHA 且 GitHub 未把检查关联到最终提交，先对当前 main 执行 `Dashboard CI` 的 `workflow_dispatch` 并等待成功；不能复用未经核对的其它提交的绿色检查。正常自动部署仍由受保护的合并队列验收，不增加 main 上的重复 CI。
 - JWT、Auth0、会话、角色配置及其 Secret 由 Gateway 维护；Dashboard 只需要 `IDENTITY` Service Binding。新建或变更绑定须先部署提供对应 entrypoint 的 Gateway。
 - Gateway 变更的发布顺序见 [Gateway DEVELOPMENT](../../gateway/docs/DEVELOPMENT.md)。不能恢复本 Worker 的公网 route、workers.dev、preview 或旧 Access 开关。
 - 程序化联调在 Gateway 执行 `node scripts/verify-integration.mjs`，使用本仓库构建结果验证 SvelteKit 页面、数据预取、登录状态及 Data 契约。`DASHBOARD_CHECKOUT` / `DATA_CHECKOUT` 可指定独立工作树。

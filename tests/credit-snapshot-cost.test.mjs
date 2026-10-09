@@ -6,7 +6,24 @@ import { compareCreditInstitutionOrder } from '../src/lib/credit/presentation.ts
 const base = { id: 1, institution_name: '甲银行', effective_on: '2026-08-01', created_at: '2026-08-01T00:00:00Z',
   created_by: null, updated_at: null, type: 'maintenance', confidentiality_status:false, status: 'approved', institution_type: '城商行',
   effective_date: '2026-08-01', expiry_date: '2026-08-31', total: 10, bond_investment_secondary_used: 2 };
-import {creditDatabase} from './helpers/credit-database.mjs';
+import {creditDatabase,seedCredit} from './helpers/credit-database.mjs';
+
+test('calendar usage queries include only affected institutions while table dates retain every balance',async t=>{
+  const db=await creditDatabase(t);
+  for(const name of ['甲银行','乙银行'])await seedCredit(db,'2026-08-21',name,{expiry_date:'2026-12-31',bond_investment_secondary_used:0});
+  await db.exec(`INSERT INTO financing.debt(debt_type,name,client_id,amount,activated_at,maturity_date) VALUES
+    ('同业拆借','甲拆借',(SELECT id FROM public.client WHERE name='甲银行'),100000000,'2026-09-04','2026-12-31'),
+    ('同业拆借','乙拆借',(SELECT id FROM public.client WHERE name='乙银行'),200000000,'2026-09-05','2026-12-31')`);
+  const query=db.query.bind(db);let balances;
+  const client={query:async(sql,params)=>{const r=await query(sql,params);if(sql.includes('financing.credit_usage_as_of(d.date)'))balances=r.rows;return r;}};
+  const report=await loadCreditReport(client,'2026-09-15','2026-09');
+  assert.deepEqual(report.institutions.map(i=>i.totalUsed).sort(),[1,2]);
+  assert.ok(balances.some(r=>r.date==='2026-09-04'&&r.institution_name==='甲银行'&&r.amount===1));
+  assert.equal(balances.some(r=>r.date==='2026-09-04'&&r.institution_name==='乙银行'),false);
+  assert.ok(balances.some(r=>r.date==='2026-09-08'&&r.institution_name==='乙银行'&&r.amount===2));
+  assert.ok(report.calendarEvents.some(e=>e.date==='2026-09-04'&&e.institutionName==='甲银行'&&/增加1亿元/.test(e.label)));
+  assert.ok(report.calendarEvents.some(e=>e.date==='2026-09-05'&&e.institutionName==='乙银行'&&/增加2亿元/.test(e.label)));
+});
 
 test('lazy snapshots retain historical renewal periods and independent amount/calendar states', async t => {
   const db=await creditDatabase(t);

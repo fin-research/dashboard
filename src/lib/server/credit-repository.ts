@@ -163,21 +163,9 @@ async function readCreditReportData(client: DatabaseClient, requestedDate: strin
   const usageEventDates = [...new Set([...usageDates,...rows.filter(row => row.effective_on>=calendarStart && row.effective_on<=calendarEnd).map(row=>row.effective_on)])].sort();
   const snapshotDates = new Set([reportDate,...eventDates,...usageEventDates,...(previousDate ? [previousDate] : [])]);
   for (const date of [...eventDates,...usageEventDates]) snapshotDates.add(addDays(date,-1));
+  const calendarBeforeStart = addDays(calendarStart,-1);
   const financeDates = [...new Set([reportDate,...(previousDate ? [previousDate] : []),
-    ...[...snapshotDates].filter(date => date >= addDays(calendarStart,-1) && date <= calendarEnd)])].sort();
-  const usage = (await client.query<UsageRow>(`SELECT to_char(d.date,'YYYY-MM-DD') AS date,m.institution_name,
-    CASE u.debt_type WHEN '收益凭证' THEN 'yield_certificate' ELSE 'interbank_lending' END AS item_type,
-    (sum(u.amount)/100000000)::float8 AS amount
-    FROM unnest($1::date[]) d(date) CROSS JOIN LATERAL financing.credit_usage_as_of(d.date) u
-    JOIN credit.institution_client m ON m.client_id=u.client_id WHERE ($2::text IS NULL OR m.institution_name=$2) GROUP BY d.date,m.institution_name,u.debt_type
-    UNION ALL SELECT to_char(d.date,'YYYY-MM-DD'),u.institution_name,'bond_investment',(u.amount/100000000)::float8
-    FROM unnest($1::date[]) d(date) CROSS JOIN LATERAL credit.bond_primary_usage_as_of(d.date) u WHERE ($2::text IS NULL OR u.institution_name=$2)`,[financeDates,selectedName ?? null])).rows;
-  const clientsByInstitution = new Map<string,Array<{id:string;name:string}>>();
-  for (const {institution_name,id,name} of links) {
-    const group = clientsByInstitution.get(institution_name) ?? [];
-    group.push({id,name}); clientsByInstitution.set(institution_name,group);
-  }
-  const usageByKey = new Map(usage.map(row => [`${row.date}:${row.institution_name}:${row.item_type}`,row.amount]));
+    ...[...snapshotDates].filter(date => date >= calendarBeforeStart && date <= calendarEnd)])].sort();
   // Current/comparison tables are SQL snapshots. Event dates request only affected names.
   const requested = new Map<string,Set<string>|null>();
   const addRequest = (date:string,names:string[]|null) => {
@@ -198,6 +186,19 @@ async function readCreditReportData(client: DatabaseClient, requestedDate: strin
     const names = [...usageEventRows.filter(row=>row.date===date),...rows.filter(row=>row.effective_on===date)].map(row=>row.institution_name);
     addRequest(date,names); addRequest(addDays(date,-1),names);
   }
+  const usage = (await client.query<UsageRow>(`SELECT to_char(d.date,'YYYY-MM-DD') AS date,m.institution_name,
+    CASE u.debt_type WHEN '收益凭证' THEN 'yield_certificate' ELSE 'interbank_lending' END AS item_type,
+    (sum(u.amount)/100000000)::float8 AS amount
+    FROM jsonb_to_recordset($1::jsonb) d(date date,names text[]) CROSS JOIN LATERAL financing.credit_usage_as_of(d.date) u
+    JOIN credit.institution_client m ON m.client_id=u.client_id WHERE (d.names IS NULL OR m.institution_name=ANY(d.names)) AND ($2::text IS NULL OR m.institution_name=$2) GROUP BY d.date,m.institution_name,u.debt_type
+    UNION ALL SELECT to_char(d.date,'YYYY-MM-DD'),u.institution_name,'bond_investment',(u.amount/100000000)::float8
+    FROM jsonb_to_recordset($1::jsonb) d(date date,names text[]) CROSS JOIN LATERAL credit.bond_primary_usage_as_of(d.date) u WHERE (d.names IS NULL OR u.institution_name=ANY(d.names)) AND ($2::text IS NULL OR u.institution_name=$2)`,[JSON.stringify(financeDates.map(date => ({date,names:requested.get(date) === null ? null : [...(requested.get(date) ?? [])]}))),selectedName ?? null])).rows;
+  const clientsByInstitution = new Map<string,Array<{id:string;name:string}>>();
+  for (const {institution_name,id,name} of links) {
+    const group = clientsByInstitution.get(institution_name) ?? [];
+    group.push({id,name}); clientsByInstitution.set(institution_name,group);
+  }
+  const usageByKey = new Map(usage.map(row => [`${row.date}:${row.institution_name}:${row.item_type}`,row.amount]));
   const savedStates = await loadCreditStates(client,[...requested].map(([date,names])=>({date,names:names === null ? null : [...names],include_details:date===reportDate && !comparisonOnly})));
   const cache = new Map<string,{states:Map<string,DiffRow>;periods:Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>}>();
   for (const row of savedStates) {
@@ -239,7 +240,7 @@ async function readCreditReportData(client: DatabaseClient, requestedDate: strin
         const previous = institutionSnapshot(beforeDate,row.institution_name);
         if (!current || row.type === 'new' && current.status !== 'approved') return [];
         const eventType = row.type === 'renewal_increase' ? 'increase' : row.type as CreditEventType;
-        return [creditNewsItem(eventType,current,previous,date,addDays(date,-1))];
+        return [creditNewsItem(eventType,current,previous,date,beforeDate)];
       });
     if (date <= reportDate) {
       for (const previous of before?.values() ?? []) {
