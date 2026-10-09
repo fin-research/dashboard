@@ -62,10 +62,23 @@ test('desktop credit metrics and detail dialog stay within the viewport',async({
   const detail=page.getByRole('dialog',{name:'授信详情',exact:true});
   await expect(region).toHaveJSProperty('scrollLeft',0);
   await expect(detail.getByRole('textbox',{name:'机构性质',exact:true})).toHaveValue('商业银行');
-  const products=await detail.getByRole('group').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().y));
+  const products=await detail.getByRole('group').evaluateAll(nodes=>nodes.map(n=>{
+    const box=n.getBoundingClientRect(), style=getComputedStyle(n);
+    return {x:box.x,y:box.y,width:box.width,bottom:box.bottom,border:style.borderTopWidth,color:style.borderTopColor,radius:parseFloat(style.borderTopLeftRadius)};
+  }));
   expect(products).toHaveLength(5);
-  expect(Math.max(...products.slice(0,4))-Math.min(...products.slice(0,4))).toBeLessThanOrEqual(1);
-  expect(products[4]).toBeGreaterThan(products[1]);
+  for (const product of products) {
+    expect(product.border).toBe('1px');
+    expect(product.color).not.toBe('rgba(0, 0, 0, 0)');
+    expect(product.radius).toBeGreaterThanOrEqual(16);
+  }
+  expect(Math.max(...products.slice(0,4).map(p=>p.y))-Math.min(...products.slice(0,4).map(p=>p.y))).toBeLessThanOrEqual(1);
+  expect(products[4].y).toBeGreaterThan(products[1].y);
+  expect(Math.abs(products[4].x-products[1].x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(products[4].bottom-products[0].bottom)).toBeLessThanOrEqual(1);
+  expect(Math.abs(products[4].x+products[4].width-products[3].x-products[3].width)).toBeLessThanOrEqual(1);
+  const otherLabels=await detail.getByRole('group',{name:'其它',exact:true}).locator('label').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().y));
+  expect(Math.abs(otherLabels[0]-otherLabels[1])).toBeLessThanOrEqual(1);
   await page.setViewportSize({width:1280,height:1600});
   await expect(detail).toBeInViewport({ratio:1});
   await expect(detail).toHaveScreenshot('credit-detail-dialog.png');
@@ -195,6 +208,7 @@ test('credit report dates and quarter final badges support keyboard and mobile d
   await note.fill('第一行\n第二行\n第三行\n第四行\n第五行');
   expect((await note.boundingBox()).height).toBeGreaterThan(before);
   expect(await note.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
+  expect(await detail.locator('.tr-credit-item-grid').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   await page.keyboard.press('Escape');await expect(detail).toHaveCount(0);await expect(row).toBeFocused();
   await page.getByRole('button',{name:'报告日：2026-09-30',exact:true}).click();
   await page.getByRole('dialog',{name:'选择报告日',exact:true}).getByRole('button',{name:'26Q4',exact:true}).click();
