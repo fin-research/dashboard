@@ -28,10 +28,7 @@
     "mode": "smart"
   },
   "triggers": {
-    "crons": [
-
-      "0 9 * * MON-FRI"
-    ]
+    "crons": []
   },
   "routes": [],
   "services": [
