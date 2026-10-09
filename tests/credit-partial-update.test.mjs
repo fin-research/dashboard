@@ -16,7 +16,7 @@ test('save returns scoped canonical data; browser summary and events equal a fre
   const db=await creditDatabase(t);
   await seedCredit(db,'2026-08-01','甲银行',{expiry_date:'2026-09-30'});
   await seedCredit(db,'2026-08-01','乙银行',{expiry_date:'2026-09-30',total:20});
-  await db.query("SELECT credit.append_diff('2026-08-12','乙银行','{\"total\":25}',NULL,'increase')");
+  await db.query("SELECT credit.append_entry('2026-08-12','乙银行','{\"total\":25}',NULL,'increase')");
   const before=await loadCreditData(db,'2026-08-15');
   const untouched=before.savedStates.find(row=>row.date===before.reportDate&&row.data.institution_name==='乙银行');
   const queries=[];
@@ -25,7 +25,7 @@ test('save returns scoped canonical data; browser summary and events equal a fre
   assert.equal(result.scope,'institution');
   assert.ok(result.data.savedStates.every(row=>row.data.institution_name==='甲银行'));
   assert.equal('summary' in result,false);
-  const requests=queries.find(q=>q.sql.includes('jsonb_to_recordset')&&q.sql.includes('previous_period')&&!q.sql.includes('"totalAvailable"'));
+  const requests=queries.find(q=>q.sql.includes('jsonb_to_recordset')&&q.sql.includes('credit.entry_as_of')&&!q.sql.includes('"totalAvailable"'));
   assert.ok(JSON.parse(requests.params[0]).every(row=>Array.isArray(row.names)&&row.names.every(name=>name==='甲银行')));
   const reactive=applyCreditUpdate(before,result,'2026-08');
   assert.equal(reactive.savedStates.find(row=>row.date===reactive.reportDate&&row.data.institution_name==='乙银行'),untouched);
@@ -51,21 +51,21 @@ test('filtered canonical snapshots preserve values, empty lists and reset period
   const db=await creditDatabase(t);
   await seedCredit(db,'2026-08-01','甲银行',{effective_date:'2026-08-01',expiry_date:'2026-08-31',other_used:.000001});
   await seedCredit(db,'2026-08-01','乙银行');
-  await db.query("SELECT credit.append_diff('2026-08-10','甲银行','{\"effective_date\":\"2026-09-01\",\"expiry_date\":\"2026-09-30\"}',NULL,'renewal')");
-  const full=(await db.query("SELECT to_jsonb(s) AS data FROM credit.state_as_of('2026-08-15') s WHERE institution_name='甲银行'")).rows;
-  const filtered=(await db.query("SELECT to_jsonb(s) AS data FROM credit.state_as_of('2026-08-15',ARRAY['甲银行','甲银行']) s")).rows;
+  await db.query("SELECT credit.append_entry('2026-08-10','甲银行','{\"effective_date\":\"2026-09-01\",\"expiry_date\":\"2026-09-30\"}',NULL,'renewal')");
+  const full=(await db.query("SELECT to_jsonb(s) AS data FROM credit.entry_as_of('2026-08-15') s WHERE institution_name='甲银行'")).rows;
+  const filtered=(await db.query("SELECT to_jsonb(s) AS data FROM credit.entry_as_of('2026-08-15',ARRAY['甲银行','甲银行']) s")).rows;
   assert.deepEqual(filtered,full);
-  assert.equal((await db.query("SELECT * FROM credit.state_as_of('2026-08-15',ARRAY[]::text[])")).rows.length,0);
-  assert.deepEqual((await db.query("SELECT to_jsonb(s) AS data FROM credit.state_as_of('2026-08-15',NULL::text[]) s ORDER BY institution_name")).rows,
-    (await db.query("SELECT to_jsonb(s) AS data FROM credit.state_as_of('2026-08-15') s ORDER BY institution_name")).rows);
+  assert.equal((await db.query("SELECT * FROM credit.entry_as_of('2026-08-15',ARRAY[]::text[])")).rows.length,0);
+  assert.deepEqual((await db.query("SELECT to_jsonb(s) AS data FROM credit.entry_as_of('2026-08-15',NULL::text[]) s ORDER BY institution_name")).rows,
+    (await db.query("SELECT to_jsonb(s) AS data FROM credit.entry_as_of('2026-08-15') s ORDER BY institution_name")).rows);
   let states=await loadCreditStates(db,[{date:'2026-08-15',names:['甲银行']}]);
-  assert.deepEqual(states[0].previous_period,{effectiveDate:'2026-08-01',expiryDate:'2026-08-31'});
+  assert.equal(states[0].data.expiry_date,'2026-09-30');
   for(const date of ['2026-08-15','2026-09-01']) assert.deepEqual(buildCreditReport(await loadCreditData(db,date)).summary,(await loadCreditReport(db,date)).summary);
-  await db.query("SELECT credit.append_diff('2026-08-16','甲银行','{\"status\":\"revoked\"}',NULL,'revocation')");
-  await db.query("SELECT credit.append_diff('2026-08-17','甲银行','{\"status\":\"approved\"}',NULL,'new')");
+  await db.query("SELECT credit.append_entry('2026-08-16','甲银行','{\"status\":\"revoked\",\"expiry_date\":\"1970-01-01\"}',NULL,'revocation')");
+  await db.query("SELECT credit.append_entry('2026-08-17','甲银行','{\"status\":\"approved\",\"expiry_date\":\"2026-09-30\"}',NULL,'new')");
   states=await loadCreditStates(db,[{date:'2026-08-18',names:['甲银行']}]);
-  assert.equal(states[0].previous_period,null);
-  assert.equal((await loadCreditReport(db,'2026-08-18')).institutions.find(row=>row.institutionName==='甲银行').effectiveStatus,'pending');
+  assert.equal(states[0].data.expiry_date,'2026-09-30');
+  assert.equal((await loadCreditReport(db,'2026-08-18')).institutions.find(row=>row.institutionName==='甲银行').effectiveStatus,'approved');
 });
 
 

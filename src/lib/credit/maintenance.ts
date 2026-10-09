@@ -49,7 +49,7 @@ export function creditMaintenanceChanges(row: CreditInstitutionView, draft: Cred
     const previous = row[field] ?? (field === 'totalLimit' ? null : '');
     if (draft[field] !== previous) (institution as Record<string, unknown>)[field] = draft[field];
   }
-  if (row.status === 'applying' && draft.status === 'approved') institution.status = 'approved';
+  if (!draft.expiryDate && row.status !== draft.status) institution.status = draft.status;
   const items: CreditItemChanges[] = [];
   for (const type of creditItemTypes) {
     const before = row.items.find(item => item.type === type);

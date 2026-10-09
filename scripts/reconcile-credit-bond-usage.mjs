@@ -12,7 +12,7 @@ const db=new Client({connectionString:process.env.DATABASE_URL,application_name:
 try {
   await db.connect();await db.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
   const report=await loadCreditReport(db,date);
-  const reference=(await db.query('SELECT institution_name,bond_investment_used FROM credit.state_as_of($1)',[date])).rows;
+  const reference=(await db.query('SELECT institution_name,bond_investment_used FROM credit.entry_as_of($1)',[date])).rows;
   const rows=report.institutions.map(institution=>{
     const item=institution.items.find(item=>item.type==='bond_investment');
     return {institutionName:institution.institutionName,status:institution.status,linkedClientCount:item.linkedClientCount,

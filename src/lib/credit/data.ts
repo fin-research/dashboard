@@ -3,7 +3,7 @@ import type {CreditItemType} from './types.ts';
 export type CreditFactRow=Record<string,unknown>&{institution_name:string;effective_on:string;type:string;expiry_date?:string|null;updated_at?:string;created_at?:string};
 export type CreditClientLink={institution_name:string;id:string;name:string};
 export type CreditUsageRow={date:string;institution_name:string;item_type:CreditItemType;amount:number};
-export type CreditDataState={date:string;position?:number;data:Record<string,unknown>&{institution_name:string;created_at?:string;updated_at?:string};previous_period:{effectiveDate:string;expiryDate:string}|null};
+export type CreditDataState={date:string;position?:number;data:Record<string,unknown>&{institution_name:string;created_at?:string;updated_at?:string}};
 /** Canonical database facts; no formatted report rows or derived totals. */
 export interface CreditDataset {
   availableDates:string[];reportDate:string;previousDate:string|null;calendarMonth:string;

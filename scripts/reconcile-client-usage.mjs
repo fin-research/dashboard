@@ -12,7 +12,7 @@ try {
   report.coverage=(await db.query(`SELECT count(*) AS debt_count,count(client_id) AS linked_count,
     count(*) FILTER(WHERE counterparty IS NOT NULL AND client_id IS NULL) AS named_unlinked_count,
     count(*) FILTER(WHERE counterparty IS NULL) AS missing_name_count FROM financing.debt`)).rows[0];
-  const dates=(await db.query("SELECT DISTINCT effective_on::text AS date FROM credit.diff ORDER BY date")).rows.map(row=>row.date);
+  const dates=(await db.query("SELECT DISTINCT report_date::text AS date FROM credit.entry ORDER BY date")).rows.map(row=>row.date);
   report.reconciliation=[];
   for(const date of dates){
     const snapshot=await loadCreditReport(db,date);

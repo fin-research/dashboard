@@ -1,17 +1,17 @@
 import { creditItemTypes, type ParsedCreditInstitution } from './types.ts';
 import type { CreditInstitutionUpdateInput } from './update.ts';
 
-export const institutionDiffFields = {
+export const institutionEntryFields = {
   institutionType: 'institution_type', confidentialityStatus: 'confidentiality_status', status: 'status',
   totalLimit: 'total', effectiveDate: 'effective_date', expiryDate: 'expiry_date',
   bankOffice: 'bank_office', applyingDepartment: 'applying_department', handler: 'handler',
   detail: 'detail', bondPreference: 'bond_preference', notes: 'notes',
 } as const;
 
-export function toCreditDiffPatch(changes: CreditInstitutionUpdateInput['changes']): Record<string, unknown> {
+export function toCreditEntryPatch(changes: CreditInstitutionUpdateInput['changes']): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(changes.institution ?? {})) {
-    const column = institutionDiffFields[key as keyof typeof institutionDiffFields];
+    const column = institutionEntryFields[key as keyof typeof institutionEntryFields];
     if (column) patch[column] = value;
   }
   for (const item of changes.items ?? []) {
@@ -26,8 +26,8 @@ export function toCreditDiffPatch(changes: CreditInstitutionUpdateInput['changes
 }
 
 export function toCreditImportPatch(institution: ParsedCreditInstitution): Record<string, unknown> {
-  return { ...toCreditDiffPatch({
-    institution: Object.fromEntries(Object.keys(institutionDiffFields).map(key =>
+  return { ...toCreditEntryPatch({
+    institution: Object.fromEntries(Object.keys(institutionEntryFields).map(key =>
       [key, institution[key as keyof ParsedCreditInstitution] ?? null])),
     items: creditItemTypes.map(type => {
       const item = institution.items.find(item => item.type === type);
@@ -35,5 +35,5 @@ export function toCreditImportPatch(institution: ParsedCreditInstitution): Recor
         ...((type === 'bond_investment' || type === 'other') ? { details: item?.details ?? null } : {}),
         ...(type === 'yield_certificate' || type === 'interbank_lending' ? {} : { usedAmount: item?.usedAmount ?? null }) };
     }),
-  }), bond_investment_used: institution.items.find(item => item.type === 'bond_investment')?.usedAmount ?? null };
+  }), ...(institution.status==='revoked' ? {expiry_date:'1970-01-01'} : {}), bond_investment_used: institution.items.find(item => item.type === 'bond_investment')?.usedAmount ?? null };
 }

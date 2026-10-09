@@ -3,6 +3,7 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import { NativeSelect } from '$lib/components/ui/native-select/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { creditEffectiveStatus } from '../credit/validity.ts';
   import { permissionVisibility } from '../permission-visibility.ts';
   import { globalMessages } from '../global-messages.ts';
   import { updateCreditInstitution } from '../credit/client.ts';
@@ -34,7 +35,7 @@
   async function save(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     if (!canEdit || saving) return;
-    if (draft.effectiveDate && draft.expiryDate && draft.effectiveDate > draft.expiryDate) {
+    if (draft.effectiveDate && draft.expiryDate && draft.expiryDate !== '1970-01-01' && draft.effectiveDate > draft.expiryDate) {
       globalMessages.error('授信到期日不能早于生效日');
       return;
     }
@@ -66,10 +67,10 @@
   <div class="tr-credit-editor-grid">
     <label><span>机构性质</span><Input maxlength={100} bind:value={draft.institutionType} disabled={!canEdit || saving} /></label>
     <label><span>状态</span>
-      {#if institution.status === 'applying'}
+      {#if !draft.expiryDate}
         <NativeSelect bind:value={draft.status} disabled={!canEdit || saving}><option value="applying">申请中</option><option value="approved">已获批</option></NativeSelect>
       {:else}
-        <Input value={institution.status === 'approved' ? '已获批' : '已撤销'} disabled />
+        <Input value={creditEffectiveStatus({reportDate,expiryDate:draft.expiryDate,status:draft.status}) === 'approved' ? '已获批' : draft.expiryDate === '1970-01-01' ? '已撤销' : '申请中'} disabled />
       {/if}
     </label>
     <label><span>保密协议</span><NativeSelect value={draft.confidentialityStatus ? 'true' : 'false'} disabled={!canEdit || saving}

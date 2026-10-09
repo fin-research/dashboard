@@ -74,7 +74,7 @@ test('credit calendar supports independent multiselect and retains filters acros
   });
   await page.goto('/credit-workbench/calendar');
   const visible=page.locator('.tr-credit-calendar-event strong');
-  await expect(visible).toHaveCount(10);
+  await expect(visible).toHaveCount(9);
   const trigger=label=>page.getByRole('button',{name:new RegExp(`^${label}：`)});
   async function toggle(group,label){
     const button=trigger(group);

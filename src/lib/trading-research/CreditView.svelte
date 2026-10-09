@@ -320,14 +320,12 @@
       approved: "已获批",
       applying: "申请中",
       revoked: "已撤销",
-      expired: "已到期",
-      pending: "未生效",
     }[status];
   }
 
   function statusTone(status: CreditEffectiveStatus): "success" | "warning" | "neutral" {
     if (status === "approved") return "success";
-    if (status === "applying" || status === "expired") return "warning";
+    if (status === "applying") return "warning";
     return "neutral";
   }
 

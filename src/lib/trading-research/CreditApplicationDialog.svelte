@@ -40,7 +40,7 @@
   let errorText = $state('');
   const selected = $derived(institutions.find(row => row.institutionName === institutionName));
   const eligible = $derived(institutions.filter(row =>
-    operation === 'revocation' ? row.status !== 'revoked' : row.status === 'approved'));
+    operation === 'increase' ? row.status === 'approved' : row.status !== 'revoked'));
 
   function blankDraft(): Draft {
     return {
@@ -74,7 +74,7 @@
   function selectOperation(next: CreditApplicationType): void {
     operation = next;
     institutionName = next === 'new' ? '' : institutions.find(row =>
-      next === 'revocation' ? row.status !== 'revoked' : row.status === 'approved')?.institutionName ?? '';
+      next === 'increase' ? row.status === 'approved' : row.status !== 'revoked')?.institutionName ?? '';
     draft = copyDraft(institutions.find(row => row.institutionName === institutionName));
     confirmedRevocation = false;
     errorText = '';
@@ -113,6 +113,7 @@
       } else if (operation === 'increase') {
         institution.totalLimit = draft.totalLimit;
       } else if (operation === 'revocation') {
+        institution.expiryDate = '1970-01-01';
         institution.status = 'revoked';
       }
       if (draft.notes !== (original.notes ?? '')) institution.notes = draft.notes;
@@ -134,7 +135,7 @@
     if (submitting) return;
     if (!institutionName.trim() || !businessDate) { errorText = '请选择机构并填写业务生效日'; return; }
     if (operation === 'new' && !draft.institutionType.trim()) { errorText = '请填写机构性质'; return; }
-    if (operation === 'renewal' && (!selected?.expiryDate || !draft.expiryDate || draft.expiryDate <= selected.expiryDate)) {
+    if (operation === 'renewal' && (!draft.expiryDate || selected?.expiryDate && draft.expiryDate <= selected.expiryDate)) {
       errorText = '新到期日须晚于原到期日'; return;
     }
     if (operation === 'increase' && (draft.totalLimit == null || draft.totalLimit <= (selected?.totalLimit ?? 0))) {
@@ -183,7 +184,7 @@
         {/if}
         {#if operation === 'new'}
           <label><span>机构性质</span><Input required maxlength={100} bind:value={draft.institutionType} /></label>
-          <label><span>审批状态</span><NativeSelect bind:value={draft.status}><option value="approved">已获批</option><option value="applying">申请中</option></NativeSelect></label>
+          <label><span>审批状态</span>{#if !draft.expiryDate}<NativeSelect bind:value={draft.status}><option value="approved">已获批</option><option value="applying">申请中</option></NativeSelect>{:else}<Input value={businessDate <= draft.expiryDate ? '已获批' : '申请中'} disabled />{/if}</label>
           <label><span>保密协议</span><NativeSelect value={draft.confidentialityStatus ? 'true' : 'false'}
             onchange={event => draft.confidentialityStatus = (event.currentTarget as HTMLSelectElement).value === 'true'}>
             <option value="true">已签署</option><option value="false">未签署</option>
