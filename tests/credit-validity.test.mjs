@@ -1,3 +1,4 @@
+import {buildCreditReport} from '../src/lib/credit/build-report.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -24,7 +25,7 @@ test('跨日到期无需写入即可退出汇总，续作日期恢复有效并�
   assert.ok(after.calendarEvents.some(e=>e.date==='2026-09-10'&&e.kind==='expiry'));
   assert.equal((await db.query('SELECT count(*) n FROM credit.diff')).rows[0].n,count);
   const renewed=await saveCreditInstitution(db,{operation:'renewal',reportDate:'2026-09-12',institutionName:'甲银行',changes:{institution:{effectiveDate:'2026-09-12',expiryDate:'2027-09-11'}}},'auth0|test');
-  assert.equal(renewed.institution.effectiveStatus,'approved');assert.equal(renewed.summary.totalLimit,10);
+  assert.equal(buildCreditReport(renewed.data).institutions[0].effectiveStatus,'approved');assert.equal(buildCreditReport(renewed.data).summary.totalLimit,10);
   assert.equal((await loadCreditReport(db,'2026-09-11')).summary.totalLimit,0);
   assert.equal((await loadCreditReport(db,'2026-09-12')).weeklyNews.filter(e=>e.eventType==='renewal').length,1);
 });

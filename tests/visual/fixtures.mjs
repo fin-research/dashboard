@@ -1,3 +1,4 @@
+import {creditDataFixture} from '../helpers/credit-data-fixture.mjs';
 import { buildReportData } from "../../src/market-report-resources.ts";
 import { financingModel } from './report-fixtures.mjs';
 import { readFileSync } from 'node:fs';
@@ -17,9 +18,9 @@ export const credit = {
   institutions: ['银行甲', '银行乙'].map((institutionName, i) => ({
     reportDate: today, institutionName, institutionType: '商业银行', status: 'approved',
     confidentialityStatus: false, totalLimit: 15, totalUsed: 4, totalRemaining: 11,
-    availableAmount: 11, utilization: 26.67, effectiveDate: '2026-01-01', expiryDate: i ? '2027-09-15' : '2026-09-30', items: [], clients: [], notes: null,
+    availableAmount: 11, utilization: 26.67, effectiveDate: i ? '2026-01-01' : today, expiryDate: i ? '2027-09-15' : '2026-09-30', items: [], clients: [{id:'fixture-client-'+i,name:'测试关联客户'}], notes: null,
   })),
-  weeklyNews: [], recentApprovals: [], limitChanges: [], usageChanges: [],
+  weeklyNews: [], recentApprovals: [{reportDate:today,institutionName:'银行甲',eventType:'new',previousAmount:0,currentAmount:15,previousEffectiveDate:null,currentEffectiveDate:today,previousExpiryDate:null,currentExpiryDate:'2026-09-30'}], limitChanges: [], usageChanges: [],
   calendarEvents: [
     { id: 'new', type: 'added', kind: 'new', institutionName: '银行甲', label: '新增授信15亿元', date: '2026-09-15', status: 'completed', statusLabel: '已生效' },
     { id: 'expiry', type: 'expiry', kind: 'expiry', institutionName: '银行乙', label: '授信到期', date: '2026-09-30', status: 'planned', statusLabel: '待办理' },
@@ -81,7 +82,7 @@ export async function mockResources(page, { creditError = false, ledgerEmpty = f
     }
     if (url.pathname === '/api/credit') {
       if (creditError) return route.fulfill({ status: 503, json: { error: '授信报表暂不可用' } });
-      body = credit;
+      body = creditDataFixture(credit);
     } else if (url.pathname === '/api/market-report') body = marketSnapshot;
     else if (url.pathname === '/api/financing-model') body = financingModel;
     else if (url.pathname === '/api/financing-model/decisions') body = [];

@@ -52,7 +52,7 @@ export function buildCreditReport(data:CreditDataset):CreditReportResponse {
   for(const {institution_name,id,name} of links){const group=clientsByInstitution.get(institution_name)??[];group.push({id,name});clientsByInstitution.set(institution_name,group);}
   const usageByKey=new Map(usage.map(row=>[`${row.date}:${row.institution_name}:${row.item_type}`,row.amount]));
   const cache = new Map<string,{states:Map<string,DiffRow>;periods:Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>}>();
-  for (const row of savedStates) {
+  for (const row of [...savedStates].sort((a,b)=>a.date.localeCompare(b.date)||(a.position??0)-(b.position??0))) {
     const saved = cache.get(row.date) ?? {states:new Map<string,DiffRow>(),periods:new Map<string,NonNullable<CreditInstitutionView['previousPeriod']>[]>()};
     const state = row.data as DiffRow;
     saved.states.set(state.institution_name,state);

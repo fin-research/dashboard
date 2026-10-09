@@ -28,7 +28,7 @@ const scenes = [
   ['trading', '/trading-research/trading', '实时交易记录'],
   ['workflow', '/trading-research/workflow', '编辑模式'],
   ['credit', '/credit-workbench', '银行甲'],
-  ['calendar', '/credit-workbench/calendar', '新增授信15亿元'],
+  ['calendar', '/credit-workbench/calendar', '授信新增 · 15亿元'],
   ['credit-weekly', '/credit-workbench/weekly', '银行甲'],
   ['research', '/trading-research/research', '宏观指标'],
   ['secondary', '/trading-research/secondary-bond-pool', '测试国债'],
