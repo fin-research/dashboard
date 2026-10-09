@@ -2,7 +2,7 @@ import type { CreditSummaryView } from '../credit/types.ts';
 import type { DatabaseClient } from './postgres.ts';
 
 export type CreditStateRequest = { date: string; names: string[] | null; include_details?: boolean };
-export type CreditStateRow = { date: string; data: Record<string, unknown>;
+export type CreditStateRow = { date: string; data: import('../credit/data.ts').CreditDataState['data'];
   previous_period: { effectiveDate: string; expiryDate: string } | null };
 
 // Field inheritance belongs to the existing SQL snapshot. Only request the dates
@@ -11,8 +11,9 @@ const stateSql = (summaryOnly = false) => `
   WITH requested AS MATERIALIZED (
     SELECT r.date::date AS date,r.names,coalesce(r.include_details,true) AS include_details FROM jsonb_to_recordset($1::jsonb) r(date text,names text[],include_details boolean)
   ), states AS MATERIALIZED (
-    SELECT r.date,CASE WHEN r.include_details THEN to_jsonb(s) ELSE to_jsonb(s) -
-      '{notes,bank_office,applying_department,handler,detail,bond_preference,updated_at,created_at,created_by,bond_investment_used}'::text[] END AS data FROM requested r
+    SELECT r.date,(SELECT jsonb_object_agg(field.key,field.value) FROM jsonb_each(to_jsonb(s)) field
+      WHERE field.key=ANY('{institution_name,institution_type,confidentiality_status,status,total,effective_date,expiry_date,bond_investment_limit,bond_investment_detail,bond_investment_secondary_used,yield_certificate_limit,legal_overdraft_limit,legal_overdraft_used,interbank_lending_limit,other_detail,other_used}'::text[])
+        OR r.include_details AND field.key=ANY('{notes,bank_office,applying_department,handler,detail,bond_preference,updated_at,created_at}'::text[])) AS data FROM requested r
     CROSS JOIN LATERAL credit.state_as_of(r.date,r.names) s
     WHERE r.names IS NULL OR s.institution_name=ANY(r.names)
   ), term_changes AS MATERIALIZED (
