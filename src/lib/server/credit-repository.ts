@@ -1,3 +1,4 @@
+import { amountNumber, amountsDiffer, secondaryUsageFromYuan, subtractAmounts } from '../credit/amounts.ts';
 import { creditItemLabels, creditItemTypes, type CreditAmountChange, type CreditCalendarEvent,
   type CreditEventType, type CreditInstitutionUpdateResponse, type CreditInstitutionView,
   type CreditItemType, type CreditReportResponse, type CreditSummaryView,
@@ -11,7 +12,6 @@ import { creditEffectiveStatus, isCreditEffective } from '../credit/validity.ts'
 import type { DatabaseClient } from './postgres.ts';
 import { loadCreditStates } from './credit-snapshots.ts';
 
-const AMOUNT_TOLERANCE = 0.000001;
 const creditDateFormatter = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});
 export class CreditDatabaseError extends Error {
   readonly status: number;
@@ -40,10 +40,10 @@ export async function persistCreditWorkbook(client: DatabaseClient, input: Persi
     const linked = new Set((await client.query<{institution_name:string}>(
       'SELECT DISTINCT institution_name FROM credit.institution_client')).rows.map(row => row.institution_name));
     const residuals = parsed.institutions.filter(row => linked.has(row.institutionName)).map(row => ({
-      name: row.institutionName, patch: { bond_investment_secondary_used: sumAmounts([
+      name: row.institutionName, patch: { bond_investment_secondary_used: secondaryUsageFromYuan(
         row.items.find(item => item.type === 'bond_investment')?.usedAmount ?? 0,
-        -Number(primary.find(item => item.institution_name === row.institutionName)?.amount ?? 0)/1e8,
-      ]) },
+        primary.find(item => item.institution_name === row.institutionName)?.amount ?? '0',
+      ) },
     }));
     if (parsed.institutions.some(row => !linked.has(row.institutionName) && (row.items.find(item => item.type === 'bond_investment')?.usedAmount ?? 0) !== 0)) {
       throw new CreditDatabaseError(400,'债券投资非零的机构缺少客户关联，无法登记二级买卖差额');
@@ -67,7 +67,7 @@ export async function persistCreditWorkbook(client: DatabaseClient, input: Persi
         const actual = institution.items.find(item => item.type === type)?.usedAmount;
         const imported = source.items.find(item => item.type === type)?.usedAmount;
         if (actual == null) warnings.push(`${institution.institutionName}：客户关联缺失，${creditItemLabels[type]}已用无法计算，请维护客户关联`);
-        else if (different(actual,imported ?? 0)) warnings.push(`${institution.institutionName}：${creditItemLabels[type]}原表${imported ?? 0}亿元，融资台账${actual}亿元，差额${actual-(imported ?? 0)}亿元；使用融资台账金额`);
+        else if (different(actual,imported ?? 0)) warnings.push(`${institution.institutionName}：${creditItemLabels[type]}原表${imported ?? 0}亿元，融资台账${actual}亿元，差额${subtractAmounts(actual,imported ?? 0)}亿元；使用融资台账金额`);
       }
     }
     await client.query('COMMIT');
@@ -149,13 +149,13 @@ export async function loadCreditData(client: DatabaseClient, requestedDate: stri
     const names = [...usageEventRows.filter(row=>row.date===date),...rows.filter(row=>row.effective_on===date)].map(row=>row.institution_name);
     addRequest(date,names); addRequest(addDays(date,-1),names);
   }
-  const usage = (await client.query<UsageRow>(`SELECT to_char(d.date,'YYYY-MM-DD') AS date,m.institution_name,
+  const usage = (await client.query<Omit<UsageRow,'amount'> & {amount:string}>(`SELECT to_char(d.date,'YYYY-MM-DD') AS date,m.institution_name,
     CASE u.debt_type WHEN '收益凭证' THEN 'yield_certificate' ELSE 'interbank_lending' END AS item_type,
-    (sum(u.amount)/100000000)::float8 AS amount
+    sum(u.amount)/100000000 AS amount
     FROM jsonb_to_recordset($1::jsonb) d(date date,names text[]) CROSS JOIN LATERAL financing.credit_usage_as_of(d.date) u
     JOIN credit.institution_client m ON m.client_id=u.client_id WHERE (d.names IS NULL OR m.institution_name=ANY(d.names)) AND ($2::text IS NULL OR m.institution_name=$2) GROUP BY d.date,m.institution_name,u.debt_type
-    UNION ALL SELECT to_char(d.date,'YYYY-MM-DD'),u.institution_name,'bond_investment',(u.amount/100000000)::float8
-    FROM jsonb_to_recordset($1::jsonb) d(date date,names text[]) CROSS JOIN LATERAL credit.bond_primary_usage_as_of(d.date) u WHERE (d.names IS NULL OR u.institution_name=ANY(d.names)) AND ($2::text IS NULL OR u.institution_name=$2)`,[JSON.stringify(financeDates.map(date => ({date,names:requested.get(date) === null ? null : [...(requested.get(date) ?? [])]}))),selectedName ?? null])).rows;
+    UNION ALL SELECT to_char(d.date,'YYYY-MM-DD'),u.institution_name,'bond_investment',u.amount/100000000
+    FROM jsonb_to_recordset($1::jsonb) d(date date,names text[]) CROSS JOIN LATERAL credit.bond_primary_usage_as_of(d.date) u WHERE (d.names IS NULL OR u.institution_name=ANY(d.names)) AND ($2::text IS NULL OR u.institution_name=$2)`,[JSON.stringify(financeDates.map(date => ({date,names:requested.get(date) === null ? null : [...(requested.get(date) ?? [])]}))),selectedName ?? null])).rows.map(row => ({...row,amount:amountNumber(row.amount)}));
   const savedStates = await loadCreditStates(client,[...requested].map(([date,names])=>({date,names:names === null ? null : [...names],include_details:date===reportDate})));
   return {availableDates,reportDate,previousDate,calendarMonth:calendarMonth??reportDate.slice(0,7),calendarStart,calendarEnd,
     sixMonthStart:sixMonths.toISOString().slice(0,10),rows,links,usageEventRows,usage,savedStates};
@@ -241,5 +241,4 @@ export async function saveCreditInstitution(client: DatabaseClient,input: Credit
 
 function addDays(date:string,days:number):string { const value=new Date(`${date}T00:00:00Z`);value.setUTCDate(value.getUTCDate()+days);return value.toISOString().slice(0,10); }
 function databaseDate(value: unknown): string { return value instanceof Date ? value.toISOString().slice(0,10) : String(value).slice(0,10); }
-function different(left:number,right:number):boolean {return Math.abs(left-right)>AMOUNT_TOLERANCE;}
-function sumAmounts(values:Array<number|null>):number {return Math.round(values.reduce<number>((sum,value)=>sum+(value??0),0)*1_000_000)/1_000_000;}
+function different(left:number,right:number):boolean {return amountsDiffer(left,right);}

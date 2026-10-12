@@ -1,3 +1,4 @@
+import { amountsDiffer, amountSumExceedsTolerance, subtractAmounts as differenceAmount, sumAmounts } from './amounts.ts';
 import { SSF, read, utils } from "xlsx";
 
 import {
@@ -11,7 +12,6 @@ import {
 } from "./types.ts";
 
 const SOURCE_SHEET = "授信一览表" as const;
-const AMOUNT_TOLERANCE = 0.000001;
 
 const itemColumns: Record<CreditItemType, {
   limit: number | null;
@@ -103,11 +103,11 @@ export function parseCreditWorkbook(
       totalLimit != null &&
       reportedTotalUsed != null &&
       reportedRemaining != null &&
-      Math.abs(totalLimit - reportedTotalUsed - reportedRemaining) > AMOUNT_TOLERANCE
+      amountSumExceedsTolerance([totalLimit, -reportedTotalUsed, -reportedRemaining])
     ) {
       warnings.push(`第${sourceRow}行“${institutionName}”总额、已用和剩余不勾稽`);
     }
-    if (reportedTotalUsed != null && Math.abs(reportedTotalUsed - totalUsed) > AMOUNT_TOLERANCE) {
+    if (reportedTotalUsed != null && amountsDiffer(reportedTotalUsed, totalUsed)) {
       warnings.push(`第${sourceRow}行“${institutionName}”总已用与分项已用不一致：原表${reportedTotalUsed}亿元，分项合计${totalUsed}亿元，差额${sumAmounts([reportedTotalUsed, -totalUsed])}亿元；按分项合计导入`);
     }
 
@@ -260,17 +260,12 @@ function cleanText(value: unknown): string | null {
 
 function subtractAmounts(left: number | null, right: number | null): number | null {
   if (left == null || right == null) return null;
-  return left - right;
+  return differenceAmount(left, right);
 }
 
 function availableAmount(limit: number | null, used: number | null): number | null {
   if (limit == null) return null;
-  return limit - (used ?? 0);
-}
-
-function sumAmounts(values: Array<number | null>): number {
-  const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  return Math.round(total * 1_000_000) / 1_000_000;
+  return differenceAmount(limit, used ?? 0);
 }
 
 function cellAddress(row: number, column: number): string {

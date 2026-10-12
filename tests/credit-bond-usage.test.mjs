@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { creditDatabase, seedCredit, finishCreditMigrations } from './helpers/credit-database.mjs';
-import { loadCreditReport, persistCreditWorkbook, saveCreditInstitution } from '../src/lib/server/credit-repository.ts';
+import { loadCreditData, loadCreditReport, persistCreditWorkbook, saveCreditInstitution } from '../src/lib/server/credit-repository.ts';
+import { creditMaintenanceAmounts, creditMaintenanceDraft } from '../src/lib/credit/maintenance.ts';
 import { creditInstitutionUpdateSchema } from '../src/lib/credit/update.ts';
 
 async function allocate(db,name,amount,start,end,client='甲银行',closure=null) {
@@ -13,6 +14,38 @@ async function allocate(db,name,amount,start,end,client='甲银行',closure=null
   return id;
 }
 const bond=r=>r.institutions[0].items.find(i=>i.type==='bond_investment');
+
+test('numeric 金额从融资截面到授信详情保持一致，建信理财已用为22.2',async t=>{
+  const db=await creditDatabase(t);
+  await seedCredit(db,'2026-08-01','甲银行',{total:101.25,bond_investment_limit:47.22,bond_investment_secondary_used:-0.9});
+  await allocate(db,'建信金额回归',23.1,'2026-08-01','2027-08-01');
+  const report=await loadCreditReport(db,'2026-08-21');
+  assert.equal(bond(report).usedAmount,22.2);
+  assert.equal(bond(report).remainingAmount,25.02);
+  const institution=report.institutions[0];
+  const amounts=creditMaintenanceAmounts(institution,creditMaintenanceDraft(institution));
+  assert.equal(amounts.used.bond_investment,bond(report).usedAmount);
+  assert.equal(amounts.remaining.bond_investment,bond(report).remainingAmount);
+  assert.equal(amounts.totalUsed,institution.totalUsed);
+  assert.equal(amounts.available,institution.availableAmount);
+  assert.equal(institution.availableAmount,79.05);
+});
+
+test('融资 numeric 元换算亿元不提前截断原始一级存续金额',async t=>{
+  const db=await creditDatabase(t);await seedCredit(db,'2026-08-01','甲银行',{});
+  const id=await allocate(db,'保留分',1,'2026-08-01','2027-08-01');
+  await db.query('UPDATE financing.bond_investors SET amount=$1 WHERE bond_id=$2',['100000001.01',id]);
+  const data=await loadCreditData(db,'2026-08-21');
+  assert.equal(data.usage.find(row=>row.date==='2026-08-21'&&row.item_type==='bond_investment').amount,1.0000000101);
+});
+
+test('原始一级存续变化101元仍生成日历和周比较，不被六位舍入漏掉',async t=>{
+  const db=await creditDatabase(t);await seedCredit(db,'2026-08-01','甲银行',{});
+  await allocate(db,'小额一级变化',0.00000101,'2026-08-21','2027-08-21');
+  const report=await loadCreditReport(db,'2026-08-21');
+  assert.equal(report.calendarEvents.filter(e=>e.date==='2026-08-21'&&e.usageComponent==='primary').length,1);
+  assert.ok(report.usageChanges.some(change=>change.details.some(detail=>detail.includes('一级发行'))));
+});
 
 test('一级存续按实际投资人汇总，发行、到期和提前结清触发已用变化，二级买卖可为负',async t=>{
   const db=await creditDatabase(t);await seedCredit(db,'2026-08-01','甲银行',{bond_investment_secondary_used:-0.5});
