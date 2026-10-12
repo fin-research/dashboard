@@ -32,7 +32,7 @@ Data 错误保留安全诊断字段。市场点评 Workflow 对失败资源独�
 
 研究辅助浏览器只调用 Dashboard `GET /api/economic-indicators` 读取 Neon。Choice `GET /data/choice/edb` 与 DM `GET /data/cfets-histories` 只供首次本地全历史回填和每日定时增量任务使用，页面加载不消耗上游查询额度。
 
-市场点评所有日期只通过 `GET /api/market-report` 读取定稿。缺省日期按上海 17:00 选择 T-1 或当日。缺失明确返回错误，不回退到 Data。生成、重试与归档由 `market-briefing` Workflow 承担。
+市场点评所有日期只通过 `GET /api/market-report` 读取定稿。默认日期按上海 17:00 选择 T-1 或当日。缺失明确返回错误，不回退到 Data。生成、重试与归档由 `market-briefing` Workflow 承担。
 
 终态通知由 Messenger 订阅平台事件投递。旧写接口兼容不代表新版前端生成入口。具体规则见[市场点评](modules/market-briefing.md)。
 

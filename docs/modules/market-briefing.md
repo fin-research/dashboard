@@ -45,7 +45,7 @@
 
 ## 验证与恢复
 
-`tests/market-report.test.mjs` 直接执行无 date 的 GET handler，覆盖 Choice 不可达/503/异常日历仍读取准确 R2 定稿、缺失不回退、17:00 切日及未来年度无需日历配置。`tests/report-date.test.mjs` 覆盖周末全天、节假日按工作日选日、跨年与闰日。浏览器固定报告夹具只验证展示与交互，不能证明真实 DATA/Choice/R2 可用。发布后须程序化请求生产 `/api/market-report` 及显式日期接口核对 HTTP 状态和 `report_date`。
+`tests/market-report.test.mjs` 直接执行无 date 的 GET handler，覆盖 Choice 不可达/503/异常日历仍读取准确 R2 定稿、缺失不回退、17:00 切日及未来年度无需日历配置。`tests/report-date.test.mjs` 覆盖周末全天、节假日按工作日选日、跨年与闰日。浏览器固定报告夹具只验证展示与交互。不能证明真实 DATA/Choice/R2 可用。发布后须程序化请求生产 `/api/market-report` 及显式日期接口核对 HTTP 状态和 `report_date`。
 
 Cloudflare 流程图由静态语法分析生成，并不回放实际执行。`completeAll(...).then(...)` 曾使解析器把依赖步骤全部标为 `starts=1`，因此 Workflow 编排使用原生 Promise 批次与直接 await。发布后通过 `GET /accounts/{account}/workflows/market-briefing/versions/{version}/graph` 核对唯一并行组恰有七个模块 step，及其后 AI、归档两个串行 step。测试通过不能替代平台图核验。见 [Cloudflare 流程图文档](https://developers.cloudflare.com/workflows/build/visualizer/)。
 
@@ -63,7 +63,9 @@ Workflow 结果通知由 Messenger 订阅平台事件。渠道尝试和人工重
 
 回放必须先确认资料截止时间，历史归档补充行情的试验与固定新闻试验分开统计。
 
-字数和无条件词只证明形式。内容评审须同时检查事实/时序、具体主因、传导、判断与精炼，不能把盘后复盘时间当作其中事件时间，不能忽略材料末尾的行情卡，也不能要求模型复刻人工稿的输入外信息。出现硬事实错误的候选不作为完成验收。人工修改仍通过原导出归档路径。后续对比应同时保存所用log id与修改稿，日期相同并不证明修改起点相同。
+字数和无条件词只证明形式。内容评审须同时检查事实/时序、具体主因、传导、判断与精炼。此时不能把盘后复盘时间当作其中事件时间。此时不能忽略材料末尾的行情卡，也不能要求模型复刻人工稿的输入外信息。
+
+出现硬事实错误的候选不作为完成验收。人工修改仍通过原导出归档路径。后续对比应同时保存所用log id与修改稿，日期相同并不证明修改起点相同。
 
 ## 调度入口
 

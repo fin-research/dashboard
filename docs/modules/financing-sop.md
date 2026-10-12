@@ -18,7 +18,7 @@
 - `sop_templates` 与 `sop_nodes` 定义模板和相对日期节点。`default_offset_days` 是计划/完成偏移。`default_start_offset_days` 为空表示时点，非空表示时段启动偏移。起止均相对计划簿记日 T，沿用自然日口径，范围 -3650 至 3650，启动不得晚于完成，可配置同日时段。
 - `reminder_rules` 保存规则本体，`reminder_rule_nodes` 保存规则与 SOP 节点的多对多关联，`reminder_rule_periods` 保存可排序的多个小时级提前周期。
 - `reminder_deliveries` 以 `(rule_id, target_id, period_id)` 去重，同时保存 `scheduled_for` 和实际发送结果。
-- 项目删除必须使用已有事务服务，同步清理任务与提醒，不在页面拼接多次删除。
+- 项目删除必须使用已有事务服务，同步清理任务与提醒，不在页面串联多次删除请求。
 
 ## 页面：SOP
 
