@@ -4,8 +4,9 @@
 > **Generated:** 2026-08-14 09:42:44
 > **Page Type:** Dashboard / Data View
 
-> ⚠️ **IMPORTANT:** Rules in this file **override** the Master file (`design-system/MASTER.md`).
-> Only deviations from the Master are documented here. For all other rules, refer to the Master.
+> Historical design draft, generated on 2026-08-14. It does not override current rules.
+> Use [MASTER](../MASTER.md), [DESIGN](../../../DESIGN.md), and the [market hotspots module](../../../docs/modules/market-hotspots.md).
+> This file preserves the original recommendations below for traceability.
 
 ---
 

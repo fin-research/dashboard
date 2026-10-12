@@ -2,7 +2,9 @@
 
 Auth0 配置与 Actions 当前由 [Gateway](../../gateway/auth0/README.md) 维护。以下是旧配置说明与历史来源，不用于恢复 Cloudflare Access。
 
-# Auth0 中文主题与注册资料
+# Auth0 中文主题与注册资料（历史）
+
+以下正文记录旧 Access 与注册配置，不作为现行部署指令。当前浏览器 Bearer 登录与统一管理应用以 [Gateway Auth0](../../gateway/auth0/README.md) 为准。
 
 账号租户为 `hasbai.eu.auth0.com`，用户登录域名为 `auth.hasbai.xyz`。继续使用 New Universal Login，Auth0 负责密码和身份验证；Access 回调与稳定账号 ID 保持原契约。
 
