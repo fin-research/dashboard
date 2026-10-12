@@ -77,7 +77,7 @@
 
   async function exportExcel(): Promise<void> {
     if (!report || loading || exporting) return;
-    const snapshot = structuredClone($state.snapshot(report));
+    const snapshot = $state.snapshot(report);
     if (!snapshot.institutions.some(row => creditEffectiveStatus(row) !== 'revoked')) {
       globalMessages.info('暂无可导出的授信机构');
       return;
