@@ -10,6 +10,8 @@
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
+  import { buildCreditOverview } from "../credit/overview.ts";
+  import { renderCreditOverviewBarChart, renderCreditOverviewDonutChart } from "../../charts/credit-overview";
   import { renderWorkbenchBarChart } from "../../charts/trading-research";
   import MultiSelectFilter from "../financing/MultiSelectFilter.svelte";
   import { creditLimitFilterLabels, matchesCreditCalendarEvent } from "../credit/calendar.ts";
@@ -28,8 +30,8 @@
     type CreditStatus,
     type CreditWeeklyNewsItem,
   } from "../credit/types.ts";
-  import { compareCreditInstitutions, cycleCreditSort, defaultCreditSort, type CreditSort, type CreditSortKey as SortKey } from "../credit/sorting.ts";
-  import { compareCreditInstitutionOrder, matchesCreditStatus } from "../credit/presentation.ts";
+  import { groupCreditInstitutions, cycleCreditSort, defaultCreditSort, type CreditSort, type CreditSortKey as SortKey } from "../credit/sorting.ts";
+  import { creditCategoryTone, compareCreditInstitutionOrder, matchesCreditStatus } from "../credit/presentation.ts";
   import { creditEffectiveStatus, isCreditEffective, type CreditEffectiveStatus } from "../credit/validity.ts";
   import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
   import CreditApplicationDialog from "./CreditApplicationDialog.svelte";
@@ -39,7 +41,7 @@
   import SectionHeading from "./SectionHeading.svelte";
   import WorkbenchIcon from "./WorkbenchIcon.svelte";
 
-  type CreditTab = "overview" | "calendar" | "weekly";
+  type CreditTab = "overview" | "ledger" | "calendar" | "weekly";
   type CreditAlert = {
     id: string;
     level: "critical" | "high" | "medium" | "low";
@@ -108,9 +110,21 @@
                 daysBetween(currentReport.summary.reportDate, institution.expiryDate) <= 30,
             ));
         return matchesQuery && matchesStatus && matchesRisk;
-      })
-      .sort((left, right) => compareCreditInstitutions(left, right, sorts));
+      });
   });
+
+  const ledgerGroups = $derived(groupCreditInstitutions(filteredInstitutions, sorts));
+  const overview = $derived(buildCreditOverview(report?.institutions ?? [], report?.summary.reportDate ?? ''));
+  const overviewCharts = $derived([
+    { id: 'bank-limits', title: '银行类型授信额', rows: overview.bankLimits, unit: '亿元' },
+    { id: 'bank-counts', title: '银行类型机构数', rows: overview.bankCounts, unit: '家', donut: true },
+    { id: 'bank-utilization', title: '银行类型使用率', rows: overview.bankUtilization, unit: '%' },
+    { id: 'product-limits', title: '品种授信额度', rows: overview.productLimits, unit: '亿元' },
+    { id: 'product-usage', title: '品种已用额度', rows: overview.productUsage, unit: '亿元' },
+    { id: 'status-counts', title: '授信状态', rows: overview.statusCounts, unit: '家', donut: true },
+    { id: 'top-limits', title: '授信额度 Top 10', rows: overview.topLimits, unit: '亿元' },
+    { id: 'expiry-counts', title: '到期期限分布', rows: overview.expiryCounts, unit: '家' },
+  ]);
 
   const weeklyNews = $derived.by(() => {
     return report?.weeklyNews.map(formatCreditWeeklyNews) ?? [];
@@ -249,18 +263,22 @@
   }
 
   function sortIndicator(key: SortKey): string {
-    const index = sorts.findIndex(sort => sort.key === key);
-    if (index < 0) return "⇅";
-    return `${sorts[index]?.direction === "ascending" ? "↑" : "↓"}${index + 1}`;
+    if (key === 'institutionType') return sorts.find(sort => sort.key === key)?.direction === 'descending' ? '↓' : '↑';
+    const groupSorts = sorts.filter(sort => sort.key !== 'institutionType');
+    const index = groupSorts.findIndex(sort => sort.key === key);
+    if (index < 0) return '⇅';
+    return `${groupSorts[index]?.direction === 'ascending' ? '↑' : '↓'}${index + 1}`;
   }
 
-  function ariaSort(key: SortKey): "ascending" | "descending" | "none" {
-    return sorts[0]?.key === key ? sorts[0].direction : "none";
+  function ariaSort(key: SortKey): 'ascending' | 'descending' | 'none' {
+    return key === 'institutionType' ? (sorts.find(sort => sort.key === key)?.direction ?? 'ascending') : 'none';
   }
 
   function sortDescription(key: SortKey): string | undefined {
-    const index = sorts.findIndex(sort => sort.key === key);
-    return index < 0 ? undefined : `第${index + 1}排序，${sorts[index]?.direction === "ascending" ? "升序" : "降序"}`;
+    if (key === 'institutionType') return `分类${ariaSort(key) === 'descending' ? '降序' : '升序'}`;
+    const groupSorts = sorts.filter(sort => sort.key !== 'institutionType');
+    const index = groupSorts.findIndex(sort => sort.key === key);
+    return index < 0 ? undefined : `组内第${index + 1}排序，${groupSorts[index]?.direction === 'ascending' ? '升序' : '降序'}`;
   }
 
   function shiftCalendarMonth(offset: number): void {
@@ -364,10 +382,10 @@
         {/if}
       </div>
     {/if}
-    {#if report && activeTab === "overview"}<Button permission="credit.institution:update" data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button"} type="button" onclick={() => applicationDialog?.open()}>授信申请</Button>{/if}
+    {#if report && (activeTab === "overview" || activeTab === "ledger")}<Button permission="credit.institution:update" data-ui-owner="lib-trading-research-CreditView-svelte" variant="default" class={"ui-button"} type="button" onclick={() => applicationDialog?.open()}>授信申请</Button>{/if}
   </div>
 
-  {#if report && activeTab === "overview"}
+  {#if report && (activeTab === "overview" || activeTab === "ledger")}
     <CreditApplicationDialog bind:this={applicationDialog} institutions={report.institutions} reportDate={report.summary.reportDate} {calendarMonth} firstDate={report.availableDates[0]} previousDate={report.previousDate} contextVersion={loadSequence} onapplied={applyUpdate} />
   {/if}
 
@@ -402,6 +420,19 @@
         <MetricCard label="额度使用率" value={report.summary.utilization.toFixed(1)} unit="%" {...weeklyChange(report.summary.utilization, report.previousSummary?.utilization, '个百分点', 1)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="purple" compact smallIcon />
       </div>
     </section>
+
+    <div class="tr-credit-chart-grid">
+      {#each overviewCharts as chart (chart.id)}
+        <ModuleCard labelledBy={`credit-${chart.id}-title`}>
+          <PanelHeading id={`credit-${chart.id}-title`} title={chart.title} />
+          {#if chart.rows.some(row => row.value != null)}
+            <ChartHost renderer={chart.donut ? renderCreditOverviewDonutChart : renderCreditOverviewBarChart}
+              args={chart.donut ? [chart.rows, chart.title] : [chart.rows, chart.title, chart.unit]}
+              ariaLabel={`${chart.title}图`} className="tr-chart-host tr-credit-overview-chart" />
+          {:else}<p class="tr-empty-state">授信数据暂缺</p>{/if}
+        </ModuleCard>
+      {/each}
+    </div>
 
     <div class="tr-two-column tr-two-column--credit">
       <ModuleCard labelledBy="credit-usage-title">
@@ -440,6 +471,7 @@
       </ModuleCard>
     </div>
 
+  {:else if activeTab === "ledger"}
     <ModuleCard labelledBy="credit-table-title">
       <PanelHeading id="credit-table-title" title="授信一览表" wrap>
         <div class="tr-table-controls" role="search">
@@ -478,9 +510,9 @@
           <caption class="sr-only">授信一览表</caption>
           <thead>
             <tr>
-              <th>序号</th>
-              <th aria-sort={ariaSort("institutionName")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span><span class="sr-only">{sortDescription("institutionName") ?? "未排序"}</span></Button></th>
               <th aria-sort={ariaSort("institutionType")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionType")}>机构性质<span aria-hidden="true">{sortIndicator("institutionType")}</span><span class="sr-only">{sortDescription("institutionType") ?? "未排序"}</span></Button></th>
+              <th aria-sort={ariaSort("institutionName")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span><span class="sr-only">{sortDescription("institutionName") ?? "未排序"}</span></Button></th>
+
               <th aria-sort={ariaSort("status")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("status")}>状态<span aria-hidden="true">{sortIndicator("status")}</span><span class="sr-only">{sortDescription("status") ?? "未排序"}</span></Button></th>
               <th class="is-numeric" aria-sort={ariaSort("totalLimit")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalLimit")}>总额度<span aria-hidden="true">{sortIndicator("totalLimit")}</span><span class="sr-only">{sortDescription("totalLimit") ?? "未排序"}</span></Button></th>
               <th class="is-numeric" aria-sort={ariaSort("totalUsed")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalUsed")}>已使用<span aria-hidden="true">{sortIndicator("totalUsed")}</span><span class="sr-only">{sortDescription("totalUsed") ?? "未排序"}</span></Button></th>
@@ -490,14 +522,14 @@
               <th aria-sort={ariaSort("expiryDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("expiryDate")}>到期日<span aria-hidden="true">{sortIndicator("expiryDate")}</span><span class="sr-only">{sortDescription("expiryDate") ?? "未排序"}</span></Button></th>
             </tr>
           </thead>
+          {#each ledgerGroups as group (group.institutionType)}
           <tbody>
-            {#each filteredInstitutions as institution, index (institution.institutionName)}
-              <tr class="tr-credit-institution-row" tabindex="0" aria-label={`${institution.institutionName}授信详情`}
-                onclick={() => openInstitution(institution)}
+            {#each group.institutions as institution, index (institution.institutionName)}
+              <tr class={`tr-credit-institution-row tr-credit-category--${creditCategoryTone(group.institutionType)}`} tabindex="0" aria-label={`${institution.institutionName}授信详情`}
+                onclick={event => { if (!(event.target as Element).closest('th[scope="rowgroup"]')) openInstitution(institution); }}
                 onkeydown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openInstitution(institution); } }}>
-                <td>{index + 1}</td>
+                {#if index === 0}<th class="tr-credit-category" rowspan={group.institutions.length} scope="rowgroup">{group.institutionType}</th>{/if}
                 <th scope="row"><span class="tr-credit-bank-event">{institution.institutionName}{#if isCreditFinalized(institution, report.summary.reportDate)}<Badge tone="success">定稿</Badge>{/if}</span></th>
-                <td>{institution.institutionType}</td>
                 <td><Badge tone={statusTone(institution.status)}>{statusLabel(institution.status)}</Badge></td>
                 <td class="is-numeric">{formatAmount(institution.totalLimit)}</td>
                 <td class="is-numeric">{formatAmount(institution.totalUsed)}</td>
@@ -506,10 +538,11 @@
                 <td>{institution.effectiveDate ?? "—"}</td>
                 <td>{institution.expiryDate ?? "—"}</td>
               </tr>
-            {:else}
-              <tr><td class="tr-empty-cell" colspan="10">没有符合当前筛选条件的授信记录</td></tr>
             {/each}
           </tbody>
+          {:else}
+            <tbody><tr><td class="tr-empty-cell" colspan="9">没有符合当前筛选条件的授信记录</td></tr></tbody>
+          {/each}
         </table>
       </div>
     </ModuleCard>

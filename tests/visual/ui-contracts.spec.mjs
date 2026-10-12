@@ -143,7 +143,7 @@ test('available buttons expose hover feedback and disabled controls keep a neutr
  await expect(link).not.toHaveAttribute('href');
  expect(await link.evaluate(node=>getComputedStyle(node).cursor)).not.toBe('pointer');
  expect(await link.evaluate(node=>getComputedStyle(node).pointerEvents)).toBe('none');
- await page.goto('/credit-workbench');
+ await page.goto('/credit-workbench/ledger');
  const sort=page.getByRole('button',{name:/^机构性质/});
  const before=await sort.evaluate(node=>getComputedStyle(node).backgroundColor);
  if(await page.evaluate(()=>matchMedia('(hover: hover)').matches)){

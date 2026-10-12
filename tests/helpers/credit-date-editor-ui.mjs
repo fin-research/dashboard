@@ -24,7 +24,7 @@ globalThis.fetch=async(url,options={})=>{
 };
 async function settle(){for(let i=0;i<5;i++){await new Promise(r=>setImmediate(r));flushSync();await tick();}}
 const View=await loadComponent('src/lib/trading-research/CreditView.svelte');
-const app=mount(View,{context,target:document.querySelector('#host'),props:{tab:'overview'}});await settle();
+const app=mount(View,{context,target:document.querySelector('#host'),props:{tab:'ledger'}});await settle();
 flushSync(()=>document.querySelector('.tr-credit-table tbody tr').click());await settle();
 const detail=document.querySelector('.tr-credit-detail');
 assert.ok(detail);
@@ -60,7 +60,7 @@ assert.equal(reads,1);
 await unmount(app);await tick();
 document.body.innerHTML='<div id="tr-topbar-actions"></div><div id="host"></div>';
 const reader=createClientSession({user:{id:'auth0|reader',email:'reader@18.cn'},account:{name:'只读人员',department:'资金管理部'},_roles:['authenticated'],role:'authenticated',picture:'',permissions:['credit.institution:read'],expiresAt:Date.now()/1000+3600});
-const readonly=mount(View,{context:new Map([['site-session',reader]]),target:document.querySelector('#host'),props:{tab:'overview'}});await settle();
+const readonly=mount(View,{context:new Map([['site-session',reader]]),target:document.querySelector('#host'),props:{tab:'ledger'}});await settle();
 flushSync(()=>document.querySelector('.tr-credit-table tbody tr').click());await settle();
 const readonlyDetail=document.querySelector('.tr-credit-detail');
 assert.ok([...readonlyDetail.querySelectorAll('input,select,textarea')].every(input=>input.disabled));

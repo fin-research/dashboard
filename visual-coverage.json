@@ -42,6 +42,7 @@
       "source": "src/routes/credit-workbench/[[view]]/+page.svelte",
       "scenarios": [
         "credit",
+        "credit-ledger",
         "calendar",
         "credit-weekly",
         "browser-agent-credit",
@@ -266,7 +267,8 @@
       "scenarios": {
         "overview": "credit",
         "calendar": "calendar",
-        "weekly": "credit-weekly"
+        "weekly": "credit-weekly",
+        "ledger": "credit-ledger"
       }
     }
   ],
@@ -395,7 +397,7 @@
       "id": "credit",
       "url": "/credit-workbench",
       "kind": "screenshot",
-      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase/multisort-default/multisort-custom",
+      "state": "normal/bank-types/products/status/expiry/top-institutions",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -406,6 +408,45 @@
           ],
           "snapshots": [
             "credit.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "credit overview charts display all categories and products",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-overview-bank-limits.png",
+            "credit-overview-bank-counts.png",
+            "credit-overview-bank-utilization.png",
+            "credit-overview-product-limits.png",
+            "credit-overview-product-usage.png",
+            "credit-overview-status.png",
+            "credit-overview-top-limits.png",
+            "credit-overview-expiry.png",
+            "credit-overview-risk.png",
+            "credit-overview-alerts.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "credit-ledger",
+      "url": "/credit-workbench/ledger",
+      "kind": "screenshot",
+      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase/multisort-default/multisort-custom",
+      "evidence": [
+        {
+          "spec": "tests/visual/workspaces.spec.mjs",
+          "test": "credit-ledger renders",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-ledger.png"
           ]
         },
         {
@@ -847,14 +888,22 @@
         {
           "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
           "test": "通用 AI 侧栏接替授信助手并可选择公开材料工具",
-          "projects": ["desktop"],
-          "snapshots": ["agent-credit-tools.png"]
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "agent-credit-tools.png"
+          ]
         },
         {
           "spec": "tests/visual/credit-assistant-desktop.spec.mjs",
           "test": "本地授信对话刷新后恢复且保留来源文本",
-          "projects": ["desktop"],
-          "snapshots": ["agent-credit-history.png"]
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "agent-credit-history.png"
+          ]
         }
       ]
     },
@@ -1015,8 +1064,13 @@
         {
           "spec": "tests/visual/market-report.spec.mjs",
           "test": "AI 对话侧栏挤压桌面页面并提供会话与工具设置",
-          "projects": ["desktop", "mobile"],
-          "snapshots": ["ai-agent-welcome.png"]
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "ai-agent-welcome.png"
+          ]
         }
       ]
     },
@@ -1143,8 +1197,12 @@
         {
           "spec": "tests/visual/desktop-ui.spec.mjs",
           "test": "desktop industry heatmap keeps names visible across market-cap sizes",
-          "projects": ["desktop"],
-          "snapshots": ["market-heatmap-sectors-desktop.png"]
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "market-heatmap-sectors-desktop.png"
+          ]
         }
       ]
     },
@@ -1358,14 +1416,22 @@
         {
           "spec": "tests/visual/management-desktop.spec.mjs",
           "test": "desktop personnel navigation shows stable loading cards",
-          "projects": ["desktop"],
-          "snapshots": ["management-people-loading-desktop.png"]
+          "projects": [
+            "desktop"
+          ],
+          "snapshots": [
+            "management-people-loading-desktop.png"
+          ]
         },
         {
           "spec": "tests/visual/management-mobile.spec.mjs",
           "test": "mobile personnel navigation keeps loading cards in order",
-          "projects": ["mobile"],
-          "snapshots": ["management-people-loading-mobile.png"]
+          "projects": [
+            "mobile"
+          ],
+          "snapshots": [
+            "management-people-loading-mobile.png"
+          ]
         }
       ]
     },

@@ -31,3 +31,13 @@ export function compareCreditInstitutionOrder(
 export function matchesCreditStatus(status: CreditEffectiveStatus, filter: CreditEffectiveStatus | 'active' | 'all' = 'active'): boolean {
   return filter === 'all' || (filter === 'active' ? status !== 'revoked' : status === filter);
 }
+
+/** Display categories only; the source institution metadata remains unchanged. */
+export function creditInstitutionCategory(value: string): string {
+  const label = value.trim();
+  return ({ '国有银行': '国有行', '境外行及外资行': '外资行' } as Record<string, string>)[label] ?? (label || '未分类');
+}
+
+export function creditCategoryTone(value: string): number {
+  return typeOrder[creditInstitutionCategory(value)] ?? 7;
+}
