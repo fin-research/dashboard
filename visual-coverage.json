@@ -436,7 +436,7 @@
       "id": "credit-ledger",
       "url": "/credit-workbench/ledger",
       "kind": "screenshot",
-      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase/multisort-default/multisort-custom",
+      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase/multisort-default/multisort-custom/export-loading/export-download/export-failure/export-empty",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -492,6 +492,28 @@
           "snapshots": [
             "credit-multisort-default.png",
             "credit-multisort-custom.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-export.spec.mjs",
+          "test": "credit Excel export downloads the complete report snapshot while filtered and changing date",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-export-loading.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-export.spec.mjs",
+          "test": "credit Excel export shows global feedback for generation failure and empty reports",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-export-empty.png"
           ]
         }
       ]

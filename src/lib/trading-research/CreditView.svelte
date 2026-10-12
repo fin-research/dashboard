@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { globalMessages } from '../global-messages.ts';
   import Modal from '$lib/components/Modal.svelte';
   import CreditReportDatePicker from './CreditReportDatePicker.svelte';
   import { isCreditFinalized } from '../credit/report-date.ts';
@@ -72,6 +73,25 @@
   let calendarMonth = $state("");
   let applicationDialog = $state<CreditApplicationDialog | null>(null);
   let loadSequence = $state(0);
+  let exporting = $state(false);
+
+  async function exportExcel(): Promise<void> {
+    if (!report || loading || exporting) return;
+    const snapshot = $state.snapshot(report);
+    if (!snapshot.institutions.some(row => creditEffectiveStatus(row) !== 'revoked')) {
+      globalMessages.info('暂无可导出的授信机构');
+      return;
+    }
+    exporting = true;
+    try {
+      const { downloadCreditWorkbook } = await import('../credit/export.ts');
+      await downloadCreditWorkbook(snapshot);
+    } catch {
+      globalMessages.error('Excel导出失败，请重试');
+    } finally {
+      exporting = false;
+    }
+  }
 
   function applyUpdate(result: CreditInstitutionUpdateResponse, version: number): void {
     if (!report || loading || version !== loadSequence) return;
@@ -500,9 +520,10 @@
             </NativeSelect>
           </label>
         </div>
-        <div class="tr-table-controls" role="group" aria-label="排序操作">
+        <div class="tr-table-controls" role="group" aria-label="一览表操作">
           <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" onclick={() => sorts = []} disabled={!sorts.length}>清除排序</Button>
           <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" onclick={() => sorts = [...defaultCreditSort]}>默认排序</Button>
+          <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" onclick={exportExcel} disabled={loading || exporting} aria-busy={exporting}>{exporting ? '导出中…' : '导出Excel'}</Button>
         </div>
       </PanelHeading>
       <div class="tr-table-scroll" role="region" aria-label="授信机构记录" use:scrollableRegion>
