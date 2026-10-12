@@ -28,6 +28,7 @@
     type CreditStatus,
     type CreditWeeklyNewsItem,
   } from "../credit/types.ts";
+  import { compareCreditInstitutions, cycleCreditSort, defaultCreditSort, type CreditSort, type CreditSortKey as SortKey } from "../credit/sorting.ts";
   import { compareCreditInstitutionOrder, matchesCreditStatus } from "../credit/presentation.ts";
   import { creditEffectiveStatus, isCreditEffective, type CreditEffectiveStatus } from "../credit/validity.ts";
   import { formatCreditWeeklyNews } from "../credit/weekly-news.ts";
@@ -46,16 +47,7 @@
     meta: string;
     text: string;
   };
-  type SortKey =
-    | "institutionName"
-    | "institutionType"
-    | "status"
-    | "totalLimit"
-    | "totalUsed"
-    | "availableAmount"
-    | "utilization"
-    | "effectiveDate"
-    | "expiryDate";
+
 
   const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
 
@@ -72,8 +64,7 @@
   let selectedInstitutionName = $state<string | null>(null);
   let detailDialog: Modal;
   const selectedInstitution = $derived(report?.institutions.find(row => row.institutionName === selectedInstitutionName));
-  let sortKey = $state<SortKey>("institutionType");
-  let sortDirection = $state<"ascending" | "descending">("ascending");
+  let sorts = $state<CreditSort[]>([...defaultCreditSort]);
   let calendarLimitFilters = $state<string[]>([]);
   let calendarUsageFilters = $state<string[]>([]);
   let calendarMonth = $state("");
@@ -118,7 +109,7 @@
             ));
         return matchesQuery && matchesStatus && matchesRisk;
       })
-      .sort(compareInstitutions);
+      .sort((left, right) => compareCreditInstitutions(left, right, sorts));
   });
 
   const weeklyNews = $derived.by(() => {
@@ -254,50 +245,22 @@
   }
 
   function toggleSort(key: SortKey): void {
-    if (sortKey === key) {
-      sortDirection = sortDirection === "ascending" ? "descending" : "ascending";
-    } else {
-      sortKey = key;
-      sortDirection = "ascending";
-    }
-  }
-
-  function compareInstitutions(
-    left: CreditInstitutionView,
-    right: CreditInstitutionView,
-  ): number {
-    if (sortKey === "institutionType") {
-      const result = compareCreditInstitutionOrder(left, right);
-      return sortDirection === "ascending" ? result : -result;
-    }
-    const leftValue = sortValue(left, sortKey);
-    const rightValue = sortValue(right, sortKey);
-    if (leftValue == null && rightValue == null) return 0;
-    if (leftValue == null) return 1;
-    if (rightValue == null) return -1;
-    const result = typeof leftValue === "number" && typeof rightValue === "number"
-      ? leftValue - rightValue
-      : String(leftValue).localeCompare(String(rightValue), "zh-CN", {
-          numeric: true,
-        });
-    return sortDirection === "ascending" ? result : -result;
-  }
-
-  function sortValue(
-    institution: CreditInstitutionView,
-    key: SortKey,
-  ): string | number | null {
-    if (key === "status") return statusLabel(institution.status);
-    return institution[key];
+    sorts = cycleCreditSort(sorts, key);
   }
 
   function sortIndicator(key: SortKey): string {
-    if (sortKey !== key) return "⇅";
-    return sortDirection === "ascending" ? "↑" : "↓";
+    const index = sorts.findIndex(sort => sort.key === key);
+    if (index < 0) return "⇅";
+    return `${sorts[index]?.direction === "ascending" ? "↑" : "↓"}${index + 1}`;
   }
 
   function ariaSort(key: SortKey): "ascending" | "descending" | "none" {
-    return sortKey === key ? sortDirection : "none";
+    return sorts[0]?.key === key ? sorts[0].direction : "none";
+  }
+
+  function sortDescription(key: SortKey): string | undefined {
+    const index = sorts.findIndex(sort => sort.key === key);
+    return index < 0 ? undefined : `第${index + 1}排序，${sorts[index]?.direction === "ascending" ? "升序" : "降序"}`;
   }
 
   function shiftCalendarMonth(offset: number): void {
@@ -505,6 +468,10 @@
             </NativeSelect>
           </label>
         </div>
+        <div class="tr-table-controls" role="group" aria-label="排序操作">
+          <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" onclick={() => sorts = []} disabled={!sorts.length}>清除排序</Button>
+          <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" onclick={() => sorts = [...defaultCreditSort]}>默认排序</Button>
+        </div>
       </PanelHeading>
       <div class="tr-table-scroll" role="region" aria-label="授信机构记录" use:scrollableRegion>
         <table class="tr-data-table tr-credit-table">
@@ -512,15 +479,15 @@
           <thead>
             <tr>
               <th>序号</th>
-              <th aria-sort={ariaSort("institutionName")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span></Button></th>
-              <th aria-sort={ariaSort("institutionType")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionType")}>机构性质<span aria-hidden="true">{sortIndicator("institutionType")}</span></Button></th>
-              <th aria-sort={ariaSort("status")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("status")}>状态<span aria-hidden="true">{sortIndicator("status")}</span></Button></th>
-              <th class="is-numeric" aria-sort={ariaSort("totalLimit")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalLimit")}>总额度<span aria-hidden="true">{sortIndicator("totalLimit")}</span></Button></th>
-              <th class="is-numeric" aria-sort={ariaSort("totalUsed")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalUsed")}>已使用<span aria-hidden="true">{sortIndicator("totalUsed")}</span></Button></th>
-              <th class="is-numeric" aria-sort={ariaSort("availableAmount")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("availableAmount")}>可用<span aria-hidden="true">{sortIndicator("availableAmount")}</span></Button></th>
-              <th class="is-numeric" aria-sort={ariaSort("utilization")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("utilization")}>使用率<span aria-hidden="true">{sortIndicator("utilization")}</span></Button></th>
-              <th aria-sort={ariaSort("effectiveDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("effectiveDate")}>生效日<span aria-hidden="true">{sortIndicator("effectiveDate")}</span></Button></th>
-              <th aria-sort={ariaSort("expiryDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("expiryDate")}>到期日<span aria-hidden="true">{sortIndicator("expiryDate")}</span></Button></th>
+              <th aria-sort={ariaSort("institutionName")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionName")}>授信主体<span aria-hidden="true">{sortIndicator("institutionName")}</span><span class="sr-only">{sortDescription("institutionName") ?? "未排序"}</span></Button></th>
+              <th aria-sort={ariaSort("institutionType")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("institutionType")}>机构性质<span aria-hidden="true">{sortIndicator("institutionType")}</span><span class="sr-only">{sortDescription("institutionType") ?? "未排序"}</span></Button></th>
+              <th aria-sort={ariaSort("status")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("status")}>状态<span aria-hidden="true">{sortIndicator("status")}</span><span class="sr-only">{sortDescription("status") ?? "未排序"}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("totalLimit")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalLimit")}>总额度<span aria-hidden="true">{sortIndicator("totalLimit")}</span><span class="sr-only">{sortDescription("totalLimit") ?? "未排序"}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("totalUsed")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("totalUsed")}>已使用<span aria-hidden="true">{sortIndicator("totalUsed")}</span><span class="sr-only">{sortDescription("totalUsed") ?? "未排序"}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("availableAmount")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("availableAmount")}>可用<span aria-hidden="true">{sortIndicator("availableAmount")}</span><span class="sr-only">{sortDescription("availableAmount") ?? "未排序"}</span></Button></th>
+              <th class="is-numeric" aria-sort={ariaSort("utilization")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button tr-sort-button--numeric"} type="button" onclick={() => toggleSort("utilization")}>使用率<span aria-hidden="true">{sortIndicator("utilization")}</span><span class="sr-only">{sortDescription("utilization") ?? "未排序"}</span></Button></th>
+              <th aria-sort={ariaSort("effectiveDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("effectiveDate")}>生效日<span aria-hidden="true">{sortIndicator("effectiveDate")}</span><span class="sr-only">{sortDescription("effectiveDate") ?? "未排序"}</span></Button></th>
+              <th aria-sort={ariaSort("expiryDate")}><Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="ghost" class={"ui-button tr-sort-button"} type="button" onclick={() => toggleSort("expiryDate")}>到期日<span aria-hidden="true">{sortIndicator("expiryDate")}</span><span class="sr-only">{sortDescription("expiryDate") ?? "未排序"}</span></Button></th>
             </tr>
           </thead>
           <tbody>

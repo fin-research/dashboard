@@ -123,3 +123,32 @@ test('hotspot scope tabs and detail dialog support keyboard dismissal and restor
   await expect(page.getByRole('dialog',{name:'资金面热点详情'})).toHaveCount(0);
   await expect(keyword).toBeFocused();
 });
+
+
+test('available buttons expose hover feedback and disabled controls keep a neutral cursor',async({page})=>{
+ await page.goto('/ui-contracts');
+ const button=page.getByRole('button',{name:'打开表单',exact:true});
+ const background=await button.evaluate(node=>getComputedStyle(node).backgroundColor);
+ if(await page.evaluate(()=>matchMedia('(hover: hover)').matches)){
+   await button.hover();
+   await expect.poll(()=>button.evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe(background);
+ }
+ expect(await button.evaluate(node=>getComputedStyle(node).cursor)).toBe('pointer');
+ expect(await page.getByRole('button',{name:'原生按钮',exact:true}).evaluate(node=>getComputedStyle(node).cursor)).toBe('pointer');
+ for(const name of ['禁用按钮','ARIA 禁用按钮','数据禁用按钮']){
+   const disabled=page.getByRole('button',{name,exact:true});
+   expect(await disabled.evaluate(node=>getComputedStyle(node).cursor)).not.toBe('pointer');
+ }
+ const link=page.getByRole('link',{name:'禁用链接',exact:true});
+ await expect(link).not.toHaveAttribute('href');
+ expect(await link.evaluate(node=>getComputedStyle(node).cursor)).not.toBe('pointer');
+ expect(await link.evaluate(node=>getComputedStyle(node).pointerEvents)).toBe('none');
+ await page.goto('/credit-workbench');
+ const sort=page.getByRole('button',{name:/^机构性质/});
+ const before=await sort.evaluate(node=>getComputedStyle(node).backgroundColor);
+ if(await page.evaluate(()=>matchMedia('(hover: hover)').matches)){
+   await sort.hover();
+   await expect.poll(()=>sort.evaluate(node=>getComputedStyle(node).backgroundColor)).not.toBe(before);
+ }
+ expect(await sort.evaluate(node=>getComputedStyle(node).cursor)).toBe('pointer');
+});

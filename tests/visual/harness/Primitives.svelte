@@ -12,6 +12,13 @@
   <h1>组件交互</h1>
   <MultiSelectFilter label="负债品种" options={['固定收益凭证','公司债']} bind:values allLabel="全部品种" optionLabels={{'固定收益凭证':'固收'}} />
   <Button onclick={() => dialog.showModal()}>打开表单</Button>
+  <div class="page-shell">
+  <Button href="/ui-contracts" disabled>禁用链接</Button>
+  <Button disabled>禁用按钮</Button>
+  <Button aria-disabled="true">ARIA 禁用按钮</Button>
+  <Button data-disabled>数据禁用按钮</Button>
+  <button type="button">原生按钮</button>
+  </div>
   <p role="status">关闭次数：{closeCount}</p>
   <Modal onclose={() => closeCount++} bind:this={dialog} aria-labelledby="fixture-title" oncancel={(event) => { if (busy) event.preventDefault(); }}>
     <h2 id="fixture-title">编辑表单</h2>

@@ -395,7 +395,7 @@
       "id": "credit",
       "url": "/credit-workbench",
       "kind": "screenshot",
-      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase",
+      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase/multisort-default/multisort-custom",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -439,6 +439,18 @@
           "snapshots": [
             "credit-report-date-picker.png",
             "credit-verified-detail.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "credit multisort preserves priorities and restores the default order",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-multisort-default.png",
+            "credit-multisort-custom.png"
           ]
         }
       ]
@@ -1696,6 +1708,22 @@
           ],
           "snapshots": [
             "login-verification-redirect.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "button-hover",
+      "url": "/ui-contracts",
+      "kind": "interaction",
+      "state": "可用按钮和原生按钮手形、实际悬浮反馈、原生/ARIA/数据属性禁用与报告链接禁用",
+      "evidence": [
+        {
+          "spec": "tests/visual/ui-contracts.spec.mjs",
+          "test": "available buttons expose hover feedback and disabled controls keep a neutral cursor",
+          "projects": [
+            "desktop",
+            "mobile"
           ]
         }
       ]

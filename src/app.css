@@ -67,6 +67,8 @@
 @layer base {
   * { @apply border-border; }
   button, input, select, textarea { font-family: inherit; }
+  :is(button, [role="button"], [data-slot="button"]):not(:disabled):not([aria-disabled="true"]):not([data-disabled]) { cursor: pointer; }
+  :is(button, [role="button"], [data-slot="button"]):is(:disabled, [aria-disabled="true"], [data-disabled]) { cursor: default; }
 }
 /* Accessible targets; compact report controls are isolated in report-controls.css. */
 [data-slot="button"], [data-slot="input"], [data-slot="native-select"] { min-height: 44px; }
