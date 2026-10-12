@@ -145,12 +145,12 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
       report_date: "2026-08-10",
       prompt_version: MARKET_BRIEFING_PROMPT_VERSION,
       tags: "market-briefing,manual-generation,web-search",
-      ai_model: "gpt-5.6-luna",
+      ai_model: "gpt-6-luna",
       ai_provider: "custom-codex",
       ai_provider_attempt: "primary",
     });
     const query = JSON.parse(aiCalls[0].init.body);
-    assert.equal(query.model, "gpt-5.6-luna");
+    assert.equal(query.model, "gpt-6-luna");
     assert.equal(Object.hasOwn(query, "store"), false);
     assert.equal(
       query.prompt_cache_key,

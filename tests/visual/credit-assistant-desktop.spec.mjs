@@ -42,7 +42,7 @@ test('本地授信对话刷新后恢复且保留来源文本', async ({ page }, 
 });
 
 function modelEnvelope(id, output, status = 'completed') {
-  return { id, object: 'response', created_at: 1, status, model: 'gpt-5.6-luna', output,
+  return { id, object: 'response', created_at: 1, status, model: 'gpt-6-luna', output,
     usage: { input_tokens: 10, output_tokens: 10, total_tokens: 20,
       input_tokens_details: { cached_tokens: 0 }, output_tokens_details: { reasoning_tokens: 0 } },
     error: null, incomplete_details: null, parallel_tool_calls: false, tools: [] };
@@ -89,7 +89,7 @@ test('浏览器 agent 完成授信检索工具循环并展示原件链接', asyn
   await page.route('**/api/ai/responses', route => {
     modelCalls++;
     const body = route.request().postDataJSON();
-    expect(body.model).toBe('gpt-5.6-luna');
+    expect(body.model).toBe('gpt-6-luna');
     if (modelCalls === 2) expect(body.input.some(item => item.type === 'function_call_output')).toBe(true);
     return route.fulfill({ contentType: 'text/event-stream', body: modelCalls === 1 ? modelToolCall() : modelAnswer('依据公开报告，授信余额为 10 亿元。') });
   });
