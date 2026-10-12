@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Switch } from '$lib/components/ui/switch/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { NativeSelect } from '$lib/components/ui/native-select/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
@@ -62,6 +63,7 @@
 <form class="tr-credit-detail" onsubmit={save}>
   <div class="tr-credit-editor-head">
     <strong>{institution.institutionName}</strong>
+    <label class="tr-credit-final-toggle"><span>定稿</span><Switch aria-label="定稿" bind:checked={draft.verified} disabled={!canEdit || saving} /></label>
     <Button permission="credit.institution:update" type="submit" disabled={saving}>{saving ? '保存中' : '保存'}</Button>
   </div>
   <div class="tr-credit-editor-grid">
@@ -123,3 +125,7 @@
     <label><span>备注</span><Textarea rows={1} maxlength={8000} bind:value={draft.notes} disabled={!canEdit || saving} /></label>
   </div>
 </form>
+
+<style>
+  .tr-credit-final-toggle { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; margin-left: auto; }
+</style>

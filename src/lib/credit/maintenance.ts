@@ -4,7 +4,7 @@ import { subtractAmounts, sumAmounts } from './amounts.ts';
 
 type ItemDraft = { limitAmount: number | null; usedAmount: number | null; secondaryUsedAmount: number | null; details: string };
 export type CreditMaintenanceDraft = {
-  institutionType: string; status: CreditStatus; confidentialityStatus: boolean;
+  institutionType: string; status: CreditStatus; confidentialityStatus: boolean; verified: boolean;
   totalLimit: number | null; effectiveDate: string; expiryDate: string;
   bankOffice: string; applyingDepartment: string; handler: string;
   detail: string; bondPreference: string; notes: string;
@@ -13,7 +13,7 @@ export type CreditMaintenanceDraft = {
 
 export function creditMaintenanceDraft(row: CreditInstitutionView): CreditMaintenanceDraft {
   return {
-    institutionType: row.institutionType, status: row.status, confidentialityStatus: row.confidentialityStatus,
+    institutionType: row.institutionType, status: row.status, confidentialityStatus: row.confidentialityStatus, verified: row.verified ?? false,
     totalLimit: row.totalLimit, effectiveDate: row.effectiveDate ?? '', expiryDate: row.expiryDate ?? '',
     bankOffice: row.bankOffice ?? '', applyingDepartment: row.applyingDepartment ?? '', handler: row.handler ?? '',
     detail: row.detail ?? '', bondPreference: row.bondPreference ?? '', notes: row.notes ?? '',
@@ -50,6 +50,7 @@ export function creditMaintenanceChanges(row: CreditInstitutionView, draft: Cred
     const previous = row[field] ?? (field === 'totalLimit' ? null : '');
     if (draft[field] !== previous) (institution as Record<string, unknown>)[field] = draft[field];
   }
+  if (draft.verified !== (row.verified ?? false)) institution.verified = draft.verified;
   if (!draft.expiryDate && row.status !== draft.status) institution.status = draft.status;
   const items: CreditItemChanges[] = [];
   for (const type of creditItemTypes) {

@@ -98,5 +98,5 @@ test('a reader retains SELECT without gaining entry writes or append permissions
 test('migration runner cannot remove old write endpoints through its default command',()=>{
   const script=fs.readFileSync(new URL('../scripts/apply-credit-migrations.mjs',import.meta.url),'utf8');
   assert.match(script,/process\.argv\.includes\('--finalize'\)/);
-  assert.match(script,/finalize \|\| name < '0019_'/);
+  assert.match(script,/creditMigrationPlan\(migrationNames, appliedNames, finalize\)/);
 });

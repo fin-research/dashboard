@@ -17,7 +17,7 @@ globalThis.fetch=async(url,options={})=>{
   if(options.method==='PATCH') {
     const body=JSON.parse(options.body);
     writes.push(body);
-    institution={...institution,expiryDate:body.changes.institution.expiryDate};
+    institution={...institution,...body.changes.institution};
     return Response.json(creditDataPatch(report(),body));
   }
   reads++;return Response.json(creditDataFixture(report()));
@@ -46,6 +46,17 @@ assert.equal(reads,1,'save must not reload the report');
 assert.equal(writes[0].changes.institution.expiryDate,'2027-08-31');
 assert.equal(institution.expiryDate,'2027-08-31');
 assert.match(document.body.textContent,/授信申请/);
+const toggle=detail.querySelector('[role="switch"]');
+assert.equal(toggle.getAttribute('aria-label'),'定稿');
+assert.equal(toggle.getAttribute('aria-checked'),'false');
+toggle.click();await settle();assert.equal(writes.length,1);
+detail.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+assert.deepEqual(writes[1].changes,{institution:{verified:true}});
+assert.equal(toggle.getAttribute('aria-checked'),'true');
+toggle.click();await settle();
+detail.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await settle();
+assert.deepEqual(writes[2].changes,{institution:{verified:false}});
+assert.equal(reads,1);
 await unmount(app);await tick();
 document.body.innerHTML='<div id="tr-topbar-actions"></div><div id="host"></div>';
 const reader=createClientSession({user:{id:'auth0|reader',email:'reader@18.cn'},account:{name:'只读人员',department:'资金管理部'},_roles:['authenticated'],role:'authenticated',picture:'',permissions:['credit.institution:read'],expiresAt:Date.now()/1000+3600});
@@ -53,6 +64,7 @@ const readonly=mount(View,{context:new Map([['site-session',reader]]),target:doc
 flushSync(()=>document.querySelector('.tr-credit-table tbody tr').click());await settle();
 const readonlyDetail=document.querySelector('.tr-credit-detail');
 assert.ok([...readonlyDetail.querySelectorAll('input,select,textarea')].every(input=>input.disabled));
+assert.equal(readonlyDetail.querySelector('[role="switch"]').disabled,true);
 assert.equal([...readonlyDetail.querySelectorAll('button')].some(button=>button.textContent.trim()==='保存'),false);
 await unmount(readonly);await tick();
 // Exercise the actual editable inputs: floating tails must not reach input.value.

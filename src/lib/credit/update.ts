@@ -25,6 +25,7 @@ const nullableLimit = z.number().finite().nonnegative().nullable();
 const creditInstitutionChangesSchema = z.object({
   institutionType: z.string().trim().min(1).max(100),
   confidentialityStatus: z.boolean(),
+  verified: z.boolean(),
   status: z.enum(creditStatuses),
   totalLimit: nullableLimit,
   effectiveDate: nullableDate,

@@ -2,7 +2,7 @@ import { creditItemTypes, type ParsedCreditInstitution } from './types.ts';
 import type { CreditInstitutionUpdateInput } from './update.ts';
 
 export const institutionEntryFields = {
-  institutionType: 'institution_type', confidentialityStatus: 'confidentiality_status', status: 'status',
+  verified: 'verified', institutionType: 'institution_type', confidentialityStatus: 'confidentiality_status', status: 'status',
   totalLimit: 'total', effectiveDate: 'effective_date', expiryDate: 'expiry_date',
   bankOffice: 'bank_office', applyingDepartment: 'applying_department', handler: 'handler',
   detail: 'detail', bondPreference: 'bond_preference', notes: 'notes',
@@ -27,7 +27,7 @@ export function toCreditEntryPatch(changes: CreditInstitutionUpdateInput['change
 
 export function toCreditImportPatch(institution: ParsedCreditInstitution): Record<string, unknown> {
   return { ...toCreditEntryPatch({
-    institution: Object.fromEntries(Object.keys(institutionEntryFields).map(key =>
+    institution: Object.fromEntries(Object.keys(institutionEntryFields).filter(key => key !== 'verified').map(key =>
       [key, institution[key as keyof ParsedCreditInstitution] ?? null])),
     items: creditItemTypes.map(type => {
       const item = institution.items.find(item => item.type === type);
