@@ -122,12 +122,12 @@ test("direct Responses call uses the custom-codex provider-specific URL", async 
   assert.equal(headers.get("cf-aig-request-timeout"), "120000");
   assert.deepEqual(JSON.parse(headers.get("cf-aig-metadata")), {
     prompt_version: "test-v1",
-    ai_model: "gpt-5.6-luna",
+    ai_model: "gpt-6-luna",
     ai_provider: "custom-codex",
     ai_provider_attempt: "primary",
   });
   assert.deepEqual(JSON.parse(calls[0].init.body), {
-    model: "gpt-5.6-luna",
+    model: "gpt-6-luna",
     prompt_cache_key: "probe:v1",
     instructions: "system",
     reasoning: {

@@ -86,7 +86,7 @@ test("real Agents SQLite/alarm runtime streams across requests, persists and arc
     assert.ok(rootSpan, "workerd must emit the custom agent span");
     assert.equal(rootSpan.attributes["credit.run_id"], saved.questionId);
     assert.equal(rootSpan.attributes["gen_ai.conversation.id"], saved.conversationId);
-    const modelSpan = spans.find(span => span.name === "chat gpt-5.6-luna");
+    const modelSpan = spans.find(span => span.name === "chat gpt-6-luna");
     assert.equal(modelSpan.parent_id, rootSpan.span_id);
     assert.equal(modelSpan.attributes["gen_ai.usage.input_tokens"], 50);
     const searchSpan = spans.find(span => span.name === "execute_tool ai_search");

@@ -82,7 +82,7 @@ test("credit model stays on the configured Codex gateway with one attempt", asyn
       calls.push({ url, body: JSON.parse(init.body) }); return new Response("Unavailable", { status: 503 });
     }));
   assert.equal(calls.length, 1); assert.match(calls[0].url, /custom-codex\/responses$/);
-  assert.equal(calls[0].body.model, "gpt-5.6-luna"); assert.equal(calls[0].body.reasoning.effort, "xhigh");
+  assert.equal(calls[0].body.model, "gpt-6-luna"); assert.equal(calls[0].body.reasoning.effort, "xhigh");
 });
 
 test("interrupted queued work is removed only after recovery is scheduled", async () => {

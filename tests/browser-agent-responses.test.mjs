@@ -24,6 +24,8 @@ test('authenticated same-origin browser request streams via the fixed Gateway mo
   assert.match(await response.text(), /response.completed/);
   assert.match(outgoing.url, /custom-codex\/responses$/);
   assert.equal(outgoing.init.headers['cf-aig-authorization'], 'Bearer server-secret');
+  assert.equal(JSON.parse(outgoing.init.body).model, 'gpt-6-luna');
+  assert.equal(JSON.parse(outgoing.init.headers['cf-aig-metadata']).ai_model, 'gpt-6-luna');
   assert.equal(JSON.parse(outgoing.init.body).store, false);
   assert.equal(response.headers.get('cache-control'), 'private, no-store, no-transform');
   assert.equal(response.headers.has('cf-aig-authorization'), false);
@@ -35,6 +37,7 @@ test('anonymous, cross-origin, model override and remote state are rejected befo
   assert.equal((await proxyAgentResponses(request(valid), env, null, fetcher)).status, 401);
   assert.equal((await proxyAgentResponses(request(valid, { origin: 'https://elsewhere.example' }), env, user, fetcher)).status, 403);
   assert.equal((await proxyAgentResponses(request({ ...valid, model: 'other' }), env, user, fetcher)).status, 400);
+  assert.equal((await proxyAgentResponses(request({ ...valid, model: 'gpt-5.6-luna' }), env, user, fetcher)).status, 400);
   assert.equal((await proxyAgentResponses(request({ ...valid, previous_response_id: 'response-id' }), env, user, fetcher)).status, 400);
   assert.equal((await proxyAgentResponses(request({ ...valid, tools: [{ type: 'web_search' }] }), env, user, fetcher)).status, 400);
   assert.equal(calls, 0);

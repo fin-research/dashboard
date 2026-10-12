@@ -18,7 +18,7 @@ test("direct answer traces exactly one search and one model call", async () => {
       return schema.parse({ paragraphs: [{ text: "资产100亿元", sourceIds: [id] }], gaps: [], attachmentSourceIds: [] });
     } }));
   assert.equal(answer.status, "complete");
-  assert.deepEqual(recorded.spans.map(span => span.name), ["invoke_agent CreditAgent", "execute_tool ai_search", "chat gpt-5.6-luna"]);
+  assert.deepEqual(recorded.spans.map(span => span.name), ["invoke_agent CreditAgent", "execute_tool ai_search", "chat gpt-6-luna"]);
   assert.equal(recorded.spans[2].attributes["gen_ai.usage.input_tokens"], 100);
   assert.ok(recorded.spans.every(span => span.ended && span.attributes["credit.run_id"] === "run"));
   assert.doesNotMatch(JSON.stringify(recorded.spans.map(span => span.attributes)), /资产100亿元|secret-test-token/);
