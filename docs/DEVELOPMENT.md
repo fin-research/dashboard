@@ -37,6 +37,8 @@ pnpm dev
 
 单元任务继续使用 `.github/actions/setup-ci` 的 pnpm 下载缓存。视觉任务使用固定 digest 的 Linux ARM64 镜像，其中包含 Playwright 1.63.0 浏览器、pnpm 与字体，依赖仍以 frozen lockfile 安装。PR/合并组缓存受 GitHub ref 作用域限制，不能作为其它任务的公共缓存。因此 `dependency-cache.yml` 仅在 main 的依赖/缓存配置变化时预热可共享的默认分支缓存，不执行测试或构建。Python uv 缓存依赖键使用实际声明 PEP 723 依赖的 `tests/test_credit_materials.py`。不缓存构建产物、截图基线、实际截图或测试通过结论。
 
+本地视觉候选的生产构建与应用构建统一使用 4GB Node 堆上限。
+
 截图基线、覆盖范围与候选生成规则见 [TESTING](TESTING.md)。本地 Linux 截图由作者审阅并导入，合并组的 `Dashboard CI` 严格比较。
 
 ## 专项验证

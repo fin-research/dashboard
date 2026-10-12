@@ -51,7 +51,7 @@ const run = (command, commandArgs, env = process.env) => {
   const result = spawnSync(command, commandArgs, { cwd: root, env, stdio: 'inherit' });
   if (result.status !== 0) throw new Error(`${command} ${commandArgs.join(' ')} failed (${result.status ?? result.error})`);
 };
-run('pnpm', ['exec', 'vite', 'build']);
+run(process.execPath, ['--max-old-space-size=4096', 'node_modules/vite/bin/vite.js', 'build']);
 run('pnpm', ['build:visual']);
 
 const tasks = new Map();

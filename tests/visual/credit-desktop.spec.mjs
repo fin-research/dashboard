@@ -230,3 +230,36 @@ test('credit report dates and quarter final badges support keyboard and mobile d
   await expect(page.getByRole('button',{name:'报告日：2026-12-31',exact:true})).toBeVisible();
   await expect(page.getByText('定稿',{exact:true})).toHaveCount(0);
 });
+
+test('credit multisort preserves priorities and restores the default order',async({page})=>{
+ await mockResources(page);
+ const report=structuredClone(creditFull);
+ report.recentApprovals=[];report.weeklyNews=[];
+ report.institutions=[['银行甲','股份行',5],['银行乙','股份行',20],['银行丙','政策性银行',2],['银行丁','城商行',50],['银行戊','股份行',50]].map(([institutionName,institutionType,totalLimit])=>({...structuredClone(creditFull.institutions[0]),institutionName,institutionType,totalLimit}));
+ await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
+ await page.goto('/credit-workbench');
+ const table=page.getByRole('table',{name:'授信一览表',exact:true});
+ const names=table.locator('tbody th');
+ const type=table.getByRole('button',{name:/^机构性质/});
+ const limit=table.getByRole('button',{name:/^总额度/});
+ await expect(names).toHaveText(['银行丙','银行戊','银行乙','银行甲','银行丁']);
+ await expect(type).toContainText('↑1');await expect(limit).toContainText('↓2');
+ await expect(type).toHaveAccessibleName(/^机构性质\s*第1排序，升序$/);
+ await expect(limit).toHaveAccessibleName(/^总额度\s*第2排序，降序$/);
+ await table.scrollIntoViewIfNeeded();
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-multisort-default.png');
+ await type.click();await expect(type).toContainText('↓1');
+ await expect(type).toHaveAccessibleName(/^机构性质\s*第1排序，降序$/);
+ await type.click();await expect(limit).toContainText('↓1');
+ await expect(names).toHaveText(['银行丁','银行戊','银行乙','银行甲','银行丙']);
+ await type.press('Enter');await expect(type).toContainText('↑2');
+ await expect(names).toHaveText(['银行戊','银行丁','银行乙','银行甲','银行丙']);
+ await table.getByRole('button',{name:/^授信主体/}).click();
+ await expect(table.getByRole('button',{name:/^授信主体/})).toContainText('↑3');
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-multisort-custom.png');
+ await page.getByRole('button',{name:'清除排序',exact:true}).click();
+ await expect(names).toHaveText(['银行丙','银行丁','银行甲','银行戊','银行乙']);
+ await expect(page.getByRole('button',{name:'清除排序',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'默认排序',exact:true}).click();
+ await expect(names).toHaveText(['银行丙','银行戊','银行乙','银行甲','银行丁']);
+});
