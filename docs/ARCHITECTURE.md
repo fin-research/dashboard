@@ -4,7 +4,7 @@
 
 项目由 SvelteKit 应用和自定义 Cloudflare Worker 入口组成。`worker/entry.ts` 承载构建后的 SvelteKit Worker，并注册 `MarketBriefingWorkflow`。静态资源由 Worker Assets 提供。
 
-Worker Assets 只承载随应用版本一起构建、发布的前端资源。资金日报是每日独立上传且需要运行时立即生效的业务文件，因此存入 R2，不写入构建目录，也不触发 Worker 重新发布。
+Worker Assets 只承载随应用版本一起构建、发布的前端资源。资金日报每日独立上传，须在运行时立即生效。文件存入 R2，不写入构建目录，不触发 Worker 重新发布。
 
 跨服务拓扑、生产路由、上游访问和身份所有权只在 [共享架构](../../eastmoney/docs/ARCHITECTURE.md) 维护。这里仅描述 Dashboard 内部结构。页面按 [模块分流](../AGENTS.md#context-routing) 读取。
 

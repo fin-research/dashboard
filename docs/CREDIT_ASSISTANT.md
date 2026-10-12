@@ -1,14 +1,18 @@
 # 授信公开材料与 AI 侧栏
 
-原授信助手页面由全站 AI 侧栏取代。`/credit-workbench/assistant`、`/credit-assistant` 和 `/trading-research/credit-assistant` 重定向到门户并打开侧栏。侧栏中的浏览器 ToolLoopAgent 调用已鉴权的 `/api/ai/responses` 和 `/api/mcp`，可选择只读的 `credit_public_materials`、`credit_public_search` 工具。问答不会向客户发送消息。
+原授信助手页面由全站 AI 侧栏取代。`/credit-workbench/assistant`、`/credit-assistant` 和 `/trading-research/credit-assistant` 重定向到门户并打开侧栏。侧栏浏览器 ToolLoopAgent 调用已鉴权的 `/api/ai/responses`、`/api/mcp`。可选只读工具为 `credit_public_materials`、`credit_public_search`。问答不会向客户发送消息。
 
 ## 公开资料边界
 
-材料目录只枚举 R2 `eastmoney/credit/public/` 下的单层 PDF，原件链接使用 URL 编码后的文件名。搜索调用 Cloudflare AI Search `credit` 的 `search()`，每次最多取 50 个线上片段，并只返回仍在该公开目录中的文件片段，最终工具结果最多 12 个。ROE/净资产收益率问题从当前公开审计报告文件名确定年度，逐年检索“加权平均净资产收益率 + 年份”，仅把同年审计报告中带指标和值的表格片段计作该年证据。返回已找到和缺少的年度，不内置指标数值。检索片段没有可核验页码时仅标记“AI Search 检索片段”，不虚构页码。旧 `credit/catalog/`、`credit/originals/`、`credit/search/` 不进入浏览器 Agent 的检索结果。
+材料目录只枚举 R2 `eastmoney/credit/public/` 下的单层 PDF，原件链接使用 URL 编码后的文件名。搜索调用 Cloudflare AI Search `credit` 的 `search()`。每次最多取 50 个线上片段，并只返回仍在该公开目录中的文件片段，最终工具结果最多 12 个。ROE/净资产收益率问题先从当前公开审计报告文件名确定年度。逐年检索“加权平均净资产收益率 + 年份”。
+
+仅将同年审计报告中带指标和值的表格片段计作该年证据。返回已找到和缺少的年度，不内置指标数值。检索片段没有可核验页码时仅标记“AI Search 检索片段”，不虚构页码。旧 `credit/catalog/`、`credit/originals/`、`credit/search/` 不进入浏览器 Agent 的检索结果。
+
+
 
 AI Search 数据源仅索引 `credit/public/**`。中文关键词使用 trigram 和 `or` 匹配，检索调用开启重排并取消默认阈值。实例启用、远端 OCR 关闭：部分 PDF 的既有文字层曾把中文表项解析为乱码，线上 OCR 又有超时记录。扫描件先在本地生成可搜索 PDF，单文件低于 4 MB。
 
-原始扫描件保留，R2 公开目录存放检索副本。密集财务报表的 OCR 数字仍可能有误，回答具体金额需对照可辨认的页面或可靠文本来源。替换 R2 对象后触发 AI Search 同步作业，核对 Item 文件大小、分块中的中文指标与数值，再用不含目标数值的问题实测检索。仅显示 `completed` 不代表文本可用。
+原始扫描件保留，R2 公开目录存放检索副本。密集财务报表的 OCR 数字仍可能有误，回答具体金额需对照可辨认的页面或可靠文本来源。替换 R2 对象后触发 AI Search 同步。核对 Item 文件大小、分块中的中文指标与数值，再用不含目标数值的问题实测检索。仅显示 `completed` 不代表文本可用。
 
 ## 浏览器 Agent
 
