@@ -8,7 +8,7 @@ export function creditDataFixture(report) {
   const rowFor=(institution,date)=>{
     const state={institution_name:institution.institutionName,institution_type:institution.institutionType,
       status:institution.status,confidentiality_status:institution.confidentialityStatus,total:institution.totalLimit,
-      effective_date:institution.effectiveDate,expiry_date:institution.expiryDate,last_changed_on:institution.lastChangedOn,
+      effective_date:institution.effectiveDate,expiry_date:institution.expiryDate,last_changed_on:institution.lastChangedOn,verified:institution.verified ?? false,
       bank_office:institution.bankOffice,applying_department:institution.applyingDepartment,handler:institution.handler,
       detail:institution.detail,notes:institution.notes,bond_preference:institution.bondPreference,
       updated_at:institution.updatedAt,created_at:institution.updatedAt,bond_investment_secondary_used:0};

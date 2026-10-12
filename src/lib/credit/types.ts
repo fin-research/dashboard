@@ -76,6 +76,7 @@ export interface CreditInstitutionView
   reportDate: string;
   updatedAt: string;
   lastChangedOn?: string;
+  verified?: boolean;
   effectiveStatus?: import('./validity.ts').CreditEffectiveStatus;
   items: CreditItemView[];
   importedTotalUsed?: number | null;

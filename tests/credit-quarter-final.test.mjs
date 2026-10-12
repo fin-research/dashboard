@@ -5,25 +5,25 @@ import { creditQuarterDates, isCreditFinalized } from '../src/lib/credit/report-
 import { creditDatabase, seedCredit, applyCreditMigration } from './helpers/credit-database.mjs';
 import { loadCreditReport, saveCreditInstitution } from '../src/lib/server/credit-repository.ts';
 
-test('finalized badges require a business change on each quarter end', () => {
+test('finalized badges require explicit verification on each quarter end', () => {
   for (const date of ['2026-03-31','2026-06-30','2026-09-30','2026-12-31']) {
-    assert.equal(isCreditFinalized({lastChangedOn:date},date),true);
-    assert.equal(isCreditFinalized({lastChangedOn:'2026-01-01'},date),false);
+    assert.equal(isCreditFinalized({verified:true},date),true);
+    assert.equal(isCreditFinalized({verified:false},date),false);
     assert.equal(isCreditFinalized({},date),false);
   }
-  assert.equal(isCreditFinalized({lastChangedOn:'2026-10-09'},'2026-10-09'),false);
+  assert.equal(isCreditFinalized({verified:true},'2026-10-09'),false);
   assert.deepEqual(creditQuarterDates(2026,'2026-08-21'),[
     {date:'2026-09-30',label:'26Q3'},{date:'2026-12-31',label:'26Q4'},
   ]);
   assert.equal(creditQuarterDates(2027,'2026-08-21').length,4);
 });
 
-test('backfilled textual maintenance marks its report day and PATCH and GET agree', async t => {
+test('backfilled explicit verification marks its report day and PATCH and GET agree', async t => {
   const db=await creditDatabase(t);
   await seedCredit(db,'2026-08-21','甲银行',{expiry_date:'2027-12-31'});
   await seedCredit(db,'2026-08-21','乙银行',{expiry_date:'2027-12-31'});
   assert.equal(isCreditFinalized((await loadCreditReport(db,'2026-09-30')).institutions[0],'2026-09-30'),false);
-  const saved=await saveCreditInstitution(db,{operation:'maintenance',reportDate:'2026-09-30',viewDate:'2026-09-30',calendarMonth:'2026-09',institutionName:'甲银行',changes:{institution:{notes:'季末确认'}}},'auth0|test');
+  const saved=await saveCreditInstitution(db,{operation:'maintenance',reportDate:'2026-09-30',viewDate:'2026-09-30',calendarMonth:'2026-09',institutionName:'甲银行',changes:{institution:{notes:'季末确认',verified:true}}},'auth0|test');
   assert.equal(buildCreditReport(saved.data).institutions[0].lastChangedOn,'2026-09-30');
   assert.equal(isCreditFinalized(buildCreditReport(saved.data).institutions[0],'2026-09-30'),true);
   assert.equal(buildCreditReport(saved.data).calendarEvents.some(e=>e.kind==='amendment'),false);

@@ -180,11 +180,11 @@ test('credit application separates requests from editable maintenance details an
 test('credit report dates and quarter final badges support keyboard and mobile dialogs',async({page})=>{
   await mockResources(page);
   const source=structuredClone(creditFull);
-  source.institutions[0].lastChangedOn='2026-09-30';
-  source.institutions[1].lastChangedOn='2026-09-15';
+  source.institutions[0].verified=true;
+  source.institutions[1].verified=false;
   await page.route('**/api/credit**',route=>{
     const date=new URL(route.request().url()).searchParams.get('date') ?? source.summary.reportDate;
-    const report={...source,summary:{...source.summary,reportDate:date},institutions:source.institutions.map(row=>({...row,reportDate:date}))};
+    const report={...source,summary:{...source.summary,reportDate:date},institutions:source.institutions.map(row=>({...row,reportDate:date,verified:date==='2026-09-30' && row.verified}))};
     return route.fulfill({json:creditDataFixture(report)});
   });
   await page.goto('/credit-workbench');
@@ -204,6 +204,11 @@ test('credit report dates and quarter final badges support keyboard and mobile d
   await row.focus();await row.press('Enter');
   const detail=page.getByRole('dialog',{name:'授信详情',exact:true});
   await expect(detail).toBeInViewport({ratio:1});
+  const toggle=detail.getByRole('switch',{name:'定稿',exact:true});
+  await expect(toggle).toBeChecked();
+  await toggle.focus();await toggle.press('Space');await expect(toggle).not.toBeChecked();
+  await toggle.press('Space');await expect(toggle).toBeChecked();
+  await expect(detail).toHaveScreenshot('credit-verified-detail.png');
   const bond=detail.getByRole('group',{name:'债券投资',exact:true});
   await expect(bond.getByRole('textbox',{name:'一级发行（亿元）',exact:true})).toBeDisabled();
   await bond.getByRole('spinbutton',{name:'已用（亿元）',exact:true}).fill('1');
