@@ -26,6 +26,8 @@ Worker 通过 `HYPERDRIVE` 访问 Neon `credit` schema，migration 只放 `credi
 
 ## 已用额度
 
+金额以 PostgreSQL `numeric` 存储，查询汇总与元转亿元不转 `float8`。授信报表、详情联动和导入残差共用十进制金额运算。派生金额与二级余额按六位小数、半入舍入归一。融资原始一级存续额保留元金额分级精度，仅在现有数字 DTO 边界转换为 number。该 DTO 不保证数据库 numeric 全取值范围的无损字符串传输。
+
 - 可用额度为 `available = total - used`。使用率为 `utilization_pct = used / total * 100`。
 - `total=0` 时使用率必须为 `null`，页面显示缺失，不显示 0%。
 - 当前单机构派生已遵循零分母规则，汇总 `build-report.ts` 仍返回 0。汇总是已知实现偏差，待业务修复，不改变上述口径。

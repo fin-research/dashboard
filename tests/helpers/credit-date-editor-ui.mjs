@@ -54,4 +54,20 @@ flushSync(()=>document.querySelector('.tr-credit-table tbody tr').click());await
 const readonlyDetail=document.querySelector('.tr-credit-detail');
 assert.ok([...readonlyDetail.querySelectorAll('input,select,textarea')].every(input=>input.disabled));
 assert.equal([...readonlyDetail.querySelectorAll('button')].some(button=>button.textContent.trim()==='保存'),false);
-await unmount(readonly);await tick();await window.happyDOM.abort();console.log('Credit editable detail and role checks passed');
+await unmount(readonly);await tick();
+// Exercise the actual editable inputs: floating tails must not reach input.value.
+const Editor=await loadComponent('src/lib/trading-research/CreditDetailEditor.svelte');
+const decimalInstitution={...institution,totalLimit:101.25,items:[
+  {type:'bond_investment',limitAmount:47.22,usedAmount:22.2,primaryUsedAmount:23.1,secondaryUsedAmount:-0.9,details:null},
+]};
+const editor=mount(Editor,{context,target:document.querySelector('#host'),props:{institution:decimalInstitution,
+  reportDate:summary.reportDate,calendarMonth:'2026-09',previousDate:null,contextVersion:1,onapplied:()=>{}}});await settle();
+const bond=document.querySelector('.tr-credit-item-bond');
+const inputFor=label=>[...bond.querySelectorAll('label')].find(node=>node.textContent.trim()===label).querySelector('input');
+assert.equal(inputFor('已用（亿元）').value,'22.2');
+assert.equal(inputFor('可用（亿元）').value,'25.02');
+inputFor('可用（亿元）').value='30';
+inputFor('可用（亿元）').dispatchEvent(new window.Event('input',{bubbles:true}));await settle();
+assert.equal(inputFor('已用（亿元）').value,'17.22');
+assert.equal(inputFor('二级买卖').value,'-5.88');
+await unmount(editor);await tick();await window.happyDOM.abort();console.log('Credit editable detail and role checks passed');
