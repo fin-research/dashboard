@@ -26,6 +26,11 @@ Worker 通过 `HYPERDRIVE` 访问 Neon `credit` schema，migration 只放 `credi
 
 ## 已用额度
 
+- 可用额度为 `available = total - used`；使用率为 `utilization_pct = used / total * 100`。
+- `total=0` 时使用率必须为 `null`，页面显示缺失，不显示 0%。
+- 当前单机构派生已遵循零分母规则，汇总 `build-report.ts` 仍返回 0。汇总是已知实现偏差，待业务修复，不改变上述口径。
+
+
 `institution_client` 保留静态一对多客户关联，归属规则见 [客户与授信关联](clients.md)。
 
 - 收益凭证、同业拆借按截面日期调用 `financing.credit_usage_as_of(date)` 读取存续本金，元转亿元；不在 entry 中重复存一份融资已用值。
