@@ -70,3 +70,22 @@ test('bond used and available inputs reverse into signed secondary usage and pre
   assert.equal(missing.items.bond_investment.secondaryUsedAmount,1);
   assert.equal(creditMaintenanceAmounts(unlinked,missing).used.bond_investment,null);
 });
+
+test('建信理财金额联动使用十进制，编辑后反算二级余额不会产生伪变更',()=>{
+  const institution={...row,institutionName:'建信理财',totalLimit:101.25,items:row.items.map(item=>
+    item.type==='bond_investment'?{...item,limitAmount:47.22,usedAmount:22.2,primaryUsedAmount:23.1,secondaryUsedAmount:-0.9}:
+    {...item,usedAmount:item.type==='yield_certificate'?3.1:item.type==='interbank_lending'?0.2:item.type==='legal_overdraft'?0.3:null})};
+  const draft=creditMaintenanceDraft(institution);
+  const amount=creditMaintenanceAmounts(institution,draft);
+  assert.equal(amount.used.bond_investment,22.2);
+  assert.equal(amount.remaining.bond_investment,25.02);
+  assert.equal(amount.totalUsed,25.8);
+  assert.equal(amount.available,75.45);
+  setCreditBondUsage(institution,draft,'used',22.2);
+  assert.deepEqual(creditMaintenanceChanges(institution,draft),{});
+  setCreditBondUsage(institution,draft,'remaining',25.02);
+  assert.deepEqual(creditMaintenanceChanges(institution,draft),{});
+  setCreditBondUsage(institution,draft,'remaining',30);
+  assert.equal(draft.items.bond_investment.secondaryUsedAmount,-5.88);
+  assert.equal(creditMaintenanceAmounts(institution,draft).used.bond_investment,17.22);
+});

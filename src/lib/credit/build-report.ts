@@ -1,8 +1,8 @@
+import { amountsDiffer, subtractAmounts, sumAmounts } from './amounts.ts';
 import {creditItemLabels,creditItemTypes,type CreditAmountChange,type CreditCalendarEvent,type CreditEventType,type CreditInstitutionView,type CreditItemType,type CreditReportResponse,type CreditSummaryView,type CreditWeeklyNewsItem} from './types.ts';
 import type {CreditDataset,CreditFactRow} from './data.ts';
 import {compareCreditInstitutionOrder} from './presentation.ts';
 import {creditEffectiveStatus,isCreditEffective} from './validity.ts';
-const AMOUNT_TOLERANCE=0.000001;
 type DiffRow=import('./data.ts').CreditDataState['data'];
 function itemUsage(state: DiffRow, date: string, type: CreditItemType, linked: boolean, usage: Map<string,number>) {
   const bond = type === 'bond_investment';
@@ -20,7 +20,7 @@ function institutionView(state: DiffRow, date: string, clients: Array<{id:string
     const financing = bond || type === 'yield_certificate' || type === 'interbank_lending';
     const limitAmount = type === 'other' ? null : nullableNumber(state[`${type}_limit`]);
     const {usedAmount,primaryUsedAmount,secondaryUsedAmount} = itemUsage(state,date,type,clients.length > 0,usage);
-    const item: CreditInstitutionView['items'][number] = { type,limitAmount,usedAmount,remainingAmount:limitAmount == null || (financing && usedAmount == null) ? null : limitAmount-(usedAmount ?? 0),
+    const item: CreditInstitutionView['items'][number] = { type,limitAmount,usedAmount,remainingAmount:limitAmount == null || (financing && usedAmount == null) ? null : subtractAmounts(limitAmount,usedAmount ?? 0),
       details: (type === 'bond_investment' || type === 'other' ? state[`${type}_detail`] as string | null : null) ?? null,
       usageSource:bond ? 'bond_investors' : financing ? 'financing' : 'credit',linkedClientCount:clients.length };
     if (bond) { item.primaryUsedAmount = primaryUsedAmount; item.secondaryUsedAmount = secondaryUsedAmount; }
@@ -28,7 +28,7 @@ function institutionView(state: DiffRow, date: string, clients: Array<{id:string
   });
   const totalLimit = nullableNumber(state.total);
   const totalUsed = clients.length ? sumAmounts(items.map(item => item.usedAmount)) : null;
-  const availableAmount = totalLimit == null || totalUsed == null ? null : totalLimit-totalUsed;
+  const availableAmount = totalLimit == null || totalUsed == null ? null : subtractAmounts(totalLimit,totalUsed);
   const period = {reportDate:date,status:state.status as CreditInstitutionView['status'],
     effectiveDate:state.effective_date as string | null ?? null,expiryDate:state.expiry_date as string | null ?? null};
   return { reportDate:date,lastChangedOn:state.last_changed_on as string,effectiveStatus:creditEffectiveStatus(period),institutionName:state.institution_name,institutionType:state.institution_type as string,
@@ -134,12 +134,12 @@ export function buildCreditReport(data:CreditDataset):CreditReportResponse {
         // Missing client associations are unknown, not a zero balance.
         if (item.usedAmount == null || prior && prior.usedAmount == null) continue;
         const components = type === 'bond_investment'
-          ? [{kind:'primary' as const,label:'债券投资——一级发行',delta:(item.primaryUsedAmount ?? 0)-(prior?.primaryUsedAmount ?? 0)},
-            {kind:'secondary' as const,label:'债券投资——二级买卖',delta:(item.secondaryUsedAmount ?? 0)-(prior?.secondaryUsedAmount ?? 0)}]
-          : [{kind:undefined,label:creditItemLabels[type],delta:item.usedAmount-(prior?.usedAmount ?? 0)}];
+          ? [{kind:'primary' as const,label:'债券投资——一级发行',before:prior?.primaryUsedAmount ?? 0,after:item.primaryUsedAmount ?? 0},
+            {kind:'secondary' as const,label:'债券投资——二级买卖',before:prior?.secondaryUsedAmount ?? 0,after:item.secondaryUsedAmount ?? 0}]
+          : [{kind:undefined,label:creditItemLabels[type],before:prior?.usedAmount ?? 0,after:item.usedAmount}];
         for (const component of components) {
-          const delta = component.delta;
-          if (Math.abs(delta)<=AMOUNT_TOLERANCE) continue;
+          if (!amountsDiffer(component.after,component.before)) continue;
+          const delta = subtractAmounts(component.after,component.before);
           calendarEvents.push({id:`usage:${state.institution_name}:${type}:${component.kind ?? 'total'}:${date}`,date,type:'usage',kind:'usage',itemType:type,
             ...(component.kind ? {usageComponent:component.kind} : {}),institutionName:state.institution_name,
             label:`${component.label} · ${delta>=0?'增加':'减少'}${formatCalendarAmount(Math.abs(delta))}亿元`,
@@ -196,7 +196,7 @@ function creditNewsItem(
     reportDate,previousReportDate,institutionName:detailSource?.institutionName ?? '',
     institutionType:detailSource?.institutionType ?? '未分类',eventType,
     previousStatus:previous?.status ?? null,currentStatus:current?.status ?? null,
-    previousAmount,currentAmount,deltaAmount:currentAmount-previousAmount,
+    previousAmount,currentAmount,deltaAmount:subtractAmounts(currentAmount,previousAmount),
     previousEffectiveDate:previous?.effectiveDate ?? null,currentEffectiveDate:current?.effectiveDate ?? null,
     previousExpiryDate:previous?.expiryDate ?? null,currentExpiryDate:current?.expiryDate ?? null,
     creditDetails:(detailSource?.items ?? [])
@@ -269,7 +269,7 @@ export function compareCreditSnapshots(
       kind: !previous ? "added" : !current ? "removed" : "changed",
       previousAmount,
       currentAmount,
-      deltaAmount: currentAmount - previousAmount,
+      deltaAmount: subtractAmounts(currentAmount, previousAmount),
       details,
     });
   }
@@ -322,7 +322,7 @@ export function buildWeeklyCreditNews(
       currentStatus: current?.status ?? null,
       previousAmount,
       currentAmount,
-      deltaAmount: currentAmount - previousAmount,
+      deltaAmount: subtractAmounts(currentAmount, previousAmount),
       previousEffectiveDate: previous?.effectiveDate ?? null,
       currentEffectiveDate: current?.effectiveDate ?? null,
       previousExpiryDate: previous?.expiryDate ?? null,
@@ -356,11 +356,11 @@ function classifyInstitutionEvent(
     current &&
     previous &&
     hasApprovedPeriod &&
-    currentAmount > previousAmount + AMOUNT_TOLERANCE
+    currentAmount > previousAmount && amountsDiffer(currentAmount,previousAmount)
   ) {
     return "increase";
   }
-  if (current && previous && hasApprovedPeriod && currentAmount < previousAmount - AMOUNT_TOLERANCE) return 'decrease';
+  if (current && previous && hasApprovedPeriod && currentAmount < previousAmount && amountsDiffer(currentAmount,previousAmount)) return 'decrease';
   if (
     current &&
     previous &&
@@ -456,12 +456,12 @@ function amountForMode(
 }
 
 function amountTransition(previous: number, current: number): string {
-  const delta = current - previous;
+  const delta = subtractAmounts(current, previous);
   return `${previous.toFixed(2)} → ${current.toFixed(2)} 亿元（${delta >= 0 ? "+" : ""}${delta.toFixed(2)}）`;
 }
 
 function different(left: number, right: number): boolean {
-  return Math.abs(left - right) > AMOUNT_TOLERANCE;
+  return amountsDiffer(left, right);
 }
 
 function dayDifference(start: string, end: string): number {
@@ -492,11 +492,6 @@ function nullableNumber(value: unknown): number | null {
 
 function numberValue(value: unknown): number {
   return nullableNumber(value) ?? 0;
-}
-
-function sumAmounts(values: Array<number | null>): number {
-  const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  return Math.round(total * 1_000_000) / 1_000_000;
 }
 
 function addDays(date:string,days:number):string {const value=new Date(`${date}T00:00:00Z`);value.setUTCDate(value.getUTCDate()+days);return value.toISOString().slice(0,10);}
