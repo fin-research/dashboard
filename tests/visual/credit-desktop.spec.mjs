@@ -51,11 +51,8 @@ test('desktop credit metrics and detail dialog stay within the viewport',async({
   await mockResources(page);
   await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(creditFull)}));
   await page.setViewportSize({width:1280,height:900});
-  await page.goto('/credit-workbench');
+  await page.goto('/credit-workbench/ledger');
   await expect(page.getByRole('rowheader',{name:'银行甲',exact:true})).toBeVisible();
-  const metrics=page.getByRole('region',{name:'授信总览',exact:true});
-  const tops=await metrics.getByRole('article').evaluateAll(nodes=>nodes.map(n=>n.getBoundingClientRect().y));
-  expect(Math.max(...tops)-Math.min(...tops)).toBeLessThanOrEqual(1);
   const region=page.getByRole('region',{name:'授信机构记录',exact:true});
   const bounds=await region.evaluate(el=>({width:el.clientWidth,content:el.scrollWidth}));
   expect(bounds.content).toBeLessThanOrEqual(bounds.width+1);
@@ -115,7 +112,7 @@ test('credit application separates requests from editable maintenance details an
     return route.fulfill({json:creditDataFixture(report)});
   });
   await page.setViewportSize({width:1280,height:900});
-  await page.goto('/credit-workbench');
+  await page.goto('/credit-workbench/ledger');
   const region=page.getByRole('region',{name:'授信机构记录',exact:true});
   await region.getByRole('rowheader',{name:'银行甲',exact:true}).click();
   const detail=page.getByRole('dialog',{name:'授信详情',exact:true});
@@ -187,7 +184,7 @@ test('credit report dates and quarter final badges support keyboard and mobile d
     const report={...source,summary:{...source.summary,reportDate:date},institutions:source.institutions.map(row=>({...row,reportDate:date,verified:date==='2026-09-30' && row.verified}))};
     return route.fulfill({json:creditDataFixture(report)});
   });
-  await page.goto('/credit-workbench');
+  await page.goto('/credit-workbench/ledger');
   await page.getByRole('button',{name:`报告日：${source.summary.reportDate}`,exact:true}).click();
   const picker=page.getByRole('dialog',{name:'选择报告日',exact:true});
   await expect(picker.locator('[data-calendar-grid]')).toBeVisible();
@@ -237,29 +234,65 @@ test('credit multisort preserves priorities and restores the default order',asyn
  report.recentApprovals=[];report.weeklyNews=[];
  report.institutions=[['银行甲','股份行',5],['银行乙','股份行',20],['银行丙','政策性银行',2],['银行丁','城商行',50],['银行戊','股份行',50]].map(([institutionName,institutionType,totalLimit])=>({...structuredClone(creditFull.institutions[0]),institutionName,institutionType,totalLimit}));
  await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
- await page.goto('/credit-workbench');
+ await page.goto('/credit-workbench/ledger');
  const table=page.getByRole('table',{name:'授信一览表',exact:true});
- const names=table.locator('tbody th');
+ const names=table.locator('tbody th[scope=row]');
  const type=table.getByRole('button',{name:/^机构性质/});
  const limit=table.getByRole('button',{name:/^总额度/});
  await expect(names).toHaveText(['银行丙','银行戊','银行乙','银行甲','银行丁']);
- await expect(type).toContainText('↑1');await expect(limit).toContainText('↓2');
- await expect(type).toHaveAccessibleName(/^机构性质\s*第1排序，升序$/);
- await expect(limit).toHaveAccessibleName(/^总额度\s*第2排序，降序$/);
+ const categories=table.locator('th[scope=rowgroup]');
+ await expect(categories).toHaveText(['政策性银行','股份行','城商行']);
+ await expect(categories.nth(1)).toHaveAttribute('rowspan','3');
+ await categories.nth(1).click();await expect(page.getByRole('dialog',{name:'授信详情',exact:true})).toHaveCount(0);
+ const categoryColor=await categories.nth(1).evaluate(node=>getComputedStyle(node).backgroundColor);
+ await expect(type).toContainText('↑');await expect(limit).toContainText('↓1');
+ await expect(type).toHaveAccessibleName(/^机构性质\s*分类升序$/);
+ await expect(limit).toHaveAccessibleName(/^总额度\s*组内第1排序，降序$/);
  await table.scrollIntoViewIfNeeded();
  await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-multisort-default.png');
- await type.click();await expect(type).toContainText('↓1');
- await expect(type).toHaveAccessibleName(/^机构性质\s*第1排序，降序$/);
+ await type.click();await expect(type).toContainText('↓');
+ await expect(categories).toHaveText(['城商行','股份行','政策性银行']);
+ expect(await categories.nth(1).evaluate(node=>getComputedStyle(node).backgroundColor)).toBe(categoryColor);
+ await expect(type).toHaveAccessibleName(/^机构性质\s*分类降序$/);
  await type.click();await expect(limit).toContainText('↓1');
- await expect(names).toHaveText(['银行丁','银行戊','银行乙','银行甲','银行丙']);
- await type.press('Enter');await expect(type).toContainText('↑2');
- await expect(names).toHaveText(['银行戊','银行丁','银行乙','银行甲','银行丙']);
+ await expect(names).toHaveText(['银行丙','银行戊','银行乙','银行甲','银行丁']);
+ await type.press('Enter');await expect(type).toContainText('↑');
+ await expect(names).toHaveText(['银行丙','银行戊','银行乙','银行甲','银行丁']);
  await table.getByRole('button',{name:/^授信主体/}).click();
- await expect(table.getByRole('button',{name:/^授信主体/})).toContainText('↑3');
+ await expect(table.getByRole('button',{name:/^授信主体/})).toContainText('↑2');
  await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-multisort-custom.png');
  await page.getByRole('button',{name:'清除排序',exact:true}).click();
- await expect(names).toHaveText(['银行丙','银行丁','银行甲','银行戊','银行乙']);
+ await expect(names).toHaveText(['银行丙','银行甲','银行戊','银行乙','银行丁']);
  await expect(page.getByRole('button',{name:'清除排序',exact:true})).toBeDisabled();
  await page.getByRole('button',{name:'默认排序',exact:true}).click();
  await expect(names).toHaveText(['银行丙','银行戊','银行乙','银行甲','银行丁']);
+ await expect(table.getByRole('columnheader',{name:'序号',exact:true})).toHaveCount(0);
+ await expect(table.getByRole('columnheader').first()).toContainText('机构性质');
+ report.institutions.push(...['国有行','国有银行'].map((institutionType,index)=>({...structuredClone(report.institutions[0]),institutionName:index?'银行庚':'银行己',institutionType})));
+ await page.reload();
+ await expect(table.locator('th[scope=rowgroup]').filter({hasText:'国有行'})).toHaveCount(1);
+ await expect(table.locator('th[scope=rowgroup]').filter({hasText:'国有行'})).toHaveAttribute('rowspan','2');
+ await page.getByRole('searchbox',{name:'搜索授信机构',exact:true}).fill('银行己');
+ await expect(table.locator('th[scope=rowgroup]')).toHaveCount(1);
+ await expect(table.locator('th[scope=rowgroup]')).toHaveAttribute('rowspan','1');
+ await expect(names).toHaveText(['银行己']);
+ const bankRow=table.getByRole('row',{name:'银行己授信详情',exact:true});await bankRow.focus();await bankRow.press('Space');
+ await expect(page.getByRole('dialog',{name:'授信详情',exact:true})).toBeVisible();
+});
+
+test('credit overview charts display all categories and products',async({page})=>{
+ await mockResources(page);
+ const report=structuredClone(creditFull);
+ report.institutions=['政策性银行','国有行','国有银行','股份行','城商行','农商行','民营银行','外资行'].map((institutionType,index)=>({...structuredClone(creditFull.institutions[index%2]),institutionName:`银行${index+1}`,institutionType,totalLimit:(index+1)*10,expiryDate:index===7?null:'2027-06-30'}));
+ await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
+ await page.goto('/credit-workbench');
+ await expect(page.getByRole('table',{name:'授信一览表',exact:true})).toHaveCount(0);
+ for(const [title,snapshot] of [
+   ['银行类型授信额','credit-overview-bank-limits.png'],['银行类型机构数','credit-overview-bank-counts.png'],['银行类型使用率','credit-overview-bank-utilization.png'],
+   ['品种授信额度','credit-overview-product-limits.png'],['品种已用额度','credit-overview-product-usage.png'],['授信状态','credit-overview-status.png'],
+   ['授信额度 Top 10','credit-overview-top-limits.png'],['到期期限分布','credit-overview-expiry.png'],['授信额度使用率','credit-overview-risk.png'],['授信预警','credit-overview-alerts.png']]){
+   const region=page.getByRole('region',{name:title,exact:true});await region.scrollIntoViewIfNeeded();
+   await expect(region).toHaveScreenshot(snapshot);
+ }
+ await expect(page.getByRole('region',{name:'授信状态',exact:true}).locator('.tr-chart-host')).toHaveAttribute('aria-label','授信状态');
 });

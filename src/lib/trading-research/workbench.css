@@ -2127,3 +2127,19 @@ body:has(.tr-workbench) {
 @media screen and (min-width: 1200px) {
   .tr-credit-weekly-report .tr-metric-grid--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
+
+.tr-credit-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.tr-credit-overview-chart { height: 330px; }
+.tr-credit-table thead th:first-child .tr-sort-button { justify-content: center; }
+.tr-credit-table .tr-credit-category { text-align: center; vertical-align: middle; cursor: default; min-width: 7rem; }
+.tr-credit-category--0 { --credit-category-bg: #eff6ff; }
+.tr-credit-category--1 { --credit-category-bg: #f0fdfa; }
+.tr-credit-category--2 { --credit-category-bg: #f5f3ff; }
+.tr-credit-category--3 { --credit-category-bg: #fffbeb; }
+.tr-credit-category--4 { --credit-category-bg: #f0fdf4; }
+.tr-credit-category--5 { --credit-category-bg: #fff1f2; }
+.tr-credit-category--6 { --credit-category-bg: #f0f9ff; }
+.tr-credit-category--7 { --credit-category-bg: var(--tr-surface-muted); }
+.tr-credit-table .tr-credit-institution-row > :is(th, td) { background: var(--credit-category-bg); }
+.tr-credit-table .tr-credit-institution-row:hover > :is(th, td):not(.tr-credit-category) { background: color-mix(in srgb, var(--credit-category-bg), var(--tr-primary) 6%); }
+@media (max-width: 900px) { .tr-credit-chart-grid { grid-template-columns: minmax(0, 1fr); } }

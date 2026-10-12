@@ -22,7 +22,7 @@ export const WORKBENCH_CHART_PALETTE = [
 
 export type WorkbenchBarDatum = {
   label: string;
-  value: number;
+  value: number | null;
   color?: string;
 };
 
@@ -67,14 +67,14 @@ type WorkbenchHistory = {
   series: Array<{ name: string; values: readonly number[] }>;
 };
 
-export function renderWorkbenchBarChart(
-  host: HTMLElement,
+export function workbenchBarChartOption(
   data: readonly WorkbenchBarDatum[],
   description: string,
   unit: string,
   max?: number,
   thresholds: readonly number[] = [],
-): void {
+  showLegend = false,
+): ChartOption {
   const option: ChartOption = {
     animationDuration: 240,
     aria: { enabled: true, description },
@@ -83,14 +83,16 @@ export function renderWorkbenchBarChart(
       ...tooltip,
       trigger: "axis",
       axisPointer: { type: "shadow" },
-      valueFormatter: (value: unknown) => `${Number(value).toFixed(1)}${unit}`,
+      valueFormatter: (value: unknown) => value == null ? "—" : `${Number(value).toFixed(unit === "家" ? 0 : 1)}${unit}`,
     },
-    grid: { left: 8, right: 76, top: 10, bottom: 24, containLabel: true },
+    legend: showLegend ? { top: 0, data: [description], textStyle: axisLabel } : undefined,
+    grid: { left: 8, right: 76, top: showLegend ? 44 : 10, bottom: 24, containLabel: true },
     xAxis: {
       type: "value",
-      min: 0,
-      max,
+      min: data.some(item => item.value != null && item.value < 0) ? undefined : 0,
+      max: max == null ? undefined : Math.max(max, ...data.map(item => item.value ?? 0)),
       splitNumber: 3,
+      minInterval: unit === "家" ? 1 : undefined,
       name: unit,
       nameGap: 8,
       nameTextStyle: axisLabel,
@@ -106,17 +108,17 @@ export function renderWorkbenchBarChart(
     yAxis: {
       type: "category",
       inverse: true,
-      data: data.map((item) => item.label),
+      data: data.map((item) => item.value == null ? `${item.label} —` : item.label),
       axisLabel: { ...axisLabel, color: colors.ink },
       axisLine: { show: false },
       axisTick: { show: false },
     },
     series: [
       {
-        name: unit === "%" ? "占比" : "数值",
+        name: showLegend ? description : unit === "%" ? "占比" : "数值",
         type: "bar",
         barMaxWidth: 18,
-        showBackground: true,
+        showBackground: !data.some(item => item.value != null && item.value < 0),
         backgroundStyle: { color: colors.brandSoft, borderRadius: 5 },
         data: data.map((item, index) => ({
           value: item.value,
@@ -133,7 +135,7 @@ export function renderWorkbenchBarChart(
           fontSize: chartTextSize,
           fontWeight: "normal",
           formatter: ({ value }: { value: unknown }) =>
-            `${Number(value).toFixed(1)}${unit}`,
+            value == null ? "—" : `${Number(value).toFixed(unit === "家" ? 0 : 1)}${unit}`,
         },
         markLine: thresholds.length
           ? {
@@ -153,7 +155,13 @@ export function renderWorkbenchBarChart(
       },
     ],
   };
-  setChart(host, option);
+  return option;
+}
+
+export function renderWorkbenchBarChart(
+  host: HTMLElement, data: readonly WorkbenchBarDatum[], description: string, unit: string, max?: number, thresholds: readonly number[] = [],
+): void {
+  setChart(host, workbenchBarChartOption(data, description, unit, max, thresholds));
 }
 
 export function renderWorkbenchTrendChart(

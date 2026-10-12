@@ -1,5 +1,5 @@
 import type { CreditInstitutionView } from './types.ts';
-import { compareCreditInstitutionTypes } from './presentation.ts';
+import { creditInstitutionCategory, compareCreditInstitutionTypes } from './presentation.ts';
 
 export type CreditSortKey = 'institutionName' | 'institutionType' | 'status' | 'totalLimit' | 'totalUsed' | 'availableAmount' | 'utilization' | 'effectiveDate' | 'expiryDate';
 export type CreditSort = { key: CreditSortKey; direction: 'ascending' | 'descending' };
@@ -30,4 +30,19 @@ export function compareCreditInstitutions(left: CreditInstitutionView, right: Cr
     if (result) return direction === 'ascending' ? result : -result;
   }
   return collator.compare(left.institutionName, right.institutionName);
+}
+
+/** A category remains one row group; other selected keys sort its institutions. */
+export function groupCreditInstitutions(rows: readonly CreditInstitutionView[], sorts: readonly CreditSort[]) {
+  const groups = new Map<string, CreditInstitutionView[]>();
+  for (const row of rows) {
+    const label = creditInstitutionCategory(row.institutionType);
+    const group = groups.get(label) ?? [];
+    group.push(row);
+    groups.set(label, group);
+  }
+  const direction = sorts.find(sort => sort.key === 'institutionType')?.direction === 'descending' ? -1 : 1;
+  return [...groups].sort(([a], [b]) => direction * compareCreditInstitutionTypes(a, b))
+    .map(([institutionType, institutions]) => ({ institutionType,
+      institutions: institutions.sort((a, b) => compareCreditInstitutions(a, b, sorts.filter(sort => sort.key !== 'institutionType'))) }));
 }
