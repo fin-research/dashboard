@@ -46,7 +46,8 @@
         "calendar",
         "credit-weekly",
         "browser-agent-credit",
-        "sidebar-credit"
+        "sidebar-credit",
+        "credit-usage-interactions"
       ]
     },
     {
@@ -436,7 +437,7 @@
       "id": "credit-ledger",
       "url": "/credit-workbench/ledger",
       "kind": "screenshot",
-      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase/multisort-default/multisort-custom/export-loading/export-download/export-failure/export-empty",
+      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase/multisort-default/multisort-custom/export-loading/export-download/export-failure/export-empty/usage-details/usage-empty/draft-preservation/late-response/financing-link",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -514,6 +515,17 @@
           ],
           "snapshots": [
             "credit-export-empty.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "credit usage drilldowns preserve drafts and open financing debt details",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-usage-details.png"
           ]
         }
       ]
@@ -1813,6 +1825,32 @@
             "desktop",
             "mobile"
           ]
+        }
+      ]
+    },
+    {
+      "id": "credit-usage-interactions",
+      "url": "/credit-workbench/ledger",
+      "kind": "interaction",
+      "state": "late-response/retry/financing-link-visibility",
+      "evidence": [
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "credit usage ignores late requests after returning and reopening another institution",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": []
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "credit usage retries failures and omits financing links without data read visibility",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": []
         }
       ]
     }

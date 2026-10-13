@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { withBase } from '../financing/app-paths.ts';
+  import { scrollableRegion } from '../scrollable-region';
+  import { tick } from 'svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Switch } from '$lib/components/ui/switch/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -7,9 +10,9 @@
   import { creditEffectiveStatus } from '../credit/validity.ts';
   import { permissionVisibility } from '../permission-visibility.ts';
   import { globalMessages } from '../global-messages.ts';
-  import { updateCreditInstitution } from '../credit/client.ts';
+  import { fetchCreditUsage, updateCreditInstitution } from '../credit/client.ts';
   import { creditMaintenanceAmounts, creditMaintenanceChanges, creditMaintenanceDraft, setCreditBondUsage, type CreditMaintenanceDraft } from '../credit/maintenance.ts';
-  import { creditItemLabels, type CreditInstitutionView, type CreditInstitutionUpdateResponse, type CreditItemType } from '../credit/types.ts';
+  import { creditItemLabels, type CreditUsageType, type CreditUsageDetail, type CreditInstitutionView, type CreditInstitutionUpdateResponse, type CreditItemType } from '../credit/types.ts';
 
   let { institution, reportDate, calendarMonth, firstDate, previousDate, contextVersion, onapplied }: {
     institution: CreditInstitutionView;
@@ -24,6 +27,36 @@
     draft = creditMaintenanceDraft(institution);
   });
   let saving = $state(false);
+  let usageType = $state<CreditUsageType | null>(null);
+  let usage = $state<CreditUsageDetail | null>(null);
+  let usageLoading = $state(false);
+  let usageError = $state('');
+  let usageSequence = 0;
+  let usageBack = $state<HTMLButtonElement | null>(null);
+  let usageTrigger: HTMLElement | null = null;
+  $effect(() => {
+    institution.institutionName; reportDate; contextVersion;
+    usageSequence++; usageType = null; usage = null; usageLoading = false; usageError = '';
+  });
+  async function openUsage(type: CreditUsageType, offset = 0, event?: MouseEvent): Promise<void> {
+    if (event) usageTrigger = event.currentTarget as HTMLElement;
+    const sequence = ++usageSequence;
+    const name = institution.institutionName, date = reportDate;
+    usageType = type; usageLoading = true; usageError = ''; usage = null;
+    await tick();
+    usageBack?.focus();
+    try {
+      const result = await fetchCreditUsage(date,name,type,offset);
+      if (sequence === usageSequence && name === institution.institutionName && date === reportDate) usage = result;
+    } catch (error) {
+      if (sequence === usageSequence) usageError = error instanceof Error ? error.message : '融资条目加载失败';
+    } finally { if (sequence === usageSequence) usageLoading = false; }
+  }
+  async function returnToEditor() {
+    usageSequence++; usageType = null; usageLoading = false; usageError = '';
+    await tick();
+    usageTrigger?.focus();
+  }
   const amounts = $derived(creditMaintenanceAmounts(institution, draft));
 
   function numberInput(event: Event): number | null {
@@ -60,7 +93,27 @@
   }
 </script>
 
-<form class="tr-credit-detail" onsubmit={save}>
+{#if usageType}
+  <section class="tr-credit-usage" aria-label="融资条目" aria-busy={usageLoading}>
+    <div class="tr-credit-usage-head"><Button bind:ref={usageBack} variant="outline" type="button" onclick={returnToEditor}>返回授信详情</Button><h3>{usageType === 'bond_investment' ? '一级发行' : creditItemLabels[usageType]}</h3><span>{reportDate}</span></div>
+    {#if usageLoading}<p role="status">加载中…</p>
+    {:else if usageError}<p role="alert">{usageError}</p><Button variant="outline" type="button" onclick={() => openUsage(usageType!)}>重试</Button>
+    {:else if usage}
+      <div class="tr-credit-usage-summary"><strong>{institution.institutionName}</strong><span>{usage.totalCount} 笔 · {formatAmount(usage.totalUsed)} 亿元</span></div>
+      {#if !usage.linked}<p>客户关联缺失</p>
+      {:else if !usage.totalCount}<p>暂无存续融资条目</p>
+      {:else}
+        <div class="tr-table-scroll" role="region" aria-label="融资条目列表" use:scrollableRegion>
+          <table class="tr-data-table"><thead><tr><th>融资条目</th><th>关联客户</th><th class="is-numeric">已用（亿元）</th><th>生效日</th><th>到期日</th></tr></thead><tbody>
+            {#each usage.items as entry (`${entry.id}:${entry.clientName}`)}<tr><td>{#if $allowed('financing.data:read')}<a href={withBase(`/debts/${entry.id}`)}>{entry.name || '—'}</a>{:else}{entry.name || '—'}{/if}</td><td>{entry.clientName}</td><td class="is-numeric">{formatAmount(entry.amount)}</td><td>{entry.startDate ?? '—'}</td><td>{entry.maturityDate ?? '—'}</td></tr>{/each}
+          </tbody></table>
+        </div>
+        {#if usage.totalCount > 100}<div class="tr-credit-usage-pagination"><Button variant="outline" disabled={!usage.offset} onclick={() => openUsage(usageType!,Math.max(0,usage!.offset-100))}>上一页</Button><span>{Math.floor(usage.offset/100)+1} / {Math.ceil(usage.totalCount/100)}</span><Button variant="outline" disabled={usage.offset+100 >= usage.totalCount} onclick={() => openUsage(usageType!,usage!.offset+100)}>下一页</Button></div>{/if}
+      {/if}
+    {/if}
+  </section>
+{/if}
+<form class="tr-credit-detail" hidden={usageType !== null} onsubmit={save}>
   <div class="tr-credit-editor-head">
     <strong>{institution.institutionName}</strong>
     <label class="tr-credit-final-toggle"><span>定稿</span><Switch aria-label="定稿" bind:checked={draft.verified} disabled={!canEdit || saving} /></label>
@@ -102,12 +155,12 @@
         {:else if type === 'legal_overdraft' || type === 'other'}
           <label><span>已用（亿元）</span><Input type="number" step="0.000001" value={draft.items[type].usedAmount ?? ''} disabled={!canEdit || saving} oninput={event => draft.items[type].usedAmount = numberInput(event)} /></label>
         {:else}
-          <label><span>已用（亿元）</span><Input value={formatAmount(amounts.used[type])} disabled /></label>
+          <div class="tr-credit-usage-field"><span>已用（亿元）</span><Button variant="outline" type="button" class="tr-credit-usage-button" aria-label={`${creditItemLabels[type]}已用（亿元）`} disabled={amounts.used[type] == null} onclick={event => openUsage(type as CreditUsageType,0,event)}>{formatAmount(amounts.used[type])}<span aria-hidden="true">›</span></Button></div>
         {/if}
         {#if type === 'bond_investment'}
           <label><span>可用（亿元）</span><Input type="number" step="0.000001" value={amounts.remaining[type] ?? ''} disabled={!canEdit || saving || item?.primaryUsedAmount == null || draft.items[type].limitAmount == null} oninput={event => setCreditBondUsage(institution, draft, 'remaining', numberInput(event))} /></label>
           <div class="tr-credit-bond-components">
-            <label><span>一级发行</span><Input aria-label="一级发行（亿元）" value={formatAmount(item?.primaryUsedAmount)} disabled /></label>
+            <div class="tr-credit-usage-field"><span>一级发行</span><Button variant="outline" type="button" class="tr-credit-usage-button" aria-label="一级发行（亿元）" disabled={item?.primaryUsedAmount == null} onclick={event => openUsage('bond_investment',0,event)}>{formatAmount(item?.primaryUsedAmount)}<span aria-hidden="true">›</span></Button></div>
             <label><span>二级买卖</span><Input aria-label="二级买卖（亿元）" type="number" step="0.000001" value={draft.items[type].secondaryUsedAmount ?? ''} disabled={!canEdit || saving} oninput={event => draft.items[type].secondaryUsedAmount = numberInput(event)} /></label>
           </div>
         {:else if type !== 'other'}

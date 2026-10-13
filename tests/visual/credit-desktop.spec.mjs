@@ -207,7 +207,7 @@ test('credit report dates and quarter final badges support keyboard and mobile d
   await toggle.press('Space');await expect(toggle).toBeChecked();
   await expect(detail).toHaveScreenshot('credit-verified-detail.png');
   const bond=detail.getByRole('group',{name:'债券投资',exact:true});
-  await expect(bond.getByRole('textbox',{name:'一级发行（亿元）',exact:true})).toBeDisabled();
+  await expect(bond.getByRole('button',{name:'一级发行（亿元）',exact:true})).toBeEnabled();
   await bond.getByRole('spinbutton',{name:'已用（亿元）',exact:true}).fill('1');
   await expect(bond.getByRole('spinbutton',{name:'二级买卖（亿元）',exact:true})).toHaveValue('-0.5');
   await expect(bond.getByRole('spinbutton',{name:'可用（亿元）',exact:true})).toHaveValue('2');
@@ -295,4 +295,86 @@ test('credit overview charts display all categories and products',async({page})=
    await expect(region).toHaveScreenshot(snapshot);
  }
  await expect(page.getByRole('region',{name:'授信状态',exact:true}).locator('.tr-chart-host')).toHaveAttribute('aria-label','授信状态');
+});
+
+
+test('credit usage drilldowns preserve drafts and open financing debt details',async({page})=>{
+ await mockResources(page);
+ const report=structuredClone(creditFull);
+ await page.route('**/api/credit**',route=>{
+  const params=new URL(route.request().url()).searchParams;
+  if(params.get('view')==='usage') {
+   const type=params.get('type'),name=params.get('institution');
+   return route.fulfill({json:{reportDate:params.get('date'),institutionName:name,type,linked:true,totalUsed:type==='interbank_lending'?0:1.5,totalCount:type==='interbank_lending'?0:1,offset:0,
+    items:type==='interbank_lending'?[]:[{id:'1',name:type==='bond_investment'?'26东财证券01':'吉祥231号收益凭证',clientName:name,amount:1.5,startDate:'2026-08-01',maturityDate:'2027-08-01'}]}});
+  }
+  return route.fulfill({json:creditDataFixture(report)});
+ });
+ await page.goto('/credit-workbench/ledger');
+ await page.getByRole('rowheader',{name:'银行甲',exact:true}).click();
+ const detail=page.getByRole('dialog',{name:'授信详情',exact:true});
+ await detail.getByRole('textbox',{name:'银行经办机构'}).fill('未保存分行');
+ await detail.getByRole('group',{name:'债券投资',exact:true}).getByRole('spinbutton',{name:'已用（亿元）',exact:true}).fill('1');
+ for(const [button,label] of [['一级发行（亿元）','26东财证券01'],['收益凭证已用（亿元）','吉祥231号收益凭证'],['同业拆借已用（亿元）',null]]) {
+  const trigger=detail.getByRole('button',{name:button,exact:true});await trigger.focus();await trigger.press('Enter');
+  const usage=detail.getByRole('region',{name:'融资条目',exact:true});
+  const back=usage.getByRole('button',{name:'返回授信详情',exact:true});await expect(back).toBeFocused();
+  if(label) {await expect(usage.getByRole('link',{name:label})).toHaveAttribute('href','/financing/debts/1');await expect(usage.getByRole('table')).toContainText('1.50');}
+  else await expect(usage).toContainText('暂无存续融资条目');
+  if(button==='一级发行（亿元）') await expect(detail).toHaveScreenshot('credit-usage-details.png');
+  await back.press('Enter');await expect(trigger).toBeFocused();
+  await expect(detail.getByRole('textbox',{name:'银行经办机构'})).toHaveValue('未保存分行');
+  await expect(detail.getByRole('group',{name:'债券投资',exact:true}).getByRole('spinbutton',{name:'二级买卖（亿元）',exact:true})).toHaveValue('-0.5');
+ }
+ await detail.getByRole('textbox',{name:'备注',exact:true}).fill(Array(12).fill('长备注').join('\n'));
+ await detail.getByRole('textbox',{name:'备注',exact:true}).focus();await page.keyboard.press('End');
+ await expect(detail.getByRole('textbox',{name:'备注',exact:true})).toBeInViewport();
+ expect(await detail.locator('.dialog-body').evaluate(el=>getComputedStyle(el).scrollbarWidth)).toBe('none');
+ await detail.getByRole('button',{name:'收益凭证已用（亿元）',exact:true}).click();
+ await detail.getByRole('link',{name:'吉祥231号收益凭证',exact:true}).click();
+ await expect(page).toHaveURL(/\/financing\/debts\/1$/);
+ await expect(page.getByRole('heading',{name:'吉祥231号收益凭证',exact:true})).toBeVisible();
+});
+
+test('credit usage ignores late requests after returning and reopening another institution',async({page})=>{
+ await mockResources(page);
+ let resolveOld;
+ const pending=new Promise(resolve=>resolveOld=resolve);
+ await page.route('**/api/credit**',async route=>{
+  const params=new URL(route.request().url()).searchParams;
+  if(params.get('view')==='usage'){
+   if(params.get('institution')==='银行甲' && params.get('type')==='bond_investment') await pending;
+   return route.fulfill({json:{reportDate:params.get('date'),institutionName:params.get('institution'),type:params.get('type'),linked:true,totalUsed:1,totalCount:1,offset:0,
+    items:[{id:'1',name:params.get('institution')+'融资',clientName:params.get('institution'),amount:1,startDate:'2026-08-01',maturityDate:null}]}});
+  }
+  return route.fulfill({json:creditDataFixture(creditFull)});
+ });
+ await page.goto('/credit-workbench/ledger');await page.getByRole('rowheader',{name:'银行甲',exact:true}).click();
+ const detail=page.getByRole('dialog',{name:'授信详情',exact:true});
+ await detail.getByRole('button',{name:'一级发行（亿元）',exact:true}).click();await expect(detail.getByRole('status')).toContainText('加载中');
+ await detail.getByRole('button',{name:'返回授信详情'}).click();await detail.getByRole('button',{name:'关闭授信详情'}).click();
+ await page.getByRole('rowheader',{name:'银行乙',exact:true}).click();await detail.getByRole('button',{name:'一级发行（亿元）',exact:true}).click();
+ await expect(detail.getByRole('link',{name:'银行乙融资',exact:true})).toBeVisible();
+ const oldResponse=page.waitForResponse(response=>response.url().includes('view=usage') && new URL(response.url()).searchParams.get('institution')==='银行甲');
+ resolveOld();await oldResponse;
+ await expect(detail.getByRole('link',{name:'银行甲融资',exact:true})).toHaveCount(0);
+});
+
+
+test('credit usage retries failures and omits financing links without data read visibility',async({page})=>{
+ await mockResources(page);let attempts=0;
+ await page.route('**/api/credit**',route=>{
+  const params=new URL(route.request().url()).searchParams;
+  if(params.get('view')==='usage') {
+   if(++attempts===1) return route.fulfill({status:503,json:{error:'融资条目加载失败'}});
+   return route.fulfill({json:{reportDate:params.get('date'),institutionName:params.get('institution'),type:params.get('type'),linked:true,totalUsed:1,totalCount:1,offset:0,
+    items:[{id:'1',name:'只读认购条目',clientName:'银行甲',amount:1,startDate:'2026-08-01',maturityDate:null}]}});
+  }
+  return route.fulfill({json:creditDataFixture(creditFull)});
+ });
+ await page.goto('/credit-workbench/ledger?withoutFinancingRead');await page.getByRole('rowheader',{name:'银行甲',exact:true}).click();
+ const detail=page.getByRole('dialog',{name:'授信详情',exact:true});await detail.getByRole('button',{name:'一级发行（亿元）',exact:true}).click();
+ await expect(detail.getByRole('alert')).toContainText('融资条目加载失败');await detail.getByRole('button',{name:'重试',exact:true}).click();
+ await expect(detail.getByRole('table')).toContainText('只读认购条目');await expect(detail.getByRole('link')).toHaveCount(0);
+ await detail.getByRole('button',{name:'返回授信详情'}).click();await expect(detail.getByRole('button',{name:'一级发行（亿元）',exact:true})).toBeFocused();
 });

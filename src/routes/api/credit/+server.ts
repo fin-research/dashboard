@@ -5,16 +5,23 @@ import { BondLedgerUploadError, validateSameOrigin } from "$lib/server/bond-ledg
 import {
   CreditDatabaseError,
   loadCreditData,
+  loadCreditUsage,
   saveCreditInstitution,
 } from "$lib/server/credit-repository.ts";
 import { withPostgres } from "$lib/server/postgres.ts";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform, url }) => {
+  const view = url.searchParams.get("view");
+  const institution = url.searchParams.get("institution");
+  const type = url.searchParams.get("type");
+  const offset = url.searchParams.get("offset") ?? "0";
+  if (view !== null && view !== 'usage' || view === 'usage' && (!institution?.trim() || institution.length > 200 || !['bond_investment','yield_certificate','interbank_lending'].includes(type ?? '') || !/^\d+$/.test(offset) || Number(offset) > 100000))
+    return Response.json({error:'授信用量参数无效'},{status:400,headers:{'Cache-Control':'no-store'}});
   const date = url.searchParams.get("date");
   const month = url.searchParams.get("month");
   if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return Response.json({error:"日历月份无效"},{status:400,headers:{"Cache-Control":"no-store"}});
-  if (date && !isIsoDate(date)) {
+  if (view === 'usage' && !date || date && !isIsoDate(date)) {
     return Response.json(
       { error: "报表日必须是有效的 YYYY-MM-DD 日期" },
       { status: 400, headers: { "Cache-Control": "no-store" } },
@@ -27,7 +34,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
       async (client) => {
         await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
         try {
-          const report = await loadCreditData(client, date, month ?? undefined);
+          const report = view === 'usage' ? await loadCreditUsage(client,date!,institution!,type as import('$lib/credit/types.ts').CreditUsageType,Number(offset)) : await loadCreditData(client, date, month ?? undefined);
           await client.query('COMMIT');
           return report;
         } catch (error) {

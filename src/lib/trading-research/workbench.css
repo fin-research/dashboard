@@ -1292,7 +1292,7 @@ body:has(.tr-workbench) {
   display: grid;
   gap: 16px;
   padding: 16px;
-  background: color-mix(in srgb, var(--tr-primary-soft) 30%, var(--tr-surface));
+  background: var(--tr-surface);
 }
 
 .tr-credit-editor-head {
@@ -2143,3 +2143,24 @@ body:has(.tr-workbench) {
 .tr-credit-table .tr-credit-institution-row > :is(th, td) { background: var(--credit-category-bg); }
 .tr-credit-table .tr-credit-institution-row:hover > :is(th, td):not(.tr-credit-category) { background: color-mix(in srgb, var(--credit-category-bg), var(--tr-primary) 6%); }
 @media (max-width: 900px) { .tr-credit-chart-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Credit detail owns its scroll surface; hide chrome without disabling scrolling. */
+.credit-detail-dialog .dialog-body { padding-right: 0; scrollbar-width: none; }
+.credit-detail-dialog .dialog-body::-webkit-scrollbar { display: none; }
+.credit-detail-dialog .tr-credit-detail { padding: 0; gap: 20px; }
+.credit-detail-dialog .tr-credit-detail[hidden] { display: none; }
+.credit-detail-dialog .tr-credit-editor-head { padding-block: 12px; border-bottom: 1px solid var(--tr-border); }
+.credit-detail-dialog .tr-credit-detail :is(input, select, textarea) { background: var(--tr-surface); }
+.tr-credit-usage-field { display: grid; gap: 5px; color: var(--tr-muted); font-size: 0.875rem; }
+.tr-credit-usage-button { justify-content: space-between; width: 100%; color: var(--tr-primary); font-variant-numeric: tabular-nums; }
+.tr-credit-usage-button:disabled { color: var(--tr-text); opacity: 1; }
+.tr-credit-usage { display: grid; gap: 20px; padding-block: 16px; }
+.tr-credit-usage-head, .tr-credit-usage-summary, .tr-credit-usage-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tr-credit-usage-head h3 { margin: 0; font-size: 1.125rem; font-weight: bold; }
+.tr-credit-usage-head > span { color: var(--tr-muted); }
+.tr-credit-usage-summary { padding-bottom: 16px; border-bottom: 1px solid var(--tr-border); }
+.tr-credit-usage a { color: var(--tr-primary); text-decoration: underline; text-underline-offset: 3px; }
+.tr-credit-usage .tr-data-table { min-width: 36rem; }
+
+.credit-detail-dialog .tr-table-scroll { scrollbar-width: none; }
+.credit-detail-dialog .tr-table-scroll::-webkit-scrollbar { display: none; }
