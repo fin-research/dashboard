@@ -1,7 +1,7 @@
 import { amountNumber, amountsDiffer, secondaryUsageFromYuan, subtractAmounts } from '../credit/amounts.ts';
 import { creditItemLabels, creditItemTypes, type CreditAmountChange, type CreditCalendarEvent,
   type CreditEventType, type CreditInstitutionUpdateResponse, type CreditInstitutionView,
-  type CreditItemType, type CreditReportResponse, type CreditSummaryView,
+  type CreditUsageType, type CreditUsageDetail, type CreditItemType, type CreditReportResponse, type CreditSummaryView,
   type CreditWeeklyNewsItem, type ParsedCreditWorkbook } from '../credit/types.ts';
 import { toCreditEntryPatch, toCreditImportPatch } from '../credit/entry.ts';
 import type { CreditInstitutionUpdateInput } from '../credit/update.ts';
@@ -242,3 +242,29 @@ export async function saveCreditInstitution(client: DatabaseClient,input: Credit
 function addDays(date:string,days:number):string { const value=new Date(`${date}T00:00:00Z`);value.setUTCDate(value.getUTCDate()+days);return value.toISOString().slice(0,10); }
 function databaseDate(value: unknown): string { return value instanceof Date ? value.toISOString().slice(0,10) : String(value).slice(0,10); }
 function different(left:number,right:number):boolean {return amountsDiffer(left,right);}
+
+/** Minimal, institution-scoped drilldown; amounts match the report's historical principal. */
+export async function loadCreditUsage(client: DatabaseClient, reportDate: string, institutionName: string, type: CreditUsageType, offset = 0): Promise<CreditUsageDetail> {
+  const institution = (await client.query<{linked:boolean}>(`SELECT EXISTS(SELECT 1 FROM credit.institution_client m WHERE m.institution_name=i.name) AS linked
+    FROM credit.institution i WHERE i.name=$1`,[institutionName])).rows[0];
+  if (!institution) throw new CreditDatabaseError(404,'该授信机构不存在');
+  const source = type === 'bond_investment' ? `SELECT b.id,b.name,c.name AS client_name,sum(i.amount) AS amount,b.issue_date AS start_date,b.maturity_date
+    FROM financing.bond b JOIN financing.bond_investors i ON i.bond_id=b.id
+    JOIN credit.institution_client m ON m.client_id=i.investor_id JOIN public.client c ON c.id=i.investor_id
+    WHERE m.institution_name=$1 AND b.issue_date<=$2::date AND b.maturity_date>$2::date
+      AND (b.settled_at IS NULL OR b.settled_at>$2::date) AND (b.closed_at IS NULL OR b.closed_at>$2::date)
+    GROUP BY b.id,b.name,c.name,b.issue_date,b.maturity_date` : `SELECT d.id,d.name,c.name AS client_name,d.amount,d.activated_at AS start_date,d.maturity_date
+    FROM financing.debt d JOIN credit.institution_client m ON m.client_id=d.client_id JOIN public.client c ON c.id=d.client_id
+    WHERE m.institution_name=$1 AND d.debt_type=$4 AND d.activated_at<=$2::date
+      AND (d.maturity_date IS NULL OR d.maturity_date>$2::date)
+      AND (d.settled_at IS NULL OR d.settled_at>$2::date) AND (d.closed_at IS NULL OR d.closed_at>$2::date)`;
+  const result = (await client.query<{total:string;count:string;items:CreditUsageDetail['items']}>(`WITH entries AS (${source}), page AS (
+    SELECT id::text,name,client_name AS "clientName",amount/100000000 AS amount,
+      to_char(start_date,'YYYY-MM-DD') AS "startDate",to_char(maturity_date,'YYYY-MM-DD') AS "maturityDate"
+    FROM entries ORDER BY start_date DESC,id,client_name LIMIT 100 OFFSET $3)
+    SELECT coalesce(sum(amount),0)/100000000 AS total,count(*)::text AS count,
+      coalesce((SELECT jsonb_agg(page) FROM page),'[]'::jsonb) AS items FROM entries`,
+    type === 'bond_investment' ? [institutionName,reportDate,offset] : [institutionName,reportDate,offset,type === 'yield_certificate' ? '收益凭证' : '同业拆借'])).rows[0]!;
+  return {reportDate,institutionName,type,linked:institution.linked,totalUsed:institution.linked ? amountNumber(result.total) : null,
+    totalCount:Number(result.count),offset,items:result.items.map(item=>({...item,amount:amountNumber(item.amount)}))};
+}

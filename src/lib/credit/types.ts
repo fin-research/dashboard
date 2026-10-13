@@ -183,3 +183,10 @@ export interface CreditInstitutionUpdateResponse {
   institutionName:string;viewDate:string;calendarMonth:string;
   scope:'institution'|'context';data:import('./data.ts').CreditDataset;
 }
+
+export type CreditUsageType = 'bond_investment' | 'yield_certificate' | 'interbank_lending';
+export interface CreditUsageDetail {
+  reportDate: string; institutionName: string; type: CreditUsageType; linked: boolean;
+  totalUsed: number | null; totalCount: number; offset: number;
+  items: Array<{ id: string; name: string; clientName: string; amount: number; startDate: string | null; maturityDate: string | null }>;
+}

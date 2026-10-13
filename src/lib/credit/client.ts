@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type {
   CreditInstitutionUpdateResponse,
   CreditReportResponse,
@@ -67,4 +68,24 @@ function isCreditDataset(value:unknown):value is CreditDataset {
     &&Array.isArray(p.usageEventRows)&&p.usageEventRows.every(r=>object(r)&&date(r.date)&&typeof r.institution_name==='string')
     &&Array.isArray(p.usage)&&p.usage.every(r=>object(r)&&date(r.date)&&typeof r.institution_name==='string'&&typeof r.item_type==='string'&&typeof r.amount==='number'&&Number.isFinite(r.amount))
     &&Array.isArray(p.savedStates)&&p.savedStates.every(r=>object(r)&&date(r.date)&&object(r.data)&&typeof r.data.institution_name==='string');
+}
+
+const usageDetailSchema = z.object({
+  reportDate: z.string(), institutionName: z.string(), type: z.enum(['bond_investment','yield_certificate','interbank_lending']),
+  linked: z.boolean(), totalUsed: z.number().finite().nullable(), totalCount: z.number().int().nonnegative(), offset: z.number().int().nonnegative(),
+  items: z.array(z.object({id:z.string().regex(/^\d+$/),name:z.string(),clientName:z.string(),amount:z.number().finite(),
+    startDate:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),maturityDate:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable()})).max(100),
+});
+export async function fetchCreditUsage(reportDate: string, institutionName: string, type: import('./types.ts').CreditUsageType, offset = 0, fetcher: typeof fetch = fetch): Promise<import('./types.ts').CreditUsageDetail> {
+  const response = await fetcher(`/api/credit?${new URLSearchParams({view:'usage',date:reportDate,institution:institutionName,type,offset:String(offset)})}`,{headers:{Accept:'application/json'}});
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = z.object({error:z.string()}).safeParse(payload);
+    throw new Error(error.success ? error.data.error : '融资条目加载失败');
+  }
+  const parsed = usageDetailSchema.safeParse(payload);
+  if (!parsed.success || parsed.data.reportDate !== reportDate || parsed.data.institutionName !== institutionName || parsed.data.type !== type || parsed.data.offset !== offset
+    || parsed.data.linked !== (parsed.data.totalUsed !== null) || parsed.data.items.length > parsed.data.totalCount)
+    throw new Error('融资条目数据无效');
+  return parsed.data;
 }
