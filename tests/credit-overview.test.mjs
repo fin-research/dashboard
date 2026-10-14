@@ -7,16 +7,17 @@ const row=(name,type,limit=10,used=2,extra={})=>({institutionName:name,instituti
 test('overview shares category aliases, effective amount scope and decimal sums',()=>{
  const rows=[row('甲','国有行',0.1,0.03),row('乙','国有银行',0.2,0.02),row('丙','股份行',20,2,{status:'applying'}),row('丁','农商行',100,50,{status:'revoked'})];
  const result=buildCreditOverview(rows,'2026-10-12');
- assert.deepEqual(result.bankCounts,[{label:'国有行',value:2},{label:'股份行',value:1}]);
+ assert.deepEqual(result.bankUsage,[{label:'国有行',value:0.05},{label:'股份行',value:null}]);
  assert.deepEqual(result.bankLimits,[{label:'国有行',value:0.3},{label:'股份行',value:null}]);
  assert.ok(Math.abs(result.bankUtilization[0].value-100/6)<1e-12);
  assert.deepEqual(result.statusCounts,[{label:'已获批',value:2},{label:'申请中',value:1}]);
- assert.equal(result.productLimits.length,4);assert.equal(result.productUsage[2].value,0);assert.equal(result.productUsage[4].value,0);
+ assert.equal(result.productLimits.length,4);assert.equal(result.productUsage[2].value,0);assert.deepEqual(result.productUsage.map(row=>row.label),['债券投资','收益凭证','法透','同业拆借']);
  assert.equal(result.topLimits[0].label,'乙');assert.equal(result.expiryCounts.at(-1).value,2);
 });
 test('partial financing missing values and zero denominators remain missing while negative net use remains signed',()=>{
  const missing=row('未关联','城商行',5,null);missing.items.forEach(item=>item.usedAmount=null);
  const result=buildCreditOverview([row('已关联','城商行',5,2),missing,row('零','农商行',0,0),row('净卖出','外资行',3,-1)],'2026-10-12');
+ assert.equal(result.utilization,null);
  assert.equal(result.bankUtilization.find(row=>row.label==='城商行').value,null);
  assert.equal(result.bankUtilization.find(row=>row.label==='农商行').value,null);
  assert.equal(result.productUsage[0].value,null);assert.equal(result.productUsage[2].value,0);
@@ -48,4 +49,30 @@ test('shared bar options retain null data, signed ranges and utilization beyond 
  assert.equal(option.series[0].label.formatter({value:-20}),'-20.0%');
  assert.deepEqual(option.yAxis.data,['净卖出','超额','缺失 —']);
  assert.deepEqual(option.series[0].markLine.data,[{xAxis:60},{xAxis:80}]);
+});
+
+test('registered product totals and ratios share institutions while full usage includes unregistered limits',()=>{
+ const known=row('登记','国有行',10,2), unknown=row('未登记','国有行',20,3), zero=row('零','国有行',0,0);
+ unknown.items.forEach(item=>item.limitAmount=null);
+ zero.items.forEach(item=>item.limitAmount=0);
+ const result=buildCreditOverview([known,unknown,zero],'2026-10-12');
+ assert.equal(result.productLimits[0].value,10);
+ assert.equal(result.productLimits[0].registeredCount,2);
+ assert.equal(result.productLimits[0].unregisteredCount,1);
+ assert.equal(result.productLimits[0].unregisteredUsed,3);
+ assert.equal(result.productUsage[0].value,5);
+ assert.equal(result.productUtilization[0].value,20);
+ assert.equal(result.productUtilization[0].registeredUsed,2);
+ assert.equal(buildCreditOverview([unknown],'2026-10-12').productLimits[0].value,null);
+ assert.equal(buildCreditOverview([zero],'2026-10-12').productLimits[0].value,0);
+ assert.equal(buildCreditOverview([zero],'2026-10-12').productUtilization[0].value,null);
+ known.items[0].usedAmount=null;
+ assert.equal(buildCreditOverview([known,unknown],'2026-10-12').productUtilization[0].value,null);
+});
+test('top rankings use real amounts and utilization, retaining negative use and excluding missing and revoked',()=>{
+ const rows=[row('额度高','国有行',20,2,{utilization:10}),row('已用高','股份行',10,8,{utilization:80}),row('净卖出','城商行',5,-1,{utilization:-20}),row('缺失','城商行',5,null,{utilization:null}),row('撤销','国有行',100,100,{status:'revoked',utilization:100})];
+ const result=buildCreditOverview(rows,'2026-10-12');
+ assert.equal(result.topLimits[0].label,'额度高');
+ assert.deepEqual(result.topUsage.map(row=>row.label),['已用高','额度高','净卖出']);
+ assert.deepEqual(result.topUtilization.map(row=>row.value),[80,10,-20]);
 });

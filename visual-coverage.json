@@ -398,7 +398,7 @@
       "id": "credit",
       "url": "/credit-workbench",
       "kind": "screenshot",
-      "state": "normal/bank-types/products/status/expiry/top-institutions",
+      "state": "normal/bank-types/products/registered-product-amounts/status/expiry-histogram/top-institutions",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",
@@ -420,12 +420,15 @@
           ],
           "snapshots": [
             "credit-overview-bank-limits.png",
-            "credit-overview-bank-counts.png",
+            "credit-overview-bank-usage.png",
             "credit-overview-bank-utilization.png",
             "credit-overview-product-limits.png",
             "credit-overview-product-usage.png",
+            "credit-overview-product-utilization.png",
             "credit-overview-status.png",
             "credit-overview-top-limits.png",
+            "credit-overview-top-usage.png",
+            "credit-overview-top-utilization.png",
             "credit-overview-expiry.png",
             "credit-overview-risk.png",
             "credit-overview-alerts.png"
