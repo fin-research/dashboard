@@ -287,11 +287,11 @@ test('credit overview charts display all categories and products',async({page},t
  report.institutions[0].items.forEach(item=>item.limitAmount=null);
  await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
  await page.goto('/credit-workbench');
- await expect(page.getByRole('region',{name:'品种授信额度',exact:true}).getByText('已登记',{exact:true})).toBeVisible();
+ await expect(page.locator('.tr-credit-chart-grid').getByText('已登记',{exact:true})).toHaveCount(0);
  await expect(page.getByText('60%关注 · 80%预警',{exact:true})).toHaveCount(0);
  await expect(page.getByRole('table',{name:'授信一览表',exact:true})).toHaveCount(0);
  const grid=page.locator('.tr-credit-chart-grid');
- await expect(grid.locator('.tr-panel-heading h2')).toHaveText(['银行类型授信额度','银行类型已用额度','银行类型使用率','品种授信额度','品种已用额度','品种使用率','授信额度 Top 10','已用额度 Top 10','使用率 Top 10']);
+ await expect(grid.locator('.tr-panel-heading h2')).toHaveText(['授信额度（按类型）','已用额度（按类型）','使用率（按类型）','授信额度（按品种）','已用额度（按品种）','使用率（按品种）','授信额度 Top10','已用额度 Top10','使用率 Top10']);
  const boxes=await grid.locator(':scope > section').evaluateAll(cards=>cards.map(card=>{const {x,y,width,height}=card.getBoundingClientRect();return {x,y,width,height};}));
  expect(boxes).toHaveLength(9);
  for(let i=0;i<boxes.length;i++) {
@@ -305,9 +305,9 @@ test('credit overview charts display all categories and products',async({page},t
    }
  }
  for(const [title,snapshot] of [
-   ['银行类型授信额度','credit-overview-bank-limits.png'],['银行类型已用额度','credit-overview-bank-usage.png'],['银行类型使用率','credit-overview-bank-utilization.png'],
-   ['品种授信额度','credit-overview-product-limits.png'],['品种已用额度','credit-overview-product-usage.png'],['品种使用率','credit-overview-product-utilization.png'],['授信状态','credit-overview-status.png'],
-   ['授信额度 Top 10','credit-overview-top-limits.png'],['已用额度 Top 10','credit-overview-top-usage.png'],['使用率 Top 10','credit-overview-top-utilization.png'],['到期期限分布','credit-overview-expiry.png'],['授信额度使用率','credit-overview-risk.png'],['授信预警','credit-overview-alerts.png']]){
+   ['授信额度（按类型）','credit-overview-bank-limits.png'],['已用额度（按类型）','credit-overview-bank-usage.png'],['使用率（按类型）','credit-overview-bank-utilization.png'],
+   ['授信额度（按品种）','credit-overview-product-limits.png'],['已用额度（按品种）','credit-overview-product-usage.png'],['使用率（按品种）','credit-overview-product-utilization.png'],['授信状态','credit-overview-status.png'],
+   ['授信额度 Top10','credit-overview-top-limits.png'],['已用额度 Top10','credit-overview-top-usage.png'],['使用率 Top10','credit-overview-top-utilization.png'],['到期期限分布','credit-overview-expiry.png'],['授信额度使用率','credit-overview-risk.png'],['授信预警','credit-overview-alerts.png']]){
    const region=page.getByRole('region',{name:title,exact:true});await region.scrollIntoViewIfNeeded();
    await expect(region).toHaveScreenshot(snapshot);
  }

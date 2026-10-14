@@ -11,7 +11,7 @@ test('overview shares category aliases, effective amount scope and decimal sums'
  assert.deepEqual(result.bankLimits,[{label:'国有行',value:0.3},{label:'股份行',value:null}]);
  assert.ok(Math.abs(result.bankUtilization[0].value-100/6)<1e-12);
  assert.deepEqual(result.statusCounts,[{label:'已获批',value:2},{label:'申请中',value:1}]);
- assert.equal(result.productLimits.length,4);assert.equal(result.productUsage[2].value,0);assert.equal(result.productUsage[4].value,0);
+ assert.equal(result.productLimits.length,4);assert.equal(result.productUsage[2].value,0);assert.deepEqual(result.productUsage.map(row=>row.label),['债券投资','收益凭证','法透','同业拆借']);
  assert.equal(result.topLimits[0].label,'乙');assert.equal(result.expiryCounts.at(-1).value,2);
 });
 test('partial financing missing values and zero denominators remain missing while negative net use remains signed',()=>{
@@ -63,7 +63,6 @@ test('registered product totals and ratios share institutions while full usage i
  assert.equal(result.productUsage[0].value,5);
  assert.equal(result.productUtilization[0].value,20);
  assert.equal(result.productUtilization[0].registeredUsed,2);
- assert.equal(result.hasUnregisteredProductLimits,true);
  assert.equal(buildCreditOverview([unknown],'2026-10-12').productLimits[0].value,null);
  assert.equal(buildCreditOverview([zero],'2026-10-12').productLimits[0].value,0);
  assert.equal(buildCreditOverview([zero],'2026-10-12').productUtilization[0].value,null);

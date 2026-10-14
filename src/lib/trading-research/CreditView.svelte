@@ -135,15 +135,15 @@
   const ledgerGroups = $derived(groupCreditInstitutions(filteredInstitutions, sorts));
   const overview = $derived(buildCreditOverview(report?.institutions ?? [], report?.summary.reportDate ?? ''));
   const overviewCharts = $derived([
-    { id: 'bank-limits', title: '银行类型授信额度', rows: overview.bankLimits, unit: '亿元' },
-    { id: 'bank-usage', title: '银行类型已用额度', rows: overview.bankUsage, unit: '亿元' },
-    { id: 'bank-utilization', title: '银行类型使用率', rows: overview.bankUtilization, unit: '%' },
-    { id: 'product-limits', title: '品种授信额度', rows: overview.productLimits, unit: '亿元', registered: overview.hasUnregisteredProductLimits },
-    { id: 'product-usage', title: '品种已用额度', rows: overview.productUsage, unit: '亿元' },
-    { id: 'product-utilization', title: '品种使用率', rows: overview.productUtilization, unit: '%', registered: overview.hasUnregisteredProductLimits },
-    { id: 'top-limits', title: '授信额度 Top 10', rows: overview.topLimits, unit: '亿元' },
-    { id: 'top-usage', title: '已用额度 Top 10', rows: overview.topUsage, unit: '亿元' },
-    { id: 'top-utilization', title: '使用率 Top 10', rows: overview.topUtilization, unit: '%' },
+    { id: 'bank-limits', title: '授信额度（按类型）', rows: overview.bankLimits, unit: '亿元' },
+    { id: 'bank-usage', title: '已用额度（按类型）', rows: overview.bankUsage, unit: '亿元' },
+    { id: 'bank-utilization', title: '使用率（按类型）', rows: overview.bankUtilization, unit: '%' },
+    { id: 'product-limits', title: '授信额度（按品种）', rows: overview.productLimits, unit: '亿元' },
+    { id: 'product-usage', title: '已用额度（按品种）', rows: overview.productUsage, unit: '亿元' },
+    { id: 'product-utilization', title: '使用率（按品种）', rows: overview.productUtilization, unit: '%' },
+    { id: 'top-limits', title: '授信额度 Top10', rows: overview.topLimits, unit: '亿元' },
+    { id: 'top-usage', title: '已用额度 Top10', rows: overview.topUsage, unit: '亿元' },
+    { id: 'top-utilization', title: '使用率 Top10', rows: overview.topUtilization, unit: '%' },
   ]);
   const overviewDistributions = $derived([
     { id: 'status-counts', title: '授信状态', rows: overview.statusCounts, renderer: renderCreditOverviewDonutChart },
@@ -423,9 +423,7 @@
     <div class="tr-credit-chart-grid">
       {#each overviewCharts as chart (chart.id)}
         <ModuleCard labelledBy={`credit-${chart.id}-title`}>
-          <PanelHeading id={`credit-${chart.id}-title`} title={chart.title} controlsBesideTitle>
-            {#if chart.registered}<Badge>已登记</Badge>{/if}
-          </PanelHeading>
+          <PanelHeading id={`credit-${chart.id}-title`} title={chart.title} />
           {#if chart.rows.some(row => row.value != null)}
             <ChartHost renderer={renderCreditOverviewBarChart}
               args={[chart.rows, chart.title, chart.unit]}
