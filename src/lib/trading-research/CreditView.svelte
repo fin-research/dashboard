@@ -12,8 +12,7 @@
   import MetricCard from "../../components/MetricCard.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
   import { buildCreditOverview } from "../credit/overview.ts";
-  import { renderCreditOverviewBarChart, renderCreditOverviewDonutChart } from "../../charts/credit-overview";
-  import { renderWorkbenchBarChart } from "../../charts/trading-research";
+  import { renderCreditOverviewBarChart, renderCreditOverviewDonutChart, renderCreditOverviewHistogram, renderCreditOverviewGauge } from "../../charts/credit-overview";
   import MultiSelectFilter from "../financing/MultiSelectFilter.svelte";
   import { creditLimitFilterLabels, matchesCreditCalendarEvent } from "../credit/calendar.ts";
   import { portal } from "../portal.ts";
@@ -136,14 +135,19 @@
   const ledgerGroups = $derived(groupCreditInstitutions(filteredInstitutions, sorts));
   const overview = $derived(buildCreditOverview(report?.institutions ?? [], report?.summary.reportDate ?? ''));
   const overviewCharts = $derived([
-    { id: 'bank-limits', title: '银行类型授信额', rows: overview.bankLimits, unit: '亿元' },
-    { id: 'bank-counts', title: '银行类型机构数', rows: overview.bankCounts, unit: '家', donut: true },
+    { id: 'bank-limits', title: '银行类型授信额度', rows: overview.bankLimits, unit: '亿元' },
+    { id: 'bank-usage', title: '银行类型已用额度', rows: overview.bankUsage, unit: '亿元' },
     { id: 'bank-utilization', title: '银行类型使用率', rows: overview.bankUtilization, unit: '%' },
-    { id: 'product-limits', title: '品种授信额度', rows: overview.productLimits, unit: '亿元' },
+    { id: 'product-limits', title: '品种授信额度', rows: overview.productLimits, unit: '亿元', registered: overview.hasUnregisteredProductLimits },
     { id: 'product-usage', title: '品种已用额度', rows: overview.productUsage, unit: '亿元' },
-    { id: 'status-counts', title: '授信状态', rows: overview.statusCounts, unit: '家', donut: true },
+    { id: 'product-utilization', title: '品种使用率', rows: overview.productUtilization, unit: '%', registered: overview.hasUnregisteredProductLimits },
     { id: 'top-limits', title: '授信额度 Top 10', rows: overview.topLimits, unit: '亿元' },
-    { id: 'expiry-counts', title: '到期期限分布', rows: overview.expiryCounts, unit: '家' },
+    { id: 'top-usage', title: '已用额度 Top 10', rows: overview.topUsage, unit: '亿元' },
+    { id: 'top-utilization', title: '使用率 Top 10', rows: overview.topUtilization, unit: '%' },
+  ]);
+  const overviewDistributions = $derived([
+    { id: 'status-counts', title: '授信状态', rows: overview.statusCounts, renderer: renderCreditOverviewDonutChart },
+    { id: 'expiry-counts', title: '到期期限分布', rows: overview.expiryCounts, renderer: renderCreditOverviewHistogram },
   ]);
 
   const weeklyNews = $derived.by(() => {
@@ -169,31 +173,6 @@
     }));
   });
 
-  const creditUsageRows = $derived.by(() =>
-    (report?.institutions ?? [])
-      .filter(
-        (institution) =>
-          isCreditEffective(institution) &&
-          institution.utilization != null &&
-          institution.totalLimit != null &&
-          institution.totalLimit > 0,
-      )
-      .sort((left, right) =>
-        (right.utilization ?? 0) - (left.utilization ?? 0),
-      )
-      .slice(0, 10)
-      .map((institution) => ({
-        label: institution.institutionName,
-        value: institution.utilization ?? 0,
-        color:
-          (institution.utilization ?? 0) >= 80
-            ? "#d92d20"
-            : (institution.utilization ?? 0) >= 60
-              ? "#f79009"
-              : "#2f6fed",
-      })),
-  );
-
   const creditAlerts = $derived.by(() => {
     const currentReport = report;
     if (!currentReport) return [];
@@ -206,7 +185,7 @@
           level: utilization >= 80 ? "critical" : "medium",
           label: utilization >= 80 ? "额度预警" : "额度关注",
           meta: `${utilization.toFixed(1)}%`,
-          text: `${institution.institutionName}授信额度使用率达到${utilization.toFixed(1)}%，${utilization >= 80 ? "已超过80%预警线" : "已超过60%关注线"}`,
+          text: `${institution.institutionName}授信额度使用率达到${utilization.toFixed(1)}%`,
         });
       }
       if (institution.expiryDate && isCreditEffective(institution)) {
@@ -444,10 +423,12 @@
     <div class="tr-credit-chart-grid">
       {#each overviewCharts as chart (chart.id)}
         <ModuleCard labelledBy={`credit-${chart.id}-title`}>
-          <PanelHeading id={`credit-${chart.id}-title`} title={chart.title} />
+          <PanelHeading id={`credit-${chart.id}-title`} title={chart.title} controlsBesideTitle>
+            {#if chart.registered}<Badge>已登记</Badge>{/if}
+          </PanelHeading>
           {#if chart.rows.some(row => row.value != null)}
-            <ChartHost renderer={chart.donut ? renderCreditOverviewDonutChart : renderCreditOverviewBarChart}
-              args={chart.donut ? [chart.rows, chart.title] : [chart.rows, chart.title, chart.unit]}
+            <ChartHost renderer={renderCreditOverviewBarChart}
+              args={[chart.rows, chart.title, chart.unit]}
               ariaLabel={`${chart.title}图`} className="tr-chart-host tr-credit-overview-chart" />
           {:else}<p class="tr-empty-state">授信数据暂缺</p>{/if}
         </ModuleCard>
@@ -455,15 +436,23 @@
     </div>
 
     <div class="tr-two-column tr-two-column--credit">
+      {#each overviewDistributions as chart (chart.id)}
+        <ModuleCard labelledBy={`credit-${chart.id}-title`}>
+          <PanelHeading id={`credit-${chart.id}-title`} title={chart.title} />
+          <ChartHost renderer={chart.renderer} args={[chart.rows, chart.title]}
+            ariaLabel={`${chart.title}图`} className="tr-chart-host tr-credit-overview-chart" />
+        </ModuleCard>
+      {/each}
+    </div>
+
+    <div class="tr-two-column tr-two-column--credit">
       <ModuleCard labelledBy="credit-usage-title">
-        <PanelHeading id="credit-usage-title" title="授信额度使用率">
-          <Badge tone="warning">60%关注 · 80%预警</Badge>
-        </PanelHeading>
-        {#if creditUsageRows.length}
+        <PanelHeading id="credit-usage-title" title="授信额度使用率" />
+        {#if overview.utilization != null}
           <ChartHost
-            renderer={renderWorkbenchBarChart}
-            args={[creditUsageRows, "授信机构额度使用率及60%和80%阈值", "%", 100, [60, 80]]}
-            ariaLabel="授信机构额度使用率及60%和80%阈值横向柱状图"
+            renderer={renderCreditOverviewGauge}
+            args={[overview.utilization, overview.totalLimit, overview.totalUsed]}
+            ariaLabel={`授信额度使用率${overview.utilization.toFixed(1)}%`}
             className="tr-chart-host"
           />
         {:else}

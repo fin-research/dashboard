@@ -280,17 +280,34 @@ test('credit multisort preserves priorities and restores the default order',asyn
  await expect(page.getByRole('dialog',{name:'授信详情',exact:true})).toBeVisible();
 });
 
-test('credit overview charts display all categories and products',async({page})=>{
+test('credit overview charts display all categories and products',async({page},testInfo)=>{
  await mockResources(page);
  const report=structuredClone(creditFull);
  report.institutions=['政策性银行','国有行','国有银行','股份行','城商行','农商行','民营银行','外资行'].map((institutionType,index)=>({...structuredClone(creditFull.institutions[index%2]),institutionName:`银行${index+1}`,institutionType,totalLimit:(index+1)*10,expiryDate:index===7?null:'2027-06-30'}));
+ report.institutions[0].items.forEach(item=>item.limitAmount=null);
  await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
  await page.goto('/credit-workbench');
+ await expect(page.getByRole('region',{name:'品种授信额度',exact:true}).getByText('已登记',{exact:true})).toBeVisible();
+ await expect(page.getByText('60%关注 · 80%预警',{exact:true})).toHaveCount(0);
  await expect(page.getByRole('table',{name:'授信一览表',exact:true})).toHaveCount(0);
+ const grid=page.locator('.tr-credit-chart-grid');
+ await expect(grid.locator('.tr-panel-heading h2')).toHaveText(['银行类型授信额度','银行类型已用额度','银行类型使用率','品种授信额度','品种已用额度','品种使用率','授信额度 Top 10','已用额度 Top 10','使用率 Top 10']);
+ const boxes=await grid.locator(':scope > section').evaluateAll(cards=>cards.map(card=>{const {x,y,width,height}=card.getBoundingClientRect();return {x,y,width,height};}));
+ expect(boxes).toHaveLength(9);
+ for(let i=0;i<boxes.length;i++) {
+   if(testInfo.project.name==='desktop') {
+     expect(Math.abs(boxes[i].y-boxes[Math.floor(i/3)*3].y)).toBeLessThan(1);
+     expect(Math.abs(boxes[i].x-boxes[i%3].x)).toBeLessThan(1);
+     if(i%3) expect(boxes[i].x).toBeGreaterThan(boxes[i-1].x);
+   } else {
+     expect(Math.abs(boxes[i].x-boxes[0].x)).toBeLessThan(1);
+     if(i) expect(boxes[i].y).toBeGreaterThanOrEqual(boxes[i-1].y+boxes[i-1].height);
+   }
+ }
  for(const [title,snapshot] of [
-   ['银行类型授信额','credit-overview-bank-limits.png'],['银行类型机构数','credit-overview-bank-counts.png'],['银行类型使用率','credit-overview-bank-utilization.png'],
-   ['品种授信额度','credit-overview-product-limits.png'],['品种已用额度','credit-overview-product-usage.png'],['授信状态','credit-overview-status.png'],
-   ['授信额度 Top 10','credit-overview-top-limits.png'],['到期期限分布','credit-overview-expiry.png'],['授信额度使用率','credit-overview-risk.png'],['授信预警','credit-overview-alerts.png']]){
+   ['银行类型授信额度','credit-overview-bank-limits.png'],['银行类型已用额度','credit-overview-bank-usage.png'],['银行类型使用率','credit-overview-bank-utilization.png'],
+   ['品种授信额度','credit-overview-product-limits.png'],['品种已用额度','credit-overview-product-usage.png'],['品种使用率','credit-overview-product-utilization.png'],['授信状态','credit-overview-status.png'],
+   ['授信额度 Top 10','credit-overview-top-limits.png'],['已用额度 Top 10','credit-overview-top-usage.png'],['使用率 Top 10','credit-overview-top-utilization.png'],['到期期限分布','credit-overview-expiry.png'],['授信额度使用率','credit-overview-risk.png'],['授信预警','credit-overview-alerts.png']]){
    const region=page.getByRole('region',{name:title,exact:true});await region.scrollIntoViewIfNeeded();
    await expect(region).toHaveScreenshot(snapshot);
  }

@@ -2128,7 +2128,7 @@ body:has(.tr-workbench) {
   .tr-credit-weekly-report .tr-metric-grid--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 
-.tr-credit-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.tr-credit-chart-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .tr-credit-overview-chart { height: 330px; }
 .tr-credit-table thead th:first-child .tr-sort-button { justify-content: center; }
 .tr-credit-table .tr-credit-category { text-align: center; vertical-align: middle; cursor: default; min-width: 7rem; }
