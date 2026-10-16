@@ -4,7 +4,7 @@
   import { PERMISSION_CODES } from '../../../src/lib/permissions';
   import { provideAiClient } from '../../../src/lib/ai-client.svelte';
   // Component fixtures only; no authentication service or production identity bypass.
-  setContext(CLIENT_SESSION_CONTEXT, createClientSession({user:{id:'auth0|test',auth0Id:'auth0|test',email:'test@18.cn'},account:null,_roles:['admin'],role:'admin',picture:'',permissions: location.search.includes('withoutFinancingRead') ? PERMISSION_CODES.filter(code=>code!=='financing.data:read') : [...PERMISSION_CODES],expiresAt:2100000000}));
+  setContext(CLIENT_SESSION_CONTEXT, createClientSession({user:{id:'auth0|test',auth0Id:'auth0|test',email:'test@18.cn'},account:null,_roles:['admin'],role:'admin',picture:'',permissions: location.search.includes('debtReadOnly') ? PERMISSION_CODES.filter(code=>!['financing.data:create','financing.data:update','financing.data:delete'].includes(code)) : location.search.includes('withoutFinancingRead') ? PERMISSION_CODES.filter(code=>code!=='financing.data:read') : [...PERMISSION_CODES],expiresAt:2100000000}));
   const aiClient = provideAiClient();
   import GlobalMessages from '../../../src/lib/GlobalMessages.svelte';
   import AiPanel from '../../../src/lib/AiPanel.svelte';

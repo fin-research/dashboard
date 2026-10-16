@@ -160,13 +160,13 @@ test('new financing projects use one bookbuilding date anchored to SOP issue day
 	assert.match(server, /default_offset_days = 0/);
 });
 
-test('Data API mutations request returned rows and merge them without a reload', async () => {
-	const [apiSource, tableSource] = await Promise.all([
-		readFile(new URL('../../src/lib/financing/neon-data-api.ts', import.meta.url), 'utf8'),
-		readFile(new URL('../../src/lib/financing/DataAdminTable.svelte', import.meta.url), 'utf8')
-	]);
-	assert.ok((apiSource.match(/Prefer: 'return=representation'/g) ?? []).length >= 3);
-	assert.match(tableSource, /rows = sortCurrentRows\(\[savedRows\[0\], \.\.\.rows\]\)/);
-	assert.match(tableSource, /rows = sortCurrentRows\(rows\.map\(/);
-	assert.match(tableSource, /rows = rows\.filter\(/);
+test('Data API mutations request returned rows and editors reuse one form', async () => {
+ const [apiSource, editor] = await Promise.all([
+  readFile(new URL('../../src/lib/financing/neon-data-api.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../../src/lib/financing/DebtDataEditor.svelte', import.meta.url), 'utf8')
+ ]);
+ assert.ok((apiSource.match(/Prefer: 'return=representation'/g) ?? []).length >= 3);
+ assert.match(editor, /debtEditorPayload/);
+ assert.match(editor, /api.insert/);
+ assert.match(editor, /api.update/);
 });

@@ -1,4 +1,8 @@
 <script lang="ts">
+import { page } from '$app/state';
+import DataAdminTable from '$lib/financing/DataAdminTable.svelte';
+import DebtDataEditor from '$lib/financing/DebtDataEditor.svelte';
+import { DEBT_ENTITIES } from '$lib/financing/data-admin';
 import { getContext } from 'svelte';
 import { CLIENT_SESSION_CONTEXT, type ClientSession } from '$lib/client-session';
 import ModuleCard from '../../../components/ModuleCard.svelte';
@@ -10,6 +14,9 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 	let { data } = $props();
 	const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
 	const permissions = $derived($session?.permissions ?? data.permissions);
+const entity = $derived(DEBT_ENTITIES.find(item => item.key === page.url.searchParams.get('tab')));
+const entry = $derived(page.url.searchParams.get('entry'));
+const returnHref = $derived.by(() => { const url = new URL(page.url); url.searchParams.delete('entry'); return url.pathname + url.search; });
 </script>
 
 <svelte:head>
@@ -18,9 +25,12 @@ import ModuleCard from '../../../components/ModuleCard.svelte';
 
 <div class="management-page data-page">
 	{#if hasPermission(permissions, 'financing.data:read')}
+		{#if entity}
+			{#if entry}<DebtDataEditor config={entity} {entry} {returnHref} {permissions}/>{:else}<DataAdminTable config={entity} url={page.url} {permissions}/>{/if}
+		{:else}
 		{#if hasPermission(permissions, 'financing.data:import')}<DebtImportPanel />{/if}
 		<FinanceParametersPanel permissions={permissions} />
-		<!-- 通用大表格保留在 $lib/DataAdminTable.svelte，需要恢复时重新挂载。 -->
+		{/if}
 	{:else}
 		<ModuleCard class="section-card permission-empty">
 			<h2>暂无数据后台权限</h2>
