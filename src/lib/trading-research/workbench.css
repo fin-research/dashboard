@@ -1533,10 +1533,10 @@ body:has(.tr-workbench) {
   padding-left: 7px;
 }
 
-.tr-credit-muted {
+.tr-credit-news-empty {
   margin: 0;
-  color: var(--tr-muted);
-  font-size: 0.875rem;
+  color: var(--tr-text);
+  font-size: 1rem;
 }
 
 .tr-credit-news-list {
@@ -1544,7 +1544,7 @@ body:has(.tr-workbench) {
   gap: 8px;
   margin: 0;
   padding: 0;
-  color: var(--tr-text-2);
+  color: var(--tr-text);
   font-size: 1rem;
   line-height: 1.5;
   list-style: none;
@@ -1554,12 +1554,9 @@ body:has(.tr-workbench) {
 .tr-credit-news-list li {
   display: grid;
   grid-template-columns: 2rem minmax(0, 1fr);
-  align-items: start;
+  align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--tr-border);
-  border-radius: var(--tr-radius-control);
-  background: var(--tr-surface);
+  padding: 6px 0;
   counter-increment: credit-news;
 }
 
@@ -1574,6 +1571,11 @@ body:has(.tr-workbench) {
   background: var(--tr-primary-soft);
   font-size: 0.875rem;
   font-weight: bold;
+}
+
+.tr-credit-approval-table thead th,
+.tr-credit-weekly-detail-table thead th {
+  font-size: 1rem;
 }
 
 .tr-credit-weekly-report {
