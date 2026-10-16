@@ -10,6 +10,7 @@ import { navigating, page } from '$app/state';
 import WorkbenchShell from '$lib/workbench/WorkbenchShell.svelte';
 import type { WorkbenchIconName } from '$lib/trading-research/demo-data';
 import { hasPermission } from '$lib/permissions';
+import { DATA_ADMIN_TABS } from '$lib/financing/data-admin';
 import { withBase, withoutBase } from '$lib/financing/app-paths';
 let { data, children } = $props();
 const session = getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
@@ -42,6 +43,7 @@ const activeLabel = $derived(path.startsWith('/projects/') ? '项目详情' : pa
 
 {#if data.user}
 <WorkbenchShell title="融资工作台" homeHref="/financing/" {views} {activeViewId} {activeLabel} activeHref={page.url.pathname}
+  tabs={path === '/data' ? DATA_ADMIN_TABS : []} activeTabId={path === '/data' ? page.url.searchParams.get('tab') ?? 'management' : ''}
   class="financing-scope" tone="orange" layoutReport={isLiabilityReport} reportKind={isLiabilityReport ? 'liability' : null}>
   {#snippet actions()}
     <Popover.Root bind:open={remindersOpen}>

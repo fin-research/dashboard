@@ -2,12 +2,19 @@ import { withBase } from './app-paths';
 import type { DataRow, EntityConfig } from './data-admin';
 import { LIABILITY_REPORT_EDB_CODES } from './liability-report-data.js';
 
-type ListOptions = {
+export type ListOptions = {
 	page: number;
 	pageSize: number;
 	sortKey: string;
 	sortDirection: 'asc' | 'desc';
 	search: string;
+	lifecycle?: string;
+	asOfDate?: string;
+	status?: string;
+	subtype?: string;
+	issueFrom?: string;
+	issueTo?: string;
+	filters?: Record<string, {value?: string; min?: string; max?: string}>;
 };
 
 type ApiErrorBody = { message?: string; details?: string; hint?: string; code?: string };
@@ -71,13 +78,22 @@ export class NeonDataApi {
 		const selected = config.fields.map((field) => field.key).join(',');
 		const params = new URLSearchParams({
 			select: selected,
-			order: `${options.sortKey}.${options.sortDirection}.nullslast`,
+			order: [ `${options.sortKey}.${options.sortDirection}.nullslast`, ...config.primaryKeys.filter(key => key !== options.sortKey).map(key => `${key}.desc.nullslast`) ].join(','),
 			limit: String(options.pageSize),
 			offset: String(options.page * options.pageSize)
 		});
 		for (const [key, value] of Object.entries(config.fixedValues ?? {})) {
 			params.set(key, value === null ? 'is.null' : `eq.${String(value)}`);
 		}
+		for (const [key, filter] of Object.entries(options.filters ?? {})) params.set(`filter_${key}`, JSON.stringify(filter));
+		if (options.lifecycle === 'unmatured') {
+			params.set('lifecycle', 'unmatured');
+			params.set('as_of', options.asOfDate ?? '');
+		}
+		if (options.status) params.set('status', `eq.${options.status}`);
+		if (options.subtype && !Object.hasOwn(config.fixedValues ?? {}, 'subtype') && config.fields.some(field => field.key === 'subtype' && field.options?.some(choice => choice.value === options.subtype))) params.set('subtype', `eq.${options.subtype}`);
+		if (options.issueFrom) params.set('issue_from', options.issueFrom);
+		if (options.issueTo) params.set('issue_to', options.issueTo);
 		const search = options.search.trim().replace(/[,*()]/g, ' ');
 		if (search && config.searchFields.length) {
 			params.set('or', `(${config.searchFields.map((field) => `${field}.ilike.*${search}*`).join(',')})`);
@@ -88,8 +104,37 @@ export class NeonDataApi {
 		return { rows, total: totalPart && totalPart !== '*' ? Number(totalPart) : rows.length };
 	}
 
+	async all(config: EntityConfig, options: ListOptions) {
+		const rows: DataRow[] = [];
+		const seen = new Set<string>();
+		let expectedTotal: number | null = null;
+		for (let page = 0; ; page++) {
+			const result = await this.list(config, { ...options, page, pageSize: 500 });
+			if (expectedTotal === null) expectedTotal = result.total;
+			if (result.total !== expectedTotal) throw new Error('导出数据已变化，请重试');
+			for (const row of result.rows) {
+				const id = config.primaryKeys.map(key => String(row[key])).join(':');
+				if (seen.has(id)) throw new Error('导出数据已变化，请重试');
+				seen.add(id);
+				rows.push(row);
+			}
+			if (rows.length === expectedTotal) return rows;
+			if (!result.rows.length || rows.length > expectedTotal) throw new Error('导出数据已变化，请重试');
+		}
+	}
+
+	async get(config: EntityConfig, id: string) {
+		const params = this.#rowFilter(config, { id }, false);
+		params.set('limit', '1');
+		const response = await this.#request(`${config.tableName}?${params}`);
+		const rows = await response.json() as DataRow[];
+		if (!rows[0]) throw new Error('记录不存在或已删除');
+		return rows[0];
+	}
+
 	#rowFilter(config: EntityConfig, row: DataRow, includeVersion = true) {
 		const params = new URLSearchParams();
+		for (const [key, value] of Object.entries(config.fixedValues ?? {})) params.set(key, value === null ? 'is.null' : `eq.${String(value)}`);
 		for (const key of config.primaryKeys) params.set(key, `eq.${String(row[key])}`);
 		if (includeVersion && row.updated_at) params.set('updated_at', `eq.${String(row.updated_at)}`);
 		return params;

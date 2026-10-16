@@ -164,3 +164,43 @@ test('liability report fetches business and raw EDB data in parallel with one au
 		globalThis.fetch = originalFetch;
 	}
 });
+
+test('debt export freshly fetches all pages with identical filters and stable sorting; editor scopes id to product',async()=>{
+ const {NeonDataApi}=await loadNeonDataApi();const previous=globalThis.fetch;const calls=[];
+ const config={...entity,fields:[{key:'id'},{key:'name'}],fixedValues:{debt_type:'债券',subtype:'小公募'}};
+ globalThis.fetch=async(input)=>{
+  if(String(input)==='/financing/data/token')return Response.json({token:'x',dataApiUrl:'https://data.example.test'});
+  const url=new URL(input);calls.push(url);
+  const offset=Number(url.searchParams.get('offset')??0),limit=Number(url.searchParams.get('limit'));
+  return Response.json(limit===1?[{id:9}]:Array.from({length:Math.min(500,501-offset)},(_,i)=>({id:offset+i})),{headers:{'content-range':`${offset}-${Math.min(500,501-offset)}/501`}});
+ };
+ try {
+ const api=new NeonDataApi();const rows=await api.all(config,{...listOptions,sortKey:'name',sortDirection:'desc',lifecycle:'unmatured',asOfDate:'2026-10-16',search:'foo'});
+ assert.equal(rows.length,501);assert.equal(calls.length,2);
+ for(const url of calls){assert.equal(url.searchParams.get('lifecycle'),'unmatured');assert.equal(url.searchParams.get('as_of'),'2026-10-16');assert.equal(url.searchParams.get('order'),'name.desc.nullslast,id.desc.nullslast');assert.equal(url.searchParams.get('subtype'),'eq.小公募');}
+ await api.get(config,'9');assert.equal(calls[2].searchParams.get('id'),'eq.9');assert.equal(calls[2].searchParams.get('subtype'),'eq.小公募');
+ }finally{globalThis.fetch=previous;}
+});
+
+test('export rejects changed counts or duplicate identities rather than exporting partial results',async()=>{
+ const {NeonDataApi}=await loadNeonDataApi();const previous=globalThis.fetch;
+ try{
+  for(const mode of ['changed','duplicate']){
+   let calls=0;
+   globalThis.fetch=async(input)=>{
+    if(String(input)==='/financing/data/token')return Response.json({token:'x',dataApiUrl:'https://data.example.test'});
+    const page=calls++;return Response.json(page===0?Array.from({length:500},(_,id)=>({id})):[{id:mode==='duplicate'?499:500}],{headers:{'content-range':`0-0/${mode==='changed'&&page?502:501}`}});
+   };
+   await assert.rejects(new NeonDataApi().all(entity,listOptions),/数据已变化/);
+  }
+ }finally{globalThis.fetch=previous;}
+});
+
+test('fixed product subtype cannot be overridden by URL options',async()=>{
+ const {NeonDataApi}=await loadNeonDataApi();const previous=globalThis.fetch;let observed;
+ globalThis.fetch=async(input)=>{
+  if(String(input)==='/financing/data/token')return Response.json({token:'x',dataApiUrl:'https://data.example.test'});
+  observed=new URL(input);return Response.json([]);
+ };
+ try{await new NeonDataApi().list({...entity,fixedValues:{debt_type:'债券',subtype:'小公募'}},{...listOptions,subtype:'次级债'});assert.equal(observed.searchParams.get('subtype'),'eq.小公募');}finally{globalThis.fetch=previous;}
+});

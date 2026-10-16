@@ -35,7 +35,7 @@ export async function loadDebtDetail(db, id) {
 			d.amount, d.interest_payable AS interestPayable, d.total_amount AS totalAmount,
 			d.annual_rate AS annualRate, d.issue_date AS issueDate, d.maturity_date AS maturityDate,
 			d.term_days AS termDays, d.activated_at AS activatedAt,
-			d.settled_at AS settledAt, d.closed_at AS closedAt, d.status,
+			d.settled_at AS settledAt, d.closed_at AS closedAt, financing.debt_status_as_of(d.issue_date,d.maturity_date,d.activated_at,d.settled_at,d.closed_at,(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date) AS status,
 			b.issuance_method AS issuanceMethod, b.bookbuilding_date AS bookbuildingDate,
 			b.interest_basis AS interestBasis, b.issuance_target AS issuanceTarget,
 			b.market AS bondMarket, b.receiving_account AS bondReceivingAccount, b.trustee, b.bookrunner,

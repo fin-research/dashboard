@@ -103,7 +103,7 @@ test('data administration gets its endpoint with the private token request', asy
 	assert.match(endpoint, /vary: 'Cookie'/);
 	assert.match(client, /dataApiUrl\?: string/);
 	assert.match(client, /parsed\.protocol !== 'https:'/);
-	assert.doesNotMatch(page, /import DataAdminTable|<DataAdminTable/);
+	assert.match(page, /<DataAdminTable config=\{entity\}/);
 	assert.match(page, /<FinanceParametersPanel permissions=\{permissions\} \/>/);
 	assert.match(parameters, /new NeonDataApi\(\)/);
 	assert.doesNotMatch(parameters.slice(parameters.indexOf('async function save()')), /api\.list\(|loadRows\(\);|invalidateAll/);

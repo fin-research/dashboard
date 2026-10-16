@@ -107,7 +107,7 @@ function debtTableName(debtType: string) {
 	}
 }
 
-const debtEntities: EntityConfig[] = DATA_ADMIN_DEBT_TYPES.map((item, index) => {
+export const DEBT_ENTITIES: EntityConfig[] = DATA_ADMIN_DEBT_TYPES.map((item, index) => {
 	const tableName = debtTableName(item.type);
 	const fields = [...commonDebtFields];
 	if (item.subtypeOptions) {
@@ -137,7 +137,7 @@ const debtEntities: EntityConfig[] = DATA_ADMIN_DEBT_TYPES.map((item, index) => 
 });
 
 export const DATA_ENTITIES: EntityConfig[] = [
-	...debtEntities,
+	...DEBT_ENTITIES,
 	{
 		key: 'monthly-finance', label: '月度财务数据', tableName: 'financial_monthly_data', primaryKeys: ['period_end'], searchFields: ['notes'],
 		defaultSort: { key: 'period_end', direction: 'desc' }, canCreate: true, canDelete: true,
@@ -212,4 +212,27 @@ export function valueForDatabase(field: FieldConfig, value: unknown) {
 		return numeric / (field.displayFactor ?? 1);
 	}
 	return String(value).trim();
+}
+
+export const DATA_ADMIN_TABS = [
+	{ id: 'management', label: '数据管理', href: '/financing/data' },
+	...DEBT_ENTITIES.map(config => ({ id: config.key, label: config.label, href: `/financing/data?tab=${config.key}` }))
+];
+
+export function debtEditorFields(config: EntityConfig, mode: 'create' | 'edit') {
+	return config.fields.filter(field => !field.readOnly && field.form !== false && !(mode === 'edit' && config.primaryKeys.includes(field.key)) && !(config.tableName === 'refinancing' && field.key === 'name'));
+}
+
+export function debtEditorPayload(config: EntityConfig, mode: 'create' | 'edit', values: DataRow) {
+	const result: DataRow = {};
+	for (const field of debtEditorFields(config, mode)) {
+		const raw = values[field.key];
+		if (mode === 'create' && field.omitWhenEmptyOnCreate && (raw === '' || raw == null)) continue;
+		const value = valueForDatabase(field, raw);
+		if (field.required && (value === null || value === '')) throw new Error(`请填写${field.label}`);
+		if (typeof value === 'number' && ((field.min != null && Number(raw) < field.min) || (field.max != null && Number(raw) > field.max))) throw new Error(`${field.label}超出范围`);
+		result[field.key] = value;
+	}
+	if (config.tableName === 'refinancing') result.name = '转融资';
+	return result;
 }

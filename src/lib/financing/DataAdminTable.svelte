@@ -1,373 +1,136 @@
 <script lang="ts">
-  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
-  import * as Table from "$lib/components/ui/table/index.js";
-  import * as Tabs from "$lib/components/ui/tabs/index.js";
-  import { NativeSelect } from "$lib/components/ui/native-select/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
-  import { Button } from "$lib/components/ui/button/index.js";
-	import { tick } from 'svelte';
-	import { createTable, FlexRender, tableFeatures, type ColumnDef } from '@tanstack/svelte-table';
-	import {
-		Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp,
-		LoaderCircle, Pencil, Plus, RefreshCw, Search, Trash2, X
-	} from '@lucide/svelte';
-	import { globalMessages } from '$lib/global-messages';
-	import {
-		DATA_ENTITIES, formatDataValue, valueForDatabase, valueForEditor,
-		type DataRow, type EntityConfig, type FieldConfig
-	} from './data-admin';
-	import { NeonDataApi } from './neon-data-api';
+ import ModuleCard from '../../components/ModuleCard.svelte';
+ import { goto } from '$app/navigation';
+ import { Button } from '$lib/components/ui/button/index.js';
+ import { Input } from '$lib/components/ui/input/index.js';
+ import { NativeSelect } from '$lib/components/ui/native-select/index.js';
+ import DebtColumnMenu from './DebtColumnMenu.svelte';
+ import * as Popover from '$lib/components/ui/popover/index.js';
+ import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+ import { createTable, tableFeatures } from '@tanstack/svelte-table';
+ import * as Table from '$lib/components/ui/table/index.js';
+ import { globalMessages } from '$lib/global-messages';
+ import { hasPermission } from '$lib/permissions';
+ import { formatDataValue, type EntityConfig, type DataRow } from './data-admin';
+ import { NeonDataApi, type ListOptions } from './neon-data-api';
+ import { financingToday } from './time.js';
+ import { downloadDebtWorkbook } from './debt-export';
+ let { config, url, permissions }: {config:EntityConfig; url:URL; permissions:string[]} = $props();
+ const api = new NeonDataApi();
+ const core = ['name','subtype','counterparty','amount','annual_rate','issue_date','maturity_date','status'];
+ const availableFields = $derived(config.fields.filter(field => core.includes(field.key)));
+ const hidden = $derived((url.searchParams.get('hidden')??'').split(',').filter(key=>key!=='name'));
+ const fields = $derived(availableFields.filter(field=>!hidden.includes(field.key)));
+ const filters = $derived.by(() => {
+  const result: NonNullable<ListOptions['filters']> = {};
+  for (const field of availableFields) {
+   try { const value=url.searchParams.get(`f_${field.key}`);if(value){const parsed=JSON.parse(value);if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))result[field.key]=parsed;} } catch { /* Ignore malformed UI state. */ }
+  }
+  return result;
+ });
+ let rows = $state<DataRow[]>([]), total = $state(0), loading = $state(true), exporting = $state(false), error = $state('');
+ const features = tableFeatures({});
+ const columns = $derived(fields.map(field=>({accessorKey:field.key,header:field.label})));
+ const table = createTable({features,get columns(){return columns;},get data(){return rows;}});
+ const options = $derived.by((): ListOptions => ({
+  page: Math.max(0, Math.floor(Number(url.searchParams.get('page')) || 0)),
+  pageSize: [25, 50, 100].includes(Number(url.searchParams.get('size'))) ? Number(url.searchParams.get('size')) : 50,
+  filters,
+  sortKey: config.fields.some(field => field.key === url.searchParams.get('sort'))
+   ? url.searchParams.get('sort')! : config.defaultSort.key,
+  sortDirection: url.searchParams.get('direction') === 'asc' ? 'asc' : 'desc',
+  search: url.searchParams.get('search') ?? '',
+  lifecycle: url.searchParams.get('lifecycle') === 'all' ? 'all' : 'unmatured',
+  asOfDate: financingToday(),
+  status: url.searchParams.get('status') ?? '',
+  subtype: url.searchParams.get('subtype') ?? '',
+  issueFrom: url.searchParams.get('from') ?? '',
+  issueTo: url.searchParams.get('to') ?? ''
+ }));
 
-	const features = tableFeatures({});
-	const firstEntity = DATA_ENTITIES[0];
-	if (!firstEntity) throw new Error('数据后台实体配置为空');
-	let activeKey = $state(firstEntity.key);
-	let rows = $state<DataRow[]>([]);
-	let total = $state(0);
-	let page = $state(0);
-	let pageSize = $state(50);
-	let search = $state('');
-	let appliedSearch = $state('');
-	let sortKey = $state(firstEntity.defaultSort.key);
-	let sortDirection = $state<'asc' | 'desc'>(firstEntity.defaultSort.direction);
-	let loading = $state(true);
-	let savingKey = $state<string | null>(null);
-	let editorMode = $state<'create' | 'edit' | null>(null);
-	let editingKey = $state<string | null>(null);
-	let originalRow = $state<DataRow | null>(null);
-	let formValues = $state<Record<string, unknown>>({});
-	const api = new NeonDataApi();
-
-	const activeConfig = $derived(DATA_ENTITIES.find((item) => item.key === activeKey) ?? firstEntity);
-	const visibleFields = $derived(activeConfig.fields.filter((field) => field.table !== false));
-	const totalPages = $derived(Math.max(1, Math.ceil(total / pageSize)));
-	const columns = $derived(visibleFields.map((field) => ({
-		accessorKey: field.key,
-		header: field.label
-	})) as ColumnDef<typeof features, DataRow>[]);
-	const table = createTable({
-		features,
-		get columns() { return columns; },
-		get data() { return rows; }
-	});
-
-	$effect(() => {
-		void loadRows();
-	});
-
-	async function loadRows() {
-		loading = true;
-		cancelEdit();
-		try {
-			const result = await api.list(activeConfig, {
-				page, pageSize, sortKey, sortDirection, search: appliedSearch
-			});
-			rows = result.rows;
-			total = result.total;
-			if (page > 0 && !rows.length && total > 0) {
-				page = Math.max(0, Math.ceil(total / pageSize) - 1);
-				await loadRows();
-			}
-		} catch (error) {
-			globalMessages.error(error instanceof Error ? error.message : String(error), {
-				key: 'data-admin-load',
-				title: '数据读取失败'
-			});
-			rows = [];
-			total = 0;
-		} finally {
-			loading = false;
-		}
-	}
-
-	function rowKey(config: EntityConfig, row: DataRow) {
-		return config.primaryKeys.map((key) => String(row[key] ?? '')).join(':');
-	}
-
-	function switchEntity(config: EntityConfig) {
-		activeKey = config.key;
-		page = 0;
-		search = '';
-		appliedSearch = '';
-		sortKey = config.defaultSort.key;
-		sortDirection = config.defaultSort.direction;
-		cancelEdit();
-	}
-
-	function applySearch() {
-		page = 0;
-		appliedSearch = search.trim();
-	}
-
-	function toggleSort(key: string) {
-		if (sortKey === key) sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-		else {
-			sortKey = key;
-			sortDirection = 'asc';
-		}
-		page = 0;
-	}
-
-	function canEditField(field: FieldConfig, mode: 'create' | 'edit') {
-		return !field.readOnly && field.form !== false && !(mode === 'edit' && activeConfig.primaryKeys.includes(field.key));
-	}
-
-	function editorValues(row: DataRow | null, mode: 'create' | 'edit') {
-		return Object.fromEntries(activeConfig.fields
-			.filter((field) => canEditField(field, mode))
-			.map((field) => [field.key, row ? valueForEditor(field, row[field.key]) : field.type === 'boolean' ? false : '']));
-	}
-
-	async function focusEditor(cell?: HTMLTableCellElement, fieldKey?: string) {
-		await tick();
-		const target = fieldKey
-			? cell?.querySelector<HTMLElement>(`[data-field="${fieldKey}"]`)
-			: document.querySelector<HTMLElement>('[data-new-row] input:not([type="checkbox"]), [data-new-row] select');
-		target?.focus();
-	}
-
-	async function beginEdit(row: DataRow, fieldKey?: string, cell?: HTMLTableCellElement) {
-		if (activeConfig.readOnly) return;
-		editorMode = 'edit';
-		editingKey = rowKey(activeConfig, row);
-		originalRow = row;
-		formValues = editorValues(row, 'edit');
-		await focusEditor(cell, fieldKey);
-	}
-
-	async function beginCreate() {
-		if (!activeConfig.canCreate || activeConfig.readOnly) return;
-		editorMode = 'create';
-		editingKey = '__new__';
-		originalRow = null;
-		formValues = editorValues(null, 'create');
-		await focusEditor();
-	}
-
-	function cancelEdit() {
-		editorMode = null;
-		editingKey = null;
-		originalRow = null;
-		formValues = {};
-	}
-
-	function setField(key: string, value: unknown) {
-		formValues = { ...formValues, [key]: value };
-	}
-
-	function payload(mode: 'create' | 'edit') {
-		const result: DataRow = {};
-		for (const field of activeConfig.fields) {
-			if (!canEditField(field, mode)) continue;
-			const raw = formValues[field.key];
-			if (mode === 'create' && field.omitWhenEmptyOnCreate && (raw === '' || raw == null)) continue;
-			const value = valueForDatabase(field, raw);
-			if (field.required && (value === null || value === '')) throw new Error(`请填写${field.label}`);
-			result[field.key] = value;
-		}
-		return result;
-	}
-
-	function compareValues(left: unknown, right: unknown) {
-		if (left == null || left === '') return right == null || right === '' ? 0 : 1;
-		if (right == null || right === '') return -1;
-		const leftNumber = Number(left);
-		const rightNumber = Number(right);
-		const comparison = Number.isFinite(leftNumber) && Number.isFinite(rightNumber)
-			? leftNumber - rightNumber
-			: String(left).localeCompare(String(right), 'zh-CN', { numeric: true });
-		return sortDirection === 'asc' ? comparison : -comparison;
-	}
-
-	function sortCurrentRows(nextRows: DataRow[]) {
-		return [...nextRows].sort((left, right) => compareValues(left[sortKey], right[sortKey]));
-	}
-
-	async function saveRow() {
-		if (!editorMode) return;
-		const currentKey = editingKey ?? '__new__';
-		savingKey = currentKey;
-		try {
-			const values = payload(editorMode);
-			if (editorMode === 'create') {
-				const savedRows = await api.insert(activeConfig, values);
-				if (!savedRows[0]) throw new Error('新增失败');
-				rows = sortCurrentRows([savedRows[0], ...rows]).slice(0, pageSize);
-				total += 1;
-			} else if (originalRow) {
-				const savedRows = await api.update(activeConfig, originalRow, values);
-				const saved = savedRows[0];
-				if (!saved) throw new Error('保存未返回更新记录，请重试');
-				const originalKey = rowKey(activeConfig, originalRow);
-				rows = sortCurrentRows(rows.map((row) => rowKey(activeConfig, row) === originalKey ? saved : row));
-			}
-			cancelEdit();
-			globalMessages.success('已保存', { key: 'data-admin-mutation', title: '数据已更新' });
-		} catch (error) {
-			globalMessages.error(error instanceof Error ? error.message : String(error), {
-				key: 'data-admin-mutation'
-			});
-		} finally {
-			savingKey = null;
-		}
-	}
-
-	async function deleteRow(row: DataRow) {
-		if (!activeConfig.canDelete || activeConfig.readOnly) return;
-		const identity = activeConfig.primaryKeys.map((key) => `${key}=${String(row[key])}`).join('，');
-		if (!confirm(`确定删除？\n${identity}`)) return;
-		const identityKey = rowKey(activeConfig, row);
-		savingKey = identityKey;
-		try {
-			await api.delete(activeConfig, row);
-			rows = rows.filter((item) => rowKey(activeConfig, item) !== identityKey);
-			total = Math.max(0, total - 1);
-			if (editingKey === identityKey) cancelEdit();
-			globalMessages.success('已删除', { key: 'data-admin-mutation', title: '数据已更新' });
-		} catch (error) {
-			globalMessages.error(error instanceof Error ? error.message : String(error), {
-				key: 'data-admin-mutation'
-			});
-		} finally {
-			savingKey = null;
-		}
-	}
-
-	function goTo(nextPage: number) {
-		page = Math.min(Math.max(nextPage, 0), totalPages - 1);
-	}
+ let search = $state('');
+ let request = 0;
+ $effect(() => { search = options.search; void load(config, options); });
+ async function load(entity:EntityConfig, query:ListOptions) {
+  const current = ++request; loading = true; error = '';
+  try {
+   const result = await api.list(entity, { ...query, asOfDate: financingToday() });
+   if(current!==request)return;
+   const lastPage=Math.max(0,Math.ceil(result.total/query.pageSize)-1);
+   if(query.page>lastPage){change({page:String(lastPage)});return;}
+   rows=result.rows;total=result.total;
+  }
+  catch(cause) { if(current!==request)return;rows=[];total=0;error=cause instanceof Error?cause.message:String(cause); }
+  finally { if(current===request)loading=false; }
+ }
+ function change(changes:Record<string,string>) {
+  const next = new URL(url); next.searchParams.delete('page');
+  for(const [key,value] of Object.entries(changes)) { if(value)next.searchParams.set(key,value);else next.searchParams.delete(key); }
+  void goto(next.pathname+next.search,{noScroll:true,keepFocus:true});
+ }
+ function setFilter(key:string, filter:NonNullable<ListOptions['filters']>[string]) {
+  change({[`f_${key}`]:Object.keys(filter).length?JSON.stringify(filter):''});
+ }
+ function setHidden(key:string, hide:boolean) {
+  change({hidden:(hide?[...hidden,key]:hidden.filter(item=>item!==key)).join(',')});
+ }
+ function entryHref(id:unknown) { const next=new URL(url);next.searchParams.set('entry',String(id));return next.pathname+next.search; }
+ async function exportRows() {
+  if(exporting)return; exporting=true;
+  try { const entity=config, query={...options,asOfDate:financingToday()};const fresh=await api.all(entity,query);await downloadDebtWorkbook(entity,fresh);globalMessages.success(`已导出 ${fresh.length} 条`,{key:'debt-export'}); }
+  catch(cause){globalMessages.error(cause instanceof Error?cause.message:String(cause),{key:'debt-export'});}
+  finally{exporting=false;}
+ }
+ const pages = $derived(Math.max(1,Math.ceil(total/options.pageSize)));
 </script>
-
-{#snippet fieldEditor(field: FieldConfig)}
-	{#if field.type === 'select'}
-		<NativeSelect data-ui-owner="lib-financing-DataAdminTable-svelte" class={"ui-select"} aria-label={field.label} data-field={field.key} value={String(formValues[field.key] ?? '')} onchange={(event) => setField(field.key, event.currentTarget.value)}>
-			{#if !field.required && !(field.options ?? []).some((choice) => choice.value === '')}<option value="">未设置</option>{/if}
-			{#each field.options ?? [] as choice}<option value={choice.value}>{choice.label}</option>{/each}
-		</NativeSelect>
-	{:else if field.type === 'boolean'}
-		<Checkbox data-ui-owner="lib-financing-DataAdminTable-svelte" class="ui-checkbox  cell-checkbox" aria-label={field.label} data-field={field.key} checked={Boolean(formValues[field.key])} onCheckedChange={(checked) => setField(field.key, checked)} />
-	{:else}
-		<Input data-ui-owner="lib-financing-DataAdminTable-svelte" class={"ui-input"} aria-label={field.label} data-field={field.key} type={field.type === 'textarea' ? 'text' : field.type ?? 'text'} value={String(formValues[field.key] ?? '')} min={field.min} max={field.max} step={field.step} oninput={(event) => setField(field.key, event.currentTarget.value)} />
-	{/if}
-{/snippet}
-
-<section class="data-editor" aria-label="融资数据表">
-	<Tabs.Root value={activeKey} onValueChange={(key) => { const config = DATA_ENTITIES.find(item => item.key === key); if (config) switchEntity(config); }}>
-  <Tabs.List class="entity-tabs h-auto w-full justify-start overflow-x-auto rounded-none" aria-label="数据表">
-		{#each DATA_ENTITIES as config}
-			<Tabs.Trigger value={config.key}>{config.label}</Tabs.Trigger>
-		{/each}
-	</Tabs.List></Tabs.Root>
-
-	<div class="table-toolbar">
-		<form class="search-form" onsubmit={(event) => { event.preventDefault(); applySearch(); }}>
-			<label><span class="sr-only">搜索{activeConfig.label}</span><Search size={18} /><Input data-ui-owner="lib-financing-DataAdminTable-svelte" class={"ui-input"} bind:value={search} type="search" /></label>
-			<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="submit">查询</Button>
-		</form>
-		<div class="table-meta">
-			<strong>{total.toLocaleString('zh-CN')} 条</strong>
-			<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="ghost" type="button" class={"ui-button  icon-action"} aria-label="刷新数据" onclick={() => void loadRows()} disabled={loading}><RefreshCw size={18} class={loading ? 'spin' : ''} /></Button>
-		</div>
-	</div>
-
-	<div class="table-shell" aria-busy={loading}>
-		<Table.Root scrollable={false} class="ui-table">
-			<Table.Header>
-				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-					<Table.Row>
-						{#each headerGroup.headers as header (header.id)}
-							<Table.Head scope="col"><Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" type="button" class={"ui-button sort-button"} onclick={() => toggleSort(header.column.id)}><FlexRender {header} />{#if sortKey === header.column.id}{#if sortDirection === 'asc'}<ChevronUp size={15} />{:else}<ChevronDown size={15} />{/if}{/if}</Button></Table.Head>
-						{/each}
-						<Table.Head scope="col" class="action-column">操作</Table.Head>
-					</Table.Row>
-				{/each}
-			</Table.Header>
-			<Table.Body>
-				{#if editorMode === 'create'}
-					<Table.Row class="editing-row" data-new-row>
-						{#each visibleFields as field (field.key)}
-							<Table.Cell>{#if canEditField(field, 'create')}{@render fieldEditor(field)}{:else}—{/if}</Table.Cell>
-						{/each}
-						<Table.Cell class="row-actions"><div>
-							<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="保存新增行" onclick={() => void saveRow()} disabled={savingKey === '__new__'}>{#if savingKey === '__new__'}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</Button>
-							<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="取消新增" onclick={cancelEdit} disabled={savingKey === '__new__'}><X size={17} /></Button>
-						</div></Table.Cell>
-					</Table.Row>
-				{/if}
-				{#if loading}
-					<Table.Row><Table.Cell colspan={visibleFields.length + 1} class="empty-row"><LoaderCircle size={20} class="spin" /> 正在读取…</Table.Cell></Table.Row>
-				{:else if table.getRowModel().rows.length === 0 && editorMode !== 'create'}
-					<Table.Row><Table.Cell colspan={visibleFields.length + 1} class="empty-row">暂无记录</Table.Cell></Table.Row>
-				{:else}
-					{#each table.getRowModel().rows as row (rowKey(activeConfig, row.original))}
-						{@const identityKey = rowKey(activeConfig, row.original)}
-						{@const editing = editorMode === 'edit' && editingKey === identityKey}
-						<Table.Row class={editing ? "editing-row" : ""}>
-							{#each visibleFields as field (field.key)}
-								<Table.Cell
-									class={!editing && canEditField(field, 'edit') ? "editable-cell" : ""}
-									onclick={(event) => { if (!editing && canEditField(field, 'edit')) void beginEdit(row.original, field.key, event.currentTarget); }}
-								>
-									{#if editing && canEditField(field, 'edit')}{@render fieldEditor(field)}{:else}{formatDataValue(field, row.original[field.key])}{/if}
-								</Table.Cell>
-							{/each}
-							<Table.Cell class="row-actions"><div>
-								{#if editing}
-									<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="保存本行" onclick={() => void saveRow()} disabled={savingKey === identityKey}>{#if savingKey === identityKey}<LoaderCircle size={17} class="spin" />{:else}<Check size={17} />{/if}</Button>
-									<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="取消编辑" onclick={cancelEdit} disabled={savingKey === identityKey}><X size={17} /></Button>
-								{:else}
-									<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="编辑本行" onclick={() => void beginEdit(row.original)}><Pencil size={17} /></Button>
-									{#if activeConfig.canDelete}<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="destructive" type="button" class={"ui-button  danger"} aria-label="删除本行" onclick={() => void deleteRow(row.original)} disabled={savingKey === identityKey}><Trash2 size={17} /></Button>{/if}
-								{/if}
-							</div></Table.Cell>
-						</Table.Row>
-					{/each}
-				{/if}
-			</Table.Body>
-		</Table.Root>
-	</div>
-
-	<div class="pagination-bar">
-		<label>每页 <NativeSelect data-ui-owner="lib-financing-DataAdminTable-svelte" class={"ui-select"} value={pageSize} onchange={(event) => { pageSize = Number(event.currentTarget.value); page = 0; }}><option value="25">25</option><option value="50">50</option><option value="100">100</option></NativeSelect></label>
-		<span>第 {page + 1} / {totalPages} 页</span>
-		<div><Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="上一页" onclick={() => goTo(page - 1)} disabled={page === 0 || loading}><ChevronLeft size={18} /></Button><Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="outline" class={"ui-button"} type="button" aria-label="下一页" onclick={() => goTo(page + 1)} disabled={page + 1 >= totalPages || loading}><ChevronRight size={18} /></Button></div>
-	</div>
-</section>
-
-{#if activeConfig.canCreate && !activeConfig.readOnly}
-	<Button data-ui-owner="lib-financing-DataAdminTable-svelte" variant="default" class={"ui-button  floating-create-button data-create"} type="button" aria-label="新增一行" onclick={() => void beginCreate()} disabled={loading || editorMode !== null}><Plus size={24} /></Button>
-{/if}
-
+<ModuleCard class="data-editor" padding="none" labelledBy="debt-table-title">
+ <h2 id="debt-table-title" class="sr-only">{config.label}负债数据</h2>
+ <div class="table-toolbar">
+  <form onsubmit={event=>{event.preventDefault();change({search});}}><Input aria-label="搜索负债" type="search" bind:value={search}/><Button type="submit" variant="outline">查询</Button></form>
+  <div class="table-actions">
+   <NativeSelect aria-label="到期筛选" value={options.lifecycle} onchange={event=>change({lifecycle:event.currentTarget.value})}><option value="unmatured">未到期</option><option value="all">全部</option></NativeSelect>
+   <Popover.Root><Popover.Trigger>{#snippet child({props})}<Button {...props} variant="outline">视图</Button>{/snippet}</Popover.Trigger><Popover.Content align="end" class="w-52 p-3"><div class="view-columns">{#each availableFields as field}<label><Checkbox checked={!hidden.includes(field.key)} disabled={field.key==='name'} onCheckedChange={checked=>setHidden(field.key,!checked)}/>{field.label}</label>{/each}</div></Popover.Content></Popover.Root><Button variant="outline" onclick={()=>void load(config,options)} disabled={loading}>刷新</Button><Button variant="outline" onclick={()=>void exportRows()} disabled={exporting}>{exporting?'导出中…':'导出 Excel'}</Button>{#if hasPermission(permissions,'financing.data:create')}<Button href={entryHref('new')}>新增条目</Button>{/if}</div>
+ </div>
+ {#if error}<div role="alert" class="table-error">{error}<Button variant="outline" onclick={()=>void load(config,options)}>重试</Button></div>{/if}
+ <div class="table-shell" role="region" aria-label="负债表格" tabindex="0" aria-busy={loading}>
+ <Table.Root scrollable={false}>
+  <Table.Header>{#each table.getHeaderGroups() as group}<Table.Row>{#each group.headers as header}
+   {@const field=fields.find(field=>field.key===header.column.id)!}
+   <Table.Head aria-sort={options.sortKey===field.key?(options.sortDirection==='asc'?'ascending':'descending'):'none'} class={field.type==='number'?'numeric':''}>
+    <DebtColumnMenu {field} sortDirection={options.sortKey===field.key?options.sortDirection:undefined} filter={filters[field.key]} onsort={direction=>change({sort:direction?field.key:'',direction})} onfilter={filter=>setFilter(field.key,filter)} onhide={()=>{if(field.key!=='name')setHidden(field.key,true);}}/>
+   </Table.Head>
+  {/each}</Table.Row>{/each}</Table.Header>
+  <Table.Body>
+   {#if loading}<Table.Row><Table.Cell colspan={fields.length} class="empty-row">正在读取…</Table.Cell></Table.Row>
+   {:else}{#each table.getRowModel().rows as item (String(item.original.id))}
+    {@const row=item.original}
+    <Table.Row class="debt-row" onclick={()=>void goto(entryHref(row.id))}>
+     {#each fields as field}<Table.Cell class={field.type==='number'?'numeric':''}>
+      {#if field.key==='name'}<a href={entryHref(row.id)} onclick={event=>event.stopPropagation()}>{formatDataValue(field,row[field.key])}</a>
+      {:else if field.key==='status'}{({planned:'未生效',active:'存续',matured:'到期',closed:'关闭'} as Record<string,string>)[String(row.status)]??String(row.status)}
+      {:else}{formatDataValue(field,row[field.key])}{/if}
+     </Table.Cell>{/each}
+    </Table.Row>
+   {:else}<Table.Row><Table.Cell colspan={fields.length} class="empty-row">暂无记录</Table.Cell></Table.Row>{/each}{/if}
+  </Table.Body>
+ </Table.Root>
+ </div>
+ <div class="pagination-bar"><strong>{total.toLocaleString('zh-CN')} 条</strong><label>每页<NativeSelect aria-label="每页条数" value={String(options.pageSize)} onchange={event=>change({size:event.currentTarget.value})}><option value="25">25</option><option value="50">50</option><option value="100">100</option></NativeSelect></label><span>第 {options.page+1} / {pages} 页</span><Button variant="outline" aria-label="上一页" disabled={loading||options.page===0} onclick={()=>change({page:String(options.page-1)})}>上一页</Button><Button variant="outline" aria-label="下一页" disabled={loading||options.page+1>=pages} onclick={()=>change({page:String(options.page+1)})}>下一页</Button></div>
+</ModuleCard>
 <style>
-  .data-editor { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
-  :global(.data-editor .entity-tabs) { padding: .75rem 1rem; border-bottom: 1px solid var(--line); }
-  .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 1rem; }
-  .search-form { display: flex; align-items: center; gap: .5rem; min-width: min(100%, 26rem); }
-  .search-form label { display: flex; flex: 1; align-items: center; gap: .5rem; min-width: 0; }
-  .table-meta { display: flex; align-items: center; gap: .75rem; white-space: nowrap; }
-  .table-shell { min-width: 0; max-width: 100%; overflow: auto; border-block: 1px solid var(--line); }
-  :global(.data-editor table) { width: max(100%, 70rem); border-collapse: collapse; font-size: 1rem; }
-  :global(.data-editor th), :global(.data-editor td) { padding: .75rem; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  :global(.data-editor th) { position: sticky; top: 0; z-index: 2; background: #f8fafc; color: var(--ink); font-weight: bold; }
-  :global(.data-editor tbody tr:hover) { background: #f8fbff; }
-  :global(.data-editor .editing-row) { background: var(--brand-soft); }
-  :global(.data-editor .editable-cell) { cursor: text; }
-  :global(.data-editor .editable-cell:hover) { box-shadow: inset 0 0 0 1px var(--border-strong); }
-  :global(.data-editor .sort-button) { gap: .25rem; width: 100%; padding: 0; border: 0; background: transparent; justify-content: flex-start; }
-  :global(.data-editor .action-column) { position: sticky; right: 0; z-index: 3; min-width: 7rem; }
-  :global(.data-editor .row-actions) { position: sticky; right: 0; z-index: 1; background: inherit; }
-  :global(.data-editor .row-actions > div) { display: flex; align-items: center; justify-content: center; gap: .375rem; }
-  :global(.data-editor .row-actions button), :global(.data-editor .icon-action) { width: 44px; padding: 0; }
-  :global(.data-editor td input:not([type='checkbox'])), :global(.data-editor td select) { width: max(100%, 8rem); padding: .375rem .5rem; }
-  :global(.data-editor .cell-checkbox) { display: block; width: 1.25rem; margin: auto; }
-  :global(.data-editor .empty-row) { height: 8rem; text-align: center; color: var(--text-muted); }
-  :global(.data-editor .empty-row svg) { display: inline-block; vertical-align: middle; margin-right: .375rem; }
-  .pagination-bar { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; padding: .75rem 1rem; }
-  .pagination-bar label, .pagination-bar > div { display: flex; align-items: center; gap: .5rem; }
-  :global(.data-create) { z-index: 15; }
-  :global(.spin) { animation: spin .8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @media (max-width: 64rem) { .table-toolbar { align-items: stretch; flex-direction: column; } .table-meta { justify-content: flex-end; } }
-  @media (max-width: 35rem) { .table-toolbar, .pagination-bar { padding-inline: .75rem; } .search-form { min-width: 0; } .pagination-bar { justify-content: space-between; flex-wrap: wrap; } }
-  @media (prefers-reduced-motion: reduce) { :global(.spin) { animation: none; } }
+ :global(.data-editor) {min-width:0;overflow:hidden;}
+ .table-toolbar,.table-actions,.pagination-bar,.table-toolbar form {display:flex;align-items:center;gap:.75rem;}
+ .table-toolbar,.pagination-bar {padding:1rem;flex-wrap:wrap;}
+ .table-toolbar {justify-content:space-between;}.table-toolbar form{flex:1;max-width:28rem;min-width:16rem;}.table-actions{flex-wrap:wrap;} :global(.table-actions select){width:auto;min-width:7rem;}.pagination-bar label{white-space:nowrap;} :global(.pagination-bar select){width:5rem;}
+ .view-columns {display:flex;flex-direction:column;gap:.75rem;}.view-columns label,.pagination-bar label{display:flex;align-items:center;gap:.5rem;font-size:.875rem;}.pagination-bar strong{margin-right:auto;}
+
+ .table-shell{overflow:auto;max-width:100%;border-block:1px solid var(--line);}
+ :global(.data-editor table){width:100%;font-variant-numeric:tabular-nums;}
+ :global(.data-editor th),:global(.data-editor td){white-space:nowrap;padding:.75rem 1rem;}
+ :global(.data-editor .numeric){text-align:right;}:global(.data-editor th.numeric button){margin-left:auto;}
+ :global(.data-editor .debt-row){cursor:pointer;}:global(.data-editor .debt-row:hover){background:var(--brand-soft);}
+ :global(.data-editor .debt-row a){color:var(--brand);font-weight:bold;}
+ :global(.data-editor .empty-row){height:8rem;text-align:center;}
+ .pagination-bar{justify-content:flex-end;}.table-error{display:flex;gap:1rem;align-items:center;padding:1rem;color:#b42318;}
+ @media(max-width:40rem){.table-toolbar form{min-width:0;max-width:none;width:100%;}.table-toolbar{align-items:stretch;}.table-actions{width:100%;}.pagination-bar{justify-content:space-between;}}
 </style>
