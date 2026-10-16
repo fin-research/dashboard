@@ -1,4 +1,5 @@
 <script lang="ts">
+ import { Search, SlidersHorizontal, RefreshCw, Download, Plus } from '@lucide/svelte';
  import ModuleCard from '../../components/ModuleCard.svelte';
  import { goto } from '$app/navigation';
  import { Button } from '$lib/components/ui/button/index.js';
@@ -86,10 +87,10 @@
 <ModuleCard class="data-editor" padding="none" labelledBy="debt-table-title">
  <h2 id="debt-table-title" class="sr-only">{config.label}负债数据</h2>
  <div class="table-toolbar">
-  <form onsubmit={event=>{event.preventDefault();change({search});}}><Input aria-label="搜索负债" type="search" bind:value={search}/><Button type="submit" variant="outline">查询</Button></form>
+  <form role="search" onsubmit={event=>{event.preventDefault();change({search});}}><Input aria-label="搜索负债" placeholder="搜索负债" type="search" bind:value={search}/><Button type="submit" variant="ghost" size="icon" class="size-11" aria-label="查询"><Search aria-hidden="true"/></Button></form>
   <div class="table-actions">
    <NativeSelect aria-label="到期筛选" value={options.lifecycle} onchange={event=>change({lifecycle:event.currentTarget.value})}><option value="unmatured">未到期</option><option value="all">全部</option></NativeSelect>
-   <Popover.Root><Popover.Trigger>{#snippet child({props})}<Button {...props} variant="outline">视图</Button>{/snippet}</Popover.Trigger><Popover.Content align="end" class="w-52 p-3"><div class="view-columns">{#each availableFields as field}<label><Checkbox checked={!hidden.includes(field.key)} disabled={field.key==='name'} onCheckedChange={checked=>setHidden(field.key,!checked)}/>{field.label}</label>{/each}</div></Popover.Content></Popover.Root><Button variant="outline" onclick={()=>void load(config,options)} disabled={loading}>刷新</Button><Button variant="outline" onclick={()=>void exportRows()} disabled={exporting}>{exporting?'导出中…':'导出 Excel'}</Button>{#if hasPermission(permissions,'financing.data:create')}<Button href={entryHref('new')}>新增条目</Button>{/if}</div>
+   <Popover.Root><Popover.Trigger>{#snippet child({props})}<Button {...props} variant="outline"><SlidersHorizontal aria-hidden="true"/>视图</Button>{/snippet}</Popover.Trigger><Popover.Content align="end" class="w-52 p-3"><div class="view-columns">{#each availableFields as field}<label><Checkbox checked={!hidden.includes(field.key)} disabled={field.key==='name'} onCheckedChange={checked=>setHidden(field.key,!checked)}/>{field.label}</label>{/each}</div></Popover.Content></Popover.Root><Button variant="ghost" size="icon" class="size-11" aria-label="刷新" onclick={()=>void load(config,options)} disabled={loading}><RefreshCw aria-hidden="true" class={loading?'animate-spin':''}/></Button><Button variant="outline" onclick={()=>void exportRows()} disabled={exporting}><Download aria-hidden="true"/>{exporting?'导出中…':'导出 Excel'}</Button>{#if hasPermission(permissions,'financing.data:create')}<Button class="ui-button" href={entryHref('new')}><Plus aria-hidden="true"/>新增条目</Button>{/if}</div>
  </div>
  {#if error}<div role="alert" class="table-error">{error}<Button variant="outline" onclick={()=>void load(config,options)}>重试</Button></div>{/if}
  <div class="table-shell" role="region" aria-label="负债表格" tabindex="0" aria-busy={loading}>
@@ -121,7 +122,8 @@
  :global(.data-editor) {min-width:0;overflow:hidden;}
  .table-toolbar,.table-actions,.pagination-bar,.table-toolbar form {display:flex;align-items:center;gap:.75rem;}
  .table-toolbar,.pagination-bar {padding:1rem;flex-wrap:wrap;}
- .table-toolbar {justify-content:space-between;}.table-toolbar form{flex:1;max-width:28rem;min-width:16rem;}.table-actions{flex-wrap:wrap;} :global(.table-actions select){width:auto;min-width:7rem;}.pagination-bar label{white-space:nowrap;} :global(.pagination-bar select){width:5rem;}
+ .table-toolbar {justify-content:space-between;gap:1rem;}.table-toolbar form{position:relative;flex:0 1 20rem;min-width:12rem;}.table-actions{flex-wrap:wrap;gap:.5rem;}
+ :global(.table-toolbar form input){padding-right:3.25rem;} :global(.table-toolbar form button){position:absolute;right:0;top:0;} :global(.table-actions select){width:auto;min-width:7rem;}.pagination-bar label{white-space:nowrap;} :global(.pagination-bar select){width:5rem;}
  .view-columns {display:flex;flex-direction:column;gap:.75rem;}.view-columns label,.pagination-bar label{display:flex;align-items:center;gap:.5rem;font-size:.875rem;}.pagination-bar strong{margin-right:auto;}
 
  .table-shell{overflow:auto;max-width:100%;border-block:1px solid var(--line);}
@@ -132,5 +134,5 @@
  :global(.data-editor .debt-row a){color:var(--brand);font-weight:bold;}
  :global(.data-editor .empty-row){height:8rem;text-align:center;}
  .pagination-bar{justify-content:flex-end;}.table-error{display:flex;gap:1rem;align-items:center;padding:1rem;color:#b42318;}
- @media(max-width:40rem){.table-toolbar form{min-width:0;max-width:none;width:100%;}.table-toolbar{align-items:stretch;}.table-actions{width:100%;}.pagination-bar{justify-content:space-between;}}
+ @media(max-width:40rem){.table-toolbar form{flex-basis:100%;min-width:0;width:100%;}.table-toolbar{align-items:stretch;}.table-actions{width:100%;}.pagination-bar{justify-content:space-between;}}
 </style>

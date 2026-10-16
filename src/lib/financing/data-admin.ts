@@ -216,7 +216,8 @@ export function valueForDatabase(field: FieldConfig, value: unknown) {
 
 export const DATA_ADMIN_TABS = [
 	{ id: 'management', label: '数据管理', href: '/financing/data' },
-	...DEBT_ENTITIES.map(config => ({ id: config.key, label: config.label, href: `/financing/data?tab=${config.key}` }))
+	...DEBT_ENTITIES.filter(config => !['科创债', '私募债', '收益权转让', '互换便利'].includes(config.label))
+		.map(config => ({ id: config.key, label: config.label, href: `/financing/data?tab=${config.key}` }))
 ];
 
 export function debtEditorFields(config: EntityConfig, mode: 'create' | 'edit') {

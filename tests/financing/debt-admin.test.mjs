@@ -5,7 +5,7 @@ import { PGlite } from '@electric-sql/pglite';
 import ExcelJS from 'exceljs';
 import {readFile} from 'node:fs/promises';
 const {compileDataAdminQuery} = await tsImport('../../src/lib/server/financing/data-admin-query.ts',import.meta.url);
-const {DEBT_ENTITIES,debtEditorPayload} = await tsImport('../../src/lib/financing/data-admin.ts',import.meta.url);
+const {DEBT_ENTITIES,DATA_ADMIN_TABS,debtEditorPayload} = await tsImport('../../src/lib/financing/data-admin.ts',import.meta.url);
 const {populateDebtWorkbook} = await tsImport('../../src/lib/financing/debt-export.ts',import.meta.url);
 
 test('actual debt SQL excludes maturity today, early settlement and closure; retains future and undated planned debt',async()=>{
@@ -83,4 +83,11 @@ test('migration status function and preserved overview use Shanghai current date
   assert.match(migration,/CURRENT_TIMESTAMP AT TIME ZONE 'Asia\/Shanghai'/);
   assert.match(migration,/SECURITY INVOKER/);
  }finally{await db.close();}
+});
+
+
+test('debt tabs hide inactive categories without changing existing entity URLs',()=>{
+ assert.deepEqual(DATA_ADMIN_TABS.map(tab=>tab.label),['数据管理','收益凭证','小公募','次级债','短期融资券','转融资','集团借款','同业拆借']);
+ assert.equal(DEBT_ENTITIES.find(entity=>entity.key==='debt-1').label,'小公募');
+ assert.equal(DATA_ADMIN_TABS.find(tab=>tab.label==='短期融资券').id,'debt-5');
 });

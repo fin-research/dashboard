@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { isDebtNarrativeName } from '../../../src/lib/financing/debt-import-rules.js';
 import { financingToday } from '../../../src/lib/financing/time.js';
 import * as XLSX from 'xlsx/xlsx.mjs';
 import { stableDebtKey } from './debt-key.mjs';
@@ -231,10 +232,17 @@ function isMeaningfulRow(row) {
 	return row.some((value) => text(value) !== null);
 }
 
-function isNarrativeRow(row, sheetName) {
-	if (!['小公募', '私募债', '短期融资券', '集团借款'].includes(sheetName)) return false;
-	const values = row.map(text).filter(Boolean);
-	return values.length === 1 && /^(?:发行阶段[：:]|兑付阶段[：:]|注[：:]|截至目前集团共发行|[123]、)/u.test(values[0]);
+function isNarrativeRow(row, sheetName, fields, headers) {
+ if (!['小公募', '次级债', '私募债', '科创债', '短期融资券', '公司债', '集团借款'].includes(sheetName)) return false;
+ const names = ['instrumentName', 'counterparty'].map(field => text(valueAt(row, fields, field))).filter(Boolean);
+ if (!names.some(isDebtNarrativeName)) return false;
+ if (['issueDate', 'maturityDate', 'annualRate', 'instrumentCode'].some(field => text(valueAt(row, fields, field)) !== null)) return false;
+ if (!['principalAmount', 'outstandingAmount'].every(field => isZeroOrMissingAmount(valueAt(row, fields, field), headers[fields[field]]))) return false;
+ // Extra business dates or cashflows must be validated, never silently discarded.
+ return row.every((value, index) => {
+  const candidate = text(value);
+  return candidate === null || isDebtNarrativeName(candidate) || /^(?:0(?:\.0+)?|[-—–])$/u.test(candidate);
+ });
 }
 
 function isZeroOrMissingAmount(value, header) {
@@ -427,7 +435,8 @@ export function parseDebtWorkbookData(workbookData, sourceFile) {
 			const row = rows[index];
 			if (!isMeaningfulRow(row)) continue;
 			const sourceRow = index + 1;
-			if (isNarrativeRow(row, sheetName)) {
+			if (isNarrativeRow(row, sheetName, header.fields, headers)) {
+				parent = null;
 				skippedNarrativeRows += 1;
 				skipped += 1;
 				continue;

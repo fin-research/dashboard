@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isNarrativeOnlyDebt } from './debt-import-rules.js';
 import { DebtImportError } from './debt-import-error.ts';
 
 const text = z.string().trim().min(1).max(2000);
@@ -55,6 +56,7 @@ export function validateWorkbook(input: { debts: unknown[]; cashflows: unknown[]
 export function validateIncrement(input: ImportWorkbook) {
   const keys = new Set<string>();
   for (const debt of input.debts) {
+    if (isNarrativeOnlyDebt(debt)) throw new DebtImportError('说明文字不能作为负债导入');
     if (keys.has(debt.sourceKey)) throw new DebtImportError('新增负债来源键重复');
     keys.add(debt.sourceKey);
     const table = {债券:'bond',收益凭证:'income_certificate',收益权转让:'income_right',转融资:'refinancing',互换便利:'swap_facility',同业拆借:'debt',集团借款:'debt'}[debt.debtType];
