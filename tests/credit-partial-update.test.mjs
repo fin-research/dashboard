@@ -38,12 +38,12 @@ test('save returns scoped canonical data; browser summary and events equal a fre
 test('historical maintenance and future changes update the selected view without switching its date',async t=>{
   const db=await creditDatabase(t);await seedCredit(db,'2026-08-01');
   const before=await loadCreditData(db,'2026-08-15','2026-09');
-  const past=await saveCreditInstitution(db,{operation:'maintenance',reportDate:'2026-08-08',viewDate:'2026-08-15',calendarMonth:'2026-09',institutionName:'甲银行',changes:{items:[{type:'bond_investment',secondaryUsedAmount:0}],institution:{totalLimit:0,confidentialityStatus:false,notes:''}}});
-  assert.equal(buildCreditReport(past.data).institutions[0].totalUsed,0);assert.equal(buildCreditReport(past.data).institutions[0].totalLimit,0);
+  const past=await saveCreditInstitution(db,{operation:'maintenance',reportDate:'2026-08-08',viewDate:'2026-08-15',calendarMonth:'2026-09',institutionName:'甲银行',changes:{items:[{type:'bond_investment',limitAmount:0,secondaryUsedAmount:0}],institution:{confidentialityStatus:false,notes:''}}});
+  assert.equal(buildCreditReport(past.data).institutions[0].totalUsed,0);assert.equal(buildCreditReport(past.data).institutions[0].totalLimit,10);
   const updated=applyCreditUpdate(before,past,'2026-09');
   assert.deepEqual(orderCollections(updated),orderCollections(await loadCreditReport(db,'2026-08-15','2026-09')));
-  const future=await saveCreditInstitution(db,{operation:'maintenance',reportDate:'2026-09-01',viewDate:'2026-08-15',calendarMonth:'2026-09',institutionName:'甲银行',changes:{institution:{totalLimit:5}}});
-  assert.equal(future.viewDate,'2026-08-15');assert.equal(buildCreditReport(future.data).institutions[0].totalLimit,0);
+  const future=await saveCreditInstitution(db,{operation:'maintenance',reportDate:'2026-09-01',viewDate:'2026-08-15',calendarMonth:'2026-09',institutionName:'甲银行',changes:{institution:{notes:'未来备注'}}});
+  assert.equal(future.viewDate,'2026-08-15');assert.equal(buildCreditReport(future.data).institutions[0].totalLimit,10);
   assert.deepEqual(orderCollections(applyCreditUpdate(updated,future,'2026-09')),orderCollections(await loadCreditReport(db,'2026-08-15','2026-09')));
 });
 

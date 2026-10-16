@@ -484,17 +484,17 @@ test('授信布尔协议契约拒绝字符串及已删除的周报标记', () =>
 
 test('稀疏变更正确继承 false、零和清空，补录历史不覆盖后续显式变更',async t=>{
   const db=await creditDatabase(t);await seedCredit(db,'2026-08-21','甲银行',{confidentiality_status:true,notes:'旧备注'});
-  await saveCreditInstitution(db,{reportDate:'2026-08-23',institutionName:'甲银行',changes:{institution:{totalLimit:12,notes:'后续备注'}}},'auth0|test');
-  await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{institution:{confidentialityStatus:false,totalLimit:0,notes:''},items:[{type:'bond_investment',secondaryUsedAmount:0}]}},'auth0|test');
+  await saveCreditInstitution(db,{operation:'increase',reportDate:'2026-08-23',institutionName:'甲银行',changes:{institution:{totalLimit:12,notes:'后续备注'}}},'auth0|test');
+  await saveCreditInstitution(db,{reportDate:'2026-08-22',institutionName:'甲银行',changes:{institution:{confidentialityStatus:false,notes:''},items:[{type:'bond_investment',limitAmount:0,secondaryUsedAmount:0}]}},'auth0|test');
   const before=(await loadCreditReport(db,'2026-08-21')).institutions[0];
   const middle=(await loadCreditReport(db,'2026-08-22')).institutions[0];
   const after=(await loadCreditReport(db,'2026-08-25')).institutions[0];
-  assert.equal(before.notes,'旧备注');assert.equal(middle.notes,'');assert.equal(middle.totalLimit,0);assert.equal(middle.confidentialityStatus,false);
+  assert.equal(before.notes,'旧备注');assert.equal(middle.notes,'');assert.equal(middle.totalLimit,10);assert.equal(middle.items.find(item=>item.type==='bond_investment').limitAmount,0);assert.equal(middle.confidentialityStatus,false);
   assert.equal(after.totalLimit,12);assert.equal(after.notes,'后续备注');assert.equal(after.totalUsed,0);
   const sql=(await db.query("SELECT notes,total::float8,confidentiality_status FROM credit.entry_as_of('2026-08-25')")).rows[0];
   assert.deepEqual(sql,{notes:'后续备注',total:12,confidentiality_status:false});
   const rows=(await db.query("SELECT field_id,v_num,v_text FROM credit.entry WHERE report_date='2026-08-22'")).rows;
-  assert.equal(rows.find(r=>r.field_id==='notes').v_text,'');assert.equal(Number(rows.find(r=>r.field_id==='total').v_num),0);
+  assert.equal(rows.find(r=>r.field_id==='notes').v_text,'');assert.equal(Number(rows.find(r=>r.field_id==='bond_investment_limit').v_num),0);
   assert.equal(before.confidentialityStatus,false);
 });
 
@@ -556,7 +556,7 @@ test('旧快照转换可逐字段复原，并记录旧字段清空和机构撤�
 test('数据库精度归一后相同金额不产生重复 diff，历史补录不能破坏后续期限',async t=>{
   const db=await creditDatabase(t);await seedCredit(db);
   const patch={reportDate:'2026-08-21',institutionName:'甲银行',changes:{institution:{totalLimit:10.1234567}}};
-  await saveCreditInstitution(db,patch,'auth0|test');
+  await saveCreditInstitution(db,{...patch,operation:'increase'},'auth0|test');
   const count=(await db.query('SELECT count(*) n FROM credit.entry')).rows[0].n;
   await saveCreditInstitution(db,patch,'auth0|test');
   assert.equal((await db.query('SELECT count(*) n FROM credit.entry')).rows[0].n,count);

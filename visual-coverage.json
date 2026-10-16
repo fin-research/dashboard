@@ -440,7 +440,7 @@
       "id": "credit-ledger",
       "url": "/credit-workbench/ledger",
       "kind": "screenshot",
-      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/application-new/application-increase/multisort-default/multisort-custom/export-loading/export-download/export-failure/export-empty/usage-details/usage-empty/draft-preservation/late-response/financing-link",
+      "state": "normal/quarter-final/report-date-picker/detail-dialog/editable-maintenance/readonly-total/editable-item-limits/application-new/application-increase/multisort-default/multisort-custom/export-loading/export-download/export-failure/export-empty/usage-details/usage-empty/draft-preservation/late-response/financing-link",
       "evidence": [
         {
           "spec": "tests/visual/workspaces.spec.mjs",

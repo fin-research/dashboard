@@ -16,7 +16,6 @@ const row = {
 
 test('maintenance calculates total and item availability from editable values without inventing an other limit',()=>{
   const draft=creditMaintenanceDraft(row);
-  draft.totalLimit=12;
   draft.items.bond_investment.secondaryUsedAmount=2;
   draft.items.legal_overdraft.usedAmount=0.75;
   draft.items.other.usedAmount=0.5;
@@ -29,9 +28,9 @@ test('maintenance calculates total and item availability from editable values wi
   assert.equal(amount.remaining.legal_overdraft,1.25);
   assert.equal(amount.remaining.other,null);
   assert.equal(amount.totalUsed,7.25);
-  assert.equal(amount.available,4.75);
+  assert.equal(amount.available,2.75);
   const changes=creditMaintenanceChanges(row,draft);
-  assert.deepEqual(changes.institution,{totalLimit:12});
+  assert.equal(changes.institution,undefined);
   assert.deepEqual(changes.items,[
     {type:'bond_investment',secondaryUsedAmount:2},
     {type:'legal_overdraft',usedAmount:0.75},

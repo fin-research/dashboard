@@ -132,7 +132,7 @@
       onchange={event => draft.confidentialityStatus = (event.currentTarget as HTMLSelectElement).value === 'true'}>
       <option value="true">已签署</option><option value="false">未签署</option>
     </NativeSelect></label>
-    <label><span>授信总额（亿元）</span><Input type="number" min="0" step="0.000001" value={draft.totalLimit ?? ''} disabled={!canEdit || saving} oninput={event => draft.totalLimit = numberInput(event)} /></label>
+    <label><span>授信总额（亿元）</span><Input type="number" value={institution.totalLimit ?? ''} disabled /></label>
     <label><span>已用额度（亿元）</span><Input value={formatAmount(amounts.totalUsed)} disabled /></label>
     <label><span>可用额度（亿元）</span><Input value={formatAmount(amounts.available)} disabled /></label>
     <label><span>生效日</span><Input type="date" bind:value={draft.effectiveDate} disabled={!canEdit || saving} /></label>

@@ -14,6 +14,11 @@ export function subtractAmounts(left: Amount, right: Amount): number {
   return new CreditDecimal(left).minus(right).toDecimalPlaces(6).toNumber();
 }
 
+/** Match equality after each value crosses PostgreSQL's numeric(20,6) boundary. */
+export function amountsEqual(left: Amount, right: Amount): boolean {
+  return new CreditDecimal(left).toDecimalPlaces(6).eq(new CreditDecimal(right).toDecimalPlaces(6));
+}
+
 /** Compare the unrounded delta so the existing 100-yuan threshold stays exact. */
 export function amountsDiffer(left: Amount, right: Amount): boolean {
   return new CreditDecimal(left).minus(right).abs().gt('0.000001');
