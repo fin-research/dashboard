@@ -251,3 +251,16 @@ export const shiborRatesSchema = z.array(z.object({
   tenor: z.enum(['O/N', '1W', '2W', '1M', '3M', '6M', '9M', '1Y']), rate: z.number().finite(),
 })).max(8);
 export type ShiborRate = z.infer<typeof shiborRatesSchema>[number];
+
+// CAMEL adapter: smallest DTOs consumed by the interbank ledger client.
+const interbankId = z.union([z.string().min(1), z.number().finite()]);
+const interbankScalar = z.union([z.string(), z.number().finite()]).nullish();
+export const interbankPageSchema = z.object({
+  records:z.array(z.object({id:interbankId,serialNo:z.string(),busiDate:z.string(),ourpartyName:interbankScalar,counterpartyName:interbankScalar,matchAmount:interbankScalar,matchTime:interbankScalar,firstSettleDate:z.string(),expireAmount:interbankScalar,financingCode:interbankScalar,hid:interbankId.nullish(),allocateReviewStatus:interbankScalar})),
+  total:z.number().int().nonnegative(),
+});
+export const interbankParseSchema = z.object({status:z.string(),data:z.array(z.record(z.string(),z.unknown())),totalNum:z.number().int(),warnings:z.array(z.unknown()).optional()});
+export const interbankAttachmentSchema = z.object({id:interbankId});
+export const interbankSavedSchema = z.object({saved:z.literal(true)});
+export const interbankDraftSavedSchema = z.object({hid:interbankId});
+export const interbankDraftSchema = z.object({hid:interbankId,reservationId:interbankScalar,remark:z.string(),repaymentId:interbankId.nullish(),reviewStatus:interbankScalar,status:interbankScalar,attachmentList:z.array(z.object({id:interbankId}))});

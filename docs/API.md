@@ -4,7 +4,7 @@
 
 ## 外部数据服务 `/data/*`
 
-市场点评及其定稿 GET/HEAD 公开只读。市场点评 Workflow 通过私有 DATA binding 读取原始行情，浏览器只读取 R2 定稿。DM、东方财富网和固定行业快照读取不查询身份服务。Choice 通用查询和 CAMEL 仍要求登录。旧 `/api/market-resources/*` 保留为公开的限定兼容通道。
+市场点评及其定稿 GET/HEAD 公开只读。市场点评 Workflow 通过私有 DATA binding 读取原始行情，浏览器只读取 R2 定稿。DM、东方财富网和固定行业快照读取不查询身份服务。Choice 通用查询仍要求登录。CAMEL 只经 Dashboard 同源 `/api/interbank/*` 访问私有 Data 入口，见[拆借台账](TRADING_RESEARCH_WORKBENCH.md#拆借台账)。旧 `/api/market-resources/*` 保留为公开的限定兼容通道。
 
 除基础配置和 Choice 外，所有 REST 资源都支持 `fields=a,b` 顶层字段投影。未知字段为
 422。列表资源直接返回 JSON array，不再读取 `data`、`list` 等上游 envelope。响应必须
