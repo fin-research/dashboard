@@ -117,6 +117,8 @@ test('credit application separates requests from editable maintenance details an
   await region.getByRole('rowheader',{name:'银行甲',exact:true}).click();
   const detail=page.getByRole('dialog',{name:'授信详情',exact:true});
   await expect(detail.getByRole('textbox',{name:'机构性质',exact:true})).toBeEnabled();
+  await expect(detail.getByRole('spinbutton',{name:'授信总额（亿元）',exact:true})).toBeDisabled();
+  await expect(detail.getByRole('group',{name:'债券投资',exact:true}).getByRole('spinbutton',{name:'额度（亿元）',exact:true})).toBeEnabled();
   await expect(detail.getByRole('textbox',{name:'已用额度（亿元）',exact:true})).toBeDisabled();
   await expect(detail.getByRole('textbox',{name:'状态',exact:true})).toBeDisabled();
   await expect(detail.getByRole('button',{name:'保存',exact:true})).toBeVisible();

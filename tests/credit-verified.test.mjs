@@ -14,7 +14,7 @@ test('report-day verification is explicit, idempotent, and isolated from later s
  let response=await save({verified:true});assert.equal(buildCreditReport(response.data).institutions[0].verified,true);
  const before=await rows();assert.equal(before.length,1);assert.equal(before[0].v_text,'原备注');assert.equal(before[0].event,'maintenance');
  await save({verified:true});assert.deepEqual(await rows(),before);
- await save({totalLimit:11});assert.ok((await rows()).every(r=>r.verified));
+ await save({detail:'更新额度说明'});assert.ok((await rows()).every(r=>r.verified));
  response=await save({verified:false});assert.equal(buildCreditReport(response.data).institutions[0].verified,false);
  assert.ok((await rows()).every(r=>!r.verified));
  assert.equal((await rows())[0].created_by,before[0].created_by);

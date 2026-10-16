@@ -1,4 +1,4 @@
-import { amountNumber, amountsDiffer, secondaryUsageFromYuan, subtractAmounts } from '../credit/amounts.ts';
+import { amountNumber, amountsDiffer, amountsEqual, secondaryUsageFromYuan, subtractAmounts } from '../credit/amounts.ts';
 import { creditItemLabels, creditItemTypes, type CreditAmountChange, type CreditCalendarEvent,
   type CreditEventType, type CreditInstitutionUpdateResponse, type CreditInstitutionView,
   type CreditUsageType, type CreditUsageDetail, type CreditItemType, type CreditReportResponse, type CreditSummaryView,
@@ -174,6 +174,10 @@ export async function saveCreditInstitution(client: DatabaseClient,input: Credit
     if (create !== (operation === 'new')) throw new CreditDatabaseError(400,'授信申请操作与机构状态不匹配');
     const before = existing.rows[0];
     const fields = input.changes.institution ?? {};
+    if (operation === 'maintenance' && fields.totalLimit != null &&
+      (before?.total == null || !amountsEqual(fields.totalLimit, before.total))) {
+      throw new CreditDatabaseError(400,'维护不能变更授信总额，请使用授信申请');
+    }
     const allowedFields = operation === 'renewal' ? ['effectiveDate','expiryDate','totalLimit','notes']
       : operation === 'increase' ? ['totalLimit','notes']
         : operation === 'revocation' ? ['expiryDate','status','notes'] : null;

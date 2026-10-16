@@ -31,6 +31,7 @@ assert.ok(detail);
 assert.equal([...detail.querySelectorAll('label')].some(label=>label.textContent.trim()==='记录日期'),false);
 const date=[...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='到期日').querySelector('input');
 assert.equal(date.disabled,false);
+assert.equal([...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='授信总额（亿元）').querySelector('input').disabled,true);
 assert.equal([...detail.querySelectorAll('label')].find(label=>label.textContent.trim()==='可用额度（亿元）').querySelector('input').disabled,true);
 date.value='2027-08-31';date.dispatchEvent(new window.Event('input',{bubbles:true}));
 date.dispatchEvent(new window.Event('change',{bubbles:true}));await settle();
@@ -76,6 +77,7 @@ const editor=mount(Editor,{context,target:document.querySelector('#host'),props:
   reportDate:summary.reportDate,calendarMonth:'2026-09',previousDate:null,contextVersion:1,onapplied:()=>{}}});await settle();
 const bond=document.querySelector('.tr-credit-item-bond');
 const inputFor=label=>[...bond.querySelectorAll('label')].find(node=>node.textContent.trim()===label).querySelector('input');
+assert.equal(inputFor('额度（亿元）').disabled,false);
 assert.equal(inputFor('已用（亿元）').value,'22.2');
 assert.equal(inputFor('可用（亿元）').value,'25.02');
 inputFor('可用（亿元）').value='30';
