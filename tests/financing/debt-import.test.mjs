@@ -140,3 +140,37 @@ test('browser compares the downloaded index and uploads only candidate additions
  assert.deepEqual(incrementForIndex(withSwap,{...index,debts:[old,swap]}).debts,[]);
  assert.deepEqual(incrementForIndex(withSwap,{...index,debts:[old,{...swap,issueDate:'2026-08-31'}]}).debts.map(d=>d.sourceKey),['swap']);
 });
+
+test('narrative sections with zero placeholders and duplicate cells cannot become debts or steal cashflows',()=>{
+ const workbook=XLSX.read(workbookFixture(),{type:'array'});
+ const serialize=()=>XLSX.write(workbook,{type:'array',bookType:'xlsx'});
+ for(const sheet of ['小公募','次级债','私募债','科创债','短期融资券','公司债']){
+  workbook.Sheets[sheet]=XLSX.utils.aoa_to_sheet([
+   ['债券简称','发行金额','发行日期','到期日','备注'],
+   ['1、真实债券',1000,'2026-09-01','2027-09-01'],
+   ['发行阶段：说明',0,null,null,'发行阶段：说明'],
+   ['4、兑付日前办理手续','-',null,null]
+  ]);
+  if(!workbook.SheetNames.includes(sheet))workbook.SheetNames.push(sheet);
+ }
+ const parsed=parseDebtWorkbookData(serialize(),'借入资金汇总表20260903.xlsx');
+ const transformed=validateWorkbook(transformWorkbook(parsed));
+ assert.equal(transformed.debts.length,7);assert.equal(parsed.skipped,12);
+ assert.ok(transformed.debts.filter(d=>d.debtType==='债券').every(d=>d.amount===1000));
+ workbook.Sheets['小公募']=XLSX.utils.aoa_to_sheet([
+  ['债券简称','发行金额','发行日期','到期日','应付利息','付息时间'],
+  ['真实债券',1000,'2026-09-01','2027-09-01'],
+  ['发行阶段：说明',0],
+  [null,null,null,null,10,'2027-09-01']
+ ]);
+ assert.throws(()=>parseDebtWorkbookData(serialize(),'借入资金汇总表20260903.xlsx'),/无法关联负债/);
+});
+
+test('direct import increments reject undated narrative debt but preserve legitimate zero balance history',()=>{
+ const transformed=validateWorkbook(transformWorkbook(parseDebtWorkbookData(workbookFixture(),'借入资金汇总表20260903.xlsx')));
+ const debt={...transformed.debts[0],table:'bond',debtType:'债券',subtype:'小公募',name:'3、兑付日当日完成向投资人投资本息兑付。',amount:0,interestPayable:0,annualRate:null,counterparty:null,issueDate:null,maturityDate:null,activatedAt:null,settledAt:null,closedAt:null};
+ assert.throws(()=>validateIncrement({...transformed,debts:[debt]}),/说明文字不能作为负债/);
+ assert.doesNotThrow(()=>validateIncrement({...transformed,debts:[{...debt,name:'1、计划产品',extension:{bookbuildingDate:'2026-10-20'}}]}));
+ assert.doesNotThrow(()=>validateIncrement({...transformed,debts:[{...debt,extension:{bookbuildingDate:'2026-10-20'}}]}));
+ assert.doesNotThrow(()=>validateIncrement({...transformed,debts:[{...debt,name:'历史债券',issueDate:'2020-01-01',maturityDate:'2021-01-01'}]}));
+});

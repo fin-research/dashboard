@@ -27,6 +27,7 @@ test('financing debt table and shared editor support filtered CRUD and Excel exp
  expect(reads.at(-1).searchParams.get('lifecycle')).toBe('unmatured');expect(reads.at(-1).searchParams.get('order')).toBe('issue_date.desc.nullslast,id.desc.nullslast');
  expect(reads.at(-1).searchParams.get('as_of')).toBe('2026-10-16');
  await page.clock.setFixedTime(new Date('2026-10-16T16:01:00Z'));await page.getByRole('button',{name:'刷新',exact:true}).click();await expect.poll(()=>reads.at(-1)?.searchParams.get('as_of')).toBe('2026-10-17');await expect(page.getByRole('link',{name:'示例收益凭证',exact:true})).toBeVisible();
+ for(const name of ['科创债','私募债','收益权转让','互换便利']) await expect(page.getByRole('link',{name,exact:true})).toHaveCount(0);
  await expect(page.locator('.tr-workbench')).toHaveScreenshot('financing-debt-table.png');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.getByRole('combobox',{name:'到期筛选'}).selectOption('all');

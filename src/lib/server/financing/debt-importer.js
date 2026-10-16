@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { DebtImportError } from '../../financing/debt-import-error.ts';
+import { isNarrativeOnlyDebt } from '../../financing/debt-import-rules.js';
 import { balanceKey } from '../../financing/debt-import-json.ts';
 import { clientFromDebtCounterparty } from '../../financing/debt-import-client.js';
 
@@ -148,6 +149,7 @@ export async function importDebtWorkbook(database, transformed, {
 			) ON COMMIT DROP
 		`);
 		for await (const batch of importBatches(transformed, 'debts', 'debtBatches')) {
+      if (batch.some(isNarrativeOnlyDebt)) throw new DebtImportError('说明文字不能作为负债导入');
 			await database.query(`
 				INSERT INTO maintenance_debt (
 					source_key, target_table, debt_type, subtype, name, legacy_name, counterparty, amount,

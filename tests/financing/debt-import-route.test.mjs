@@ -26,3 +26,10 @@ test('connection failures are sanitized and do not claim that a possibly committ
  const response=await POST(request);assert.equal(response.status,503);
  const result=await response.json();assert.match(result.error,/无法确认/);assert.doesNotMatch(result.error,/secret|未写入/);
 });
+
+
+test('direct JSON commit refuses narrative debt before opening a database connection',async()=>{
+ const body={action:'commit',version:'v1',snapshot:{asOfDate:'2026-10-16',totalYi:0},balances:[],snapshotBalances:[{asOfDate:'2026-10-16',debtType:'债券',subtype:'小公募',amount:0}],cashflows:[],
+  debts:[{sourceKey:'note',table:'bond',debtType:'债券',subtype:'小公募',name:'发行阶段：',amount:0,interestPayable:0,extension:{}}]};
+ const response=await POST(event(body));assert.equal(response.status,400);assert.match((await response.json()).error,/说明文字不能作为负债/);
+});
