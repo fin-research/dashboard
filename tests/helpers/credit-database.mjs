@@ -10,6 +10,7 @@ export async function creditDatabase(t, beforeDiff = false, beforeBond = false, 
     await db.exec(fs.readFileSync(new URL(`../../financing-migrations/${name}`,import.meta.url),'utf8'));
   }
   await installBondInvestors(db);
+  await db.exec(fs.readFileSync(new URL('../../financing-migrations/0036_debt_live_status.sql',import.meta.url),'utf8'));
   await db.exec('CREATE SCHEMA IF NOT EXISTS credit; CREATE TABLE credit.schema_migration(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
   for (const name of fs.readdirSync(new URL('../../credit-migrations/',import.meta.url)).filter(n=>n.endsWith('.sql')).sort()) {
     if ((!beforeDiff || name < '0008') && (!beforeBond || name < '0009') && (!beforeApplications || name < '0013') && (!beforeEntries || name < '0018')) await applyCreditMigration(db,name);
