@@ -16,10 +16,19 @@ test('desktop credit weekly report presents nonempty news and five product detai
  await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
  await page.setViewportSize({width:1280,height:900});await page.goto('/credit-workbench/weekly');
  await expect(page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article')).toHaveCount(5);
- for (const card of await page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article').all()) await expect(card).toContainText('较上周');
- await expect(page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article').first()).toContainText('较上周+2亿元');
+ for (const card of await page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article').all()) {
+   await expect(card).not.toContainText('较上周');
+   expect(await card.locator('.research-metric-card__detail').evaluate(el=>getComputedStyle(el).color)).toBe(await card.locator('strong').evaluate(el=>getComputedStyle(el).color));
+ }
+ await expect(page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article').first()).toContainText('+2亿元');
  await expect(page.getByRole('region',{name:'本周授信快讯',exact:true})).toContainText('较前额增加5亿');
  await expect(page.locator('.tr-credit-news-list li')).toHaveCount(4);
+ for(const row of await page.locator('.tr-credit-news-list li').all()) {
+   expect(await row.evaluate(el=>getComputedStyle(el).borderWidth)).toBe('0px');
+   expect(await row.evaluate(el=>getComputedStyle(el).alignItems)).toBe('center');
+ }
+ await expect(page.getByRole('heading',{name:'近期新增授信批复',exact:true})).toBeVisible();
+ for(const header of await page.locator('.tr-credit-weekly-report thead th').all()) expect(await header.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
  await expect(page.getByRole('table',{name:'所选报表日前近6个月新增、续作和扩额授信批复',exact:true})).toContainText('同业拆借 3.00亿');
  await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-weekly-full-desktop.png');
 });
@@ -396,4 +405,21 @@ test('credit usage retries failures and omits financing links without data read 
  await expect(detail.getByRole('alert')).toContainText('融资条目加载失败');await detail.getByRole('button',{name:'重试',exact:true}).click();
  await expect(detail.getByRole('table')).toContainText('只读认购条目');await expect(detail.getByRole('link')).toHaveCount(0);
  await detail.getByRole('button',{name:'返回授信详情'}).click();await expect(detail.getByRole('button',{name:'一级发行（亿元）',exact:true})).toBeFocused();
+});
+
+
+test('credit weekly empty news uses standard text and unchanged metrics say flat',async({page})=>{
+ await mockResources(page);
+ const report=structuredClone(creditFull);
+ report.weeklyNews=[];report.recentApprovals=[];
+ report.previousInstitutions=structuredClone(report.institutions);
+ await page.route('**/api/credit**',route=>route.fulfill({json:creditDataFixture(report)}));
+ await page.goto('/credit-workbench/weekly');
+ const empty=page.getByRole('region',{name:'本周授信快讯',exact:true}).getByText('本周暂无',{exact:true});
+ await expect(empty).toBeVisible();
+ expect(await empty.evaluate(el=>getComputedStyle(el).fontWeight)).toBe('400');
+ const cards=page.getByRole('region',{name:'授信周报',exact:true}).getByRole('article');
+ await expect(cards).toHaveCount(5);
+ for(const card of await cards.all()) await expect(card).toContainText('持平');
+ await expect(page.locator('.tr-workspace')).toHaveScreenshot('credit-weekly-empty.png');
 });

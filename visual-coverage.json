@@ -558,7 +558,7 @@
       "id": "credit-weekly",
       "url": "/credit-workbench/weekly",
       "kind": "screenshot",
-      "state": "normal",
+      "state": "非空快讯、空态与持平指标、完整表头",
       "evidence": [
         {
           "spec": "tests/visual/credit-desktop.spec.mjs",
@@ -589,6 +589,17 @@
           ],
           "snapshots": [
             "credit-weekly-full-desktop.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-desktop.spec.mjs",
+          "test": "credit weekly empty news uses standard text and unchanged metrics say flat",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-weekly-empty.png"
           ]
         }
       ]

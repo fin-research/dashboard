@@ -23,6 +23,7 @@
     detailPrefix = "",
     detailSuffix = "",
     detailTone = "",
+    neutralDetail = false,
     details,
     tone = "primary",
     iconComponent: IconComponent,
@@ -39,6 +40,7 @@
     detailPrefix?: string;
     detailSuffix?: string;
     detailTone?: string;
+    neutralDetail?: boolean;
     details?: Snippet;
     tone?: MetricTone;
     iconComponent?: Component<any>;
@@ -72,9 +74,9 @@
       {#if unit}<span>{unit}</span>{/if}
     </div>
     {#if details}
-      <div class="research-metric-card__detail">{@render details()}</div>
+      <div class="research-metric-card__detail" class:research-metric-card__detail--neutral={neutralDetail}>{@render details()}</div>
     {:else if detail !== undefined && detail !== ""}
-      <p class="research-metric-card__detail">
+      <p class="research-metric-card__detail" class:research-metric-card__detail--neutral={neutralDetail}>
         {detailPrefix}{#if detailTone}<b class={detailTone}>{detail}</b>{:else}<span
             >{detail}</span
           >{/if}{detailSuffix}
@@ -253,6 +255,10 @@
     font-weight: normal;
     line-height: 1.2;
     overflow-wrap: anywhere;
+  }
+
+  .research-metric-card__detail--neutral {
+    color: var(--text-1, #172033);
   }
 
   .research-metric-card__detail b {

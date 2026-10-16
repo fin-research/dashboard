@@ -283,7 +283,7 @@ test("授信 schema、API 与页面保留只读详情及申请入口", async () 
   assert.match(view, /toggleSort/);
   assert.doesNotMatch(view, /structuredClone/);
   assert.doesNotMatch(view, /授信额度变动/);
-  assert.match(view, /近期新增授信批复（近6个月）/);
+  assert.match(view, /title="近期新增授信批复"/);
   assert.match(view, /title="授信明细"/);
   assert.match(view, /rowspan=\{group\.institutions\.length\}/);
   assert.match(view, /<ol class="tr-credit-news-list">/);

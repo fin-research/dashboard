@@ -323,6 +323,14 @@
     };
   }
 
+  function weeklyReportChange(current: number, previous: number | null | undefined, unit: string, digits = 2) {
+    const change = previous == null ? null : Number((current - previous).toFixed(digits));
+    return {
+      detail: change == null ? '—' : change === 0 ? '持平' : `${change > 0 ? '+' : ''}${change}${unit}`,
+      neutralDetail: true,
+    };
+  }
+
   function creditEventLabel(eventType: CreditWeeklyNewsItem["eventType"]): string {
     return {
       new: "新增",
@@ -594,25 +602,25 @@
       <section aria-labelledby="credit-weekly-title">
         <SectionHeading id="credit-weekly-title" title="授信周报" />
         <div class="tr-metric-grid tr-metric-grid--five">
-          <MetricCard label="授信总额" value={formatAmount(report.weeklySummary.totalLimit)} {...weeklyChange(report.weeklySummary.totalLimit, report.previousWeeklySummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact smallIcon />
-          <MetricCard label="已用额度" value={formatAmount(report.weeklySummary.totalUsed)} {...weeklyChange(report.weeklySummary.totalUsed, report.previousWeeklySummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact smallIcon />
-          <MetricCard label="可用额度" value={formatAmount(report.weeklySummary.totalAvailable)} {...weeklyChange(report.weeklySummary.totalAvailable, report.previousWeeklySummary?.totalAvailable, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact smallIcon />
-          <MetricCard label="新增授信" value={String(report.weeklySummary.addedInstitutionCount)} unit="家" {...weeklyChange(report.weeklySummary.addedInstitutionCount, report.previousWeeklySummary?.addedInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="purple" compact smallIcon />
-          <MetricCard label="到期" value={String(report.weeklySummary.expiredInstitutionCount)} unit="家" {...weeklyChange(report.weeklySummary.expiredInstitutionCount, report.previousWeeklySummary?.expiredInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="red" compact smallIcon />
+          <MetricCard label="授信总额" value={formatAmount(report.weeklySummary.totalLimit)} {...weeklyReportChange(report.weeklySummary.totalLimit, report.previousWeeklySummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact smallIcon />
+          <MetricCard label="已用额度" value={formatAmount(report.weeklySummary.totalUsed)} {...weeklyReportChange(report.weeklySummary.totalUsed, report.previousWeeklySummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact smallIcon />
+          <MetricCard label="可用额度" value={formatAmount(report.weeklySummary.totalAvailable)} {...weeklyReportChange(report.weeklySummary.totalAvailable, report.previousWeeklySummary?.totalAvailable, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "check" }} tone="green" compact smallIcon />
+          <MetricCard label="新增授信" value={String(report.weeklySummary.addedInstitutionCount)} unit="家" {...weeklyReportChange(report.weeklySummary.addedInstitutionCount, report.previousWeeklySummary?.addedInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "calendar" }} tone="purple" compact smallIcon />
+          <MetricCard label="到期" value={String(report.weeklySummary.expiredInstitutionCount)} unit="家" {...weeklyReportChange(report.weeklySummary.expiredInstitutionCount, report.previousWeeklySummary?.expiredInstitutionCount, '家', 0)} iconComponent={WorkbenchIcon} iconProps={{ name: "warning" }} tone="red" compact smallIcon />
         </div>
       </section>
 
       <ModuleCard labelledBy="credit-news-title">
         <PanelHeading id="credit-news-title" title="本周授信快讯" />
         {#if weeklyNews.length === 0}
-          <p class="tr-credit-muted">{report.previousDate ? '本期无新增、续作、扩额、到期或撤销事项。' : '暂无周度变化'}</p>
+          <p class="tr-credit-news-empty">本周暂无</p>
         {:else}
           <ol class="tr-credit-news-list">{#each weeklyNews as news}<li>{news}</li>{/each}</ol>
         {/if}
       </ModuleCard>
 
       <ModuleCard labelledBy="credit-recent-approvals-title">
-        <PanelHeading id="credit-recent-approvals-title" title="近期新增授信批复（近6个月）" />
+        <PanelHeading id="credit-recent-approvals-title" title="近期新增授信批复" />
         <div class="tr-table-scroll">
           <table class="tr-data-table tr-credit-approval-table">
             <caption class="sr-only">所选报表日前近6个月新增、续作和扩额授信批复</caption>
