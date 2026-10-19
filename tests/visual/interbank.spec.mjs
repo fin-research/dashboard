@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import * as XLSX from 'xlsx';
 import {zipSync,strToU8} from 'fflate';
 import {mockResources} from './fixtures.mjs';
+test.beforeEach(async({page})=>{await page.clock.setFixedTime(new Date('2026-10-16T02:00:00Z'));});
 function fixture(){
  const serial='IBO20261016000001',book=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([
@@ -67,4 +68,36 @@ test('interbank directory archive writes renamed files beneath the trade date',a
  await expect(page.getByRole('button',{name:'导入并保存草稿',exact:true})).toBeEnabled();
  expect(await page.evaluate(()=>window.archiveWrites.map(file=>file.path))).toEqual(['交易/2026-10-16/信用拆借成交查询_20261016.xlsx','交易/2026-10-16/1016 上海农 1E 成交单.pdf']);
  expect(await page.evaluate(()=>window.archiveWrites.every(file=>file.size>0))).toBe(true);
+});
+
+
+test('archive confirmation preserves progress written by another tab under the import lock',async({page})=>{
+ await mockResources(page);
+ await page.addInitScript(()=>{Object.defineProperty(window,'showDirectoryPicker',{value:undefined,configurable:true});});
+ await page.goto('/trading-research/interbank-ledger');
+ await page.getByLabel('选择成交压缩包').setInputFiles({name:'成交.zip',mimeType:'application/zip',buffer:fixture()});
+ await expect(page.getByRole('region',{name:'归档文件预览'})).toBeVisible();
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'保存归档',exact:true}).click();await download;
+ const storageKey=await page.evaluate(async()=>{
+  const key=Object.keys(localStorage).find(key=>key.startsWith('eastmoney:interbank:v1:'));
+  const account=decodeURIComponent(key.split(':')[3]);
+  let started;const ready=new Promise(resolve=>started=resolve);
+  window.otherTabLock=navigator.locks.request(`interbank:${account}`,async()=>{
+   started();await new Promise(resolve=>window.releaseOtherTab=()=>{
+    const current=JSON.parse(localStorage.getItem(key));
+    current.trades.IBO20261016000001={import:'verified',id:12,draft:'intent',attachments:['file1']};
+    current.uploads['1016 上海农 1E 成交单.pdf']={digest:'saved-digest',id:'file1',status:'uploaded'};
+    localStorage.setItem(key,JSON.stringify(current));resolve();
+   });
+  });
+  await ready;return key;
+ });
+ await page.getByRole('button',{name:'已保存下载文件',exact:true}).click();
+ await expect(page.getByRole('button',{name:'导入并保存草稿',exact:true})).toBeDisabled();
+ await page.evaluate(()=>window.releaseOtherTab());
+ await expect(page.getByRole('button',{name:'导入并保存草稿',exact:true})).toBeEnabled();
+ const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
+ expect(saved.archived).toBe(true);
+ expect(saved.trades.IBO20261016000001).toEqual({import:'verified',id:12,draft:'intent',attachments:['file1']});
+ expect(saved.uploads['1016 上海农 1E 成交单.pdf']).toEqual({digest:'saved-digest',id:'file1',status:'uploaded'});
 });

@@ -1952,6 +1952,14 @@
             "desktop",
             "mobile"
           ]
+        },
+        {
+          "spec": "tests/visual/interbank.spec.mjs",
+          "test": "archive confirmation preserves progress written by another tab under the import lock",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
         }
       ]
     }

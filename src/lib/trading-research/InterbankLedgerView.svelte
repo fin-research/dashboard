@@ -55,6 +55,7 @@
       const next:Journal=saved?JSON.parse(saved):{signature:result.batch.signature,trades:{},uploads:{}};
       if (next.signature!==result.batch.signature) throw new Error('批次记录不一致');
       batch=result.batch;journal=next;date=result.batch.date;downloaded=false;
+      if (!saved) await persist(next,account);
       globalMessages.success(`已解析 ${batch.trades.length} 笔成交`);
     });
   }
@@ -66,9 +67,18 @@
     const url=URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer],{type:'application/zip'}));
     const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
+  async function markArchived(account:string,signature:string) {
+    if (!navigator.locks) throw new Error('浏览器不支持安全导入锁');
+    await navigator.locks.request(`interbank:${account}`,async()=>{
+      if (actor!==account) throw new Error('账号已改变');
+      const current:Journal|null=JSON.parse(localStorage.getItem(key(account,signature)) ?? 'null');
+      if (!current || current.signature!==signature) throw new Error('批次进度丢失，请重新选择压缩包');
+      await persist({...current,archived:true},account);
+    });
+  }
   async function archive() {
     if (!batch || !journal) return;
-    const account=actor,prepared=batch,progress=structuredClone($state.snapshot(journal));
+    const account=actor,prepared=batch;
     // Call directory picker in the originating gesture, before asynchronous work.
     const picker=(window as unknown as {showDirectoryPicker?:()=>Promise<FileSystemDirectoryHandle>}).showDirectoryPicker;
     const directoryPromise=picker?.();
@@ -91,7 +101,7 @@
           const handle=await parent.getFileHandle(name,{create:true});
           const stream=await handle.createWritable();await stream.write(new Uint8Array(file.bytes).buffer);await stream.close();
         }
-        progress.archived=true;await persist(progress,account);
+        await markArchived(account,prepared.signature);
         globalMessages.success(`已保存 ${prepared.files.length} 个文件`);
       } else {
         const result=await process<{zip:Uint8Array}>({batch:$state.snapshot(prepared)});
@@ -102,8 +112,8 @@
   }
   async function confirmDownloaded() {
     if (!journal) return;
-    const progress=$state.snapshot(journal);
-    await action('保存中',async()=>{await persist({...progress,archived:true});globalMessages.success('已确认归档');});
+    const account=actor,signature=journal.signature;
+    await action('保存中',async()=>{await markArchived(account,signature);globalMessages.success('已确认归档');});
   }
   async function execute() {
     if (!batch || !journal) return;
