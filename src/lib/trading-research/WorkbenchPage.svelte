@@ -9,6 +9,7 @@
   import OverviewView from "./OverviewView.svelte";
   import ResearchView from "./ResearchView.svelte";
   import TradingView from "./TradingView.svelte";
+  import InterbankLedgerView from "./InterbankLedgerView.svelte";
   import WorkflowView from "./WorkflowView.svelte";
   import { normalizeWorkbenchView, workbenchViewPath, workbenchRoutes, workbenchViews, type WorkbenchViewId } from "./demo-data";
 
@@ -18,9 +19,10 @@
   const tradingTabs = [
     { id: "trading", label: "交易记录", href: workbenchViewPath("trading") },
     { id: "workflow", label: "交易流程", href: workbenchViewPath("workflow") },
+    { id: "interbank-ledger", label: "拆借台账", href: workbenchViewPath("interbank-ledger") },
   ];
-  const isTradingView = $derived(activeViewId === "trading" || activeViewId === "workflow");
-  const shellViewId = $derived(activeViewId === "workflow" ? "trading" : activeViewId);
+  const isTradingView = $derived(activeViewId === "trading" || activeViewId === "workflow" || activeViewId === "interbank-ledger");
+  const shellViewId = $derived(isTradingView ? "trading" : activeViewId);
   function isIntegratedView(value: WorkbenchViewId) {
     return value === "bond" || value === "secondary-bond-pool" || value === "financing-model";
   }
@@ -48,6 +50,8 @@
     <TrackingCommentaryPage />
   {:else if activeViewId === "research"}
     <ResearchView />
+  {:else if activeViewId === "interbank-ledger"}
+    <InterbankLedgerView />
   {:else if activeViewId === "workflow"}
     <WorkflowView />
   {:else if activeViewId === "bond"}

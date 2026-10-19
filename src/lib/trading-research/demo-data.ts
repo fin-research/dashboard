@@ -6,6 +6,7 @@ export type WorkbenchViewId =
   | "policy-tracking"
   | "research"
   | "workflow"
+  | "interbank-ledger"
   | "secondary-bond-pool"
   | "bond"
   | "financing-model";
@@ -78,6 +79,7 @@ export const workbenchRoutes: Array<{
     context: "国内宏观、海外利率与全球风险资产走势",
     icon: "research",
   },
+  { id: "interbank-ledger", label: "拆借台账", title: "拆借台账", context: "拆借归档与资金系统", icon: "trading" },
   {
     id: "workflow",
     label: "交易流程",
@@ -109,7 +111,7 @@ export const workbenchRoutes: Array<{
 ];
 
 export const workbenchViews = workbenchRoutes.filter(
-  (view) => view.id !== "bond" && view.id !== "workflow",
+  (view) => view.id !== "bond" && view.id !== "workflow" && view.id !== "interbank-ledger",
 );
 
 export function normalizeWorkbenchView(

@@ -26,12 +26,12 @@ test('permission migration preserves business references, refuses unmapped ident
   assert.equal((await db.query("SELECT default_owner_role FROM financing.sop_nodes WHERE id='permission-node'")).rows[0].default_owner_role,'rol_Handler');
   for(const table of ['people','role_permissions','audit_logs'])assert.equal((await db.query(`SELECT to_regclass('financing.${table}') AS value`)).rows[0].value,null);
   const codes=(await db.query('SELECT code FROM "authorization".permission ORDER BY sort_order')).rows.map(row=>row.code);
-  // Archived SQL predates the Auth0-only workflow and messenger permissions. Preserve its 58-code snapshot.
+  // Archived SQL predates the Auth0-only workflow, interbank and messenger permissions. Preserve its 58-code snapshot.
   assert.equal(codes.length,58);
   const retiredAssistantCodes = new Set(['credit.assistant:read', 'credit.assistant:ask', 'credit.assistant:delete', 'credit.material:upload', 'credit.material:delete']);
   assert.ok([...retiredAssistantCodes].every(code=>codes.includes(code)), 'historical migration retains its original permissions');
   assert.deepEqual(codes.filter(code=>!retiredAssistantCodes.has(code)),
-    PERMISSION_CODES.filter(code=>code!=='research.workflow:update'&&!code.startsWith('messenger.')));
+    PERMISSION_CODES.filter(code=>code!=='research.workflow:update'&&!code.startsWith('research.interbank:')&&!code.startsWith('messenger.')));
   assert.ok(!codes.includes('research.workflow:update'));
   assert.equal((await db.query('SELECT count(*)::int AS count FROM "authorization".role_permission')).rows[0].count,3*codes.length);
   const report=(await db.query("SELECT financing.liability_weekly_report_data('2026-09-01') AS value")).rows[0].value;

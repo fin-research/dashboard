@@ -222,7 +222,9 @@
         "workflow",
         "secondary",
         "bond",
-        "financing-model"
+        "financing-model",
+        "interbank-ledger",
+        "interbank-directory"
       ]
     },
     {
@@ -261,7 +263,8 @@
         "workflow": "workflow",
         "secondary-bond-pool": "secondary",
         "bond": "bond",
-        "financing-model": "financing-model"
+        "financing-model": "financing-model",
+        "interbank-ledger": "interbank-ledger"
       }
     },
     {
@@ -1909,6 +1912,50 @@
         {
           "spec": "tests/visual/financing-debt-admin.spec.mjs",
           "test": "debt table ignores stale reads and clamps a deleted last page",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "interbank-ledger",
+      "url": "/trading-research/interbank-ledger",
+      "kind": "screenshot",
+      "evidence": [
+        {
+          "spec": "tests/visual/interbank.spec.mjs",
+          "test": "interbank archive previews renamed files and saves only repayment drafts",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "interbank-empty.png",
+            "interbank-preview.png",
+            "interbank-complete.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "interbank-directory",
+      "url": "/trading-research/interbank-ledger",
+      "kind": "interaction",
+      "state": "浏览器目录归档写入日期子目录及重命名文件",
+      "evidence": [
+        {
+          "spec": "tests/visual/interbank.spec.mjs",
+          "test": "interbank directory archive writes renamed files beneath the trade date",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        },
+        {
+          "spec": "tests/visual/interbank.spec.mjs",
+          "test": "archive confirmation preserves progress written by another tab under the import lock",
           "projects": [
             "desktop",
             "mobile"
