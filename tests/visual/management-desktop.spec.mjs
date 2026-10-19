@@ -45,7 +45,7 @@ test('desktop role catalog identifies the selected role without changing permiss
   await page.goto('/management/people?tab=roles');
   await expect(page.getByRole('list',{name:'人员',exact:true})).toHaveCount(0);
   const roles=page.getByRole('list',{name:'角色',exact:true});
-  const research=roles.getByRole('button',{name:'研究业务组 13',exact:true});
+  const research=roles.getByRole('button',{name:/^研究业务组 \d+$/});
   await page.getByRole('button',{name:'授信工作台',exact:true}).click();
   await research.click();
   await expect(research).toHaveAttribute('aria-pressed','true');
