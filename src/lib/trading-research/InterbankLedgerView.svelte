@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext, onDestroy } from 'svelte';
+  import { getContext, onDestroy, onMount } from 'svelte';
   import ModuleCard from '../../components/ModuleCard.svelte';
   import PanelHeading from './PanelHeading.svelte';
   import Badge from './Badge.svelte';
@@ -10,18 +10,23 @@
   import { interbankPageSchema, interbankParseSchema, interbankAttachmentSchema, interbankSavedSchema, interbankDraftSavedSchema, interbankDraftSchema } from '../../data-contracts';
   import { runWorkflow, ledgerRows } from '$lib/interbank/workflow';
   import type { PreparedBatch, Journal, LedgerRow } from '$lib/interbank/model';
+  import { loadArchiveDirectory, saveArchiveDirectory, saveArchive, type ArchiveDirectory } from '$lib/interbank/archive';
   const session=getContext<ClientSession>(CLIENT_SESSION_CONTEXT);
   let batch=$state<PreparedBatch|null>(null), journal=$state<Journal|null>(null);
-  let downloaded=$state(false);
+  let directory=$state<ArchiveDirectory>();
+  let directoryReady=$state(false), dragging=$state(false);
+  let pendingFile:File|undefined;
+  let mounted=true;
   let busy=$state(''), date=$state(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
   let rows=$state<LedgerRow[]>([]), queried=$state(false);
   let worker:Worker|undefined;
-  let fileInput:HTMLInputElement;
+  let fileInput=$state<HTMLInputElement>();
   const actor=$derived($session?.user?.id ?? '');
   const canImport=$derived(!!$session?.permissions.includes('research.interbank:import'));
   const key=(account:string,signature:string)=>`eastmoney:interbank:v1:${encodeURIComponent(account)}:${signature}`;
-  $effect(()=>{ actor; batch=null;journal=null;rows=[];queried=false;downloaded=false; });
-  onDestroy(()=>worker?.terminate());
+  $effect(()=>{ actor; batch=null;journal=null;rows=[];queried=false;pendingFile=undefined; });
+  onMount(()=>{ void loadArchiveDirectory().then(handle=>{if(mounted)directory=handle;}).catch(()=>globalMessages.error('归档目录读取失败')).finally(()=>{directoryReady=true;}); });
+  onDestroy(()=>{mounted=false;worker?.terminate();});
   async function action(label:string, run:()=>Promise<void>) {
     if (busy) return;
     busy=label;
@@ -29,7 +34,7 @@
     finally { busy=''; }
   }
   async function api(path:string,init?:RequestInit) {
-    const response=await fetch(`/api/interbank${path}`,init);
+    const response=await fetch(`/data/camel${path}`,init);
     const body=await response.json();
     if (!response.ok) throw new Error(body.error || body.detail || '资金系统请求失败');
     const schema=path.startsWith('/borrowings?')?interbankPageSchema:path==='/borrowings/parse'?interbankParseSchema:path==='/borrowings/import'?interbankSavedSchema:path==='/attachments'?interbankAttachmentSchema:path==='/repayment-drafts'?interbankDraftSavedSchema:interbankDraftSchema;
@@ -43,111 +48,112 @@
       worker!.postMessage(data);
     });
   }
-  async function choose(event:Event) {
-    const input=event.currentTarget as HTMLInputElement,file=input.files?.[0];input.value='';
-    if (!file) return;
-    await action('解析中',async()=>{
-      if (!actor) throw new Error('请先登录');
-      const account=actor;
-      const result=await process<{batch:PreparedBatch}>({file});
-      if (actor!==account) throw new Error('账号已改变');
-      const saved=localStorage.getItem(key(account,result.batch.signature));
-      const next:Journal=saved?JSON.parse(saved):{signature:result.batch.signature,trades:{},uploads:{}};
-      if (next.signature!==result.batch.signature) throw new Error('批次记录不一致');
-      batch=result.batch;journal=next;date=result.batch.date;downloaded=false;
-      if (!saved) await persist(next,account);
-      globalMessages.success(`已解析 ${batch.trades.length} 笔成交`);
-    });
+  function checkAccount(account:string) {
+    if (!mounted || actor!==account) throw new Error('账号已改变，操作已停止');
   }
   async function persist(next:Journal,account=actor) {
+    checkAccount(account);
     localStorage.setItem(key(account,next.signature),JSON.stringify(next));
-    if (actor===account) journal=structuredClone(next);
+    journal=structuredClone(next);
   }
-  function download(bytes:Uint8Array,name:string) {
-    const url=URL.createObjectURL(new Blob([new Uint8Array(bytes).buffer],{type:'application/zip'}));
-    const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  // Invoked from the original click/drop gesture, before ZIP parsing or other awaits.
+  async function accessDirectory(change=false):Promise<ArchiveDirectory> {
+    let handle=directory;
+    if (!change && handle) {
+      if (await handle.queryPermission({mode:'readwrite'})!=='granted' && await handle.requestPermission({mode:'readwrite'})!=='granted') throw new Error('请重新授权归档目录');
+    } else {
+      const picker=(window as unknown as {showDirectoryPicker?:(options:{mode:'readwrite',id:string})=>Promise<ArchiveDirectory>}).showDirectoryPicker;
+      if (!picker) throw new Error('浏览器不支持本地目录保存');
+      handle=await picker({mode:'readwrite',id:'interbank-archive'});
+      await saveArchiveDirectory(handle);
+      directory=handle;
+    }
+    return handle;
   }
-  async function markArchived(account:string,signature:string) {
+  async function selectDirectory() {
+    if (busy) return;
+    const account=actor;
+    const access=accessDirectory(true);
+    await action('目录授权中',async()=>{
+      const root=await access;
+      checkAccount(account);
+      if (pendingFile) {const file=pendingFile;pendingFile=undefined;await processFile(file,root,account);}
+    });
+  }
+  async function selectFile() {
+    if (busy || !directoryReady) return;
+    let ready=false;
+    await action('目录授权中',async()=>{await accessDirectory();ready=true;});
+    if (ready) fileInput?.click();
+  }
+  async function choose(event:Event) {
+    const input=event.currentTarget as HTMLInputElement,file=input.files?.[0];input.value='';
+    if (file) await acceptFile(file);
+  }
+  async function drop(event:DragEvent) {
+    event.preventDefault();dragging=false;
+    if (busy || !canImport || !directoryReady) return;
+    const files=event.dataTransfer?.files;
+    if (files?.length!==1) {globalMessages.error('请选择一个成交压缩包');return;}
+    await acceptFile(files[0]!);
+  }
+  async function acceptFile(file:File) {
+    if (busy || !canImport) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) {globalMessages.error('请选择成交压缩包');return;}
+    pendingFile=file;
+    const account=actor;
+    const access=accessDirectory();
+    await action('归档中',async()=>{
+      const root=await access;
+      pendingFile=undefined;
+      await processFile(file,root,account);
+    });
+  }
+  async function processFile(file:File,root:ArchiveDirectory,account=actor) {
+    if (!account) throw new Error('请先登录');
+    checkAccount(account);
+    busy='解析中';
+    const result=await process<{batch:PreparedBatch}>({file});
+    checkAccount(account);
+    const prepared=result.batch;
+    batch=prepared;date=prepared.date;
     if (!navigator.locks) throw new Error('浏览器不支持安全导入锁');
-    await navigator.locks.request(`interbank:${account}`,async()=>{
-      if (actor!==account) throw new Error('账号已改变');
-      const current:Journal|null=JSON.parse(localStorage.getItem(key(account,signature)) ?? 'null');
-      if (!current || current.signature!==signature) throw new Error('批次进度丢失，请重新选择压缩包');
-      await persist({...current,archived:true},account);
-    });
-  }
-  async function archive() {
-    if (!batch || !journal) return;
-    const account=actor,prepared=batch;
-    // Call directory picker in the originating gesture, before asynchronous work.
-    const picker=(window as unknown as {showDirectoryPicker?:()=>Promise<FileSystemDirectoryHandle>}).showDirectoryPicker;
-    const directoryPromise=picker?.();
-    await action('保存中',async()=>{
-      if (directoryPromise) {
-        const directory=await (await directoryPromise).getDirectoryHandle(prepared.date,{create:true});
-        // Check every existing target before writing any file.
-        const pending=[];
-        for (const file of prepared.files) {
-          const parts=file.name.split('/');let parent=directory;
-          for (const part of parts.slice(0,-1)) parent=await parent.getDirectoryHandle(part,{create:true});
-          let existing:FileSystemFileHandle|undefined;
-          try { existing=await parent.getFileHandle(parts.at(-1)!); } catch(error) { if (!(error instanceof DOMException && error.name==='NotFoundError')) throw error; }
-          if (existing) {
-            const content=new Uint8Array(await (await existing.getFile()).arrayBuffer());
-            if (content.length!==file.bytes.length || content.some((value,i)=>value!==file.bytes[i])) throw new Error(`目录已有不同文件：${file.name}`);
-          } else pending.push({file,parent,name:parts.at(-1)!});
-        }
-        for (const {file,parent,name} of pending) {
-          const handle=await parent.getFileHandle(name,{create:true});
-          const stream=await handle.createWritable();await stream.write(new Uint8Array(file.bytes).buffer);await stream.close();
-        }
-        await markArchived(account,prepared.signature);
-        globalMessages.success(`已保存 ${prepared.files.length} 个文件`);
-      } else {
-        const result=await process<{zip:Uint8Array}>({batch:$state.snapshot(prepared)});
-        download(result.zip,`拆借台账_${prepared.date}.zip`);downloaded=true;
-        globalMessages.success('归档 ZIP 已下载');
-      }
-    });
-  }
-  async function confirmDownloaded() {
-    if (!journal) return;
-    const account=actor,signature=journal.signature;
-    await action('保存中',async()=>{await markArchived(account,signature);globalMessages.success('已确认归档');});
-  }
-  async function execute() {
-    if (!batch || !journal) return;
-    const account=actor,prepared=$state.snapshot(batch);
-    await action('导入中',async()=>{
-      if (!navigator.locks) throw new Error('浏览器不支持安全导入锁');
-      await navigator.locks.request(`interbank:${account}`,{ifAvailable:true},async lock=>{
-        if (!lock) throw new Error('另一个窗口正在导入');
-        const current=JSON.parse(localStorage.getItem(key(account,prepared.signature)) ?? 'null');
-        if (!current) throw new Error('批次进度丢失，请重新选择压缩包');
-        await runWorkflow(prepared,current,async(path,init)=>{
-          if (actor!==account) throw new Error('账号已改变，操作已停止');
-          return api(path,init);
-        },next=>persist(next,account));
-        
-        globalMessages.success(`已导入并保存 ${prepared.trades.length} 笔还款草稿`);
-      });
+    await navigator.locks.request(`interbank:${account}`,{ifAvailable:true},async lock=>{
+      if (!lock) throw new Error('另一个窗口正在归档');
+      checkAccount(account);
+      const saved=localStorage.getItem(key(account,prepared.signature));
+      const current:Journal=saved?JSON.parse(saved):{signature:prepared.signature,trades:{},uploads:{}};
+      if (current.signature!==prepared.signature) throw new Error('批次记录不一致');
+      await persist(current,account);
+      busy='保存中';
+      await saveArchive(root,prepared,()=>checkAccount(account));
+      current.archived=true;await persist(current,account);
+      busy='导入中';
+      await runWorkflow(prepared,current,async(path,init)=>{
+        checkAccount(account);
+        return api(path,init);
+      },next=>persist(next,account));
+      checkAccount(account);
+      globalMessages.success(`已归档并保存 ${prepared.trades.length} 笔还款草稿`);
     });
   }
 </script>
 <div class="interbank-ledger">
   <ModuleCard labelledBy="interbank-archive">
     <PanelHeading id="interbank-archive" title="成交归档">
-      <input hidden bind:this={fileInput} type="file" accept=".zip,application/zip" aria-label="选择成交压缩包" onchange={choose} disabled={!!busy}/>
-      <Button variant="outline" onclick={()=>fileInput.click()} disabled={!!busy}>{busy==='解析中'?'解析中':'选择成交压缩包'}</Button>
-      <Button variant="outline" onclick={archive} disabled={!batch || !!busy}>{busy==='保存中'?'保存中':'保存归档'}</Button>
-      {#if batch && downloaded && !journal?.archived && !(typeof window!=='undefined' && typeof (window as unknown as {showDirectoryPicker?:unknown}).showDirectoryPicker==='function')}<Button variant="outline" onclick={confirmDownloaded} disabled={!!busy}>已保存下载文件</Button>{/if}
-      <Button onclick={execute} disabled={!batch || !journal?.archived || !!busy || !canImport}>{busy==='导入中'?'导入中':'导入并保存草稿'}</Button>
+      {#if canImport}
+        <input hidden bind:this={fileInput} type="file" accept=".zip,application/zip" aria-label="选择成交压缩包" onchange={choose} disabled={!directoryReady}/>
+        <Button onclick={selectFile} disabled={!!busy || !directoryReady}>{busy || '选择成交压缩包'}</Button>
+        <Button variant="outline" onclick={selectDirectory} disabled={!!busy || !directoryReady}>{directory?.name ?? '选择归档目录'}</Button>
+      {/if}
     </PanelHeading>
+    <div class="archive-drop" class:dragging role="region" aria-label="成交压缩包拖放区" aria-busy={!!busy} ondragover={event=>{event.preventDefault();if(!busy && canImport)dragging=true;}} ondragleave={()=>dragging=false} ondrop={drop}>
     {#if batch}
       <div class="batch-summary"><span>{batch.date}</span><span>{batch.trades.length} 笔成交</span><span>{batch.files.length} 个文件</span><Badge>{journal?.archived?'已归档':'待归档'}</Badge></div>
       <div class="table-scroll" tabindex="0" role="region" aria-label="归档文件预览"><table><thead><tr><th>原文件</th><th>归档文件</th></tr></thead><tbody>{#each batch.files as file}<tr><td>{file.source}</td><td>{file.name}</td></tr>{/each}</tbody></table></div>
       <div class="table-scroll" tabindex="0" role="region" aria-label="成交处理进度"><table><thead><tr><th>成交编号</th><th>对手方</th><th class="numeric">金额（万）</th><th>归档</th><th>台账</th><th>附件</th><th>还款草稿</th></tr></thead><tbody>{#each batch.trades as trade}{@const progress=journal?.trades[trade.serialNo]}{@const uploads=batch.files.filter(f=>f.serialNo===trade.serialNo).map(f=>journal?.uploads[f.name])}<tr><td>{trade.serialNo}</td><td>{trade['对手方']}</td><td class="numeric">{trade['拆借金额(万)']}</td><td>{journal?.archived?'已保存':'待保存'}</td><td>{progress?.import==='verified'?'已导入':progress?.import?'结果待确认':'待导入'}</td><td>{uploads.every(u=>u?.id)?'已上传':uploads.some(u=>u?.status==='intent'&&!u.id)?'结果待确认':'待上传'}</td><td>{progress?.draft==='verified'?'已保存':progress?.draft?'结果待确认':'待保存'}</td></tr>{/each}</tbody></table></div>
-    {:else}<div class="empty">{busy==='解析中'?'正在解析成交文件':'请选择成交压缩包'}</div>{/if}
+    {:else}<div class="empty">{busy || '选择或拖入成交压缩包'}</div>{/if}
+    </div>
   </ModuleCard>
   <ModuleCard labelledBy="interbank-records">
     <PanelHeading id="interbank-records" title="资金系统台账">
@@ -158,5 +164,5 @@
   </ModuleCard>
 </div>
 <style>
-  .interbank-ledger{display:grid;gap:20px;min-width:0}.date-field{width:220px;max-width:100%}.batch-summary{display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.table-scroll{overflow:auto;max-width:100%;margin-top:16px}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:.875rem}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--tr-border);font-variant-numeric:tabular-nums}th{font-weight:bold;background:var(--tr-bg)}.numeric{text-align:right}.empty{padding:36px 12px;text-align:center;color:var(--text-2)}
+  .archive-drop{border:1px dashed var(--tr-border);border-radius:12px;padding:12px}.archive-drop.dragging{border-color:var(--primary);background:var(--muted)}.interbank-ledger{display:grid;gap:20px;min-width:0}.date-field{width:220px;max-width:100%}.batch-summary{display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.table-scroll{overflow:auto;max-width:100%;margin-top:16px}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:.875rem}th,td{padding:12px;text-align:left;border-bottom:1px solid var(--tr-border);font-variant-numeric:tabular-nums}th{font-weight:bold;background:var(--tr-bg)}.numeric{text-align:right}.empty{padding:36px 12px;text-align:center;color:var(--text-2)}
 </style>

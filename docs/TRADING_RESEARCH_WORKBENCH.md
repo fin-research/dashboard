@@ -190,10 +190,10 @@
 
 ## 拆借台账
 
-交易管理 header 的 `/trading-research/interbank-ledger` 提供成交归档、逐笔进度和资金系统台账查询。ZIP 解压、Excel 全表读取、真实 xlsx 转换、PDF 文本编号关联及重命名都在浏览器 Worker 完成，原件不传至 Dashboard 存储。支持的浏览器选取目录并保存至成交日期子目录；其他浏览器下载按日期分目录的 ZIP，用户确认下载已保存后才启用导入。
+交易管理 header 的 `/trading-research/interbank-ledger` 提供成交归档、逐笔进度和资金系统台账查询。ZIP 解压、Excel 全表读取、真实 xlsx 转换、PDF 文本编号关联及重命名都在浏览器 Worker 完成，原件不传至 Dashboard 存储。选择或拖入 ZIP 后自动解析、改名、保存到成交日期子目录并导入资金系统，上传 PDF 后仅保存还款草稿。目录句柄用 IndexedDB 保存并在页面加载时恢复，已有读写权限时直接复用。首次选择目录或权限失效时，通过原生目录授权恢复后自动继续，不增加保存或导入按钮。不支持本地目录 API 的浏览器停止，不以触发下载冒充归档完成。
 
 Excel 为唯一业务来源，读取实际单元格而非工作表 dimension，重复表头选择首个完整列，冲突或分散填值停止。账号保留前导零，利率只按十进制字符串除以 100；`days` 取实际占款天数，`daysPurpose` 取拆借期限，不重算利息。PDF 只提供成交编号和文件名简称。一个批次只接收一个 Excel、一个成交日期，所有 PDF 必须与 Excel 成交编号完整对应。
 
-浏览器同源 `/api/interbank/*` 经 Dashboard `DATA: InternalData` 调用 `/camel/*`。GET 要求 `research.interbank:read`，所有 POST 要求 `research.interbank:import` 并检查同源；不透传身份头、Cookie 或上游鉴权。Data 管理 CAMEL 会话、导入查重和额度检查、可信台账到还款草稿的转换。文件解析和附件上传使用原始文件 body、严格 MIME 与 `X-Filename: encodeURIComponent(name)`；Data 流式转换为上游单文件 multipart。浏览器只保存草稿，接口不提供提交功能。
+浏览器同源 `/data/camel/*` 直接经 Gateway 的 `DATA: GatewayData` 调用资金接口，不经过 Dashboard 业务后端。Gateway 对精确资源的 GET/HEAD 校验 `research.interbank:read`，POST 校验 `research.interbank:import` 和同源，再传入专用 CAMEL 准入结果；剥离用户凭据。旧 `/api/interbank/*` 已移除。Data 管理 CAMEL 会话、导入查重和额度检查、可信台账到还款草稿的转换。文件解析和附件上传使用原始文件 body、严格 MIME 与 `X-Filename: encodeURIComponent(name)`；Data 流式转换为上游单文件 multipart。浏览器只保存草稿，接口不提供提交功能。
 
-本机进度按 Auth0 subject 和批次内容签名隔离，使用浏览器持久 journal 和账号级 Web Lock。每个写请求前先保存 intent；存储失败不得写入。导入和草稿未知结果通过台账恢复，已有草稿必须与本批已知附件 ID 一致。未知附件上传没有 ID 时停止，不盲目重传。草稿保存后只读取一次详情，确认台账关联、附件 ID 与未提交状态，不追加批次审计。跨账号切换清除当前文件视图并阻止旧批次继续请求。
+本机进度按 Auth0 subject 和批次内容签名隔离，使用浏览器持久 journal 和账号级 Web Lock；同一把锁串行覆盖本地归档及整个导入流程，取得锁后重新读取当前 journal。本地冲突、授权失败或写盘失败均不发起资金请求。每个写请求前先保存 intent；存储失败不得写入。导入和草稿未知结果通过台账恢复，已有草稿必须与本批已知附件 ID 一致。未知附件上传没有 ID 时停止，不盲目重传。草稿保存后只读取一次详情，确认台账关联、附件 ID 与未提交状态，不追加批次审计。跨账号切换清除当前文件视图并阻止旧批次继续请求。

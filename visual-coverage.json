@@ -1943,7 +1943,7 @@
       "id": "interbank-directory",
       "url": "/trading-research/interbank-ledger",
       "kind": "interaction",
-      "state": "浏览器目录归档写入日期子目录及重命名文件",
+      "state": "自动归档、目录句柄复用、中断及重复批次恢复",
       "evidence": [
         {
           "spec": "tests/visual/interbank.spec.mjs",
@@ -1955,7 +1955,31 @@
         },
         {
           "spec": "tests/visual/interbank.spec.mjs",
-          "test": "archive confirmation preserves progress written by another tab under the import lock",
+          "test": "automatic archive reads current progress under the shared account lock",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        },
+        {
+          "spec": "tests/visual/interbank.spec.mjs",
+          "test": "archive collision prevents all funding requests",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        },
+        {
+          "spec": "tests/visual/interbank.spec.mjs",
+          "test": "unknown upload stops automatic retry on repeated ZIP selection",
+          "projects": [
+            "desktop",
+            "mobile"
+          ]
+        },
+        {
+          "spec": "tests/visual/interbank.spec.mjs",
+          "test": "directory permission recovery automatically resumes the selected archive",
           "projects": [
             "desktop",
             "mobile"

@@ -91,3 +91,9 @@ pnpm visual:baseline:import-local .local-visual/<时间> --reviewed
 - 用接口、状态、焦点、键盘、回滚与权限行为验证交互。页面源码、CSS 文本和控件数量不应代替行为断言。业务口径继续通过单元或 handler 测试验证，截图不替代数值与权限测试。
 - 视觉清单只记录实际执行的页面、状态、设备与明确豁免。新增页面和状态时补充真实浏览器场景，现有缺口不计入已覆盖。
 - 覆盖率只统计实际加载的 TS/JS。Svelte、CSS、未加载文件和生产鉴权另行验收。运行记录、候选截图与 CI 链接保留在对应 Actions 工件和 Git 历史，不在本规范按次追加。
+
+## 拆借本地目录验收
+
+拆借六项交互同时保护选择/拖放自动执行、目录持久复用、账户锁、文件冲突、未知上传停止和目录权限恢复。固定 Linux Chromium 在最小 OPFS 句柄写入 IndexedDB 后读取时会触发 SIGTRAP，完整 Chromium 与 headless shell 均复现；因此 Linux 夹具仅对 `eastmoney-interbank / directory / archive-root` 的目录描述符恢复方法，文件写入仍使用真实 OPFS，进度和事务仍使用真实浏览器存储。
+
+原生句柄持久化和刷新复用另在 macOS Chrome 运行同一六项交互，不安装描述符适配。Linux 交互通过不能表示其原生句柄反序列化已验收；截图仍由固定 Linux 镜像产生和比较。此差异不进入生产归档代码。
