@@ -119,3 +119,81 @@ test('three natural-day coupon horizons publish and read back even on non-issuan
   assert.equal(result.market_forecast.at(-1).issuance_day,false);
  }finally{await db.close();}
 });
+
+function predictionOnlySnapshot() {
+ const value=shortCouponSnapshot();value.online_run=snapshot().online_run;
+ for(const point of value.forecast)point.waiting_cost_bp=0;
+ Object.assign(value.validation,{release_policy:'short_coupon_prediction',forecast_horizons:[1,14,30]});
+ Object.assign(value.decision,{action:'仅预测票面',reason:'coupon_prediction_only',
+   first_issuance_date:null,lowest_expected_cost_date:null,low_rate_dates:[],low_rate_windows:[]});
+ return value;
+}
+
+test('short coupon publication preserves three predictions without deriving an issuance action', async () => {
+ const db=await database();try {
+  const previous=snapshot(),id=await publish(db,previous);
+  await saveFinancingModelConclusion(db,{runId:id,verdict:'人工结论',preferredWindow:'资金安排',narrative:'保留人工正文'});
+  const value=predictionOnlySnapshot();value.generated_at='2026-08-24T05:00:00Z';
+  assert.equal(await publish(db,value),id);
+  const report=await loadIssuanceModelReport(db,id);
+  assert.equal(report.snapshot.decision.action,'仅预测票面');
+  assert.equal(report.snapshot.decision.reason,'coupon_prediction_only');
+  assert.equal(report.snapshot.decision.first_issuance_date,null);
+  assert.equal(report.snapshot.decision.lowest_expected_cost_date,null);
+  assert.deepEqual(report.snapshot.decision.low_rate_dates,[]);
+  assert.deepEqual(report.snapshot.decision.low_rate_windows,[]);
+  assert.deepEqual(report.snapshot.forecast.map(row=>row.lead_days),[1,14,30]);
+  assert.equal(report.snapshot.base_conclusion.narrative,'仅预测票面');
+  assert.equal(report.snapshot.base_conclusion.preferred_window,'');
+  assert.equal(report.conclusion.narrative,'保留人工正文');
+  assert.equal(report.conclusion.edited,true);
+ }finally{await db.close();}
+});
+
+test('short coupon publication rejects manual recommendations, horizons and saving estimates atomically', async () => {
+ const db=await database();try {
+  const first=predictionOnlySnapshot(),id=await publish(db,first);
+  const before=(await loadIssuanceModelReport(db,id)).snapshot;
+  const mutations=[
+   v=>{v.validation.forecast_horizons=[1,14,31];},
+   v=>{delete v.validation.forecast_horizons;},
+   v=>{delete v.validation.release_policy;},
+   v=>{v.forecast.pop();},v=>{v.forecast.reverse();},
+   v=>{v.window_days=31;v.deadline='2026-09-24';v.market_forecast.push({...v.market_forecast.at(-1),date:v.deadline,value_date:v.deadline});},
+   v=>{v.forecast[1].lead_days=15;},
+   v=>{v.decision.action='尽快发行';},v=>{v.decision.reason='lowest_quartile';},
+   v=>{v.decision.first_issuance_date=v.forecast[0].date;},
+   v=>{v.decision.lowest_expected_cost_date=v.forecast[2].date;},
+   v=>{v.decision.low_rate_dates=[v.forecast[2].date];},
+   v=>{v.decision.low_rate_windows=[{start:v.forecast[2].date,end:v.forecast[2].date}];},
+   ...['expected_net_saving_bp','annual_saving_wan','saving_probability','saving_p10_bp','joint_error_pairs']
+     .map(key=>v=>{v.decision[key]=0;}),
+   v=>{v.forecast[1].waiting_cost_bp=1;},v=>{v.forecast[1].waiting_cost_bp=null;},
+   ...['expected_saving_bp','net_saving_bp','annual_saving_wan','saving_probability','saving_p10_bp','pair_samples']
+     .map(key=>v=>{v.forecast[1][key]=0;}),
+  ];
+  for(const mutate of mutations){
+   const invalid=structuredClone(first);invalid.generated_at='2026-08-24T06:00:00Z';mutate(invalid);
+   await assert.rejects(publish(db,invalid));
+  }
+  const result=await loadIssuanceModelReport(db,id);
+  assert.deepEqual(result.snapshot,before);
+  assert.equal(result.snapshot.decision.action,'仅预测票面');
+ }finally{await db.close();}
+});
+
+test('short coupon migration leaves archived model and manual content unchanged', async () => {
+ const db=new PGlite();try {
+  for(const name of (await readdir(directory)).sort()){
+   if(name!=='0013_short_coupon_prediction.sql')await db.exec(await readFile(new URL(name,directory),'utf8'));
+  }
+  const id=await publish(db,snapshot());
+  await saveFinancingModelConclusion(db,{runId:id,verdict:'人工结论',preferredWindow:'原资金计划',narrative:'历史人工正文'});
+  const before=await loadIssuanceModelReport(db,id);
+  await db.exec(await readFile(new URL('0013_short_coupon_prediction.sql',directory),'utf8'));
+  assert.deepEqual(await loadIssuanceModelReport(db,id),before);
+  const update=snapshot();update.generated_at='2026-08-24T07:00:00Z';
+  assert.equal(await publish(db,update),id);
+  assert.equal((await loadIssuanceModelReport(db,id)).conclusion.narrative,'历史人工正文');
+ }finally{await db.close();}
+});
