@@ -114,3 +114,18 @@ test('factor presentation admits only observed registered market features with C
   assert.deepEqual(groupIssuanceShap(rows).map(row => [row.display_name,row.net_bp]), [['利率',1],['信用',-.5],['一级发行',-2.754]]);
   for (const key of Object.keys(issuanceMarketFeatures)) assert.doesNotMatch(issuanceFeatureName(key), /[a-zA-Z_]/);
 });
+
+
+test('raw valuation sequences and learned horizon interactions retain Chinese labels and signed contributions', () => {
+ const rows=[
+  {feature:'sector_quote_lag_0_bp',value:165,shap_bp:-2},
+  {feature:'quote_h1_sector_quote_lag_19_bp',value:175,shap_bp:1},
+  {feature:'issuer_quote_lag_0_bp',value:160,shap_bp:-.5},
+  {feature:'quote_h1',value:1,shap_bp:20},
+ ];
+ assert.equal(issuanceFeatureName(rows[0].feature),'券商行业收益率·最新行情');
+ assert.equal(issuanceFeatureName(rows[1].feature),'提前1日·券商行业收益率·前19个行情日');
+ assert.equal(issuanceFeatureName(rows[2].feature),'发行人估值收益率·最新行情');
+ assert.deepEqual(groupIssuanceShap(rows),[{display_name:'信用',absolute_bp:1.5,net_bp:-1.5}]);
+ assert.equal(selectIssuanceShapDrivers(rows).length,3);
+});

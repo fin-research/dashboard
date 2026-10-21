@@ -582,6 +582,7 @@
                 <caption>未来发行窗口明细</caption>
                 <thead>
                   <tr>
+                    <th scope="col">预测尺度</th>
                     <th scope="col">日期</th>
                     <th scope="col">预计票面</th>
                   </tr>
@@ -589,7 +590,8 @@
                 <tbody>
                   {#each snapshot.forecast as point}
                     <tr>
-                      <th scope="row">{displayDate(point.date)}</th>
+                      <th scope="row">T+{point.lead_days}</th>
+                      <td>{displayDate(point.date)}</td>
                       <td>{formatNullable(point.coupon_percent,2)}%</td>
                     </tr>
                   {/each}

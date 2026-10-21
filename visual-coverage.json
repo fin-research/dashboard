@@ -719,7 +719,7 @@
       "id": "financing-model",
       "url": "/trading-research/financing-model",
       "kind": "screenshot",
-      "state": "market-only Chinese factor contributions and absolute 5bp accuracy",
+      "state": "T+1/T+14/T+30 natural-day forecasts, learned raw valuation contributions and absolute 5bp accuracy",
       "evidence": [
         {
           "spec": "tests/visual/reports.spec.mjs",

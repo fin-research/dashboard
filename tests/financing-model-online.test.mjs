@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile,readdir} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {issuanceSnapshot} from './fixtures/issuance.mjs';
+import {issuanceSnapshot,shortCouponSnapshot} from './fixtures/issuance.mjs';
 import {financingModel} from './visual/report-fixtures.mjs';
 import {loadIssuanceModelReport,loadIssuanceModelMetricSource} from '../src/lib/server/issuance-model-repository.ts';
 import {saveFinancingModelConclusion,saveTimingDecisionRecord,loadTimingDecisionHistory} from '../src/lib/server/financing-model-repository.ts';
@@ -101,5 +101,21 @@ test('composite market and coupon attribution round-trips without weakening addi
   await assert.rejects(publish(db,broken),/Invalid coupon SHAP/);
   const unknown=structuredClone(value);unknown.explanation.method='unknown';
   await assert.rejects(publish(db,unknown),/Invalid coupon SHAP/);
+ }finally{await db.close();}
+});
+
+
+test('three natural-day coupon horizons publish and read back even on non-issuance dates', async () => {
+ const db=await database();try {
+  const value=shortCouponSnapshot();value.online_run=snapshot().online_run;
+  const last=value.market_forecast.find(row=>row.date===value.forecast[2].date);
+  last.issuance_day=false;
+  const id=await publish(db,value);
+  const result=(await loadIssuanceModelReport(db,id)).snapshot;
+  assert.equal(result.window_days,30);
+  assert.deepEqual(result.forecast.map(row=>row.lead_days),[1,14,30]);
+  assert.deepEqual(result.explanation.features,value.explanation.features);
+  assert.equal(result.forecast[2].saving_probability,null);
+  assert.equal(result.market_forecast.at(-1).issuance_day,false);
  }finally{await db.close();}
 });

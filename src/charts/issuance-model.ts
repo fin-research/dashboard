@@ -4,10 +4,10 @@ import { setChart, setEmpty } from './charting';
 
 export { issuanceFeatureName } from '../lib/issuance-presentation';
 export function renderIssuanceForecast(host:HTMLElement,rows:IssuanceSnapshot['forecast']):void {
-  if(!rows.length){setEmpty(host,'窗口内无发行日期');return;}
-  setChart(host,{animationDuration:180,aria:{enabled:true,description:'未来发行日预计票面'},tooltip:{...tooltip,trigger:'axis'},legend:{top:0,textStyle:axisLabel},
+  if(!rows.length){setEmpty(host,'暂无票面预测');return;}
+  setChart(host,{animationDuration:180,aria:{enabled:true,description:'各预测尺度预计票面'},tooltip:{...tooltip,trigger:'axis'},legend:{top:0,textStyle:axisLabel},
     grid:{left:12,right:16,top:45,bottom:10,containLabel:true},
-    xAxis:{type:'category',data:rows.map(r=>r.date),axisLabel:{...axisLabel,formatter:(v:string)=>v.slice(5)},axisTick:{show:false}},
+    xAxis:{type:'category',data:rows.map(r=>`T+${r.lead_days}`),axisLabel,axisTick:{show:false}},
     yAxis:{type:'value',name:'票面 %',scale:true,axisLabel,splitLine:gridLine},
     series:[{name:'预计票面',type:'line',data:rows.map(r=>r.coupon_percent),itemStyle:{color:colors.brand}}]});
 }

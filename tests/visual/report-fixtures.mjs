@@ -1,4 +1,4 @@
-import { issuanceSnapshot as snapshot } from "../fixtures/issuance.mjs";
+import { shortCouponSnapshot as snapshot } from "../fixtures/issuance.mjs";
 
 function sellSidePayload() {
   return {
