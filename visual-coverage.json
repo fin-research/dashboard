@@ -48,7 +48,8 @@
         "browser-agent-credit",
         "sidebar-credit",
         "credit-usage-interactions",
-        "credit-bank-status"
+        "credit-bank-status",
+        "credit-error"
       ]
     },
     {
