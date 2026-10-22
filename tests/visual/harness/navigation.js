@@ -20,3 +20,6 @@ export function beforeNavigate(_callback) {}
 
 export function invalidate() { return Promise.resolve(); }
 export function invalidateAll() { return Promise.resolve(); }
+
+/** @param {string | URL} url @param {unknown} state */
+export function replaceState(url, state) { window.history.replaceState(state, '', url); setPageUrl(new URL(url, window.location.href)); }
