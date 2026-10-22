@@ -7,7 +7,9 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { NativeSelect } from "$lib/components/ui/native-select/index.js";
   import { onMount } from "svelte";
+  import { afterNavigate, replaceState } from "$app/navigation";
 
+  import BankCreditStatus from "../credit-workbench/BankCreditStatus.svelte";
   import ChartHost from "../../components/ChartHost.svelte";
   import MetricCard from "../../components/MetricCard.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
@@ -53,7 +55,7 @@
 
   const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
 
-  let { tab = "overview", onreport }: { tab?: CreditTab; onreport?: (report: CreditReportResponse) => void } = $props();
+  let { tab = "overview", overviewTab = "dashboard", onreport }: { tab?: CreditTab; overviewTab?: string; onreport?: (report: CreditReportResponse) => void } = $props();
   const activeTab = $derived(tab);
   let sourceData=$state<CreditDataset|null>(null);
   let report=$derived(sourceData?buildCreditReport(sourceData):null);
@@ -72,6 +74,7 @@
   let calendarMonth = $state("");
   let applicationDialog = $state<CreditApplicationDialog | null>(null);
   let loadSequence = $state(0);
+  let requestedReportDate: string | null = null;
   let exporting = $state(false);
 
   async function exportExcel(): Promise<void> {
@@ -230,12 +233,18 @@
     });
   });
 
+  afterNavigate(({ to }) => {
+    const date = to?.url?.searchParams.get('date');
+    if (date && date !== (loading ? requestedReportDate : sourceData?.reportDate)) void loadReport(date);
+  });
+
   onMount(() => {
-    void loadReport();
+    if (loadSequence === 0) void loadReport(new URLSearchParams(window.location.search).get("date"));
   });
 
   async function loadReport(reportDate: string | null = null, month?: string): Promise<void> {
     const sequence = ++loadSequence;
+    requestedReportDate = reportDate;
     loading = true;
     errorMessage = "";
     detailDialog?.close();
@@ -244,8 +253,14 @@
       const result = await fetchCreditData(reportDate,fetch,month);
       if (sequence !== loadSequence) return;
       sourceData = result;
+      if (window.location.pathname.startsWith('/credit-workbench')) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('date', result.reportDate);
+        replaceState(url, {});
+      }
       calendarMonth = month ?? result.reportDate.slice(0, 7);
     } catch (error) {
+      if (sequence !== loadSequence) return;
       errorMessage = error instanceof Error ? error.message : "授信数据加载失败";
     } finally {
       if (sequence === loadSequence) loading = false;
@@ -416,6 +431,8 @@
       <div><h2>授信数据暂不可用</h2><p>{errorMessage || "暂无授信记录"}</p></div>
       <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-credit-retry"} type="button" onclick={() => void loadReport()}>重新加载</Button>
     </section>
+  {:else if activeTab === "overview" && overviewTab === "bank-credit"}
+    <BankCreditStatus {report} />
   {:else if activeTab === "overview"}
     <section aria-labelledby="credit-metrics-title">
       <SectionHeading id="credit-metrics-title" title="授信总览" />

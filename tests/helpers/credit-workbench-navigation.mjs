@@ -30,7 +30,8 @@ const Host = await loadComponent("tests/helpers/CreditWorkspaceHost.svelte", `<s
   views={[{id:"overview",label:"总览",icon:"overview",href:"/trading-research"}]}><p>交易研究内容</p></WorkbenchShell>{/if}`);
 const app = mount(Host, { context, target: document.body });
 flushSync();
-const afterNavigation = globalThis.domAfterNavigations[0];
+const overviewNavigation = globalThis.domAfterNavigations[0];
+const afterNavigation = globalThis.domAfterNavigations[1];
 assert.equal(typeof afterNavigation, 'function');
 const workspace = document.querySelector('.tr-workspace');
 let scrollResets = 0;
@@ -46,6 +47,10 @@ assert.deepEqual([...document.querySelectorAll(".tr-drawer__nav a")].map(a => [a
   ["授信周报", "/credit-workbench/weekly"],
 ]);
 assert.equal(document.querySelector("h1").textContent, "授信总览");
+assert.deepEqual([...document.querySelectorAll('.page-header__tabs a')].map(a => a.textContent.trim()), ['仪表盘', '银行授信情况']);
+flushSync(() => overviewNavigation({ to: { url: new URL('http://localhost/credit-workbench?tab=bank-credit') } }));
+assert.ok(document.querySelector('a[href="/credit-workbench?tab=bank-credit"]').getAttribute('aria-current'));
+flushSync(() => overviewNavigation({ to: { url: new URL('http://localhost/credit-workbench') } }));
 assert.equal(document.querySelector("main").classList.contains("tr-chat-page"), false);
 flushSync(() => app.navigate("calendar"));
 const reportView = document.querySelector(".tr-credit-view");
@@ -74,6 +79,87 @@ assert.equal(document.querySelectorAll(".credit-chat").length, 0);
 await unmount(app);
 await tick();
 assert.equal(document.querySelectorAll(".tr-workbench, .chat-toolbar, .tr-credit-toolbar").length, 0);
+
+// Exercise same-instance tab/date navigation with the actual report builder.
+const { creditFull } = await import('../visual/audit-fixtures.mjs');
+const { creditDataFixture } = await import('./credit-data-fixture.mjs');
+globalThis.domAfterNavigations = [];
+window.location.href = 'http://localhost/credit-workbench?tab=bank-credit&date=2026-06-30';
+reportRequests = 0;
+globalThis.fetch = async url => {
+  reportRequests++;
+  const date = new URL(url, window.location.href).searchParams.get('date') || '2026-06-30';
+  const report = structuredClone(creditFull);
+  report.summary.reportDate = date;
+  report.previousDate = null;
+  report.weeklyNews = report.recentApprovals = [];
+  report.availableDates = ['2026-06-30', '2026-09-30'];
+  report.institutions.forEach(row => { row.expiryDate = '2027-12-31'; });
+  return Response.json(creditDataFixture(report));
+};
+const loadedApp = mount(Host, { context, target: document.body });
+flushSync();
+function navigateOverview(url) {
+  window.history.pushState({}, '', url);
+  const event = { to: { url: new URL(url) } };
+  flushSync(() => { for (const callback of globalThis.domAfterNavigations) callback(event); });
+}
+async function waitForReport(date) {
+  for (let i = 0; i < 30; i++) {
+    await new Promise(resolve => setTimeout(resolve, 10));
+    flushSync();
+    if (document.querySelector(`[aria-label="报告日：${date}"]`)) return;
+  }
+  assert.fail(`report did not load ${date}`);
+}
+await waitForReport('2026-06-30');
+navigateOverview(window.location.href);
+const reportInstance = document.querySelector('.tr-credit-view');
+assert.ok(document.querySelector('table[aria-label="银行性质汇总"]'));
+assert.equal(reportRequests, 1);
+navigateOverview('http://localhost/credit-workbench?date=2026-06-30');
+assert.equal(document.querySelector('table[aria-label="银行性质汇总"]'), null);
+assert.equal(reportRequests, 1, 'tab-only navigation reuses the report');
+navigateOverview('http://localhost/credit-workbench?tab=bank-credit&date=2026-09-30');
+await waitForReport('2026-09-30');
+assert.ok(document.body.textContent.includes('数据时点：2026-09-30'));
+assert.equal(reportRequests, 2);
+navigateOverview('http://localhost/credit-workbench?tab=bank-credit&date=2026-06-30');
+await waitForReport('2026-06-30');
+assert.equal(document.querySelector('.tr-credit-view'), reportInstance);
+assert.ok(document.body.textContent.includes('数据时点：2026-06-30'));
+assert.equal(reportRequests, 3, 'history navigation to another date loads that date');
+const normalFetch = globalThis.fetch;
+let releaseLateResponse;
+globalThis.fetch = async url => {
+  if (String(url).includes('2026-09-30')) await new Promise(resolve => { releaseLateResponse = resolve; });
+  return normalFetch(url);
+};
+navigateOverview('http://localhost/credit-workbench?tab=bank-credit&date=2026-09-30');
+assert.equal(typeof releaseLateResponse, 'function');
+navigateOverview('http://localhost/credit-workbench?tab=bank-credit&date=2026-06-30');
+await waitForReport('2026-06-30');
+releaseLateResponse();
+await new Promise(resolve => setTimeout(resolve, 30));
+flushSync();
+assert.ok(document.body.textContent.includes('数据时点：2026-06-30'), 'late responses cannot undo history navigation');
+assert.equal(new URL(window.location.href).searchParams.get('date'), '2026-06-30');
+globalThis.fetch = async url => {
+  if (String(url).includes('2026-09-30')) {
+    await new Promise(resolve => { releaseLateResponse = resolve; });
+    return Response.json({ error: '旧日期请求失败' }, { status: 503 });
+  }
+  return normalFetch(url);
+};
+navigateOverview('http://localhost/credit-workbench?tab=bank-credit&date=2026-09-30');
+navigateOverview('http://localhost/credit-workbench?tab=bank-credit&date=2026-06-30');
+await waitForReport('2026-06-30');
+releaseLateResponse();
+await new Promise(resolve => setTimeout(resolve, 30));
+flushSync();
+assert.ok(document.body.textContent.includes('数据时点：2026-06-30'), 'late failures cannot replace the current report');
+assert.equal(document.querySelector('[role="alert"]'), null);
+await unmount(loadedApp);
 
 globalThis.domNavigations = [];
 window.location.href = "http://localhost/policy-tracking?category=monetary#policy-existing";

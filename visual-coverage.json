@@ -47,7 +47,8 @@
         "credit-weekly",
         "browser-agent-credit",
         "sidebar-credit",
-        "credit-usage-interactions"
+        "credit-usage-interactions",
+        "credit-bank-status"
       ]
     },
     {
@@ -1983,6 +1984,27 @@
           "projects": [
             "desktop",
             "mobile"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "credit-bank-status",
+      "url": "/credit-workbench?tab=bank-credit",
+      "kind": "screenshot",
+      "state": "bank-natures/top-ten/report-date/navigation",
+      "evidence": [
+        {
+          "spec": "tests/visual/credit-bank-status.spec.mjs",
+          "test": "bank credit table follows report date and preserves overview navigation",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-bank-header.png",
+            "credit-bank-summary.png",
+            "credit-bank-top.png"
           ]
         }
       ]
