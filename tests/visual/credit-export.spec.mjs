@@ -74,3 +74,46 @@ test('credit Excel export shows global feedback for generation failure and empty
   await page.getByRole('button', { name: '导出Excel', exact: true }).click();
   await expect(page.getByText('暂无可导出的授信机构', { exact: true })).toBeVisible();
 });
+
+test('credit weekly exports one complete PNG after scrolling through the detail table', async ({ page }, testInfo) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const unregistered = await mockResources(page);
+  const report = structuredClone(creditFull);
+  report.institutions = Array.from({ length: 30 }, (_, index) => ({
+    ...structuredClone(creditFull.institutions[0]),
+    institutionName: `银行${String(index + 1).padStart(2, '0')}`,
+  }));
+  await page.route('**/api/credit**', route => route.fulfill({ json: creditDataFixture(report) }));
+  await page.goto('/credit-workbench/weekly');
+  const surface = page.locator('.tr-credit-weekly-report');
+  await expect(surface.getByRole('rowheader', { name: '银行30', exact: true })).toHaveCount(1);
+  await surface.getByRole('rowheader', { name: '银行30', exact: true }).scrollIntoViewIfNeeded();
+  const scrollTop = await page.locator('.tr-workspace').evaluate(element => element.scrollTop);
+  expect(scrollTop).toBeGreaterThan(0);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await page.route(/\/export-[^/]+\.js/, async route => { await gate; await route.continue(); });
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出图片', exact: true }).click();
+  await expect(page.getByRole('button', { name: `报告日：${report.summary.reportDate}`, exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '导出中…', exact: true })).toBeDisabled();
+  release();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(`资金管理部-授信周报-${report.summary.reportDate}.png`);
+  const output = testInfo.outputPath('credit-weekly.png');
+  await download.saveAs(output);
+  const bytes = await readFile(output);
+  expect(bytes.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20);
+  expect(height).toBeGreaterThan(3 * 900);
+  await expect(page.getByRole('button', { name: '导出图片', exact: true })).toBeEnabled();
+  expect(await page.locator('.tr-workspace').evaluate(element => element.scrollTop)).toBe(scrollTop);
+  await expect(surface).not.toHaveClass(/is-export-capture/);
+  expect(errors).toEqual([]);
+  expect(unregistered).toEqual([]);
+  const preview = await page.context().newPage();
+  await preview.setContent(`<img alt="授信周报导出图片" src="data:image/png;base64,${bytes.toString('base64')}" style="display:block;width:${width / 3}px">`);
+  await expect(preview.getByRole('img')).toHaveScreenshot('credit-weekly-export-image.png');
+  await preview.close();
+});

@@ -6,7 +6,7 @@
   import * as Popover from '$lib/components/ui/popover/index.js';
   import { creditQuarterDates } from '../credit/report-date.ts';
 
-  let { value, min, onchange }: { value: string; min?: string; onchange: (date: string) => void } = $props();
+  let { value, min, disabled = false, onchange }: { value: string; min?: string; disabled?: boolean; onchange: (date: string) => void } = $props();
   let open = $state(false);
   let year = $state(0);
   const quarters = $derived(creditQuarterDates(year, min));
@@ -18,7 +18,7 @@
   <Popover.Root bind:open onOpenChange={next => { if (next) year = Number(value.slice(0, 4)); }}>
     <Popover.Trigger>
       {#snippet child({ props })}
-        <Button {...props} variant="outline" aria-label={`报告日：${value}`}><CalendarDays size={16} aria-hidden="true" />{value}</Button>
+        <Button {...props} {disabled} variant="outline" aria-label={`报告日：${value}`}><CalendarDays size={16} aria-hidden="true" />{value}</Button>
       {/snippet}
     </Popover.Trigger>
     <Popover.Content role="dialog" aria-label="选择报告日" align="start" class="credit-report-date-popover">

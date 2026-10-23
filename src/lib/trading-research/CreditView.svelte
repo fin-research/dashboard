@@ -76,6 +76,7 @@
   let loadSequence = $state(0);
   let requestedReportDate: string | null = null;
   let exporting = $state(false);
+  let weeklyReport: HTMLDivElement;
 
   async function exportExcel(): Promise<void> {
     if (!report || loading || exporting) return;
@@ -306,8 +307,22 @@
     return `${year}年${Number(monthNumber)}月`;
   }
 
-  function printWeeklyReport(): void {
-    window.print();
+  async function exportWeeklyImage(): Promise<void> {
+    if (!report || loading || exporting || !weeklyReport) return;
+    const reportDate = report.summary.reportDate;
+    exporting = true;
+    try {
+      const { exportReportImage } = await import('../../export');
+      await exportReportImage(weeklyReport, reportDate, {
+        captureClass: true,
+        filename: `资金管理部-授信周报-${reportDate}.png`,
+      });
+      globalMessages.success('授信周报图片已导出');
+    } catch {
+      globalMessages.error('图片导出失败，请重试');
+    } finally {
+      exporting = false;
+    }
   }
 
   function statusLabel(status: CreditEffectiveStatus): string {
@@ -398,9 +413,9 @@
   >
     {#if report}
       <div class="tr-credit-toolbar__actions">
-        <CreditReportDatePicker value={report.summary.reportDate} min={report.availableDates[0]} onchange={date => void loadReport(date)} />
+        <CreditReportDatePicker disabled={activeTab === "weekly" && exporting} value={report.summary.reportDate} min={report.availableDates[0]} onchange={date => void loadReport(date)} />
         {#if activeTab === "weekly"}
-          <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-credit-print"} type="button" onclick={printWeeklyReport}>打印 / 导出 PDF</Button>
+          <Button data-ui-owner="lib-trading-research-CreditView-svelte" variant="outline" class={"ui-button tr-credit-print"} type="button" onclick={exportWeeklyImage} disabled={loading || exporting} aria-busy={exporting}>{exporting ? '导出中…' : '导出图片'}</Button>
         {/if}
       </div>
     {/if}
@@ -615,9 +630,10 @@
       </ModuleCard>
     </section>
   {:else}
-    <div class="tr-credit-weekly-report layout-report layout-report--credit">
+    <div bind:this={weeklyReport} class="tr-credit-weekly-report layout-report layout-report--credit">
       <section aria-labelledby="credit-weekly-title">
         <SectionHeading id="credit-weekly-title" title="授信周报" />
+        <p class="tr-credit-export-date">{report.summary.reportDate}</p>
         <div class="tr-metric-grid tr-metric-grid--five">
           <MetricCard label="授信总额" value={formatAmount(report.weeklySummary.totalLimit)} {...weeklyReportChange(report.weeklySummary.totalLimit, report.previousWeeklySummary?.totalLimit, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "credit" }} tone="blue" compact smallIcon />
           <MetricCard label="已用额度" value={formatAmount(report.weeklySummary.totalUsed)} {...weeklyReportChange(report.weeklySummary.totalUsed, report.previousWeeklySummary?.totalUsed, '亿元')} iconComponent={WorkbenchIcon} iconProps={{ name: "funds" }} tone="orange" compact smallIcon />

@@ -288,7 +288,7 @@ test("授信 schema、API 与页面保留只读详情及申请入口", async () 
   assert.match(view, /rowspan=\{group\.institutions\.length\}/);
   assert.match(view, /<ol class="tr-credit-news-list">/);
   assert.doesNotMatch(view, /使用额度变动/);
-  assert.match(view, /打印 \/ 导出 PDF/);
+  assert.match(view, /导出图片/);
   assert.match(view, /label="30日内到期"/);
   assert.match(view, /label="额度使用率" value=\{report\.summary\.utilization\.toFixed\(1\)\} unit="%"/);
   assert.match(view, /title="授信额度使用率"/);
