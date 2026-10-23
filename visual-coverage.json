@@ -563,7 +563,7 @@
       "id": "credit-weekly",
       "url": "/credit-workbench/weekly",
       "kind": "screenshot",
-      "state": "非空快讯、空态与持平指标、完整表头",
+      "state": "非空快讯、空态与持平指标、完整表头、完整长图下载",
       "evidence": [
         {
           "spec": "tests/visual/credit-desktop.spec.mjs",
@@ -605,6 +605,17 @@
           ],
           "snapshots": [
             "credit-weekly-empty.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/credit-export.spec.mjs",
+          "test": "credit weekly exports one complete PNG after scrolling through the detail table",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "credit-weekly-export-image.png"
           ]
         }
       ]

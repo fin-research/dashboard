@@ -1583,6 +1583,20 @@ body:has(.tr-workbench) {
   gap: 22px;
 }
 
+.tr-credit-export-date {
+  display: none;
+}
+
+.tr-credit-weekly-report.is-export-capture .tr-credit-export-date {
+  display: block;
+  margin: 0 0 16px;
+}
+
+.tr-credit-weekly-report.is-export-capture thead,
+.tr-credit-weekly-report.is-export-capture thead th {
+  position: static;
+}
+
 .tr-credit-bank-event {
   display: inline-flex;
   align-items: center;
