@@ -12,12 +12,15 @@ test('published actions have one explicit business label', () => {
   assert.equal(issuanceDecisionLabel('等待'), '等待');
   assert.equal(issuanceDecisionLabel('暂缓发行'), '暂缓发行');
   assert.equal(issuanceDecisionLabel('unrecognized'), null);
+  assert.equal(issuanceDecisionLabel('仅预测票面'), null);
   const snapshot = issuanceSnapshot();
   assert.match(issuanceDecisionNarrative(snapshot), /1\.85%.*2026-09-01至2026-09-03.*等待较低区间/);
   snapshot.decision.action='尽快发行';
   assert.match(issuanceDecisionNarrative(snapshot), /可按资金计划发行/);
   snapshot.forecast=[];
   assert.match(issuanceDecisionNarrative(snapshot), /没有可用的发行利率预测/);
+  snapshot.decision.action='仅预测票面';
+  assert.equal(issuanceDecisionNarrative(snapshot), null);
   snapshot.decision.action='unrecognized';
   assert.equal(issuanceDecisionNarrative(snapshot), null);
 });
@@ -113,4 +116,19 @@ test('factor presentation admits only observed registered market features with C
   assert.deepEqual(selectIssuanceShapDrivers(rows).map(row => row.feature), ['peer_premium_mean_bp','known_treasury_bp','industry_aaa_minus_treasury_bp']);
   assert.deepEqual(groupIssuanceShap(rows).map(row => [row.display_name,row.net_bp]), [['利率',1],['信用',-.5],['一级发行',-2.754]]);
   for (const key of Object.keys(issuanceMarketFeatures)) assert.doesNotMatch(issuanceFeatureName(key), /[a-zA-Z_]/);
+});
+
+
+test('raw valuation sequences and learned horizon interactions retain Chinese labels and signed contributions', () => {
+ const rows=[
+  {feature:'sector_quote_lag_0_bp',value:165,shap_bp:-2},
+  {feature:'quote_h1_sector_quote_lag_19_bp',value:175,shap_bp:1},
+  {feature:'issuer_quote_lag_0_bp',value:160,shap_bp:-.5},
+  {feature:'quote_h1',value:1,shap_bp:20},
+ ];
+ assert.equal(issuanceFeatureName(rows[0].feature),'券商行业收益率·最新行情');
+ assert.equal(issuanceFeatureName(rows[1].feature),'提前1日·券商行业收益率·前19个行情日');
+ assert.equal(issuanceFeatureName(rows[2].feature),'发行人估值收益率·最新行情');
+ assert.deepEqual(groupIssuanceShap(rows),[{display_name:'信用',absolute_bp:1.5,net_bp:-1.5}]);
+ assert.equal(selectIssuanceShapDrivers(rows).length,3);
 });

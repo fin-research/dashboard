@@ -40,3 +40,32 @@ export function issuanceSnapshot() {
     calendar_audit:{calendar:{year:2026,issuance_source:'https://www.sse.com.cn/'}},
     base_conclusion:{verdict:'可按资金计划发行',preferred_window:add(10),narrative:'预期节约有限，按资金计划发行。'}};
 }
+
+export function shortCouponSnapshot() {
+  const value = issuanceSnapshot();
+  const add = days => new Date(Date.parse(value.as_of_date) + days * 86400000).toISOString().slice(0, 10);
+  value.window_days = 30;
+  value.deadline = add(30);
+  value.forecast = [1, 14, 30].map(lead => ({...value.forecast[0],
+    date: add(lead), lead_days: lead, effective_horizon: lead, coupon_percent: 1.85 - lead * .001,
+    net_saving_bp: null, expected_saving_bp: null, waiting_cost_bp: null, annual_saving_wan: null,
+    saving_probability: null, saving_p10_bp: null, pair_samples: null,
+  }));
+  value.market_forecast = Array.from({length: 31}, (_, lead) => ({...value.market_forecast[0],
+    date: add(lead), value_date: add(lead), issuance_day: ![0, 6].includes(new Date(add(lead)).getUTCDay()),
+  }));
+  Object.assign(value.decision, {first_issuance_date: add(1), lowest_expected_cost_date: add(30),
+    low_rate_dates: [add(30)], low_rate_windows: [{start: add(30), end: add(30)}],
+    expected_net_saving_bp: null, annual_saving_wan: null, saving_probability: null,
+    saving_p10_bp: null, joint_error_pairs: null,
+  });
+  value.explanation.method = 'linear';
+  value.explanation.prediction_coupon_bp = value.forecast[0].coupon_percent * 100;
+  value.explanation.features = [
+    {feature: 'sector_quote_lag_0_bp', value: 165, shap_bp: -2},
+    {feature: 'quote_h1_sector_quote_lag_19_bp', value: 175, shap_bp: -1},
+    {feature: 'issuer_quote_lag_0_bp', value: 160, shap_bp: -.5},
+  ];
+  value.explanation.base_coupon_bp = value.explanation.prediction_coupon_bp + 3.5;
+  return value;
+}

@@ -12,7 +12,7 @@ test('financing-model preserves its approved report layout',async({page})=>{
   await expect(page.getByText('123.00',{exact:true})).toBeVisible();
   await expect(page.getByText('历史P45.0',{exact:false})).toBeVisible();
   await expect(page.getByRole('heading',{name:'因子贡献',exact:true})).toBeVisible();
-  await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue('首个可发行日预计票面1.85%；预测较低区间为2026-09-01至2026-09-03。最低日2026-09-03预计票面1.82%。可结合资金需求等待较低区间。');
+  await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue('T+1预计票面1.85%；预测较低区间为2026-09-23。最低日2026-09-23预计票面1.82%。可结合资金需求等待较低区间。');
   await expect(page.getByRole('heading',{name:'四品种对比'})).toBeVisible();
   await expect(page.getByText('57.5%',{exact:true})).toBeVisible();
   await expect(page.getByText('2026预测命中率（±5bp）',{exact:true})).toBeVisible();
@@ -98,6 +98,7 @@ test('financing-model switches between issuance model dates', async ({page}) => 
   await expect(page.getByRole('textbox',{name:'整体结论'})).toHaveValue(/预测较低区间为/);
   await page.getByRole('button',{name:'展开未来发行窗口明细'}).click();
   await expect(page.getByRole('columnheader',{name:'预计票面'})).toBeVisible();
+  for (const horizon of [1, 14, 30]) await expect(page.getByRole('rowheader', {name: `T+${horizon}`, exact: true})).toBeVisible();
   await expect(page.getByRole('columnheader',{name:'90%区间',exact:true})).toHaveCount(0);
   expect(errors).toEqual([]);
 });

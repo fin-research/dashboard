@@ -17,7 +17,7 @@ export function issuanceDecisionNarrative(snapshot: IssuanceSnapshot): string | 
   if(first?.coupon_percent==null)return '当前没有可用的发行利率预测。';
   const windows=snapshot.decision.low_rate_windows.map(row=>row.start===row.end?row.start:`${row.start}至${row.end}`).join('、');
   const best=snapshot.forecast.find(row=>row.date===snapshot.decision.lowest_expected_cost_date);
-  return `首个可发行日预计票面${first.coupon_percent.toFixed(2)}%；预测较低区间为${windows}。${best?.coupon_percent==null?'':`最低日${best.date}预计票面${best.coupon_percent.toFixed(2)}%。`}${snapshot.decision.action==='尽快发行'?'当前已处于较低区间，可按资金计划发行。':'可结合资金需求等待较低区间。'}`;
+  return `T+${first.lead_days}预计票面${first.coupon_percent.toFixed(2)}%；预测较低区间为${windows}。${best?.coupon_percent==null?'':`最低日${best.date}预计票面${best.coupon_percent.toFixed(2)}%。`}${snapshot.decision.action==='尽快发行'?'当前已处于较低区间，可按资金计划发行。':'可结合资金需求等待较低区间。'}`;
 }
 
 export type ShapGroup = { display_name: string; absolute_bp: number; net_bp: number };
@@ -76,6 +76,17 @@ register('二级成交', {
   bond_volume_pctile_60d:'债券成交量·60日分位', credit_bond_volume_ratio:'信用债成交比',
   credit_volume_chg_5d:'信用债成交量·5日变化', rate_credit_volume_ratio:'利率与信用成交比',
 });
+for (let lag = 0; lag < 20; lag += 1) {
+  const observation = lag === 0 ? '最新行情' : `前${lag}个行情日`;
+  for (const [source, title] of Object.entries({ sector: '券商行业收益率', issuer: '发行人估值收益率' })) {
+    const feature = `${source}_quote_lag_${lag}_bp`;
+    const name = `${title}·${observation}`;
+    register('信用', { [feature]: name });
+    for (const horizon of [1, 14, 30]) {
+      register('信用', { [`quote_h${horizon}_${feature}`]: `提前${horizon}日·${name}` });
+    }
+  }
+}
 export function issuanceFeatureName(feature: string): string {
   return issuanceMarketFeatures[feature]?.name ?? '未登记特征';
 }
