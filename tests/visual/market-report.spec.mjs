@@ -142,7 +142,7 @@ test('AI 生成自动展开任务详情、轮替模型摘要并保留完成结�
 
 test('AI 对话侧栏挤压桌面页面并提供会话与工具设置', async ({ page, isMobile }) => {
   await mockResources(page);
-  await page.route('**/api/mcp', route => route.fulfill({ json: { jsonrpc: '2.0', id: 'visual', result: { tools: [
+  await page.route('**/mcp', route => route.fulfill({ json: { jsonrpc: '2.0', id: 'visual', result: { tools: [
     { name: 'credit_report', title: '读取授信报表', description: '读取授信报表', inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true } },
     { name: 'update_credit_institution', title: '修改授信机构', description: '修改授信机构', inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: false } },
   ] } } }));

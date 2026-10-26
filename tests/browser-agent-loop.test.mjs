@@ -53,7 +53,7 @@ test('browser ToolLoopAgent streams, calls a user-authorized MCP tool, and resum
   const events = [];
   globalThis.fetch = async (input, init) => {
     const url = String(input);
-    if (url.endsWith('/api/mcp')) {
+    if (url.endsWith('/mcp')) {
       const rpc = JSON.parse(init.body);
       assert.equal(init.credentials, 'same-origin');
       if (rpc.method === 'tools/list') return Response.json({ jsonrpc: '2.0', id: rpc.id, result: { tools: [tool, article] } });

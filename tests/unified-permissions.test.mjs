@@ -11,6 +11,13 @@ test('every application route and named mutation is registered in the one permis
   const files = await readdir(root, { recursive: true });
   for (const path of files.filter(path => /\+(page\.server|server)\.ts$/.test(path) || /\+page\.svelte$/.test(path))) {
     const id = '/' + path.split('/').slice(0, -1).join('/');
+    // This handler is reachable only through GatewayDashboard; the public
+    // Gateway endpoint owns its login policy and retires /api/mcp.
+    if (id === '/api/mcp') {
+      assert.equal(ROUTE_PERMISSIONS[id], undefined);
+      assert.deepEqual(ROUTE_PERMISSIONS['/mcp'], { GET: 'login', POST: 'login', DELETE: 'login' });
+      continue;
+    }
     assert.ok(ROUTE_PERMISSIONS[id], `Missing route: ${id}`);
     const source = await readFile(new URL(path, root), 'utf8');
     if (path.endsWith('+server.ts')) for (const method of ['GET','POST','PUT','PATCH','DELETE']) {
