@@ -81,8 +81,8 @@ test('credit GET usage validates inputs before opening a connection and keeps re
  const code=(await build({stdin:{contents:await readFile(new URL('../src/routes/api/credit/+server.ts',import.meta.url),'utf8'),resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'credit-route-fixture',setup(plugin){
   plugin.onResolve({filter:/^\$lib\//},args=>({path:args.path,namespace:'fixture'}));
   plugin.onLoad({filter:/.*/,namespace:'fixture'},args=>({contents:args.path.includes('postgres') ? `export async function withPostgres(connection,name,fn) {globalThis.__usageTestCalls.push(['connect']);return fn({query:async(sql)=>{globalThis.__usageTestCalls.push([sql]);return {rows:[]}}})}`
-   : args.path.includes('credit-ai') ? `export async function loadCreditAi(){throw new Error('AI path must not run for report/usage')}`
-   : args.path.endsWith('/credit/ai.ts') ? `export const creditAiQuerySchema={safeParse:()=>({success:true})}`
+   : args.path.includes('credit-masked') ? `export async function loadCreditMasked(){throw new Error('AI path must not run for report/usage')}`
+   : args.path.endsWith('/credit/masked.ts') ? `export const creditMaskedQuerySchema={safeParse:()=>({success:true})}`
    : args.path.includes('credit-repository') ? `export class CreditDatabaseError extends Error{};export async function loadCreditUsage(...args){globalThis.__usageTestCalls.push(['usage',...args.slice(1)]);return {items:[]}};export async function loadCreditData(){globalThis.__usageTestCalls.push(['report']);return {report:true}};export function saveCreditInstitution(){}`
    : args.path.includes('bond-ledger') ? `export class BondLedgerUploadError extends Error{};export function validateSameOrigin(){}` : `export const creditInstitutionUpdateSchema={parse:value=>value};`}));
  }}]})).outputFiles[0].text;

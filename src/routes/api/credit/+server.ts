@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { creditInstitutionUpdateSchema } from "$lib/credit/update.ts";
-import { creditAiQuerySchema } from "$lib/credit/ai.ts";
-import { loadCreditAi } from "$lib/server/credit-ai.ts";
+import { creditMaskedQuerySchema } from "$lib/credit/masked.ts";
+import { loadCreditMasked } from "$lib/server/credit-masked.ts";
 import { BondLedgerUploadError, validateSameOrigin } from "$lib/server/bond-ledger.ts";
 import {
   CreditDatabaseError,
@@ -15,13 +15,13 @@ import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ platform, url }) => {
   const view = url.searchParams.get("view");
-  if (view === 'ai' && (!creditAiQuerySchema.safeParse(Object.fromEntries(url.searchParams)).success ||
+  if (view === 'masked' && (!creditMaskedQuerySchema.safeParse(Object.fromEntries(url.searchParams)).success ||
       new Set(url.searchParams.keys()).size !== [...url.searchParams].length))
     return Response.json({error:'授信查询参数无效'},{status:400,headers:{'Cache-Control':'no-store'}});
   const institution = url.searchParams.get("institution");
   const type = url.searchParams.get("type");
   const offset = url.searchParams.get("offset") ?? "0";
-  if (view !== null && view !== 'usage' && view !== 'ai' || view === 'usage' && (!institution?.trim() || institution.length > 200 || !['bond_investment','yield_certificate','interbank_lending'].includes(type ?? '') || !/^\d+$/.test(offset) || Number(offset) > 100000))
+  if (view !== null && view !== 'usage' && view !== 'masked' || view === 'usage' && (!institution?.trim() || institution.length > 200 || !['bond_investment','yield_certificate','interbank_lending'].includes(type ?? '') || !/^\d+$/.test(offset) || Number(offset) > 100000))
     return Response.json({error:'授信用量参数无效'},{status:400,headers:{'Cache-Control':'no-store'}});
   const date = url.searchParams.get("date");
   const month = url.searchParams.get("month");
@@ -39,7 +39,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
       async (client) => {
         await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
         try {
-          const report = view === 'ai' ? await loadCreditAi(client,date ?? undefined,url.searchParams.get('institutionId') ?? undefined)
+          const report = view === 'masked' ? await loadCreditMasked(client,date ?? undefined,url.searchParams.get('institutionId') ?? undefined)
             : view === 'usage' ? await loadCreditUsage(client,date!,institution!,type as import('$lib/credit/types.ts').CreditUsageType,Number(offset)) : await loadCreditData(client, date, month ?? undefined);
           await client.query('COMMIT');
           return report;

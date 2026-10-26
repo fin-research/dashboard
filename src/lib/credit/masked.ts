@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { dateSchema } from '../tracking-commentary.ts';
 
-export const creditAiQuerySchema = z.object({
-  view: z.literal('ai'),
+export const creditMaskedQuerySchema = z.object({
+  view: z.literal('masked'),
   date: dateSchema.optional(),
   institutionId: z.string().refine(value => /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n).optional(),
 }).strict();
 const amount = z.string().regex(/^-?\d+(\.\d+)?$/).nullable();
-export const creditAiInstitutionSchema = z.object({
+export const creditMaskedInstitutionSchema = z.object({
   institution_id: z.string().regex(/^[1-9]\d*$/),
   status: z.enum(['approved', 'applying']),
   effective_date: dateSchema.nullable(), expiry_date: dateSchema.nullable(),
@@ -18,7 +18,7 @@ export const creditAiInstitutionSchema = z.object({
   legal_overdraft_limit: amount, legal_overdraft_used: amount, other_used: amount,
   verified: z.boolean(),
 }).strict();
-export const creditAiReportSchema = z.object({
+export const creditMaskedReportSchema = z.object({
   reportDate: dateSchema, amountUnit: z.literal('亿元'),
-  institutions: z.array(creditAiInstitutionSchema),
+  institutions: z.array(creditMaskedInstitutionSchema),
 }).strict();

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { progressPatch } from './trading-progress.ts';
-import { creditAiQuerySchema } from '../credit/ai.ts';
+import { creditMaskedQuerySchema } from '../credit/masked.ts';
 import { conclusionUpdateSchema, timingDecisionInputSchema, sellSideSummaryUpdateSchema } from '../financing-model.ts';
 import { policyCategorySchema, articleAssociationUpdateSchema, commentaryContentSchema, commentaryTypeSchema } from '../policies.ts';
 import { createTrackingSchema, updateTrackingSchema, generateTrackingSchema, dateSchema } from '../tracking-commentary.ts';
@@ -48,7 +48,7 @@ export const mcpOperations: McpOperation[] = [
   api('update_tracking_commentary', '修改跟踪点评', '/api/tracking-commentaries/[id]', 'PUT', at(updateTrackingSchema)),
   api('generate_tracking_commentary', 'AI 生成并保存跟踪点评', '/api/tracking-commentaries/[id]/generate', 'POST', at(generateTrackingSchema), { ai: true }),
   api('economic_indicators', '读取经济指标与趋势', '/api/economic-indicators'),
-  api('credit_report', '读取脱敏授信一览表', '/api/credit?view=ai', 'GET', query(creditAiQuerySchema.omit({view:true}).shape)),
+  api('credit_report', '读取脱敏授信一览表', '/api/credit?view=masked', 'GET', query(creditMaskedQuerySchema.omit({view:true}).shape)),
   api('bond_ledger', '读取二级池台账与周报', '/api/bond-ledger', 'GET', query({ start: dateSchema.optional(), end: dateSchema.optional() })),
   api('delete_bond_ledger', '删除指定日期二级池台账', '/api/bond-ledger', 'DELETE', z.object({ query: z.object({ date: dateSchema }) }).strict()),
   api('financing_model', '读取融资择时模型报告', '/api/financing-model', 'GET', query({ run: z.string().uuid().optional() })),
