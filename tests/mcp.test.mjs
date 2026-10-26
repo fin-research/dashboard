@@ -37,7 +37,7 @@ test('real MCP discovery lists only Gateway-approved tools and labels writes/gen
 test('credit MCP always dispatches the anonymized API and cannot select full reports',async()=>{
   const f=fixture(()=>true,request=>{
     const target=new URL(new URL(request.url).searchParams.get('target'),'https://eastmoney.hasbai.xyz');
-    assert.equal(target.pathname,'/api/credit');assert.deepEqual(target.searchParams.getAll('view'),['ai']);
+    assert.equal(target.pathname,'/api/credit');assert.deepEqual(target.searchParams.getAll('view'),['masked']);
     return Response.json({reportDate:'2026-08-21',amountUnit:'亿元',institutions:[{institution_id:'8',total_limit:'10.000000'}]});
   });
   const read=await rpc(f,'tools/call',{name:'credit_report',arguments:{query:{date:'2026-08-21',institutionId:'8'}}});

@@ -45,9 +45,9 @@ Worker 通过 `HYPERDRIVE` 访问 Neon `credit` schema，migration 只放 `credi
 
 ## 接口与维护
 
-- AI 授信查询只使用 `GET /api/credit?view=ai&date=YYYY-MM-DD&institutionId=数字ID`，日期默认上海今天，ID 可省略。沿用 `credit.institution:read` 与 `no-store`。响应为 `reportDate`、`amountUnit=亿元`、`institutions`，机构仅使用字符串 `institution_id`；金额为十进制字符串，缺失为 `null`。不支持机构名称、日历或自由查询参数。
-- `0022_credit_ai_ledger.sql` 新建 `credit.ai_ledger`（上海当日）与 `credit.ai_ledger_as_of(date)`（历史截面）。直接从 entry 白名单取最新字段，融资用量按 `institution_client.institution_id` 汇总，不查询 `credit.institution` 或 `public.client`。保留额度、已用、剩余、使用率、期限、状态及报告日定稿标记；不返回机构资料、客户资料、自由文本或作者。日期继承、撤销排除、融资存续、缺关联和零分母与一览表口径一致。历史台账债券已用不进入投影。
-- MCP 的 `credit_report` 固定读取上述脱敏模式；新增/修改授信工具退出 AI 目录，网站维护接口继续按原权限使用。CLI `scripts/query-credit-ai.mjs` 复用 Gateway 正常程序化登录和内存 Bearer 会话，只输出通过严格白名单校验的结果，见[授信查询 skill](../skills/credit-query.md)。
+- AI 授信查询只使用 `GET /api/credit?view=masked&date=YYYY-MM-DD&institutionId=数字ID`，日期默认上海今天，ID 可省略。沿用 `credit.institution:read` 与 `no-store`。响应为 `reportDate`、`amountUnit=亿元`、`institutions`，机构仅使用字符串 `institution_id`；金额为十进制字符串，缺失为 `null`。不支持机构名称、日历或自由查询参数。
+- `0023_credit_masked.sql` 将脱敏视图统一命名为 `credit.masked`（上海当日）与 `credit.masked_as_of(date)`（历史截面）。直接从 entry 白名单取最新字段，融资用量按 `institution_client.institution_id` 汇总，不查询 `credit.institution` 或 `public.client`。保留额度、已用、剩余、使用率、期限、状态及报告日定稿标记；不返回机构资料、客户资料、自由文本或作者。日期继承、撤销排除、融资存续、缺关联和零分母与一览表口径一致。历史台账债券已用不进入投影。旧视图与函数直接改名，不保留别名。
+- MCP 的 `credit_report` 固定读取上述脱敏模式；新增/修改授信工具退出 AI 目录，网站维护接口继续按原权限使用。不提供独立授信 skill 或专用登录 CLI。
 
 - 后端直接查询当前/对比 SQL 截面、客户关联、用量、申请事实及所需事件日期的截面，显式投影业务字段，不返回内部作者或审计 ID。当前/对比日期保留完整余额，其余日期仅返回相关机构用量。提前续作的旧有效期限从 SQL 历史事实读取。不在 Worker 构造机构展示对象或拼装报表。
 - `GET /api/credit?date=YYYY-MM-DD&month=YYYY-MM` 返回 `CreditDataset` 原始业务数据与日期上下文。浏览器共用 `buildCreditReport(data)` 生成一览表、总额、使用率、周报与日历。后端 GET/PATCH 不调用该函数。CLI/Excel 核对适配器复用同一纯函数，不保留第二套公式。`month` 默认所选日期所在月。非法日期/月为 400，早于历史覆盖起点或无记录为 404，连接异常为 503。
