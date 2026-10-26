@@ -31,4 +31,6 @@ const withoutBuildImport = generated.replace(
 await writeFile(declarationUrl, withoutBuildImport
   .replace(/Workflow<Parameters<import\("\.\/worker\/entry"\)\.MarketBriefingWorkflow\['run'\]>\[0\]\['payload'\]>/,
     'Workflow<import("./src/lib/market-briefing-types").MarketBriefingParams>')
-  .replaceAll('import("./worker/entry").CreditAgent' , 'import("agents").Agent<Cloudflare.Env>'));
+  .replace(/Workflow<Parameters<import\("\.\/worker\/entry"\)\.MarketBriefingNewsBatchWorkflow\['run'\]>\[0\]\['payload'\]>/,
+    'Workflow<import("./src/lib/market-briefing-types").MarketBriefingNewsBatchParams>')
+  .replaceAll('import("./worker/entry").CreditAgent', 'import("agents").Agent<Cloudflare.Env>'));

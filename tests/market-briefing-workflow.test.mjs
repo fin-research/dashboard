@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { newsWorkflow } from './fixtures/market-briefing-news.mjs';
 import { runMarketBriefing, startMarketBriefing } from '../worker/market-briefing-runner.ts';
 import { saveMarketReport } from '../src/lib/server/market-report.ts';
 import { directResponse } from './fixtures/market-resources.mjs';
@@ -23,6 +24,7 @@ function harness(override) {
     if (url.pathname.startsWith('/data/news/')) return Response.json(newsItem(1));
     return directResponse(req.url);
   } }, EASTMONEY: { put: async (key, body) => { objects.set(key, JSON.parse(body)); return { etag: 'saved' }; } } };
+  env.MARKET_BRIEFING_NEWS = newsWorkflow(env);
   // Successful step values survive replay. The harness does not implement the platform's retry engine.
   const step = { do: async (name, config, fn) => {
     if (checkpoints.has(name)) return structuredClone(checkpoints.get(name));
@@ -280,4 +282,19 @@ test('DM新闻为空时今日聚焦模块失败，其余六模块仍独立完成
   assert.ok(moduleSteps.slice(1).every(name => h.checkpoints.has(name)));
   assert.equal(h.objects.size, 0);
   assert.equal(h.steps.some(row => row.name === 'generate-focus'), false);
+});
+
+test('40篇新闻不消耗父流程详情预算，完整七模块仍归档', async t => {
+  clock(t);
+  const h = harness(url => {
+    const path = new URL(url).pathname;
+    if (path === '/data/news') return Response.json(Array.from({ length: 40 }, (_, i) => newsItem(i)));
+    if (path.startsWith('/data/news/')) return Response.json(newsItem(Number(path.split('-').at(-1))));
+  });
+  assert.equal((await h.run()).status, 'complete');
+  const childCalls = [...h.env.MARKET_BRIEFING_NEWS.instances.values()].reduce((sum, child) => sum + child.calls, 0);
+  assert.equal(childCalls, 40);
+  assert.equal(h.calls.length - childCalls, 17);
+  assert.equal(h.checkpoints.get('collect-focus-news').news_count, 40);
+  assert.equal(h.objects.size, 1);
 });

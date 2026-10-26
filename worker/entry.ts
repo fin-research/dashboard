@@ -26,7 +26,7 @@ export class NotificationSource extends WorkerEntrypoint<Cloudflare.Env> {
  override fetch(request:Request) { return notificationSource(request,this.env); }
 }
 
-export { MarketBriefingWorkflow } from "./market-briefing-workflow.ts";
+export { MarketBriefingWorkflow, MarketBriefingNewsBatchWorkflow } from "./market-briefing-workflow.ts";
 export { CreditAgent } from "./credit-agent.ts";
 
 export class ScheduledTasks extends WorkerEntrypoint<Cloudflare.Env> {

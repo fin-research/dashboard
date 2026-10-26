@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { newsWorkflow } from "./fixtures/market-briefing-news.mjs";
 
 import {
   buildMarketBriefingPrompt,
@@ -126,6 +127,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
     DATA: { fetch: dataFetch },
   };
+  env.MARKET_BRIEFING_NEWS = newsWorkflow(env);
   try {
     const result = await generateMarketBriefing(env, "2026-08-10");
     assert.deepEqual(result, {

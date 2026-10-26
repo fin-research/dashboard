@@ -86,6 +86,11 @@
       "binding": "MARKET_BRIEFING",
       "name": "market-briefing",
       "class_name": "MarketBriefingWorkflow"
+    },
+    {
+      "binding": "MARKET_BRIEFING_NEWS",
+      "name": "market-briefing-news",
+      "class_name": "MarketBriefingNewsBatchWorkflow"
     }
   ],
   "observability": {
