@@ -77,3 +77,6 @@ Quant工作日08:30运行，归档`quant-trial/runs/{date}/{instanceId}/result.j
 `0013_relu_path_attribution.sql`扩展归因方法白名单以接收ReLU路径积分贡献，保留票面加法校验和历史方法。
 
 `0014_coupon_point_publication.sql`接收声明`forecast_horizons=[1,14,30]`且`expected_savings_supported=false`的三点票面预测。日期、区间、节约和建议字段按点预测契约校验，动作保留“仅预测票面”。该形状不执行历史低四分位择时规则，不按`release_policy`或`qualified`判定效果资格。
+
+`0015_coupon_point_zero_waiting_cost.sql`沿用点预测的`waiting_cost_bp=0`语义，表示未计等待成本；同时兼容空值，拒绝非零等待成本。区间和节约字段仍须为空。
+该迁移同时允许未提供的平市场对照MAE为空，不补造对照结果。
