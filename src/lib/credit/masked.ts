@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dateSchema } from '../tracking-commentary.ts';
+import { dateSchema } from '../commentary.ts';
 
 export const creditMaskedQuerySchema = z.object({
   view: z.literal('masked'),

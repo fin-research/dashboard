@@ -15,14 +15,14 @@ f.env.DASHBOARD={fetch(request){const context=JSON.parse(Buffer.from(request.hea
 const token=await f.signed({azp:'portal'});
 async function rpc(method,params={}) {const response=await gatewayRequest(new Request(f.env.SITE_ORIGIN+'/api/mcp',{method:'POST',headers:{Authorization:'Bearer '+token,Host:'eastmoney.hasbai.xyz','Content-Type':'application/json',Accept:'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})}),f.env);const text=await response.text();assert.equal(response.status,200,text);const value=response.headers.get('Content-Type')?.includes('text/event-stream')?text.split('\n').filter(v=>v.startsWith('data: ')).map(v=>JSON.parse(v.slice(6))).find(v=>v.id===1):JSON.parse(text);return value.error?{isError:true,rpcError:value.error}:value.result;}
 try{
-const list=await rpc('tools/list');assert.deepEqual(list.tools.map(tool=>tool.name),['credit_report']);
+const list=await rpc('tools/list');assert.equal(list.tools.length,15);assert.ok(list.tools.some(tool=>tool.name==='commentary'));assert.ok(list.tools.every(tool=>!tool.name.startsWith('generate_')));
 const call=(name,args={})=>rpc('tools/call',{name,arguments:args});
-for(const name of ['health','fund_reports','save_trading_progress','trading_progress','update_project','credit_public_search','dashboard_credit_report'])assert.ok((await call(name)).isError,name);
+for(const name of ['health','fund_reports','save_trading_progress','trading_progress','update_project','credit_public_search','dashboard_credit_report','generate_market_focus','generate_hotspots','generate_policy_commentary','generate_tracking_commentary','tracking_commentary'])assert.ok((await call(name)).isError,name);
 // Invalid arguments are rejected before any business database connection.
 assert.ok((await call('credit_report',{query:{view:'usage'}})).isError);
 assert.ok((await call('credit_report',{query:{date:'2026-02-30'}})).isError);
 await f.updateGrants([]);
-assert.deepEqual((await rpc('tools/list')).tools,[]);
+assert.deepEqual((await rpc('tools/list')).tools.map(tool=>tool.name),['market_report']);
 assert.ok((await call('credit_report')).isError);
 console.log(JSON.stringify({integration:true,tools:list.tools.length,realGateway:true,builtSvelteKit:true,unpublishedToolsRejected:true,inputValidation:true,permissionRevocation:true,externalServices:'mocked',browserUsed:false}));
 }finally{for(const fn of cleanup)fn()}

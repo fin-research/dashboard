@@ -19,7 +19,7 @@ async function query(sql,params=[]) {
   if (!result.success || result.result.some(item=>!item.success)) throw new Error('D1 archive operation failed');
   return result.result.flatMap(item=>item.results);
 }
-const rows = await query('SELECT * FROM research_commentary ORDER BY id');
+const rows = await query('SELECT * FROM commentary ORDER BY id');
 const manifest = JSON.parse(await readFile(manifestPath,'utf8'));
 const byId = new Map(manifest.map(item=>[item.id,item]));
 const sha = bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -41,7 +41,7 @@ console.log(JSON.stringify({mode:apply?'apply':'preview',bucket:'eastmoney',pref
 if (!apply) process.exit(0);
 const objectPath=key=>'/r2/buckets/eastmoney/objects/'+key.split('/').map(encodeURIComponent).join('/');
 for (const item of plan) {
-  const prior=await query('SELECT * FROM research_commentary_pdf WHERE commentary_id=? AND revision_at=?',[item.id,item.revisionAt]);
+  const prior=await query('SELECT * FROM commentary_pdf WHERE commentary_id=? AND revision_at=?',[item.id,item.revisionAt]);
   if (prior.length && (prior[0].r2_key!==item.key || prior[0].sha256!==item.sha256)) throw new Error('Archive version conflict');
   let existing=null;
   try { existing=await request(objectPath(item.key)); } catch(error) { if(!String(error).endsWith('HTTP 404')) throw error; }
@@ -53,10 +53,10 @@ for (const item of plan) {
   }
   const retrieved=await request(objectPath(item.key));
   if(sha(Buffer.from(await retrieved.arrayBuffer()))!==item.sha256)throw new Error('R2 PDF hash verification failed');
-  await query(`INSERT INTO research_commentary_pdf(commentary_id,revision_at,r2_key,file_name,sha256,byte_size,archived_at)
+  await query(`INSERT INTO commentary_pdf(commentary_id,revision_at,r2_key,file_name,sha256,byte_size,archived_at)
     VALUES(?,?,?,?,?,?,?) ON CONFLICT(commentary_id,revision_at) DO NOTHING`,[item.id,item.revisionAt,item.key,item.fileName,item.sha256,item.size,new Date().toISOString()]);
 }
-const confirmed=await query('SELECT commentary_id,revision_at,r2_key,sha256,byte_size FROM research_commentary_pdf');
+const confirmed=await query('SELECT commentary_id,revision_at,r2_key,sha256,byte_size FROM commentary_pdf');
 for(const item of plan)if(!confirmed.some(row=>row.commentary_id===item.id && row.revision_at===item.revisionAt && row.r2_key===item.key && row.sha256===item.sha256 && row.byte_size===item.size))throw new Error('D1 PDF archive readback failed');
 await writeFile(path.join(output,'result.json'),JSON.stringify({verified:plan.length,originals:plan.filter(item=>item.original).length,generated:plan.filter(item=>!item.original).length},null,2));
 console.log(JSON.stringify({verified:plan.length,bucket:'eastmoney',prefix:'research-commentary/'}));

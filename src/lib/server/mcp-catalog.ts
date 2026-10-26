@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { progressPatch } from './trading-progress.ts';
 import { creditMaskedQuerySchema } from '../credit/masked.ts';
 import { conclusionUpdateSchema, timingDecisionInputSchema, sellSideSummaryUpdateSchema } from '../financing-model.ts';
-import { policyCategorySchema, articleAssociationUpdateSchema, commentaryContentSchema, commentaryTypeSchema } from '../policies.ts';
-import { createTrackingSchema, updateTrackingSchema, generateTrackingSchema, dateSchema } from '../tracking-commentary.ts';
+import { policyCategorySchema, articleAssociationUpdateSchema } from '../policies.ts';
+import { createCommentarySchema, updateCommentarySchema, commentaryTypeSchema, dateSchema } from '../commentary.ts';
 import { saveSchema } from '../trading-workflow/model.ts';
 import { projectCreateSchema } from '../financing/project-form.ts';
 import { DATA_ENTITIES } from '../financing/data-admin.ts';
@@ -15,7 +15,7 @@ const queryValues = z.record(z.string().max(100), z.union([z.string().max(4000),
 const formValues = queryValues.describe('与网站表单相同的字段；多值字段使用字符串数组。缺失字段不会自动补齐，更新前先读取当前记录。');
 export interface McpOperation {
   name: string; title: string; path: string; method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  input: z.ZodObject; format?: 'page' | 'form' | 'html'; action?: string; ai?: boolean; description?: string;
+  input: z.ZodObject; format?: 'page' | 'form' | 'html'; action?: string; description?: string;
 }
 function api(name: string, title: string, path: string, method: McpOperation['method'] = 'GET', input: z.ZodObject = empty, extra: Partial<McpOperation> = {}): McpOperation {
   return { name, title, path, method, input, ...extra };
@@ -32,21 +32,16 @@ function form(name: string, title: string, path: string, action: string, fields:
 export const mcpOperations: McpOperation[] = [
   api('market_report', '读取市场点评定稿', '/api/market-report', 'GET', query({ date: dateSchema.optional() })),
   api('save_market_report', '保存市场点评定稿', '/api/market-report', 'PUT', z.object({ query: z.object({ date: dateSchema }), body: z.object({ report: z.record(z.string(), z.unknown()), focusText: z.string().optional() }) }).strict()),
-  api('generate_market_focus', 'AI 生成市场今日聚焦', '/api/market-briefing', 'POST', query({ date: dateSchema.optional() }), { ai: true }),
   api('hotspots', '读取最新市场热点快照', '/api/rag/hotspots'),
-  api('generate_hotspots', 'AI 生成并保存市场热点', '/api/rag/hotspots', 'POST', body(z.discriminatedUnion('mode', [z.object({ mode: z.literal('rolling'), rollingCount: z.number().int().min(8).max(100) }), z.object({ mode: z.literal('range'), startDate: dateSchema, endDate: dateSchema })])), { ai: true }),
   api('policies', '查询政策时间轴', '/api/policies', 'GET', query({ ...dates, category: policyCategorySchema.optional() })),
   api('policy_articles', '搜索可关联研报', '/api/policies/articles', 'GET', query({ q: z.string().max(120).optional() })),
   api('update_policy_articles', '更新政策关联研报', '/api/policies/[id]/articles', 'PUT', at(articleAssociationUpdateSchema)),
-  api('generate_policy_commentary', 'AI 生成政策点评', '/api/policies/[id]/commentary', 'POST', z.object({ id }).strict(), { ai: true }),
-  api('update_policy_commentary', '修改政策点评', '/api/policies/[id]/commentary', 'PUT', at(commentaryContentSchema)),
-  ...['articles', 'news', 'commentaries'].map((kind, index) => api(['article', 'news', 'commentary'][index]!, ['读取研报正文', '读取新闻详情', '读取研究点评'][index]!, `/api/${kind}/[id]`, 'GET', z.object({ id }).strict())),
-  api('tracking_commentaries', '查询跟踪点评', '/api/tracking-commentaries', 'GET', query({ q: z.string().max(240).optional(), type: commentaryTypeSchema.optional(), offset: z.number().int().min(0).max(100000).optional(), policyId: id.optional() })),
-  api('tracking_commentary', '读取跟踪点评', '/api/tracking-commentaries/[id]', 'GET', z.object({ id }).strict()),
-  api('tracking_revisions', '读取跟踪点评历史版本', '/api/tracking-commentaries/[id]/revisions', 'GET', z.object({ id }).strict()),
-  api('create_tracking_commentary', '创建跟踪点评', '/api/tracking-commentaries', 'POST', body(createTrackingSchema)),
-  api('update_tracking_commentary', '修改跟踪点评', '/api/tracking-commentaries/[id]', 'PUT', at(updateTrackingSchema)),
-  api('generate_tracking_commentary', 'AI 生成并保存跟踪点评', '/api/tracking-commentaries/[id]/generate', 'POST', at(generateTrackingSchema), { ai: true }),
+  ...['articles', 'news'].map((kind, index) => api(['article', 'news'][index]!, ['读取研报正文', '读取新闻详情'][index]!, `/api/${kind}/[id]`, 'GET', z.object({ id }).strict())),
+  api('commentaries', '查询标准点评', '/api/commentaries', 'GET', query({ q: z.string().max(240).optional(), type: commentaryTypeSchema.optional(), offset: z.number().int().min(0).max(100000).optional(), policyId: id.optional() })),
+  api('commentary', '读取标准点评', '/api/commentaries/[id]', 'GET', z.object({ id }).strict()),
+  api('commentary_revisions', '读取标准点评历史版本', '/api/commentaries/[id]/revisions', 'GET', z.object({ id }).strict()),
+  api('create_commentary', '创建标准点评', '/api/commentaries', 'POST', body(createCommentarySchema)),
+  api('update_commentary', '修改标准点评', '/api/commentaries/[id]', 'PUT', at(updateCommentarySchema)),
   api('economic_indicators', '读取经济指标与趋势', '/api/economic-indicators'),
   api('credit_report', '读取脱敏授信一览表', '/api/credit?view=masked', 'GET', query(creditMaskedQuerySchema.omit({view:true}).shape)),
   api('bond_ledger', '读取二级池台账与周报', '/api/bond-ledger', 'GET', query({ start: dateSchema.optional(), end: dateSchema.optional() })),
@@ -55,7 +50,6 @@ export const mcpOperations: McpOperation[] = [
   api('update_model_conclusion', '修改融资模型结论', '/api/financing-model/conclusion', 'PATCH', body(conclusionUpdateSchema)),
   api('timing_decisions', '读取融资择时决策历史', '/api/financing-model/decisions'),
   api('create_timing_decision', '保存融资择时决策', '/api/financing-model/decisions', 'POST', body(timingDecisionInputSchema)),
-  api('generate_sell_side', 'AI 生成并保存卖方观点', '/api/financing-model/sell-side', 'POST', body(z.object({ runId: z.string().uuid() })), { ai: true }),
   api('update_sell_side', '修改卖方观点总结', '/api/financing-model/sell-side', 'PATCH', body(sellSideSummaryUpdateSchema)),
   api('trading_workflow', '读取交易流程配置', '/api/trading-workflow/config'),
   api('save_trading_workflow', '保存交易流程配置', '/api/trading-workflow/config', 'PUT', body(saveSchema)),

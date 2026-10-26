@@ -1,3 +1,4 @@
+import type { CommentarySummary } from "./commentary.ts";
 import { z } from "zod";
 
 export const policyCategorySchema = z.enum([
@@ -17,30 +18,12 @@ export const policyImportanceSchema = z.enum([
   "general",
 ]);
 
-export const commentaryTypeSchema = z.enum([
-  "current_affairs",
-  "policy_tracking",
-  "overseas_event",
-]);
-
-export const commentaryContentSchema = z.object({
-  eventName: z.string().trim().min(4).max(240),
-  sources: z.string().trim().min(2).max(500),
-  eventPublishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  commentaryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  eventSummary: z.string().trim().min(20).max(4_000),
-  commentary: z.string().trim().min(20).max(16_000),
-  recommendation: z.string().trim().min(20).max(6_000),
-}).strict();
-
 export const articleAssociationUpdateSchema = z.object({
   articleIds: z.array(z.string().min(1)).max(100),
 }).strict();
 
 export type PolicyCategory = z.infer<typeof policyCategorySchema>;
 export type PolicyImportance = z.infer<typeof policyImportanceSchema>;
-export type CommentaryType = z.infer<typeof commentaryTypeSchema>;
-export type CommentaryContent = z.infer<typeof commentaryContentSchema>;
 
 export interface PolicyNews {
   id: string;
@@ -60,16 +43,6 @@ export interface PolicyArticle {
   associationMethod: "ai" | "manual";
 }
 
-export interface ResearchCommentary extends CommentaryContent {
-  id: string;
-  type: CommentaryType;
-  model: string | null;
-  promptVersion: string | null;
-  generatedAt: string | null;
-  edited: boolean;
-  updatedAt: string;
-}
-
 export interface PolicyEvent {
   id: string;
   title: string;
@@ -83,7 +56,7 @@ export interface PolicyEvent {
   updatedAt: string;
   news: PolicyNews[];
   articles: PolicyArticle[];
-  commentary: ResearchCommentary | null;
+  commentary: CommentarySummary | null;
 }
 
 export interface PolicyTimelineResponse {
@@ -117,8 +90,8 @@ export interface ResearchReportDetail extends ArticleSearchResult {
   policies: RelatedPolicySummary[];
 }
 
-export interface ResearchCommentaryDetail {
-  commentary: ResearchCommentary;
+export interface CommentaryDetail {
+  commentary: CommentarySummary;
   policy: RelatedPolicySummary | null;
 }
 

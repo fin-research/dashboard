@@ -1,14 +1,12 @@
+import type { CommentarySummary } from "../commentary.ts";
 import type {
   ArticleSearchResult,
-  CommentaryContent,
   PolicyArticle,
   PolicyCategory,
   PolicyEvent,
   PolicyNews,
   PolicyNewsDetail,
   RelatedPolicySummary,
-  ResearchCommentaryDetail,
-  ResearchCommentary,
 } from "$lib/policies";
 
 export class PolicyRepositoryError extends Error {
@@ -57,7 +55,7 @@ interface ArticleRow {
 interface CommentaryRow {
   id: string;
   policy_id: string;
-  commentary_type: ResearchCommentary["type"];
+  commentary_type: CommentarySummary["type"];
   event_name: string;
   sources: string;
   event_published_at: string;
@@ -97,13 +95,6 @@ interface PolicyNewsDetailRow {
   content: string | null;
   link: string | null;
   policy_id: string;
-  policy_title: string;
-  policy_summary: string;
-  policy_category: PolicyCategory;
-  policy_date: string;
-}
-
-interface CommentaryDetailRow extends CommentaryRow {
   policy_title: string;
   policy_summary: string;
   policy_category: PolicyCategory;
@@ -184,7 +175,7 @@ export async function loadPolicyTimeline(
       SELECT id, policy_id, commentary_type, event_name, sources,
              event_published_at, commentary_date, event_summary, commentary,
              recommendation, model, prompt_version, generated_at, edited, updated_at
-      FROM research_commentary
+      FROM commentary
       WHERE policy_id IN (${placeholders})
     `).bind(...policyIds).all<CommentaryRow>(),
   ]);
@@ -311,34 +302,6 @@ export async function loadPolicyNewsDetail(
   };
 }
 
-export async function loadResearchCommentaryDetail(
-  database: Env["DB"],
-  commentaryId: string,
-): Promise<ResearchCommentaryDetail> {
-  const row = await database.prepare(`
-    SELECT rc.id, rc.policy_id, rc.commentary_type, rc.event_name, rc.sources,
-           rc.event_published_at, rc.commentary_date, rc.event_summary,
-           rc.commentary, rc.recommendation, rc.model, rc.prompt_version,
-           rc.generated_at, rc.edited, rc.updated_at,
-           pe.title AS policy_title, pe.summary AS policy_summary,
-           pe.category AS policy_category, pe.policy_date
-    FROM research_commentary rc
-    LEFT JOIN policy_event pe ON pe.id = rc.policy_id
-    WHERE rc.id = ?
-  `).bind(commentaryId).first<CommentaryDetailRow>();
-  if (!row) throw new PolicyRepositoryError(404, "研究点评不存在");
-  return {
-    commentary: commentaryFromRow(row),
-    policy: row.policy_id ? {
-      id: row.policy_id,
-      title: row.policy_title,
-      summary: row.policy_summary,
-      category: row.policy_category,
-      policyDate: row.policy_date,
-    } : null,
-  };
-}
-
 export async function saveManualPolicyArticles(
   database: Env["DB"],
   policyId: string,
@@ -440,98 +403,6 @@ export async function loadCommentaryGenerationContext(
   };
 }
 
-export async function saveGeneratedCommentary(
-  database: Env["DB"],
-  policyId: string,
-  content: CommentaryContent,
-  metadata: { model: string; promptVersion: string; generatedAt: string },
-): Promise<ResearchCommentary> {
-  await requirePolicy(database, policyId);
-  const existing = await database.prepare(
-    "SELECT id, created_at FROM research_commentary WHERE policy_id = ?",
-  ).bind(policyId).first<{ id: string; created_at: string }>();
-  const id = existing?.id ?? crypto.randomUUID();
-  const createdAt = existing?.created_at ?? metadata.generatedAt;
-  await database.prepare(`
-    INSERT INTO research_commentary (
-      id, policy_id, commentary_type, event_name, sources, event_published_at,
-      commentary_date, event_summary, commentary, recommendation, model,
-      prompt_version, generated_at, edited, created_at, updated_at
-    ) VALUES (?, ?, 'policy_tracking', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-    ON CONFLICT(policy_id) DO UPDATE SET
-      event_name = excluded.event_name,
-      sources = excluded.sources,
-      event_published_at = excluded.event_published_at,
-      commentary_date = excluded.commentary_date,
-      event_summary = excluded.event_summary,
-      commentary = excluded.commentary,
-      recommendation = excluded.recommendation,
-      model = excluded.model,
-      prompt_version = excluded.prompt_version,
-      generated_at = excluded.generated_at,
-      edited = 0,
-      updated_at = excluded.updated_at
-  `).bind(
-    id,
-    policyId,
-    content.eventName,
-    content.sources,
-    content.eventPublishedAt,
-    content.commentaryDate,
-    content.eventSummary,
-    content.commentary,
-    content.recommendation,
-    metadata.model,
-    metadata.promptVersion,
-    metadata.generatedAt,
-    createdAt,
-    metadata.generatedAt,
-  ).run();
-  return await requireCommentary(database, policyId);
-}
-
-export async function saveEditedCommentary(
-  database: Env["DB"],
-  policyId: string,
-  content: CommentaryContent,
-): Promise<ResearchCommentary> {
-  await requirePolicy(database, policyId);
-  const existing = await database.prepare(
-    "SELECT id, created_at FROM research_commentary WHERE policy_id = ?",
-  ).bind(policyId).first<{ id: string; created_at: string }>();
-  const now = new Date().toISOString();
-  await database.prepare(`
-    INSERT INTO research_commentary (
-      id, policy_id, commentary_type, event_name, sources, event_published_at,
-      commentary_date, event_summary, commentary, recommendation, edited,
-      created_at, updated_at
-    ) VALUES (?, ?, 'policy_tracking', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-    ON CONFLICT(policy_id) DO UPDATE SET
-      event_name = excluded.event_name,
-      sources = excluded.sources,
-      event_published_at = excluded.event_published_at,
-      commentary_date = excluded.commentary_date,
-      event_summary = excluded.event_summary,
-      commentary = excluded.commentary,
-      recommendation = excluded.recommendation,
-      edited = 1,
-      updated_at = excluded.updated_at
-  `).bind(
-    existing?.id ?? crypto.randomUUID(),
-    policyId,
-    content.eventName,
-    content.sources,
-    content.eventPublishedAt,
-    content.commentaryDate,
-    content.eventSummary,
-    content.commentary,
-    content.recommendation,
-    existing?.created_at ?? now,
-    now,
-  ).run();
-  return await requireCommentary(database, policyId);
-}
-
 async function requirePolicy(database: Env["DB"], policyId: string): Promise<PolicyRow> {
   const policy = await database.prepare(`
     SELECT id, title, summary, category, departments_json, policy_date,
@@ -540,20 +411,6 @@ async function requirePolicy(database: Env["DB"], policyId: string): Promise<Pol
   `).bind(policyId).first<PolicyRow>();
   if (!policy) throw new PolicyRepositoryError(404, "政策记录不存在");
   return policy;
-}
-
-async function requireCommentary(
-  database: Env["DB"],
-  policyId: string,
-): Promise<ResearchCommentary> {
-  const row = await database.prepare(`
-    SELECT id, policy_id, commentary_type, event_name, sources,
-           event_published_at, commentary_date, event_summary, commentary,
-           recommendation, model, prompt_version, generated_at, edited, updated_at
-    FROM research_commentary WHERE policy_id = ?
-  `).bind(policyId).first<CommentaryRow>();
-  if (!row) throw new PolicyRepositoryError(500, "点评保存后无法读取");
-  return commentaryFromRow(row);
 }
 
 function newsFromRow(row: NewsRow): PolicyNews {
@@ -578,9 +435,10 @@ function articleFromRow(row: ArticleRow): PolicyArticle {
   };
 }
 
-function commentaryFromRow(row: CommentaryRow): ResearchCommentary {
+function commentaryFromRow(row: CommentaryRow): CommentarySummary {
   return {
     id: row.id,
+    policyId: row.policy_id,
     type: row.commentary_type,
     eventName: row.event_name,
     sources: row.sources,

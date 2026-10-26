@@ -25,7 +25,7 @@ test.beforeEach(async ({page}) => {
   pdfBytes=null; stored=structuredClone(original); errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.clock.setFixedTime(new Date('2026-09-15T11:00:00+08:00'));
   unexpected=await mockResources(page);
-  await page.route('**/api/tracking-commentaries**',async route=>{
+  await page.route('**/api/commentaries**',async route=>{
     const url=new URL(route.request().url());const method=route.request().method();
     if(url.pathname.endsWith('/pdf')) {
       if(method==='GET')return route.fulfill({contentType:'application/pdf',body:pdfBytes});
@@ -41,7 +41,7 @@ test.beforeEach(async ({page}) => {
     if(url.pathname.endsWith('/revisions'))return route.fulfill({json:{revisions:[{savedAt:original.updatedAt,content:original}]}});
     if(method==='PUT') { const body=route.request().postDataJSON();expect(body.updatedAt).toBe(stored.updatedAt);stored={...stored,...body,updatedAt:'2026-09-15T03:01:00Z'};return route.fulfill({json:stored}); }
     if(method==='POST') { stored={...stored,...route.request().postDataJSON(),id:'new-1'};return route.fulfill({json:stored,status:201}); }
-    if(url.pathname==='/api/tracking-commentaries')return route.fulfill({json:{items:[stored],hasMore:false}});
+    if(url.pathname==='/api/commentaries')return route.fulfill({json:{items:[stored],hasMore:false}});
     return route.fulfill({json:stored});
   });
 });
@@ -67,7 +67,7 @@ test('tracking archive opens, edits, generates and retains source evidence',asyn
   const downloaded=page.waitForEvent('download');
   await page.getByRole('button',{name:'保存 PDF',exact:true}).click();
   await (await downloaded).saveAs(testInfo.outputPath('tracking-commentary-saved.pdf'));
-  await expect(page.getByRole('link',{name:'下载 PDF',exact:true})).toHaveAttribute('href',`/api/tracking-commentaries/archive-1/pdf?revisionAt=${encodeURIComponent(stored.updatedAt)}`);
+  await expect(page.getByRole('link',{name:'下载 PDF',exact:true})).toHaveAttribute('href',`/api/commentaries/archive-1/pdf?revisionAt=${encodeURIComponent(stored.updatedAt)}`);
   await page.getByRole('button',{name:'版本记录',exact:true}).click();
   await expect(page.getByRole('button',{name:/2026-09-15 03:00:00/})).toBeVisible();
 });
@@ -75,7 +75,7 @@ test('tracking archive opens, edits, generates and retains source evidence',asyn
 test('failed saves retain the edited draft',async({page})=>{
   await page.goto('/trading-research/tracking-commentary?id=archive-1');
   await expect(page.getByLabel('主题',{exact:true})).toHaveValue(original.eventName);
-  await page.route('**/api/tracking-commentaries/archive-1',async route=>route.request().method()==='PUT' ? route.fulfill({status:409,json:{error:'点评已更新，请重新打开后编辑'}}):route.fallback());
+  await page.route('**/api/commentaries/archive-1',async route=>route.request().method()==='PUT' ? route.fulfill({status:409,json:{error:'点评已更新，请重新打开后编辑'}}):route.fallback());
   await page.getByLabel('事件摘要',{exact:true}).fill('保留这段尚未保存的内容');
   await page.getByRole('button',{name:'保存草稿',exact:true}).click();
   await expect(page.getByText('点评已更新，请重新打开后编辑',{exact:true})).toBeVisible();

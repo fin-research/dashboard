@@ -16,8 +16,7 @@ export const AI_GATEWAY_REASONING_EFFORT_BY_TASK = {
   generation: "xhigh",
   market_briefing: "xhigh",
   analysis: "xhigh",
-  policy_commentary: "xhigh",
-  tracking_commentary: "xhigh",
+  commentary: "xhigh",
   credit_answer: "xhigh",
   summary: "xhigh",
 } as const;

@@ -41,7 +41,7 @@ test('caller cancellation terminates both JSON and SSE response bodies without r
     let calls = 0, cancelled = false;
     const pending = generateAiGatewayObject({ accountId: 'test', gatewayId: 'default', token: 'test' }, [],
       z.object({ ok: z.boolean() }), 'test', {
-        taskType: 'policy_commentary', metadata: {}, promptCacheKey: 'test', requestTimeoutMs: 1000,
+        taskType: 'commentary', metadata: {}, promptCacheKey: 'test', requestTimeoutMs: 1000,
         signal: abort.signal, ...(streaming ? { onTextDelta() {} } : {}),
       }, async () => {
         calls++;

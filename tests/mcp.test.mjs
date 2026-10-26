@@ -6,6 +6,7 @@ const { handleDashboardMcp, executeOperation, decodeBusinessResponse, boundedTex
 const { mcpOperations, operationPath } = await import('../src/lib/server/mcp-catalog.ts');
 const { clientRequestPermission } = await import('../src/lib/route-permissions.ts');
 const { stringify } = await import('devalue');
+const publishedNames = ['market_report','save_market_report','hotspots','policies','policy_articles','update_policy_articles','article','news','commentaries','commentary','commentary_revisions','create_commentary','update_commentary','economic_indicators','credit_report'];
 const user = { id:'auth0|test',auth0Id:'auth0|test',email:'test@18.cn',issuedAt:1,expiresAt:9999999999,authorization:{name:'测试',picture:'',roles:[],permissions:[],mode:'enforce'} };
 function fixture(allow = () => true, response = () => Response.json({ saved:true })) {
   const calls = [];
@@ -21,10 +22,12 @@ async function rpc(f, method, params = {}, identity = user) {
   const payload = response.headers.get('Content-Type')?.includes('text/event-stream') ? text.split('\n').filter(line=>line.startsWith('data: ')).map(line=>JSON.parse(line.slice(6))).find(value=>value.id===1) : JSON.parse(text);
   return {response,payload};
 }
-test('real MCP discovery publishes exactly credit_report and respects Gateway permission',async()=>{
+test('real MCP discovery publishes only reviewed market data and credit and respects Gateway permission',async()=>{
   const {response,payload}=await rpc(fixture(),'tools/list');
   assert.equal(response.status,200);
-  assert.deepEqual(payload.result.tools.map(tool=>tool.name),['credit_report']);
+  assert.deepEqual(payload.result.tools.map(tool=>tool.name),publishedNames);
+  assert.ok(!mcpOperations.some(op=>op.name.startsWith('generate_')));
+  assert.ok(payload.result.tools.every(tool=>tool.annotations.openWorldHint===false));
   assert.equal(payload.result.tools[0].annotations.readOnlyHint,true);
   const denied=await rpc(fixture(()=>false),'tools/list');
   assert.deepEqual(denied.payload.result.tools,[]);
@@ -33,7 +36,7 @@ test('unpublished tools and prefixed aliases cannot execute or access backing se
   const f=fixture();
   f.env.EASTMONEY={list(){assert.fail('Unpublished materials must not be read')}};
   f.env.CREDIT_SEARCH={search(){assert.fail('Unpublished search must not execute')}};
-  for(const name of ['health','credit_public_materials','credit_public_search','dashboard_credit_report',...mcpOperations.filter(op=>op.name!=='credit_report').map(op=>op.name)]) {
+  for(const name of ['health','credit_public_materials','credit_public_search','dashboard_credit_report','policy_commentary','update_policy_commentary','tracking_commentary','tracking_commentaries','tracking_revisions','create_tracking_commentary','update_tracking_commentary','generate_market_focus','generate_hotspots','generate_policy_commentary','generate_tracking_commentary','generate_sell_side',...mcpOperations.filter(op=>!publishedNames.includes(op.name)).map(op=>op.name)]) {
     const {payload}=await rpc(f,'tools/call',{name,arguments:{}});
     assert.ok(payload.error||payload.result.isError,name);
   }
@@ -81,15 +84,13 @@ test('JSON mutations and named actions use private dispatch, preserve user conte
   assert.equal(new URL(g.calls[0].url).searchParams.get('target'),'/financing/sop/abc?%2FupdateTemplate=');
   assert.deepEqual((await g.calls[0].formData()).getAll('nodeIds'),['1','2']);
 });
-test('business failures, Svelte data and SSE terminal results retain their meaning',async()=>{
+test('business failures and Svelte data retain their meaning; AI streams are not decoded',async()=>{
   assert.deepEqual(await decodeBusinessResponse(Response.json({type:'data',nodes:[{type:'data',data:JSON.parse(stringify({secret:'layout'}))},{type:'data',data:JSON.parse(stringify({projects:[]}))}]}),{format:'page'}),{projects:[]});
   const failure=await decodeBusinessResponse(Response.json({type:'failure',status:409,data:stringify({message:'版本冲突'})}),{format:'form'});assert.equal(failure.failed,true);assert.equal(failure.status,409);
   const f=fixture(()=>true,()=>Response.json({detail:'权限已变更'},{status:403}));
   const result=await rpc(f,'tools/call',{name:'credit_report',arguments:{}});assert.equal(result.payload.result.isError,true);assert.match(result.payload.result.content[0].text,/403/);
   const sse=text=>new Response(text,{headers:{'Content-Type':'text/event-stream'}});
-  assert.deepEqual(await decodeBusinessResponse(sse('event: progress\ndata: 生成中\n\nevent: result\ndata: {"saved":true}\n\n'),{}),{saved:true});
-  await assert.rejects(decodeBusinessResponse(sse('event: error\ndata: 失败\n\n'),{}),/失败/);
-  await assert.rejects(decodeBusinessResponse(sse('event: progress\ndata: 未完成\n\n'),{}),/中断/);
+  await assert.rejects(decodeBusinessResponse(sse('event: result\ndata: {"saved":true}\n\n'),{}),SyntaxError);
   await assert.rejects(boundedText(new Response('超出限制'),3),/大小限制/);
 });
 test('modern discovery and legacy initialization both serve the Dashboard identity',async()=>{
@@ -109,4 +110,21 @@ test('public credit search remains unpublished and cannot return indexed financi
   f.env.CREDIT_SEARCH={search(){assert.fail('Unpublished search must not query AI Search')}};
   const {payload}=await rpc(f,'tools/call',{name:'credit_public_search',arguments:{query:'近几年的ROE是多少'}});
   assert.ok(payload.error||payload.result.isError);
+});
+
+test('standard commentary MCP results omit originals, filenames and private archive/search metadata',async()=>{
+  const value={id:'c1',policyId:null,type:'current_affairs',eventName:'标准点评',sources:'公开研报',eventPublishedAt:'2026-10-26',commentaryDate:'2026-10-26',eventSummary:'事件摘要',commentary:'标准点评正文',recommendation:'发行建议',model:null,promptVersion:null,generatedAt:null,edited:true,updatedAt:'v1',originalText:'原稿哨兵',sourceFiles:[{name:'内部路径哨兵.docx'}],pdf:{key:'存储哨兵'},search:{query:'检索哨兵'},evidence:[{sourceKey:'原始key哨兵'}]};
+  const body=Object.fromEntries(['type','eventName','sources','eventPublishedAt','commentaryDate','eventSummary','commentary','recommendation'].map(key=>[key,value[key]]));
+  for(const [name,args,response] of [
+    ['commentary',{id:'c1'},value],
+    ['create_commentary',{body},value],
+    ['update_commentary',{id:'c1',body:{...body,updatedAt:'v1'}},value],
+    ['commentaries',{}, {items:[value],hasMore:false,policy:{internal:'哨兵'}}],
+    ['commentary_revisions',{id:'c1'}, {revisions:[{savedAt:'v1',content:value}]}],
+  ]) {
+    const {payload}=await rpc(fixture(()=>true,()=>Response.json(response)),'tools/call',{name,arguments:args});
+    assert.equal(payload.result.isError,undefined,name);
+    assert.doesNotMatch(JSON.stringify(payload.result),/哨兵|originalText|sourceFiles|sourceKey|pdf|search|evidence/);
+    assert.match(JSON.stringify(payload.result),/标准点评/);
+  }
 });

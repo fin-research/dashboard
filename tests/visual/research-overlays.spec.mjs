@@ -65,7 +65,7 @@ test('desktop policy association choices remain square and cancel preserves the 
 
 test('desktop commentary preview prioritizes the report and returns to its draft',async({page})=>{
   const {commentaryAudit}=await import('./audit-fixtures.mjs');
-  await page.route('**/api/tracking-commentaries**',route=>route.fulfill({json:new URL(route.request().url()).pathname==='/api/tracking-commentaries'?{items:[commentaryAudit],hasMore:false}:commentaryAudit}));
+  await page.route('**/api/commentaries**',route=>route.fulfill({json:new URL(route.request().url()).pathname==='/api/commentaries'?{items:[commentaryAudit],hasMore:false}:commentaryAudit}));
   await page.goto('/trading-research/tracking-commentary?id=archive-1');
   await expect(page.getByRole('textbox',{name:'主题',exact:true})).toHaveValue(commentaryAudit.eventName);
   await page.getByRole('button',{name:'预览',exact:true}).click();

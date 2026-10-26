@@ -3,8 +3,8 @@
   const allowed=permissionVisibility();
   import { onMount, tick } from "svelte";
   import { beforeNavigate } from "$app/navigation";
-  import CommentaryReport from "$lib/tracking-commentary/CommentaryReport.svelte";
-  import { captureCommentaryPdf, downloadPdfBlob } from "$lib/tracking-commentary/browser-pdf";
+  import CommentaryReport from "$lib/commentary/CommentaryReport.svelte";
+  import { captureCommentaryPdf, downloadPdfBlob } from "$lib/commentary/browser-pdf";
   import { portal } from "$lib/portal";
   import DocumentBody from "$lib/policy-tracking/DocumentBody.svelte";
   import ModuleCard from "../../components/ModuleCard.svelte";
@@ -16,17 +16,17 @@
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { globalMessages } from "$lib/global-messages";
   import { isAiRequestCancelled, useAiClient } from "$lib/ai-client.svelte";
-  import { commentaryTypeLabels, shanghaiDate, trackingText, type TrackingCommentary, type TrackingDraft, type TrackingRevision, type CommentaryPdfArchive } from "$lib/tracking-commentary";
+  import { commentaryTypeLabels, shanghaiDate, commentaryText, type Commentary, type CommentaryDraft, type CommentaryRevision, type CommentaryPdfArchive } from "$lib/commentary";
 
-  type Item = Pick<TrackingCommentary, "id" | "eventName" | "type" | "commentaryDate" | "origin" | "edited" | "generatedAt">;
+  type Item = Pick<Commentary, "id" | "eventName" | "type" | "commentaryDate" | "origin" | "edited" | "generatedAt">;
   let items = $state<Item[]>([]), query = $state(""), typeFilter = $state("");
   let loading = $state(true), listError = $state(""), hasMore = $state(false), loadingMore = $state(false);
-  let selected = $state<TrackingCommentary | null>(null), draft = $state<TrackingDraft>(blank());
+  let selected = $state<Commentary | null>(null), draft = $state<CommentaryDraft>(blank());
   let savedDraft = $state(JSON.stringify(blank())), policyId = $state<string | null>(null);
   const aiClient = useAiClient();
   let busy = $state(false), opening = $state(false), preview = $state(false);
   let startDate = $state(shanghaiDate(-6)), endDate = $state(shanghaiDate());
-  let revisions = $state<TrackingRevision[]>([]), shownRevision = $state<TrackingRevision | null>(null);
+  let revisions = $state<CommentaryRevision[]>([]), shownRevision = $state<CommentaryRevision | null>(null);
   let generation = 0, listRequest = 0, mounted = false;
   let pdfElement = $state<HTMLElement>();
   let savingDraft = $state(false), failedSaveDraft = $state(""), saveConflict = $state(false);
@@ -42,10 +42,10 @@
   });
   async function syncDraft() {
     if (!$allowed("research.policy_commentary:update") || !selected || savingDraft || busy) return;
-    const requestId=generation, id=selected.id, snapshot=JSON.parse(JSON.stringify(draft)) as TrackingDraft;
+    const requestId=generation, id=selected.id, snapshot=JSON.parse(JSON.stringify(draft)) as CommentaryDraft;
     savingDraft=true;
     try {
-      const value=await json<TrackingCommentary>(`/api/tracking-commentaries/${encodeURIComponent(id)}`,{
+      const value=await json<Commentary>(`/api/commentaries/${encodeURIComponent(id)}`,{
         method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...snapshot,updatedAt:selected.updatedAt}),
       });
       if(mounted && requestId===generation && selected?.id===id){selected=value;savedDraft=JSON.stringify(snapshot);failedSaveDraft="";}
@@ -56,7 +56,7 @@
     if(!selected || !window.confirm("重新读取将放弃当前未保存的修改，是否继续？"))return;
     const id=selected.id, requestId=++generation;
     opening=true;
-    try { const value=await json<TrackingCommentary>(`/api/tracking-commentaries/${encodeURIComponent(id)}`);if(mounted && requestId===generation)accept(value); }
+    try { const value=await json<Commentary>(`/api/commentaries/${encodeURIComponent(id)}`);if(mounted && requestId===generation)accept(value); }
     catch(error){fail(error);}finally{if(requestId===generation)opening=false;}
   }
   function clearPrintMode() {
@@ -68,10 +68,10 @@
   async function printDraft() {
     await document.fonts.ready; enablePrintMode(); window.print();
   }
-  function blank(): TrackingDraft {
+  function blank(): CommentaryDraft {
     return { eventName: "", type: "current_affairs", sources: "", eventPublishedAt: shanghaiDate(), commentaryDate: shanghaiDate(), eventSummary: "", commentary: "", recommendation: "" };
   }
-  function accept(value: TrackingCommentary) {
+  function accept(value: Commentary) {
     selected = value; policyId = value.policyId;
     draft = { eventName: value.eventName, type: value.type, sources: value.sources, eventPublishedAt: value.eventPublishedAt,
       commentaryDate: value.commentaryDate, eventSummary: value.eventSummary, commentary: value.commentary, recommendation: value.recommendation };
@@ -101,7 +101,7 @@
     if (policy) {
       opening = true;
       try {
-        const found = await json<{ items: Item[]; policy: { id: string; title: string; summary: string; departments: string[]; policyDate: string } | null }>(`/api/tracking-commentaries?policyId=${encodeURIComponent(policy)}`);
+        const found = await json<{ items: Item[]; policy: { id: string; title: string; summary: string; departments: string[]; policyDate: string } | null }>(`/api/commentaries?policyId=${encodeURIComponent(policy)}`);
         if (!mounted) return;
         if (found.items[0]) { await open(found.items[0].id); return; }
         const value = found.policy;
@@ -118,7 +118,7 @@
     try {
       const params = new URLSearchParams({ q: query, offset: String(more ? items.length : 0) });
       if (typeFilter) params.set("type", typeFilter);
-      const result = await json<{ items: Item[]; hasMore: boolean }>(`/api/tracking-commentaries?${params}`);
+      const result = await json<{ items: Item[]; hasMore: boolean }>(`/api/commentaries?${params}`);
       if (!mounted || requestId !== listRequest) return;
       items = more ? [...items, ...result.items] : result.items; hasMore = result.hasMore;
     } catch (error) { if (requestId === listRequest) listError = error instanceof Error ? error.message : "点评列表读取失败"; }
@@ -127,7 +127,7 @@
   async function open(id: string) {
     if (busy || !canLeave()) return;
     const requestId = ++generation; opening = true;
-    try { const value = await json<TrackingCommentary>(`/api/tracking-commentaries/${encodeURIComponent(id)}`); if (mounted && requestId === generation) accept(value); }
+    try { const value = await json<Commentary>(`/api/commentaries/${encodeURIComponent(id)}`); if (mounted && requestId === generation) accept(value); }
     catch (error) { if (requestId === generation) fail(error); }
     finally { if (requestId === generation) opening = false; }
   }
@@ -137,10 +137,10 @@
     startDate = shanghaiDate(-6); endDate = shanghaiDate(); revisions = []; shownRevision = null; preview = false;
     window.history.replaceState(window.history.state, "", window.location.pathname);
   }
-  async function persist(): Promise<TrackingCommentary> {
+  async function persist(): Promise<Commentary> {
     await autosavePromise;
     if (selected && !dirty) return selected;
-    const value = await json<TrackingCommentary>(selected ? `/api/tracking-commentaries/${encodeURIComponent(selected.id)}` : "/api/tracking-commentaries", {
+    const value = await json<Commentary>(selected ? `/api/commentaries/${encodeURIComponent(selected.id)}` : "/api/commentaries", {
       method: selected ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(selected ? { ...draft, updatedAt: selected.updatedAt } : { ...draft, policyId }),
     });
@@ -161,13 +161,13 @@
       const current = dirty || !selected ? await persist() : selected;
       const commentary = await aiClient.run({
         title: `跟踪点评 · ${current.eventName}`,
-        url: `/api/tracking-commentaries/${encodeURIComponent(current.id)}/generate`,
+        url: `/api/commentaries/${encodeURIComponent(current.id)}/generate`,
         init: {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...range, updatedAt: current.updatedAt }),
         },
-        parse: (value) => value as TrackingCommentary,
+        parse: (value) => value as Commentary,
         resultText: value => [value.eventName, value.eventSummary, value.commentary, value.recommendation].filter(Boolean).join('\n\n'),
       });
       if (mounted) accept(commentary);
@@ -177,7 +177,7 @@
   }
   async function loadRevisions() {
     if (!selected) return; const id = selected.id;
-    try { const result = await json<{ revisions: TrackingRevision[] }>(`/api/tracking-commentaries/${encodeURIComponent(id)}/revisions`); if (mounted && selected?.id === id) revisions = result.revisions; }
+    try { const result = await json<{ revisions: CommentaryRevision[] }>(`/api/commentaries/${encodeURIComponent(id)}/revisions`); if (mounted && selected?.id === id) revisions = result.revisions; }
     catch (error) { fail(error); }
   }
   async function archivePdf() {
@@ -189,19 +189,19 @@
         await tick();
         if(!pdfElement)throw new Error("报告尚未完成排版");
         const bytes=await captureCommentaryPdf(pdfElement);
-        const pdf = await json<CommentaryPdfArchive>(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/pdf?updatedAt=${encodeURIComponent(current.updatedAt)}`, {
+        const pdf = await json<CommentaryPdfArchive>(`/api/commentaries/${encodeURIComponent(current.id)}/pdf?updatedAt=${encodeURIComponent(current.updatedAt)}`, {
           method: "POST", headers: { "Content-Type": "application/pdf" }, body: bytes,
         });
         if (mounted && selected?.id === current.id) selected = { ...selected, pdf };
       }
       // Download the archived bytes, including when another tab already saved this version.
-      const response=await fetch(`/api/tracking-commentaries/${encodeURIComponent(current.id)}/pdf?revisionAt=${encodeURIComponent(current.updatedAt)}`);
+      const response=await fetch(`/api/commentaries/${encodeURIComponent(current.id)}/pdf?revisionAt=${encodeURIComponent(current.updatedAt)}`);
       if(!response.ok)throw new Error("PDF 已归档，但下载失败，请点击下载 PDF重试");
       downloadPdfBlob(await response.blob(),selected?.pdf?.fileName || `${current.eventName}.pdf`);
       globalMessages.success("PDF 已下载并归档");
     } catch(error) { fail(error); } finally { busy = false; }
   }
-  async function copy() { try { await navigator.clipboard.writeText(trackingText(draft)); globalMessages.success("点评已复制"); } catch { globalMessages.error("复制失败"); } }
+  async function copy() { try { await navigator.clipboard.writeText(commentaryText(draft)); globalMessages.success("点评已复制"); } catch { globalMessages.error("复制失败"); } }
   function fail(error: unknown) { globalMessages.error(error instanceof Error ? error.message : "操作失败"); }
 </script>
 
@@ -216,7 +216,7 @@
       <Button variant="outline" disabled={!draft.commentary} onclick={copy}>复制正文</Button>
       <Button permission="research.policy_commentary:update" variant="outline" disabled={busy || saveConflict || !draft.commentary.trim()} onclick={archivePdf}>保存 PDF</Button>
       <Button variant="outline" disabled={busy || !draft.commentary.trim()} onclick={printDraft}>打印</Button>
-      {#if selected?.pdf && !dirty}<Button variant="outline" href={`/api/tracking-commentaries/${encodeURIComponent(selected.id)}/pdf?revisionAt=${encodeURIComponent(selected.pdf.revisionAt)}`}>下载 PDF</Button>{/if}
+      {#if selected?.pdf && !dirty}<Button variant="outline" href={`/api/commentaries/${encodeURIComponent(selected.id)}/pdf?revisionAt=${encodeURIComponent(selected.pdf.revisionAt)}`}>下载 PDF</Button>{/if}
       {#if selected}<Button variant="outline" onclick={loadRevisions}>版本记录</Button>{/if}
       <Badge tone={dirty ? "warning" : "neutral"}>{savingDraft ? "保存中" : dirty ? "未保存" : selected ? "已保存" : "新稿"}</Badge>
     </div>
@@ -275,7 +275,7 @@
           </ModuleCard>{/if}
           {#if revisions.length}<ModuleCard><PanelHeading id="tracking-revisions" title="版本记录" />
             {#each revisions as revision}<Button variant="ghost" onclick={() => shownRevision = revision}>{revision.savedAt.slice(0,19).replace("T"," ")} · {revision.content.edited ? "人工稿" : "AI 草稿"}</Button>{/each}
-            {#if shownRevision}<p class="original">{trackingText(shownRevision.content)}</p>{/if}
+            {#if shownRevision}<p class="original">{commentaryText(shownRevision.content)}</p>{/if}
           </ModuleCard>{/if}
         </div>
       </div>

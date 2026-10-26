@@ -7,12 +7,13 @@
   import DetailPageShell from "$lib/policy-tracking/DetailPageShell.svelte";
   import {
     policyCategoryLabels,
-    type ResearchCommentaryDetail,
+    type CommentaryDetail,
   } from "$lib/policies";
+  import type { Commentary } from "$lib/commentary";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
-  let detail = $state<ResearchCommentaryDetail | null>(null);
+  let detail = $state<CommentaryDetail | null>(null);
   let loading = $state(true);
   let errorMessage = $state("");
 
@@ -25,7 +26,8 @@
       const response = await fetch(`/api/commentaries/${encodeURIComponent(data.id)}`);
       const payload: unknown = await response.json();
       if (!response.ok) throw new Error(readError(payload, "研究点评读取失败"));
-      detail = payload as ResearchCommentaryDetail;
+      const commentary = payload as Commentary;
+      detail = { commentary, policy: commentary.policy ?? null };
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : "研究点评读取失败";
     } finally {

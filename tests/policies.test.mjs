@@ -1,10 +1,12 @@
+import { commentaryDraftSchema } from "../src/lib/commentary.ts";
+import { createCommentary, updateCommentary, getCommentary } from "../src/lib/server/commentary-repository.ts";
+import { commentaryDatabase } from "./helpers/commentary-database.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
   articleAssociationUpdateSchema,
-  commentaryContentSchema,
   policyCategoryLabels,
   policyImportanceLabels,
   policyImportanceSchema,
@@ -13,18 +15,16 @@ import { parseResearchContent } from "../src/lib/report-content.ts";
 import { fetchDataNewsDetail } from "../src/lib/server/data-news.ts";
 import {
   stripCommentarySourceLinks,
-} from "../src/lib/policy-commentary-output.ts";
+} from "../src/lib/commentary-output.ts";
 import {
-  loadResearchCommentaryDetail,
   loadResearchReportMetadata,
   loadPolicyNewsDetail,
   loadPolicyTimeline,
   loadCommentaryGenerationContext,
-  saveGeneratedCommentary,
 } from "../src/lib/server/policy-repository.ts";
 
 test("政策点评标准化字段通过运行时 Schema 校验", () => {
-  const parsed = commentaryContentSchema.parse({
+  const parsed = commentaryDraftSchema.parse({type:"policy_tracking",
     eventName: "房地产信贷管理新政",
     sources: "中国人民银行、国家金融监督管理总局",
     eventPublishedAt: "2026-09-01",
@@ -36,7 +36,7 @@ test("政策点评标准化字段通过运行时 Schema 校验", () => {
 
   assert.equal(parsed.eventPublishedAt, "2026-09-01");
   assert.throws(
-    () => commentaryContentSchema.parse({ ...parsed, commentary: "太短" }),
+    () => commentaryDraftSchema.parse({type:"policy_tracking", ...parsed, eventName: "" }),
     /too small/i,
   );
   assert.deepEqual(articleAssociationUpdateSchema.parse({ articleIds: ["A1", "A2"] }), {
@@ -160,11 +160,15 @@ test("研报详情复用 DATA Service Binding 并只读取正文和原文链接"
 
 test("研报和点评详情仓储返回对应政策上下文", async () => {
   const report = await loadResearchReportMetadata(fakeDetailDatabase(), "A1");
-  const commentary = await loadResearchCommentaryDetail(fakeDetailDatabase(), "C1");
+  const {db,sqlite}=commentaryDatabase();
+  sqlite.exec("INSERT INTO policy_event VALUES('P1','政策','摘要','real_estate','[]','2026-09-01','first','last','created','updated')");
+  const created=await createCommentary(db,{policyId:'P1',type:'policy_tracking',eventName:'测试政策点评',sources:'来源',eventPublishedAt:'2026-09-01',commentaryDate:'2026-09-01',eventSummary:'摘要',commentary:'正文',recommendation:'建议'});
+  const commentary = await getCommentary(db,created.id);
+  sqlite.close();
 
   assert.equal(report.title, "房地产新政点评");
   assert.deepEqual(report.policies.map((policy) => policy.id), ["P1"]);
-  assert.equal(commentary.commentary.id, "C1");
+  assert.equal(commentary.id,created.id);
   assert.equal(commentary.policy.category, "real_estate");
 });
 
@@ -178,65 +182,15 @@ test("统一新闻资讯详情返回 DM 原文、政策原文链接和关联政�
 });
 
 test("AI 点评保存时模型、Prompt 版本和生成时间绑定到正确列", async () => {
-  let insertBindings = [];
-  const content = commentaryContentSchema.parse({
-    eventName: "房地产信贷管理新政",
-    sources: "中国人民银行、国家金融监督管理总局",
-    eventPublishedAt: "2026-09-01",
-    commentaryDate: "2026-09-01",
-    eventSummary: "房地产信贷管理制度完成系统性调整，贷款品种、期限与开发融资规则同步更新。",
-    commentary: "1. 信贷管理框架系统调整\n政策从个人住房贷款和开发贷款两端同步完善规则。",
-    recommendation: "建议结合政策落地和地产信用利差变化，动态评估相关主体融资窗口。",
-  });
-  const database = {
-    prepare(sql) {
-      return {
-        bindings: [],
-        bind(...values) {
-          this.bindings = values;
-          return this;
-        },
-        async first() {
-          if (/FROM policy_event/.test(sql)) {
-            return {
-              id: "P1", title: content.eventName, summary: "摘要", category: "real_estate",
-              departments_json: "[]", policy_date: "2026-09-01",
-              first_news_at: "2026-09-01T19:00:00+08:00",
-              last_news_at: "2026-09-01T19:10:00+08:00", updated_at: "2026-09-01T12:00:00Z",
-            };
-          }
-          if (/SELECT id, created_at/.test(sql)) return null;
-          if (/FROM research_commentary/.test(sql)) {
-            return {
-              id: "C1", policy_id: "P1", commentary_type: "policy_tracking",
-              event_name: content.eventName, sources: content.sources,
-              event_published_at: content.eventPublishedAt,
-              commentary_date: content.commentaryDate,
-              event_summary: content.eventSummary, commentary: content.commentary,
-              recommendation: content.recommendation, model: "gpt-5.6-luna",
-              prompt_version: "policy-commentary-v1", generated_at: "2026-09-01T12:00:00Z",
-              edited: 0, updated_at: "2026-09-01T12:00:00Z",
-            };
-          }
-          throw new Error(`unexpected first SQL: ${sql}`);
-        },
-        async run() {
-          insertBindings = this.bindings;
-        },
-      };
-    },
-  };
+  const {db,sqlite}=commentaryDatabase();
+  try {
+    const draft={type:'current_affairs',eventName:'标准点评',sources:'来源',eventPublishedAt:'2026-09-01',commentaryDate:'2026-09-01',eventSummary:'摘要',commentary:'正文',recommendation:'建议',policyId:null};
+    const initial=await createCommentary(db,draft);
+    await updateCommentary(db,initial.id,draft,initial.updatedAt,{model:'test-model',promptVersion:'commentary-v1',evidence:[],search:{startDate:'2026-09-01',endDate:'2026-09-01',query:'标准点评'}});
+    const row=sqlite.prepare('SELECT model,prompt_version,generated_at,updated_at FROM commentary WHERE id=?').get(initial.id);
+    assert.equal(row.model,'test-model');assert.equal(row.prompt_version,'commentary-v1');assert.equal(row.generated_at,row.updated_at);
+  }finally{sqlite.close();}
 
-  await saveGeneratedCommentary(database, "P1", content, {
-    model: "gpt-5.6-luna",
-    promptVersion: "policy-commentary-v1",
-    generatedAt: "2026-09-01T12:00:00Z",
-  });
-
-  assert.equal(insertBindings.length, 14);
-  assert.equal(insertBindings[9], "gpt-5.6-luna");
-  assert.equal(insertBindings[10], "policy-commentary-v1");
-  assert.equal(insertBindings[11], "2026-09-01T12:00:00Z");
 });
 
 function fakePolicyDatabase() {
@@ -279,7 +233,7 @@ function fakePolicyDatabase() {
               association_method: "ai",
             }] };
           }
-          if (/FROM research_commentary/.test(sql)) {
+          if (/FROM commentary/.test(sql)) {
             return { results: [{
               id: "C1",
               policy_id: "P1",
@@ -362,7 +316,7 @@ function fakeDetailDatabase() {
               link: "https://example.com/report",
             };
           }
-          if (/FROM research_commentary/.test(sql)) {
+          if (/FROM commentary/.test(sql)) {
             return {
               id: "C1", policy_id: "P1", commentary_type: "policy_tracking",
               event_name: "房地产信贷管理新政", sources: "中国人民银行",
