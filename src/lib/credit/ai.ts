@@ -4,7 +4,7 @@ import { dateSchema } from '../tracking-commentary.ts';
 export const creditAiQuerySchema = z.object({
   view: z.literal('ai'),
   date: dateSchema.optional(),
-  institutionId: z.string().regex(/^[1-9]\d{0,18}$/).refine(value => BigInt(value) <= 9223372036854775807n).optional(),
+  institutionId: z.string().refine(value => /^[1-9]\d{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n).optional(),
 }).strict();
 const amount = z.string().regex(/^-?\d+(\.\d+)?$/).nullable();
 export const creditAiInstitutionSchema = z.object({

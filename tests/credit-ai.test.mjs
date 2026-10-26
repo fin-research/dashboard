@@ -21,7 +21,7 @@ test('actual GET and MCP return only the SQL whitelist and reject identity queri
   }}]})).outputFiles[0].text;
   const {GET}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
   const get=query=>GET({url:new URL('https://eastmoney.hasbai.xyz/api/credit?'+query),platform:{env:{}}});
-  for(const query of ['view=ai&date=2026-02-30','view=ai&institution=API身份哨兵','view=ai&institutionId=0','view=ai&institutionId=9223372036854775808','view=ai&month=2026-08','view=ai&view=usage'])
+  for(const query of ['view=ai&date=2026-02-30','view=ai&institution=API身份哨兵','view=ai&institutionId=0','view=ai&institutionId=abc','view=ai&institutionId=','view=ai&institutionId=9223372036854775808','view=ai&month=2026-08','view=ai&view=usage'])
     assert.equal((await get(query)).status,400);
   assert.equal(connections,0);
   const response=await get('view=ai&date=2026-08-21');assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
