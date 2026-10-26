@@ -122,9 +122,10 @@ function couponPoints(){
  const value=snapshot(),add=h=>new Date(Date.parse(value.as_of_date)+h*86400000).toISOString().slice(0,10);
  value.window_days=30;value.deadline=add(30);value.explanation.method='relu_path_integrated_gradients';
  value.validation={...value.validation,forecast_horizons:[1,14,30],expected_savings_supported:false,
-   release_policy:'user_selected_frozen_mlp',qualified:false,candidate:{kind:'mlp'},adoption:{authorized_by:'user'}};
+   release_policy:'user_selected_frozen_mlp',qualified:false,candidate:{kind:'mlp'},adoption:{authorized_by:'user'},
+   metrics:value.validation.metrics.map(r=>({...r,flat_market_mae_bp:null,mae_skill_vs_flat_market:null}))};
  value.forecast=[1,14,30].map(h=>({...value.forecast[0],date:add(h),lead_days:h,effective_horizon:h,
-   coupon_low_percent:null,coupon_high_percent:null,expected_saving_bp:null,waiting_cost_bp:null,net_saving_bp:null,
+   coupon_low_percent:null,coupon_high_percent:null,expected_saving_bp:null,waiting_cost_bp:0,net_saving_bp:null,
    annual_saving_wan:null,saving_probability:null,saving_p10_bp:null,pair_samples:null}));
  value.market_forecast=Array.from({length:31},(_,h)=>({...value.market_forecast[0],date:add(h),value_date:add(h)}));
  value.decision={...value.decision,action:'仅预测票面',reason:'coupon_prediction_only',first_issuance_date:null,
@@ -144,9 +145,12 @@ test('declared coupon points publish without a timing rule or historical qualifi
   assert.ok(report.snapshot.forecast.every(r=>r.net_saving_bp===null&&r.coupon_low_percent===null));
   assert.equal(report.snapshot.explanation.method,'relu_path_integrated_gradients');
   assert.equal(report.snapshot.product_scenarios.length,4);
+  assert.ok(report.snapshot.forecast.every(r=>r.waiting_cost_bp===0));
+  assert.ok(report.snapshot.validation.metrics.every(r=>r.flat_market_mae_bp===null));
   for(const mutate of [v=>{v.forecast[1].lead_days=13;},v=>{v.forecast.pop();},
     v=>{v.decision.action='等待';},v=>{v.decision.lowest_expected_cost_date=v.forecast[0].date;},
     v=>{v.forecast[0].net_saving_bp=1;},v=>{v.forecast[0].coupon_low_percent=1;},
+    v=>{v.forecast[0].waiting_cost_bp=1;},v=>{v.forecast[0].waiting_cost_bp=-1;},
     v=>{delete v.validation.forecast_horizons;},v=>{v.validation.expected_savings_supported=true;}]){
    const broken=structuredClone(value);broken.generated_at='2026-08-24T05:00:00Z';mutate(broken);
    await assert.rejects(publish(db,broken));
