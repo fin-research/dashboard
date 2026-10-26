@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { newsWorkflow } from "./fixtures/market-briefing-news.mjs";
 
 import {
   buildMarketBriefingPrompt,
@@ -66,19 +65,20 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
       );
     }
     if (target.includes("/data/news?")) {
-      assert.equal(
-        target,
-        "https://eastmoney.hasbai.xyz/data/news?date=2026-08-10&important=true&pageSize=40&fields=sentimentId%2Ctitle%2Ctime%2Ctags%2Cimportant",
-      );
-      return Response.json({ list: [
+      const query = new URL(target).searchParams;
+      assert.equal(query.get('detail'), 'true');
+      assert.equal(query.get('pageSize'), '10');
+      assert.equal(query.get('offset'), '0');
+      return Response.json([
           {
             sentimentId: "news-1",
             title: "债市要闻",
             time: "2026-08-10T14:30:00+08:00",
             tags: ["债市"],
             important: true,
+            content: "债市新闻正文",
           },
-      ] });
+      ]);
     }
     if (target.includes("/data/news/news-1?")) {
       return Response.json({
@@ -127,7 +127,6 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
     DATA_API_BASE_URL: "https://eastmoney.hasbai.xyz/data",
     DATA: { fetch: dataFetch },
   };
-  env.MARKET_BRIEFING_NEWS = newsWorkflow(env);
   try {
     const result = await generateMarketBriefing(env, "2026-08-10");
     assert.deepEqual(result, {
@@ -135,7 +134,7 @@ test("生成流程从后端取数并直连 provider-specific Responses 结构化
       stock: "股市结论。", bond: "债市结论。",
       news_count: 2,
     });
-    assert.equal(dataCalls.length, 3);
+    assert.equal(dataCalls.length, 2);
     assert.equal(
       aiCalls[0].url,
       "https://gateway.ai.cloudflare.com/v1/account-id/default/custom-codex/responses",

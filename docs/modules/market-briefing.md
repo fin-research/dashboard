@@ -9,9 +9,9 @@
 - 定时入口在创建 Workflow 实例前按计划触发时间的上海日期检查周末，再经 DATA / InternalData 查询 `/data/trading-days`（Choice 上交所日历）。只有日期一致、`isTradingDay=true` 才创建。休市正常跳过，日历超时、HTTP/Schema/日期错误则记录 `market_briefing_calendar_unavailable` 并停止本轮，不视为休市。日历失败可能使当日定时生成漏跑，需要在服务恢复后人工补发。Workflow 内不增加休市 step。`collect-equity` 与 `collect-primary` 仍独立校验交易日与行情日期，行情滞后由 step 重试。
 - Workflow 只保留一组七个并行模块 step，直接写在 `worker/market-briefing-runner.ts` 的原生 `await Promise.allSettled([...])` 中：今日聚焦 `collect-focus-news`、公开市场操作 `collect-open-market`、固收市场 `collect-fixed-income`、权益市场 `collect-equity`、一级发行 `collect-primary`、二级行情 `collect-secondary`、东财债券 `collect-inventory`。
 - 每个模块自己完成抓取、DTO 校验、解析、业务换算和结果组装，返回已校验的报告字段。不依赖其他模块 step 的输出。一级发行独立读取交易日期。二级与东财各自补全所需债券信息，东财另自取今日成交作收益率回退。共享接口可由不同模块独立请求，不设跨模块缓存或前置步骤。
-- 今日聚焦抓取最多40条 DM 新闻摘要，详情按每批最多10篇交给独立 `market-briefing-news` Workflow 实例，批次串行、每批最多五个详情并发；模块内完成正文合并、筛选及提示材料组装。股票收评由权益模块负责，不作为今日聚焦的依赖。模块内部不创建子 step；详情批次通过独立实例隔离累计子请求额度，不能用普通 step 或降低并发代替。批次 ID 由报告日、调用范围和摘要哈希确定；父步骤重放复用已完成批次，不重启失败终态。
+- 今日聚焦在原 `collect-focus-news` 内顺序读取最多四批 DM 新闻，每批通过 `/data/news?detail=true&pageSize=10&offset=…` 返回正文，总上限 40 条。四批固定同一 `endTime`，按 ID 检查重复；Data 内详情最多五个并发。模块内完成筛选和提示材料组装，股票收评由权益模块独立获取，不创建独立新闻 Workflow。
+- 模块 step 最多重试 3 次，30 秒起指数退避。行情模块单步超时 3 分钟，今日聚焦采集超时 10 分钟。AI step 最多重试 2 次，1 分钟起指数退避、超时 15 分钟。采集 adapter 不做业务重试，任何批次失败则整个模块失败，由原 step 重试。
 - 七个模块全部结束后，显式依次 `await generate-focus → archive-report`。AI 消费今日聚焦新闻及六个行情模块已完成的规范数据投影，关闭 adapter 内部重试。归档只合并已经解析完成的模块字段、校验完整报告并保存原 `market-briefing/YYYY-MM-DD.json`，不再解析上游数据。任一必需模块失败不影响其他模块完成，但不生成或归档残缺报告。
-- 模块 step 最多重试 3 次，30 秒起指数退避。行情模块单步超时 3 分钟，今日聚焦采集超时35分钟，覆盖四个串行详情批次的重试与排队等待。详情批次只有一个 `collect-news-details` step，最多重试2次、30秒起指数退避、单步超时2分钟；每实例最多30次详情请求。父层每批最多35次状态查询、间隔15秒，超时或失败直接停止，不归档残缺报告。AI step 最多重试 2 次，1 分钟起指数退避、超时 15 分钟。所有采集、AI、归档和通知重试由 Workflow step 配置负责。
 - 当日成交、期货及报价不支持历史重放。每个未完成的采集 step 校验上海当天，跨日恢复未完成采集会失败，不能以当前行情冒充历史报告。已完成数据步骤与归档步骤可由平台恢复。
 
 - Workflow 只生成并归档报告，成功返回 reportDate、finalizedAt、focus。失败直接保留原错误。终态由 Cloudflare Event Subscriptions → Messenger 统一发送 email＋Telegram，接收人、幂等和渠道重试在 Messenger 管理。
@@ -73,6 +73,4 @@ Workflow 结果通知由 Messenger 订阅平台事件。渠道尝试和人工重
 
 ### 新闻子请求超限恢复（2026-10-23）
 
-原流程最多40次详情加其余行情请求共享一次 invocation 额度，新闻采集耗尽后普通 step 重试仍立即超限。详情已改为独立批次实例，保留40篇上限和五并发，不截短新闻。隔离解决新闻扇出触发路径；父层行情的多个失败重试仍需按实际调用数核查，不表示所有上游故障组合都不会超额。
-
-`market-briefing-news` 子实例不会写报告或调用模型。子实例耗尽重试后保留原始错误，人工确认恢复上游后可用 `wrangler workflows instances restart market-briefing-news <子实例ID>` 重跑，再恢复父流程。手动生成每次使用独立调用范围，取消等待不会终止已启动子实例；下一次用户主动生成可重新采集。
+新闻采集从一次摘要加最多 40 次详情 Service Binding 调用，改为原 Workflow 最多四次 Data 批量调用。Data 每批最多 20 次列表扫描与 10 次正文请求，单批失败不返回部分正文。六个行情模块的调用预算仍须独立核查，不能把普通 step 或降低并发解释为重置请求额度。

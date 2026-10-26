@@ -6,12 +6,3 @@ export class MarketBriefingWorkflow extends WorkflowEntrypoint<Env, MarketBriefi
     return await runMarketBriefing(this.env, step, event.payload);
   }
 }
-
-import type { MarketBriefingNewsBatchParams } from "../src/lib/market-briefing-types.ts";
-import { runMarketBriefingNewsBatch } from "./market-briefing-news-runner.ts";
-
-export class MarketBriefingNewsBatchWorkflow extends WorkflowEntrypoint<Env, MarketBriefingNewsBatchParams> {
-  async run(event: Readonly<WorkflowEvent<MarketBriefingNewsBatchParams>>, step: WorkflowStep) {
-    return runMarketBriefingNewsBatch(this.env, step, event.payload);
-  }
-}
