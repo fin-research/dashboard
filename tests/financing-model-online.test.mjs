@@ -116,3 +116,41 @@ test('ReLU path contributions preserve their method and exact additive publicati
   assert.deepEqual((await loadIssuanceModelReport(db,id)).snapshot.explanation,value.explanation);
  }finally{await db.close();}
 });
+
+
+function couponPoints(){
+ const value=snapshot(),add=h=>new Date(Date.parse(value.as_of_date)+h*86400000).toISOString().slice(0,10);
+ value.window_days=30;value.deadline=add(30);value.explanation.method='relu_path_integrated_gradients';
+ value.validation={...value.validation,forecast_horizons:[1,14,30],expected_savings_supported:false,
+   release_policy:'user_selected_frozen_mlp',qualified:false,candidate:{kind:'mlp'},adoption:{authorized_by:'user'}};
+ value.forecast=[1,14,30].map(h=>({...value.forecast[0],date:add(h),lead_days:h,effective_horizon:h,
+   coupon_low_percent:null,coupon_high_percent:null,expected_saving_bp:null,waiting_cost_bp:null,net_saving_bp:null,
+   annual_saving_wan:null,saving_probability:null,saving_p10_bp:null,pair_samples:null}));
+ value.market_forecast=Array.from({length:31},(_,h)=>({...value.market_forecast[0],date:add(h),value_date:add(h)}));
+ value.decision={...value.decision,action:'仅预测票面',reason:'coupon_prediction_only',first_issuance_date:null,
+   lowest_expected_cost_date:null,low_rate_dates:[],low_rate_windows:[],expected_net_saving_bp:null,
+   annual_saving_wan:null,saving_probability:null,saving_p10_bp:null,joint_error_pairs:null};
+ return value;
+}
+
+test('declared coupon points publish without a timing rule or historical qualification gate',async()=>{
+ const db=await database();try{
+  const value=couponPoints(),id=await publish(db,value),report=await loadIssuanceModelReport(db,id);
+  assert.equal(report.snapshot.decision.action,'仅预测票面');
+  assert.equal(report.snapshot.decision.first_issuance_date,null);
+  assert.equal(report.snapshot.decision.lowest_expected_cost_date,null);
+  assert.deepEqual(report.snapshot.decision.low_rate_dates,[]);
+  assert.deepEqual(report.snapshot.forecast.map(r=>r.lead_days),[1,14,30]);
+  assert.ok(report.snapshot.forecast.every(r=>r.net_saving_bp===null&&r.coupon_low_percent===null));
+  assert.equal(report.snapshot.explanation.method,'relu_path_integrated_gradients');
+  assert.equal(report.snapshot.product_scenarios.length,4);
+  for(const mutate of [v=>{v.forecast[1].lead_days=13;},v=>{v.forecast.pop();},
+    v=>{v.decision.action='等待';},v=>{v.decision.lowest_expected_cost_date=v.forecast[0].date;},
+    v=>{v.forecast[0].net_saving_bp=1;},v=>{v.forecast[0].coupon_low_percent=1;},
+    v=>{delete v.validation.forecast_horizons;},v=>{v.validation.expected_savings_supported=true;}]){
+   const broken=structuredClone(value);broken.generated_at='2026-08-24T05:00:00Z';mutate(broken);
+   await assert.rejects(publish(db,broken));
+  }
+  assert.equal((await loadIssuanceModelReport(db,id)).snapshot.decision.action,'仅预测票面');
+ }finally{await db.close();}
+});
