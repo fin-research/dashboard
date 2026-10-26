@@ -103,3 +103,16 @@ test('composite market and coupon attribution round-trips without weakening addi
   await assert.rejects(publish(db,unknown),/Invalid coupon SHAP/);
  }finally{await db.close();}
 });
+
+
+test('ReLU path contributions preserve their method and exact additive publication contract',async()=>{
+ const db=await database();try{
+  const value=snapshot();value.explanation.method='relu_path_integrated_gradients';
+  const id=await publish(db,value),report=await loadIssuanceModelReport(db,id);
+  assert.equal(report.snapshot.explanation.method,'relu_path_integrated_gradients');
+  assert.deepEqual(report.snapshot.explanation,value.explanation);
+  const broken=structuredClone(value);broken.generated_at='2026-08-24T05:00:00Z';broken.explanation.features[0].shap_bp+=1;
+  await assert.rejects(publish(db,broken),/Invalid coupon SHAP/);
+  assert.deepEqual((await loadIssuanceModelReport(db,id)).snapshot.explanation,value.explanation);
+ }finally{await db.close();}
+});
