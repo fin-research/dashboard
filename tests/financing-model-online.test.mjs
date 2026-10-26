@@ -4,12 +4,12 @@ import {readFile,readdir} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {issuanceSnapshot} from './fixtures/issuance.mjs';
 import {financingModel} from './visual/report-fixtures.mjs';
-import {loadIssuanceModelReport,loadIssuanceModelMetricSource} from '../src/lib/server/issuance-model-repository.ts';
+import {loadIssuanceModelReport,loadIssuanceModelMetricSource,saveActiveIssuanceSellSide} from '../src/lib/server/issuance-model-repository.ts';
 import {saveFinancingModelConclusion,saveTimingDecisionRecord,loadTimingDecisionHistory} from '../src/lib/server/financing-model-repository.ts';
 const directory=new URL('../financing-model-migrations/',import.meta.url);
 function snapshot(){const value=issuanceSnapshot();value.online_run={model_version:'0123456789abcdef0123',feature_version:'issuance-coupon',training_as_of:'2026-08-01',retrain_after:'2026-08-31',runtime:'cloudflare-workflow',workflow_id:'bond-test',input_prefix:`quant-trial/runs/${value.as_of_date}/bond-test`};return value;}
 const publish=(db,value,key=`${value.online_run.input_prefix}/result.json`)=>db.query('SELECT financing_model.publish_online_result($1::jsonb,$2) AS id',[JSON.stringify(value),key]).then(r=>r.rows[0].id);
-async function database(){const db=new PGlite();for(const name of (await readdir(directory)).sort())await db.exec(await readFile(new URL(name,directory),'utf8'));return db;}
+async function database(){const db=new PGlite();for(const name of (await readdir(directory)).sort())await db.exec(await readFile(new URL(name,directory),'utf8'));await db.query("INSERT INTO financing_model.model_eligibility(model_version,status,reason) VALUES ('0123456789abcdef0123','active','synthetic_test')");return db;}
 
 test('issuance publication round-trips coupon and SHAP while retaining daily manual content',async()=>{
  const db=await database();try{
@@ -156,5 +156,64 @@ test('declared coupon points publish without a timing rule or historical qualifi
    await assert.rejects(publish(db,broken));
   }
   assert.equal((await loadIssuanceModelReport(db,id)).snapshot.decision.action,'仅预测票面');
+ }finally{await db.close();}
+});
+
+
+test('model identity suspension rejects every publication and preserves historical and manual records',async()=>{
+ const db=new PGlite();try{
+  const names=(await readdir(directory)).sort();
+  for(const name of names.filter(name=>name<'0016'))await db.exec(await readFile(new URL(name,directory),'utf8'));
+  const value=snapshot();value.online_run.model_version='61492e3527e1ae367475';
+  value.explanation.features.forEach((row,index)=>{row.value=index+1;});
+  const id=await publish(db,value);
+  await saveFinancingModelConclusion(db,{runId:id,verdict:'人工判断',preferredWindow:'下周',narrative:'保留人工正文'});
+  await saveTimingDecisionRecord(db,{runId:id,decisionAction:'跟踪数据',outcome:'保留记录'});
+  await db.query(`INSERT INTO financing_model.sell_side_snapshot(id,run_id,period_start,period_end,search_query,model_name,payload)
+    VALUES(gen_random_uuid(),$1,'2026-08-18','2026-08-24','测试','测试',$2::jsonb)`,[id,JSON.stringify(financingModel.sellSide)]);
+  const before=(await db.query('SELECT to_jsonb(r) AS row FROM financing_model.model_run r')).rows;
+  await db.exec(await readFile(new URL('0016_model_data_quality_eligibility.sql',directory),'utf8'));
+  assert.deepEqual((await db.query('SELECT to_jsonb(r) AS row FROM financing_model.model_run r')).rows,before);
+  const live=await loadIssuanceModelReport(db);
+  assert.deepEqual(live.model_status,{model_version:value.online_run.model_version,status:'suspended',reason:'data_quality'});
+  for(const field of ['forecast','product_scenarios','market_forecast'])assert.deepEqual(live.snapshot[field],[]);
+  assert.equal(live.snapshot.explanation,null);assert.deepEqual(live.snapshot.validation.metrics,[]);
+  assert.equal(live.snapshot.decision.expected_net_saving_bp,null);
+  assert.equal(live.conclusion.narrative,'保留人工正文');assert.equal(live.sellSide.logicSummary,financingModel.sellSide.logicSummary);
+  assert.equal((await loadTimingDecisionHistory(db))[0].decisionAction,'跟踪数据');
+  const audit=await loadIssuanceModelReport(db,id);
+  assert.equal(audit.model_status.status,'suspended');assert.deepEqual(audit.snapshot.forecast.map(row=>row.coupon_percent),value.forecast.map(row=>row.coupon_percent));
+  assert.deepEqual(audit.snapshot.explanation,value.explanation);
+  // Fully observed synthetic inputs still fail: this is not a null-only gate.
+  assert.ok(value.explanation.features.every(row=>row.value!==null));
+  await assert.rejects(publish(db,value),/Model is not active/);
+  const maintenance=structuredClone(value);maintenance.online_run.workflow_id='maintenance';maintenance.online_run.input_prefix=`quant-trial/runs/${value.as_of_date}/maintenance`;
+  await assert.rejects(publish(db,maintenance),/Model is not active/);
+  const unknown=structuredClone(value);unknown.online_run.model_version='abcdef0123456789abcd';
+  await assert.rejects(publish(db,unknown),/Model is not active/);
+  await db.query(`UPDATE financing_model.model_run SET conclusion_updated_at=NULL WHERE id=$1`,[id]);
+  const unedited=await loadIssuanceModelReport(db);assert.equal(unedited.conclusion.narrative,'数据不满足要求，暂停预测');
+  await db.query('DELETE FROM financing_model.model_eligibility');
+  assert.equal((await loadIssuanceModelReport(db)).model_status.reason,'quality_review_required');
+  await saveFinancingModelConclusion(db,{runId:id,verdict:'人工更新',preferredWindow:'',narrative:'暂停期间仍能保存'});
+  assert.equal((await loadIssuanceModelReport(db)).conclusion.narrative,'暂停期间仍能保存');
+  assert.deepEqual((await db.query('SELECT to_jsonb(f) AS row FROM financing_model.issuance_forecast f ORDER BY ordinal')).rows.map(row=>row.row.coupon_percent),value.forecast.map(row=>row.coupon_percent));
+ }finally{await db.close();}
+});
+
+
+test('AI research checks eligibility again at atomic save while manual revisions remain available',async()=>{
+ const db=await database();try{
+  const id=await publish(db,snapshot()),started=await loadIssuanceModelReport(db,id);
+  await saveActiveIssuanceSellSide(db,started,financingModel.sellSide);
+  await db.query("UPDATE financing_model.model_eligibility SET status='suspended',reason='data_quality'");
+  await assert.rejects(saveActiveIssuanceSellSide(db,started,financingModel.sellSide),error=>error.status===409);
+  assert.equal((await db.query('SELECT count(*) FROM financing_model.sell_side_snapshot')).rows[0].count,1);
+  const {saveSellSideSummaryRevision}=await import('../src/lib/server/financing-model-repository.ts');
+  await saveSellSideSummaryRevision(db,started.snapshot,financingModel.sellSide,{runId:id,logicSummary:'暂停期间人工修订'});
+  assert.equal((await loadIssuanceModelReport(db)).sellSide.logicSummary,'暂停期间人工修订');
+  await db.query("UPDATE financing_model.model_eligibility SET status='active'");
+  await db.query("UPDATE financing_model.model_run SET online_model_version='abcdef0123456789abcd'");
+  await assert.rejects(saveActiveIssuanceSellSide(db,started,financingModel.sellSide),error=>error.status===409);
  }finally{await db.close();}
 });

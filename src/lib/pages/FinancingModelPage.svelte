@@ -29,7 +29,7 @@
   import { portal } from "$lib/portal";
   import { permissionVisibility } from "$lib/permission-visibility";
   import { issuanceBusinessMetricsSchema, parseIssuanceReport as parseFinancingModelReport, type IssuanceReport as FinancingModelReport } from "$lib/issuance-model";
-  import { groupIssuanceShap, selectIssuanceShapDrivers, issuanceDecisionLabel, issuanceDecisionNarrative } from "$lib/issuance-presentation";
+  import { groupIssuanceShap, groupMlpContributions, selectIssuanceShapDrivers, issuanceDecisionLabel, issuanceDecisionNarrative } from "$lib/issuance-presentation";
   import { issuanceFeatureName, renderIssuanceForecast, renderIssuanceProductComparison } from "../../charts/issuance-model";
   interface Props {
     embedded?: boolean;
@@ -151,6 +151,7 @@
     editingSellSide = false;
     editNarrative = nextReport.conclusion.edited
       ? nextReport.conclusion.narrative
+      : nextReport.model_status.status !== 'active' ? '数据不满足要求，暂停预测'
       : issuanceDecisionNarrative(nextReport.snapshot) ?? nextReport.conclusion.narrative;
     conclusionRevision = 0;
     savedConclusionRevision = 0;
@@ -275,8 +276,9 @@
     }
     const runId = report.snapshot.run_id;
     const revision = conclusionRevision;
-    const verdict = issuanceDecisionLabel(report.snapshot.decision.action) ?? report.conclusion.verdict;
-    const preferredWindow = report.conclusion.preferredWindow;
+    const verdict = report.conclusion.edited ? report.conclusion.verdict
+      : modelSuspended ? '暂停预测' : issuanceDecisionLabel(report.snapshot.decision.action) ?? report.conclusion.verdict;
+    const preferredWindow = report.conclusion.edited || !modelSuspended ? report.conclusion.preferredWindow : '';
     saving = true;
     conclusionSavePromise = (async () => {
       let succeeded = false;
@@ -309,7 +311,7 @@
   }
 
   async function generateResearch(): Promise<void> {
-    if (!report || generatingResearch) return;
+    if (!report || modelSuspended || generatingResearch) return;
     generatingResearch = true;
     try {
       const sellSide = await aiClient.run({
@@ -395,11 +397,17 @@
 
 
   let snapshot = $derived(report?.snapshot ?? null);
+  let modelSuspended = $derived(report?.model_status.status !== 'active');
   let versions = $derived(report?.versions ?? []);
-  let recommendation = $derived(snapshot ? issuanceDecisionLabel(snapshot.decision.action) : null);
+  let recommendation = $derived(!modelSuspended && snapshot ? issuanceDecisionLabel(snapshot.decision.action) : null);
   let recommendationTone = $derived(recommendation === "尽快发行" ? "strong_buy" : recommendation === "等待" ? "neutral" : "wait");
-  let driverGroups = $derived(groupIssuanceShap(snapshot?.explanation?.features ?? []));
+  let isMlpAttribution = $derived(snapshot?.explanation?.method === 'relu_path_integrated_gradients');
+  let driverGroups = $derived(isMlpAttribution
+    ? groupMlpContributions(snapshot?.explanation?.features ?? [])
+    : groupIssuanceShap(snapshot?.explanation?.features ?? []));
+  let contributionTotal = $derived(driverGroups.reduce((sum, row) => sum + row.net_bp, 0));
   let marketDrivers = $derived.by(() => {
+    if (isMlpAttribution) return driverGroups.map(row => ({display_name: row.display_name, shap: row.net_bp, value: null}));
     const merged = new Map<string, { display_name:string; shap:number; value:number|null }>();
     for (const row of selectIssuanceShapDrivers(snapshot?.explanation?.features ?? [])) {
       const name = issuanceFeatureName(row.feature);
@@ -504,7 +512,8 @@
               <span>债券品种</span>
               <strong>{snapshot.terms.rating} {snapshot.terms.tenor}年期{snapshot.terms.bond_type}</strong>
             </div>
-            <MetricCard label="预测发行利率" value={formatNullable(current?.coupon_percent, 2)} unit="%" tone="blue" compact />
+            {#if modelSuspended}<p role="status">数据不满足要求，暂停预测</p>
+            {:else}<MetricCard label="预测发行利率" value={formatNullable(current?.coupon_percent, 2)} unit="%" tone="blue" compact />{/if}
           </div>
           <Textarea
             data-ui-owner="lib-pages-FinancingModelPage-svelte"
@@ -534,6 +543,7 @@
         </ModuleCard>
       </section>
 
+      {#if !modelSuspended}
       <section aria-label="四品种对比">
         <ModuleCard class="chart-card" labelledBy="product-title">
           <PanelHeading id="product-title" title="四品种对比" />
@@ -545,11 +555,29 @@
       <section aria-label="因子贡献">
         <ModuleCard class="factor-panel" labelledBy="factor-contribution-title">
           <PanelHeading id="factor-contribution-title" title="因子贡献" />
+          {#if isMlpAttribution && snapshot.explanation}
+            <dl class="contribution-reconciliation" aria-label="路径积分贡献对账">
+              <div><dt>模型基值</dt><dd>{snapshot.explanation.base_coupon_bp.toFixed(3)} bp</dd></div>
+              <div><dt>全部贡献</dt><dd>{contributionTotal >= 0 ? '+' : ''}{contributionTotal.toFixed(3)} bp</dd></div>
+              <div><dt>预测发行利率</dt><dd>{snapshot.explanation.prediction_coupon_bp.toFixed(3)} bp</dd></div>
+            </dl>
+          {/if}
           <div class="driver-grid">
             <ChartHost renderer={renderIssuanceShapRadar} args={[driverGroups]} ariaLabel="票面预测因子贡献雷达图" className="driver-radar-chart" />
             <ChartHost renderer={renderFinancingDriverContributions} args={[marketDrivers, "coupon"]}
-              ariaLabel="当前票面预测因子贡献条形图" className="driver-contribution-chart" />
+              ariaLabel={isMlpAttribution ? `路径积分贡献：${driverGroups.map(row => `${row.display_name} ${row.net_bp.toFixed(3)} bp`).join("，")}` : "当前票面预测因子贡献条形图"} className="driver-contribution-chart" />
           </div>
+          {#if isMlpAttribution && snapshot.explanation}
+            <details class="contribution-details">
+              <summary>路径积分明细（{snapshot.explanation.features.length}项）</summary>
+              <div class="table-scroll"><table>
+                <thead><tr><th>编码因子</th><th>输入值</th><th>贡献 bp</th></tr></thead>
+                <tbody>{#each snapshot.explanation.features as row}
+                  <tr><td>{issuanceFeatureName(row.feature)}</td><td>{row.value === null ? '缺失（训练插补）' : row.value}</td><td>{row.shap_bp >= 0 ? '+' : ''}{row.shap_bp.toFixed(6)}</td></tr>
+                {/each}</tbody>
+              </table></div>
+            </details>
+          {/if}
         </ModuleCard>
       </section>
 
@@ -610,6 +638,7 @@
         </ModuleCard>
       </section>
 
+      {/if}
       <ModuleCard class="decision-history-section" labelledBy="decision-history-title">
         <PanelHeading id="decision-history-title" title="历史择时决策记录" controlsBesideTitle>
           {#if !editingDecision}
@@ -689,7 +718,7 @@
                 </svg>
               </Button>
             {/if}
-            <Button permission="model.sell_side:generate" data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={["ui-button  icon-button ai-generate-button", generatingResearch && "is-loading"]}  type="button" onclick={generateResearch} disabled={generatingResearch || savingSellSide}
+            <Button permission="model.sell_side:generate" data-ui-owner="lib-pages-FinancingModelPage-svelte" variant="default" class={["ui-button  icon-button ai-generate-button", generatingResearch && "is-loading"]}  type="button" onclick={generateResearch} disabled={modelSuspended || generatingResearch || savingSellSide}
               aria-label={generatingResearch ? "AI 生成中" : report.sellSide ? "重新生成卖方观点" : "生成卖方观点"}
               aria-busy={generatingResearch}
             >
@@ -1014,6 +1043,23 @@
     display: grid;
     gap: 16px;
   }
+
+  .contribution-details { margin-top: 16px; }
+  .contribution-details summary { cursor: pointer; }
+  .contribution-details .table-scroll { overflow-x: auto; max-height: 400px; margin-top: 16px; }
+  .contribution-details table { width: 100%; border-collapse: collapse; }
+  .contribution-details th, .contribution-details td { padding: 8px; text-align: right; border-bottom: 1px solid var(--line); }
+  .contribution-details th:first-child, .contribution-details td:first-child { text-align: left; }
+
+  .contribution-reconciliation {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 32px;
+    margin: 16px 0;
+  }
+
+  .contribution-reconciliation dt { color: var(--text-2); }
+  .contribution-reconciliation dd { margin: 4px 0 0; font-weight: bold; }
 
   .driver-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

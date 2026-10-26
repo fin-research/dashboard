@@ -294,11 +294,11 @@ export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): v
   const maximum = Math.max(0.1, ...rows.map(row => row.absolute_bp));
   setChart(host, {
     animationDuration: 180,
-    aria: { enabled: true, description: "本次票面预测各类因子的 SHAP 净贡献雷达图" },
+    aria: { enabled: true, description: "本次票面预测各类因子的净贡献雷达图" },
     color: [chartBlue],
     legend: {
       top: 0, right: 0, itemWidth: 16, itemHeight: 10,
-      textStyle: forecastAxisLabel, data: ["净贡献"],
+      textStyle: forecastAxisLabel, data: ["净贡献绝对值"],
     },
     tooltip: {
       ...tooltip,
@@ -308,7 +308,7 @@ export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): v
       ).join("<br>"),
     },
     radar: {
-      center: ["50%", "55%"], radius: compact ? "54%" : "68%", startAngle: 90,
+      center: ["50%", "55%"], radius: compact ? "44%" : "68%", startAngle: 90,
       shape: "polygon", splitNumber: 4,
       indicator: rows.map(row => ({ name: row.display_name, min: 0, max: maximum * 1.12 })),
       axisName: { ...forecastAxisLabel, color: colors.ink },
@@ -319,7 +319,7 @@ export function renderIssuanceShapRadar(host: HTMLElement, rows: ShapGroup[]): v
     series: [{
       type: "radar", symbol: "circle", symbolSize: 6,
       data: [{
-        name: "净贡献", value: rows.map(row => row.absolute_bp),
+        name: "净贡献绝对值", value: rows.map(row => row.absolute_bp),
         lineStyle: { color: chartBlue, width: 2.2 },
         itemStyle: { color: colors.paper, borderColor: chartBlue, borderWidth: 2 },
         areaStyle: { color: "rgba(47,111,214,0.13)" },
@@ -347,7 +347,7 @@ export function renderFinancingDriverContributions(
     animationDuration: 180,
     aria: {
       enabled: true,
-      description: "本次预测 SHAP 因子贡献",
+      description: "本次预测因子贡献",
     },
     grid: { left: compact ? 8 : 12, right: compact ? 55 : 78, top: 8, bottom: compact ? 55 : 48, containLabel: true },
     tooltip: {
