@@ -1,11 +1,10 @@
-import { loadIssuanceModelReport } from "$lib/server/issuance-model-repository";
+import { loadIssuanceModelReport, saveActiveIssuanceSellSide } from "$lib/server/issuance-model-repository";
 import { z } from "zod";
 
 import { sellSideSummaryUpdateSchema } from "$lib/financing-model";
 import { BondLedgerUploadError, validateSameOrigin } from "$lib/server/bond-ledger";
 import {
   FinancingModelDatabaseError,
-  saveSellSideSnapshot,
   saveSellSideSummaryRevision,
 } from "$lib/server/financing-model-repository";
 import {
@@ -35,6 +34,9 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
       "eastmoney-financing-model-research-read",
       (client) => loadIssuanceModelReport(client, runId),
     );
+    if (report.model_status.status !== 'active') {
+      throw new FinancingModelResearchError(409, '数据不满足要求，暂停预测');
+    }
     if (request.headers.get("accept")?.includes("text/event-stream")) {
       return createAiSseResponse(
         request,
@@ -53,16 +55,16 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
           return withPostgres(
             env.HYPERDRIVE?.connectionString,
             "eastmoney-financing-model-research-save",
-            (client) => saveSellSideSnapshot(client, report.snapshot, research),
+            (client) => saveActiveIssuanceSellSide(client, report, research),
           );
         },
         {
-          errorMessage: (error) => error instanceof FinancingModelResearchError
+          errorMessage: (error) => error instanceof FinancingModelResearchError || error instanceof FinancingModelDatabaseError
             ? error.message
             : "卖方观点生成失败，请稍后重试",
           onError: (error) => console.error(JSON.stringify({
             event: "financing_model_sell_side_failed",
-            status: error instanceof FinancingModelResearchError ? error.status : 500,
+            status: error instanceof FinancingModelResearchError || error instanceof FinancingModelDatabaseError ? error.status : 500,
             path: url.pathname,
             error: error instanceof Error ? error.message : String(error),
           })),
@@ -80,7 +82,7 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
     const saved = await withPostgres(
       env.HYPERDRIVE?.connectionString,
       "eastmoney-financing-model-research-save",
-      (client) => saveSellSideSnapshot(client, report.snapshot, research),
+      (client) => saveActiveIssuanceSellSide(client, report, research),
     );
     return Response.json(saved, {
       status: 201,
@@ -108,7 +110,7 @@ export const POST: RequestHandler = async ({ request, platform, url }) => {
         error:
           error instanceof BondLedgerUploadError ||
           error instanceof FinancingModelDatabaseError ||
-          error instanceof FinancingModelResearchError
+          error instanceof FinancingModelResearchError || error instanceof FinancingModelDatabaseError
             ? error.message
             : status === 400
               ? "卖方观点请求无效"

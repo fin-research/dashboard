@@ -732,7 +732,7 @@
       "id": "financing-model",
       "url": "/trading-research/financing-model",
       "kind": "screenshot",
-      "state": "market-only Chinese factor contributions and absolute 5bp accuracy",
+      "state": "legacy market contributions and complete MLP encoded-column contributions",
       "evidence": [
         {
           "spec": "tests/visual/reports.spec.mjs",
@@ -756,6 +756,28 @@
           ],
           "snapshots": [
             "financing-seller-logos.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/reports.spec.mjs",
+          "test": "financing-model shows complete MLP contribution sources",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "financing-model-mlp-factors.png"
+          ]
+        },
+        {
+          "spec": "tests/visual/reports.spec.mjs",
+          "test": "financing-model suspends numbers while keeping manual work accessible",
+          "projects": [
+            "desktop",
+            "mobile"
+          ],
+          "snapshots": [
+            "financing-model-suspended.png"
           ]
         }
       ]

@@ -77,7 +77,14 @@ register('二级成交', {
   credit_volume_chg_5d:'信用债成交量·5日变化', rate_credit_volume_ratio:'利率与信用成交比',
 });
 export function issuanceFeatureName(feature: string): string {
-  return issuanceMarketFeatures[feature]?.name ?? '未登记特征';
+  const quote = /^(?:quote_h(1|14|30)_)?(sector|issuer)_quote_lag_(\d+)_bp$/.exec(feature);
+  if (quote) return `${quote[1] ? `提前${quote[1]}日×` : ''}${quote[2] === 'sector' ? '行业' : '发行人'}报价·${Number(quote[3]) === 0 ? '最新' : `前${quote[3]}个报价日`}`;
+  const horizon = /^quote_h(1|14|30)$/.exec(feature);
+  if (horizon) return `预测提前${horizon[1]}日`;
+  const category = /^(issuer|rating|bond_type|placement_type)__(\d+)$/.exec(feature);
+  if (category) return `${({issuer:'发行人', rating:'评级', bond_type:'债券品种', placement_type:'发行方式'} as Record<string,string>)[category[1]!]}编码${category[2]}`;
+  const term = ({tenor:'发行期限',issue_size:'发行规模'} as Record<string,string>)[feature];
+  return term ?? issuanceMarketFeatures[feature]?.name ?? `未登记列：${feature}`;
 }
 function shapGroup(feature: string): MarketGroup | undefined {
   return issuanceMarketFeatures[feature]?.group;
@@ -110,4 +117,28 @@ export function selectIssuanceShapDrivers(features: NonNullable<IssuanceSnapshot
     if (representative) selected.set(representative.feature, representative);
   }
   return [...selected.values()].sort((left, right) => Math.abs(right.shap_bp) - Math.abs(left.shap_bp));
+}
+
+
+/** The MLP attribution includes every encoded column, including imputed and zero inputs. */
+export function mlpContributionSource(feature: string): string {
+  if (feature === 'known_treasury_bp') return '国债收益率';
+  if (/^(quote_h(?:1|14|30)_)?sector_quote_lag_\d+_bp$/.test(feature)) return '行业报价';
+  if (/^(quote_h(?:1|14|30)_)?issuer_quote_lag_\d+_bp$/.test(feature)) return '发行人报价';
+  if (/^issuer__\d+$/.test(feature)) return '发行人身份';
+  if (/^rating__\d+$/.test(feature)) return '信用评级';
+  if (/^(bond_type|placement_type)__\d+$/.test(feature) || ['tenor','issue_size'].includes(feature)) return '发行条款';
+  if (/^quote_h(?:1|14|30)$/.test(feature)) return '预测提前期';
+  return `未登记列：${feature}`;
+}
+
+export function groupMlpContributions(features: NonNullable<IssuanceSnapshot['explanation']>['features']): ShapGroup[] {
+  const totals = new Map<string, number>();
+  for (const row of features) {
+    if (!Number.isFinite(row.shap_bp)) continue;
+    const name = mlpContributionSource(row.feature);
+    totals.set(name, (totals.get(name) ?? 0) + row.shap_bp);
+  }
+  return [...totals].map(([display_name, net_bp]) => ({display_name, net_bp, absolute_bp: Math.abs(net_bp)}))
+    .sort((left, right) => right.absolute_bp - left.absolute_bp);
 }

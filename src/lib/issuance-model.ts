@@ -38,7 +38,8 @@ export const issuanceBusinessMetricsSchema=z.object({
   funding_gap:z.object({date:z.string().date(),value_yi:number,historical_percentile:number.min(0).max(100).nullable(),sample_count:z.number().int().nonnegative()}).nullable().optional(),
   issuer_spread:z.object({date:z.string().date(),spread_bp:nullable,outstanding_bonds:z.number().int().nonnegative(),balance_cny:number.nonnegative(),historical_percentile:number.min(0).max(100).nullable().optional(),sample_count:z.number().int().nonnegative().optional()}).nullable(),
 });
-export const issuanceReportSchema=z.object({snapshot:issuanceSnapshotSchema,conclusion:conclusionSchema,sellSide:sellSidePayloadSchema.nullable(),versions:z.array(financingModelVersionSchema),business_metrics:issuanceBusinessMetricsSchema.nullable().optional()});
+export const modelStatusSchema=z.object({model_version:z.string().nullable(),status:z.enum(['active','suspended']),reason:z.string()});
+export const issuanceReportSchema=z.object({model_status:modelStatusSchema.default({model_version:null,status:'suspended',reason:'quality_review_required'}),snapshot:issuanceSnapshotSchema,conclusion:conclusionSchema,sellSide:sellSidePayloadSchema.nullable(),versions:z.array(financingModelVersionSchema),business_metrics:issuanceBusinessMetricsSchema.nullable().optional()});
 export type IssuanceSnapshot=z.infer<typeof issuanceSnapshotSchema>;
 export type IssuanceReport=z.infer<typeof issuanceReportSchema>;
 export const parseIssuanceReport=(value:unknown):IssuanceReport=>issuanceReportSchema.parse(value);
