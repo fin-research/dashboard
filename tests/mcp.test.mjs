@@ -30,8 +30,23 @@ test('real MCP discovery lists only Gateway-approved tools and labels writes/gen
   const all=await rpc(fixture(),'tools/list');
   assert.equal(all.payload.result.tools.length,mcpOperations.length+3);
   assert.ok(all.payload.result.tools.some(t=>t.name==='credit_public_search'));
+  assert.ok(!all.payload.result.tools.some(t=>['create_credit_institution','update_credit_institution'].includes(t.name)));
   assert.equal(all.payload.result.tools.find(t=>t.name==='generate_tracking_commentary').annotations.readOnlyHint,false);
   assert.equal(all.payload.result.tools.find(t=>t.name==='create_project').annotations.destructiveHint,true);
+});
+test('credit MCP always dispatches the anonymized API and cannot select full reports',async()=>{
+  const f=fixture(()=>true,request=>{
+    const target=new URL(new URL(request.url).searchParams.get('target'),'https://eastmoney.hasbai.xyz');
+    assert.equal(target.pathname,'/api/credit');assert.deepEqual(target.searchParams.getAll('view'),['ai']);
+    return Response.json({reportDate:'2026-08-21',amountUnit:'亿元',institutions:[{institution_id:'8',total_limit:'10.000000'}]});
+  });
+  const read=await rpc(f,'tools/call',{name:'credit_report',arguments:{query:{date:'2026-08-21',institutionId:'8'}}});
+  assert.equal(read.payload.result.structuredContent.data.institutions[0].institution_id,'8');
+  for(const query of [{view:'usage'},{institution:'身份哨兵'},{month:'2026-08'}]) {
+    const result=await rpc(f,'tools/call',{name:'credit_report',arguments:{query}});
+    assert.ok(result.payload.error||result.payload.result.isError);
+  }
+  assert.equal(f.calls.filter(request=>new URL(request.url).pathname==='/mcp/dispatch').length,1);
 });
 test('MCP calls validate shared schemas, reject hidden tools, and keep identities request-scoped',async()=>{
   const f=fixture();
