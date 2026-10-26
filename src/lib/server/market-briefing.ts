@@ -1,6 +1,4 @@
 import { z } from "zod";
-import { createHash } from "node:crypto";
-import type { MarketBriefingNewsBatchParams } from "../market-briefing-types.ts";
 
 import { stockSummarySchema } from "../../data-contracts.ts";
 import { formatDataApiError } from "../../data-api-error.ts";
@@ -236,75 +234,31 @@ export async function fetchBriefingNews(
   const baseUrl = env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
   const [stockPayload, newsDetails] = await completeAll([
     fetchDataJson(env, `${baseUrl}/stock-summary?date=${reportDate}&fields=title,time,paragraphs`, stockSummarySchema, signal),
-    fetchBriefingNewsDetails(env, reportDate, signal, crypto.randomUUID()),
+    fetchBriefingNewsDetails(env, reportDate, signal),
   ]);
   return buildBriefingNews(stockPayload, newsDetails);
 }
 
-export async function fetchBriefingNewsDetails(env: Env, reportDate: string, signal?: AbortSignal, runId = reportDate) {
+export async function fetchBriefingNewsDetails(env: Env, reportDate: string, signal?: AbortSignal) {
   const baseUrl = env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
-  const newsQuery = new URLSearchParams({
-    date: reportDate, important: "true", pageSize: "40",
-    fields: "sentimentId,title,time,tags,important",
-  });
-  const news = await fetchDataJson(env, `${baseUrl}/news?${newsQuery}`, briefingNewsResponseSchema, signal);
-  // A durable step is not an independent request budget. Each batch owns its
-  // DATA calls and retries in a separate Workflow instance. Run batches in order
-  // so the existing five-detail concurrency limit also holds across instances.
-  if (news.length > 40) throw new MarketBriefingError(503, "新闻列表超过请求上限");
+  const endTime = new Date().toISOString();
   const results: z.infer<typeof briefingNewsDetailSchema>[] = [];
-  for (let offset = 0; offset < news.length; offset += 10) {
+  const seen = new Set<string>();
+  for (let offset = 0; offset < 40; offset += 10) {
     signal?.throwIfAborted();
-    const items = news.slice(offset, offset + 10);
-    const id = `news-${reportDate}-${createHash("sha256").update(JSON.stringify({ runId, items })).digest("hex")}`;
-    const workflow = env.MARKET_BRIEFING_NEWS;
-    if (!workflow) throw new MarketBriefingError(503, "新闻采集 Workflow 未配置");
-    let instance;
-    try { instance = await workflow.create({ id, params: { reportDate, items } }); }
-    catch (error) {
-      try { instance = await workflow.get(id); await instance.status(); }
-      catch { throw error; }
+    const query = new URLSearchParams({
+      date: reportDate, important: "true", detail: "true", pageSize: "10", offset: String(offset), endTime,
+      fields: "sentimentId,title,time,tags,important,content,link",
+    });
+    const batch = await fetchDataJson(env, `${baseUrl}/news?${query}`, z.array(briefingNewsDetailSchema.required({ content: true })).max(10), signal);
+    for (const item of batch) {
+      if (seen.has(item.sentimentId)) throw new MarketBriefingError(503, "新闻分页出现重复记录");
+      seen.add(item.sentimentId);
+      results.push(item);
     }
-    for (let poll = 0; ; poll++) {
-      signal?.throwIfAborted();
-      const status = await instance.status();
-      if (status.status === "complete") {
-        const output = z.array(briefingNewsDetailSchema).length(items.length).parse(status.output);
-        if (output.some((item, index) => item.sentimentId !== items[index]?.sentimentId)) {
-          throw new MarketBriefingError(503, "新闻采集批次结果不匹配");
-        }
-        results.push(...output);
-        break;
-      }
-      if (["errored", "terminated"].includes(status.status)) {
-        throw new MarketBriefingError(503, status.error?.message || "新闻采集批次失败");
-      }
-      if (poll >= 34) throw new MarketBriefingError(504, "新闻采集批次等待超时");
-      signal?.throwIfAborted();
-      await new Promise<void>((resolve, reject) => {
-        const abort = () => { clearTimeout(timer); reject(signal?.reason); };
-        const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, 15_000);
-        signal?.addEventListener("abort", abort, { once: true });
-      });
-    }
+    if (batch.length < 10) break;
   }
   return results;
-}
-
-export async function fetchBriefingNewsDetailBatch(env: Env, params: MarketBriefingNewsBatchParams) {
-  const items = briefingNewsListSchema.min(1).max(10).parse(params.items);
-  const baseUrl = env.DATA_API_BASE_URL || "https://eastmoney.hasbai.xyz/data";
-  const output = await mapWithConcurrency(items, 5, async summary => {
-    const query = new URLSearchParams({ fields: "sentimentId,title,time,tags,important,content,link" });
-    const detail = await fetchDataJson(env,
-      `${baseUrl}/news/${encodeURIComponent(summary.sentimentId)}?${query}`, briefingNewsDetailSchema);
-    if (detail.sentimentId !== summary.sentimentId) throw new MarketBriefingError(503, "新闻详情标识不匹配");
-    return { ...summary, ...detail };
-  });
-  if (new TextEncoder().encode(JSON.stringify(output)).byteLength > 900 * 1024) {
-    throw new MarketBriefingError(503, "新闻采集批次超过步骤大小限制");
-  }
-  return output;
 }
 
 export function buildBriefingNews(

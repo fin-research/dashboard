@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { newsWorkflow } from './fixtures/market-briefing-news.mjs';
 import { runMarketBriefing, startMarketBriefing } from '../worker/market-briefing-runner.ts';
 import { saveMarketReport } from '../src/lib/server/market-report.ts';
 import { directResponse } from './fixtures/market-resources.mjs';
@@ -24,7 +23,6 @@ function harness(override) {
     if (url.pathname.startsWith('/data/news/')) return Response.json(newsItem(1));
     return directResponse(req.url);
   } }, EASTMONEY: { put: async (key, body) => { objects.set(key, JSON.parse(body)); return { etag: 'saved' }; } } };
-  env.MARKET_BRIEFING_NEWS = newsWorkflow(env);
   // Successful step values survive replay. The harness does not implement the platform's retry engine.
   const step = { do: async (name, config, fn) => {
     if (checkpoints.has(name)) return structuredClone(checkpoints.get(name));
@@ -104,7 +102,7 @@ test('个别国债收益率缺失保留其他行情且不归零', async t => {
   assert.deepEqual(h.objects.get(`market-briefing/${date}.json`).government_bonds.map(row => row.yield_rate), [null, 1.8]);
 });
 
-for (const source of ['stock-summary', 'industry', 'bond-infos', 'news/news-1']) {
+for (const source of ['stock-summary', 'industry', 'bond-infos', 'news']) {
   test(`${source}的step失败直接传播，不写残缺R2`, async t => {
     clock(t);
     const h = harness(url => url.includes(`/data/${source}?`) ? Response.json({ detail: '源不可用' }, { status: 503 }) : undefined);
@@ -131,31 +129,15 @@ test('失败状态等待所有并发step结束', async t => {
   assert.equal(h.objects.size, 0);
 });
 
-test('今日聚焦模块内新闻详情并发上限五；AI失败重放不重新采集', async t => {
+test('AI失败重放复用原Workflow已完成新闻批次，不重新采集', async t => {
   clock(t);
-  const gate = deferred(), full = deferred();
-  let active = 0, peak = 0, attempts = 0;
-  const h = harness(async url => {
-    const path = new URL(url).pathname;
-    if (path === '/data/news') return Response.json(Array.from({ length: 7 }, (_, i) => newsItem(i)));
-    if (path.startsWith('/data/news/')) {
-      active++; peak = Math.max(peak, active);
-      if (active === 5) full.resolve();
-      await gate.promise;
-      active--;
-      return Response.json(newsItem(Number(path.split('-').at(-1))));
-    }
-  });
+  let attempts = 0;
+  const h = harness(url => new URL(url).pathname === '/data/news' ? Response.json(Array.from({ length: 7 }, (_, i) => newsItem(i))) : undefined);
   h.dependencies.generateMarketBriefingFromNews = async () => {
     if (++attempts === 1) throw new Error('AI unavailable');
     return { stock: '股', bond: '债' };
   };
-  const failed = assert.rejects(h.run(), /AI unavailable/);
-  await full.promise;
-  assert.equal(active, 5);
-  gate.resolve();
-  await failed;
-  assert.equal(peak, 5);
+  await assert.rejects(h.run(), /AI unavailable/);
   assert.equal(h.steps.filter(row => row.name === 'collect-focus-news').length, 1);
   assert.equal(h.checkpoints.get('collect-focus-news').news_count, 7);
   const calls = h.calls.length;
@@ -284,17 +266,19 @@ test('DM新闻为空时今日聚焦模块失败，其余六模块仍独立完成
   assert.equal(h.steps.some(row => row.name === 'generate-focus'), false);
 });
 
-test('40篇新闻不消耗父流程详情预算，完整七模块仍归档', async t => {
+test('40篇新闻通过原Workflow的四个Data批次获取，完整七模块归档', async t => {
   clock(t);
   const h = harness(url => {
-    const path = new URL(url).pathname;
-    if (path === '/data/news') return Response.json(Array.from({ length: 40 }, (_, i) => newsItem(i)));
-    if (path.startsWith('/data/news/')) return Response.json(newsItem(Number(path.split('-').at(-1))));
+    const target = new URL(url);
+    if (target.pathname === '/data/news') {
+      const offset = Number(target.searchParams.get('offset'));
+      return Response.json(Array.from({ length: 10 }, (_, i) => newsItem(offset + i)));
+    }
   });
   assert.equal((await h.run()).status, 'complete');
-  const childCalls = [...h.env.MARKET_BRIEFING_NEWS.instances.values()].reduce((sum, child) => sum + child.calls, 0);
-  assert.equal(childCalls, 40);
-  assert.equal(h.calls.length - childCalls, 17);
+  assert.equal(h.calls.filter(url => new URL(url).pathname === '/data/news').length, 4);
+  assert.equal(h.calls.some(url => new URL(url).pathname.startsWith('/data/news/')), false);
+  assert.equal(h.calls.length, 20);
   assert.equal(h.checkpoints.get('collect-focus-news').news_count, 40);
   assert.equal(h.objects.size, 1);
 });
