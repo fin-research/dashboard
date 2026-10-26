@@ -21,18 +21,23 @@ async function rpc(f, method, params = {}, identity = user) {
   const payload = response.headers.get('Content-Type')?.includes('text/event-stream') ? text.split('\n').filter(line=>line.startsWith('data: ')).map(line=>JSON.parse(line.slice(6))).find(value=>value.id===1) : JSON.parse(text);
   return {response,payload};
 }
-test('real MCP discovery lists only Gateway-approved tools and labels writes/generation',async()=>{
-  const f=fixture(item=>item.method==='GET');
-  const {response,payload}=await rpc(f,'tools/list');
-  assert.equal(response.status,200);assert.ok(payload.result.tools.some(t=>t.name==='health'));
-  assert.ok(payload.result.tools.some(t=>t.name==='credit_report'));
-  assert.ok(!payload.result.tools.some(t=>t.name==='create_project'));
-  const all=await rpc(fixture(),'tools/list');
-  assert.equal(all.payload.result.tools.length,mcpOperations.length+3);
-  assert.ok(all.payload.result.tools.some(t=>t.name==='credit_public_search'));
-  assert.ok(!all.payload.result.tools.some(t=>['create_credit_institution','update_credit_institution'].includes(t.name)));
-  assert.equal(all.payload.result.tools.find(t=>t.name==='generate_tracking_commentary').annotations.readOnlyHint,false);
-  assert.equal(all.payload.result.tools.find(t=>t.name==='create_project').annotations.destructiveHint,true);
+test('real MCP discovery publishes exactly credit_report and respects Gateway permission',async()=>{
+  const {response,payload}=await rpc(fixture(),'tools/list');
+  assert.equal(response.status,200);
+  assert.deepEqual(payload.result.tools.map(tool=>tool.name),['credit_report']);
+  assert.equal(payload.result.tools[0].annotations.readOnlyHint,true);
+  const denied=await rpc(fixture(()=>false),'tools/list');
+  assert.deepEqual(denied.payload.result.tools,[]);
+});
+test('unpublished tools and prefixed aliases cannot execute or access backing services',async()=>{
+  const f=fixture();
+  f.env.EASTMONEY={list(){assert.fail('Unpublished materials must not be read')}};
+  f.env.CREDIT_SEARCH={search(){assert.fail('Unpublished search must not execute')}};
+  for(const name of ['health','credit_public_materials','credit_public_search','dashboard_credit_report',...mcpOperations.filter(op=>op.name!=='credit_report').map(op=>op.name)]) {
+    const {payload}=await rpc(f,'tools/call',{name,arguments:{}});
+    assert.ok(payload.error||payload.result.isError,name);
+  }
+  assert.equal(f.calls.filter(request=>new URL(request.url).pathname==='/mcp/dispatch').length,0);
 });
 test('credit MCP always dispatches the anonymized API and cannot select full reports',async()=>{
   const f=fixture(()=>true,request=>{
@@ -55,7 +60,7 @@ test('MCP calls validate shared schemas, reject hidden tools, and keep identitie
   const restricted=fixture(()=>false);const denied=await rpc(restricted,'tools/call',{name:'create_project',arguments:{form:{}}});
   assert.ok(denied.payload.error||denied.payload.result.isError);assert.equal(restricted.calls.length,1);
   const anonymous=await rpc(f,'tools/list',{},null);assert.equal(anonymous.response.status,401);
-  const health=await rpc(f,'tools/call',{name:'health',arguments:{}});assert.equal(health.payload.result.structuredContent.status,'ok');
+  const read=await rpc(f,'tools/call',{name:'credit_report',arguments:{}});assert.deepEqual(read.payload.result.structuredContent.data,{saved:true});
 });
 test('catalog operations map to registered Gateway methods and cannot inject named actions or paths',()=>{
   assert.equal(new Set(mcpOperations.map(t=>t.name)).size,mcpOperations.length);
@@ -80,7 +85,7 @@ test('business failures, Svelte data and SSE terminal results retain their meani
   assert.deepEqual(await decodeBusinessResponse(Response.json({type:'data',nodes:[{type:'data',data:JSON.parse(stringify({secret:'layout'}))},{type:'data',data:JSON.parse(stringify({projects:[]}))}]}),{format:'page'}),{projects:[]});
   const failure=await decodeBusinessResponse(Response.json({type:'failure',status:409,data:stringify({message:'版本冲突'})}),{format:'form'});assert.equal(failure.failed,true);assert.equal(failure.status,409);
   const f=fixture(()=>true,()=>Response.json({detail:'权限已变更'},{status:403}));
-  const result=await rpc(f,'tools/call',{name:'economic_indicators',arguments:{}});assert.equal(result.payload.result.isError,true);assert.match(result.payload.result.content[0].text,/403/);
+  const result=await rpc(f,'tools/call',{name:'credit_report',arguments:{}});assert.equal(result.payload.result.isError,true);assert.match(result.payload.result.content[0].text,/403/);
   const sse=text=>new Response(text,{headers:{'Content-Type':'text/event-stream'}});
   assert.deepEqual(await decodeBusinessResponse(sse('event: progress\ndata: 生成中\n\nevent: result\ndata: {"saved":true}\n\n'),{}),{saved:true});
   await assert.rejects(decodeBusinessResponse(sse('event: error\ndata: 失败\n\n'),{}),/失败/);
@@ -93,33 +98,15 @@ test('modern discovery and legacy initialization both serve the Dashboard identi
     assert.equal(response.status,200,JSON.stringify(payload));assert.ok(payload.result,JSON.stringify(payload));if(method==='initialize') assert.equal(payload.result.serverInfo.name,'eastmoney-dashboard'); else assert.ok(payload.result.supportedVersions.includes('2026-07-28'));
   }
 });
-test('public credit search exposes only current public PDF excerpts and original links',async()=>{
+test('public credit materials remain unpublished even when public files are available',async()=>{
   const f=fixture();
-  f.env.EASTMONEY={list:async()=>({objects:[{key:'credit/public/测试报告.pdf',size:100,uploaded:new Date('2026-09-01'),httpEtag:'etag'}],truncated:false})};
-  f.env.CREDIT_SEARCH={search:async()=>({chunks:[
-    {id:'visible',item:{key:'credit/public/测试报告.pdf'},text:'公开授信额度为10亿元'},
-    {id:'hidden',item:{key:'credit/originals/内部报告.pdf'},text:'内部数据'},
-  ]})};
-  const {payload}=await rpc(f,'tools/call',{name:'credit_public_search',arguments:{query:'授信额度'}});
-  assert.equal(payload.result.isError,undefined);
-  const sources=payload.result.structuredContent.sources;
-  assert.equal(sources.length,1);
-  assert.equal(sources[0].title,'测试报告.pdf');
-  assert.equal(sources[0].url,'/api/credit-assistant/files/%E6%B5%8B%E8%AF%95%E6%8A%A5%E5%91%8A.pdf');
-  assert.equal(sources[0].locator,'AI Search 检索片段');
-  assert.ok(!JSON.stringify(sources).includes('内部数据'));
-  const materials=await rpc(f,'tools/call',{name:'credit_public_materials',arguments:{}});
-  assert.deepEqual(materials.payload.result.structuredContent.documents.map(document=>document.title),['测试报告.pdf']);
+  f.env.EASTMONEY={list(){assert.fail('Unpublished materials must not read R2')}};
+  const {payload}=await rpc(f,'tools/call',{name:'credit_public_materials',arguments:{}});
+  assert.ok(payload.error||payload.result.isError);
 });
-test('public credit ROE search returns indexed audit table evidence for each available year',async()=>{
+test('public credit search remains unpublished and cannot return indexed financial excerpts',async()=>{
   const f=fixture();
-  f.env.EASTMONEY={list:async()=>({objects:[2023,2024,2025].map(year=>({key:`credit/public/${year}审计报告.pdf`,size:100})),truncated:false})};
-  f.env.CREDIT_SEARCH={search:async({query})=>{
-    const year=Number(query.match(/20\d{2}/)?.[0]);
-    return {chunks:[{item:{key:`credit/public/${year}审计报告.pdf`},text:`加权平均净资产收益率 归属于公司普通股股东的净利润 ${year-2000}.37%`}]};
-  }};
+  f.env.CREDIT_SEARCH={search(){assert.fail('Unpublished search must not query AI Search')}};
   const {payload}=await rpc(f,'tools/call',{name:'credit_public_search',arguments:{query:'近几年的ROE是多少'}});
-  assert.deepEqual(payload.result.structuredContent.coverage,{requestedYears:[2023,2024,2025],foundYears:[2023,2024,2025],missingYears:[]});
-  assert.deepEqual(payload.result.structuredContent.sources.map(source=>source.text.match(/\d+\.37%/)[0]),['23.37%','24.37%','25.37%']);
-  assert.ok(payload.result.structuredContent.sources.every(source=>source.url.startsWith('/api/credit-assistant/files/')));
+  assert.ok(payload.error||payload.result.isError);
 });

@@ -7,9 +7,8 @@ import { readSse } from '../sse.ts';
 import { CONTEXT_HEADER } from './gateway-context.ts';
 import type { SiteIdentity } from '../identity.ts';
 import { mcpOperations, operationPath, type McpOperation } from './mcp-catalog.ts';
-import { listPublicCreditFiles } from './credit-public-files.ts';
-import { searchPublicCreditDocuments } from './credit-search.ts';
 
+const publishedOperations = mcpOperations.filter(operation => operation.name === 'credit_report');
 const MAX_REQUEST = 1024 * 1024;
 const MAX_RESPONSE = 8 * 1024 * 1024;
 const privateHeaders = { 'Cache-Control': 'no-store, private', Vary: 'Cookie, Authorization' };
@@ -36,9 +35,9 @@ function contextHeaders(user: SiteIdentity) {
 async function policies(env: Pick<Env, 'IDENTITY'>, user: SiteIdentity) {
   const headers = contextHeaders(user); headers.set('Content-Type', 'application/json');
   const response = await env.IDENTITY.fetch(new Request('https://identity.internal/mcp/policies', { method: 'POST', headers,
-    body: JSON.stringify(mcpOperations.map(operation => ({ path: operationPath(operation, {}), method: operation.method }))) }));
+    body: JSON.stringify(publishedOperations.map(operation => ({ path: operationPath(operation, {}), method: operation.method }))) }));
   if (!response.ok) throw new McpBusinessError(response.status, 'MCP 权限检查失败');
-  return z.object({ allowed: z.array(z.boolean()).length(mcpOperations.length) }).parse(JSON.parse(await boundedText(response, MAX_REQUEST))).allowed;
+  return z.object({ allowed: z.array(z.boolean()).length(publishedOperations.length) }).parse(JSON.parse(await boundedText(response, MAX_REQUEST))).allowed;
 }
 export async function decodeBusinessResponse(response: Response, operation: Pick<McpOperation, 'format'>, signal?: AbortSignal): Promise<unknown> {
   if (response.headers.get('Content-Type')?.includes('text/event-stream')) {
@@ -92,7 +91,7 @@ export async function executeOperation(operation: McpOperation, input: Record<st
   }));
   return decodeBusinessResponse(response, operation, signal);
 }
-export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENTITY' | 'EASTMONEY' | 'CREDIT_SEARCH'>, user: SiteIdentity | null): Promise<Response> {
+export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENTITY'>, user: SiteIdentity | null): Promise<Response> {
   if (!user) return Response.json({ error: '请先登录' }, { status: 401, headers: privateHeaders });
   if (request.method !== 'POST') return new Response(null, { status: 405, headers: { ...privateHeaders, Allow: 'POST' } });
   try {
@@ -101,29 +100,9 @@ export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENT
     const headers = new Headers(request.headers); headers.delete('Content-Length');
     const bounded = new Request(request, { headers, body });
     const handler = createMcpHandler(async () => {
-      const server = new McpServer({ name: 'eastmoney-dashboard', version: '1.0.0' });
-      server.registerTool('health', { description: 'Dashboard MCP 可用性与当前账号的工具数量。', inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async () => ({ content: [{ type: 'text', text: 'ok' }], structuredContent: { status: 'ok', toolCount: allowed.filter(Boolean).length + 3 } }));
-      server.registerTool('credit_public_materials', { title: '列出公开授信材料', description: '列出授信公开 PDF 材料与可打开的原件链接。', inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async () => {
-        const documents = (await listPublicCreditFiles(env.EASTMONEY)).map(({ title, authority, url }) => ({ title, authority, url }));
-        return { content: [{ type: 'text', text: JSON.stringify(documents) }], structuredContent: { documents } };
-      });
-      server.registerTool('credit_public_search', { title: '检索公开授信材料', description: '搜索当前公开授信 PDF，返回原始片段和原件链接。跨年度 ROE 问题逐年检索现有审计报告表格。检索片段没有可核验页码。',
-        inputSchema: z.object({ query: z.string().trim().min(2).max(200) }).strict(),
-        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } }, async ({ query }) => {
-        const documents = await listPublicCreditFiles(env.EASTMONEY);
-        const byKey = new Map(documents.map(document => [document.key, document]));
-        const search = await searchPublicCreditDocuments(env.CREDIT_SEARCH, documents, query, 12);
-        const sources = search.chunks.flatMap((chunk: { item: { key: string }; text: string }) => {
-          const document = byKey.get(chunk.item.key);
-          return document && chunk.text.trim() ? [{ title: document.title, text: chunk.text,
-            url: document.url, locator: 'AI Search 检索片段', authority: document.authority }] : [];
-        });
-        const coverage = { requestedYears: search.requestedYears, foundYears: search.foundYears,
-          missingYears: search.requestedYears.filter(year => !search.foundYears.includes(year)) };
-        return { content: [{ type: 'text', text: JSON.stringify({ sources, coverage }) }], structuredContent: { sources, coverage } };
-      });
+      const server = new McpServer({ name: 'eastmoney-dashboard', version: '1.0.0' }, { capabilities: { tools: {} } });
       const allowed = await policies(env, user);
-      mcpOperations.forEach((operation, index) => {
+      publishedOperations.forEach((operation, index) => {
         if (!allowed[index]) return;
         const readOnly = operation.method === 'GET' || operation.name === 'liability_report_data';
         server.registerTool(operation.name, { title: operation.title,
