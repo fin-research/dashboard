@@ -10,7 +10,7 @@
 
 - `POST /api/market-briefing?date=YYYY-MM-DD`：日期默认时使用上海时区当天。前端携带 `Accept: text/event-stream` 时返回统一 `progress/result/error` SSE，`progress` 为纯文本 summary，`result` 为完整市场点评 JSON。
 - 无效日期为 400。上游、模型或配置错误按路由映射为 5xx。
-- Dashboard Worker 通过 `DATA` Service Binding 读取股票收评和 DM 新闻。详情最多 5 个并发，避免同一 invocation 的外连等待槽被耗尽。
+- Dashboard Worker 通过 `DATA` Service Binding 读取股票收评和 DM 新闻。新闻详情复用独立 `market-briefing-news` 批次实例，每批最多10篇、最多5个并发，批次串行；同一请求内不再直接扇出40个详情调用。手动生成每次创建独立调用范围，父 Workflow 重试复用原批次。
 - 模型通过 provider-specific Responses API 调用，启用 `web_search`、使用统一 `xhigh` reasoning effort，并将 AI Gateway 请求超时设为 300 秒。联网证据仅用于补充、核验给定材料未充分解释的关键行情和驱动。
 
 ## 业务规则

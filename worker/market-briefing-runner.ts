@@ -42,7 +42,7 @@ export async function runMarketBriefing(
 
   try {
     const modules = await Promise.allSettled([
-      step.do("collect-focus-news", { ...DATA_STEP_OPTIONS, timeout: "10 minutes" }, () => collectFocusNews(env, reportDate)),
+      step.do("collect-focus-news", { ...DATA_STEP_OPTIONS, timeout: "35 minutes" }, () => collectFocusNews(env, reportDate)),
       step.do("collect-open-market", DATA_STEP_OPTIONS, () => collectOpenMarket(env, reportDate)),
       step.do("collect-fixed-income", DATA_STEP_OPTIONS, () => collectFixedIncome(env, reportDate)),
       step.do("collect-equity", DATA_STEP_OPTIONS, () => collectEquity(env, reportDate)),
