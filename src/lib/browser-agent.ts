@@ -34,7 +34,7 @@ function sourceLinks(value: unknown): Array<{ title: string; url: string }> {
 }
 
 async function mcpRpc<T>(method: string, params: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
-  const response = await fetch('/api/mcp', {
+  const response = await fetch('/mcp', {
     method: 'POST', credentials: 'same-origin', signal,
     headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
     body: JSON.stringify({ jsonrpc: '2.0', id: crypto.randomUUID(), method, params }),

@@ -9,7 +9,7 @@ const toolCatalog = { jsonrpc: '2.0', id: 'fixture', result: { tools: [
 test('通用 AI 侧栏接替授信助手并可选择公开材料工具', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop UI audit');
   await mockResources(page);
-  await page.route('**/api/mcp', route => route.fulfill({ json: toolCatalog }));
+  await page.route('**/mcp', route => route.fulfill({ json: toolCatalog }));
   await page.goto('/credit-workbench');
   await expect(page.getByRole('link', { name: '授信助手' })).toHaveCount(0);
   await page.getByRole('button', { name: '打开 AI 面板' }).click();
@@ -23,7 +23,7 @@ test('通用 AI 侧栏接替授信助手并可选择公开材料工具', async (
 test('本地授信对话刷新后恢复且保留来源文本', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Desktop UI audit');
   await mockResources(page);
-  await page.route('**/api/mcp', route => route.fulfill({ json: toolCatalog }));
+  await page.route('**/mcp', route => route.fulfill({ json: toolCatalog }));
   await page.addInitScript(() => localStorage.setItem('eastmoney-browser-agent:visual-test', JSON.stringify({
     selectedId: 'credit-history', conversations: [{
       id: 'credit-history', title: '授信材料查询', createdAt: 1,
@@ -77,7 +77,7 @@ test('浏览器 agent 完成授信检索工具循环并展示原件链接', asyn
   await mockResources(page);
   const tool = toolCatalog.result.tools[1];
   let toolCalls = 0, modelCalls = 0;
-  await page.route('**/api/mcp', route => {
+  await page.route('**/mcp', route => {
     const rpc = route.request().postDataJSON();
     if (rpc.method === 'tools/list') return route.fulfill({ json: { jsonrpc: '2.0', id: rpc.id, result: { tools: [tool] } } });
     toolCalls++;
