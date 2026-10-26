@@ -3,7 +3,7 @@
   import FinancingModelPage from "$lib/pages/FinancingModelPage.svelte";
   import SecondaryBondPoolWeeklyPage from "$lib/pages/SecondaryBondPoolWeeklyPage.svelte";
   import MarketHotspotsPage from "$lib/pages/MarketHotspotsPage.svelte";
-  import TrackingCommentaryPage from "$lib/pages/TrackingCommentaryPage.svelte";
+  import CommentaryPage from "$lib/pages/CommentaryPage.svelte";
   import PolicyTrackingPage from "$lib/pages/PolicyTrackingPage.svelte";
   import WorkbenchShell from "../workbench/WorkbenchShell.svelte";
   import OverviewView from "./OverviewView.svelte";
@@ -47,7 +47,7 @@
   {:else if activeViewId === "policy-tracking"}
     <PolicyTrackingPage embedded />
   {:else if activeViewId === "tracking-commentary"}
-    <TrackingCommentaryPage />
+    <CommentaryPage />
   {:else if activeViewId === "research"}
     <ResearchView />
   {:else if activeViewId === "interbank-ledger"}

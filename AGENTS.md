@@ -61,7 +61,7 @@ CI 等待和停止条件见 [CI 等待与收尾](docs/TESTING.md#ci-等待与收
 跨项目执行与并行工作树规则见 [项目组 AGENTS](../eastmoney/AGENTS.md)。未在上下文中时读取一次。只加载任务相关文档，跨模块仅加读受影响部分，不重复读取已有上下文。
 
 - 页面、API、业务或定时任务：先按下方路径定位唯一模块文档，再按任务叠加专题。兼容入口复用目标模块规范，不另建一份。
-- 门户 `/` 读[门户](docs/modules/portal.md)。市场点评、文字版和报告 API 读[市场点评](docs/modules/market-briefing.md)，其中今日聚焦另读[今日聚焦](docs/modules/market-focus.md)。市场热点、政策跟踪、跟踪点评分别读[热点](docs/modules/market-hotspots.md)、[政策](docs/modules/policy-tracking.md)、[跟踪点评](docs/modules/tracking-commentary.md)。资讯、研报与点评详情读[详情](docs/modules/research-details.md)。资金日报读[资金日报](docs/modules/fund-report.md)。
+- 门户 `/` 读[门户](docs/modules/portal.md)。市场点评、文字版和报告 API 读[市场点评](docs/modules/market-briefing.md)，其中今日聚焦另读[今日聚焦](docs/modules/market-focus.md)。市场热点、政策跟踪、跟踪点评分别读[热点](docs/modules/market-hotspots.md)、[政策](docs/modules/policy-tracking.md)、[跟踪点评](docs/modules/commentary.md)。资讯、研报与点评详情读[详情](docs/modules/research-details.md)。资金日报读[资金日报](docs/modules/fund-report.md)。
 - 交易研究首页、交易、流程及兼容跳转读[交易研究工作台](docs/TRADING_RESEARCH_WORKBENCH.md)。研究辅助与 EDB 读[研究辅助](docs/modules/research-assistance.md)。二级池读[二级池](docs/modules/secondary-bond-pool.md)。融资择时模型读[融资模型](docs/modules/financing-model.md)。
 - 授信工作台、日历、周报、Excel 导入读[授信工作台](docs/modules/credit-workbench.md)。授信材料和 CreditAgent 读[授信助手](docs/CREDIT_ASSISTANT.md)。
 - 融资首页、投资人、项目、SOP/提醒、台账与数据后台、负债周报、客户关联依次读[总览](docs/modules/financing-overview.md)、[投资人](docs/modules/bond-investors.md)、[项目](docs/modules/financing-projects.md)、[SOP](docs/modules/financing-sop.md)、[数据后台](docs/modules/financing-data.md)、[负债周报](docs/modules/liability-report.md)、[客户](docs/modules/clients.md)。管理中心、个人资料、账号与 `/auth/*` 读[管理](docs/modules/management.md)，登录配置才加读 [Gateway Auth0](../gateway/auth0/README.md)。

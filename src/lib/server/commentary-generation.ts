@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { type CommentaryEvidence, type TrackingDraft, type generateTrackingSchema, shanghaiDate } from "../tracking-commentary.ts";
+import { type CommentaryEvidence, type CommentaryDraft, type generateCommentarySchema, shanghaiDate } from "../commentary.ts";
 import { AI_GATEWAY_MODEL, generateAiGatewayObject, type AiGatewayOptions } from "./ai-gateway.ts";
 import { buildAiSearchToolCall, parseAiSearchResponse, readTextBounded, type ResearchDocument } from "./financing-model-research.ts";
 import { loadCommentaryGenerationContext, PolicyRepositoryError } from "./policy-repository.ts";
 import { fetchDataNewsDetail } from "./data-news.ts";
-import { getTrackingCommentary, updateTrackingCommentary, loadTrackingStyleReferences } from "./tracking-commentary-repository.ts";
+import { getCommentary, updateCommentary, loadCommentaryStyleReferences } from "./commentary-repository.ts";
 
-export const TRACKING_COMMENTARY_PROMPT_VERSION = "tracking-commentary-select-v4";
-export function trackingGenerationOptions(
+export const COMMENTARY_PROMPT_VERSION = "tracking-commentary-select-v4";
+export function commentaryGenerationOptions(
   id: string,
   documentCount: number,
   progress: (message: string) => void,
@@ -16,13 +16,13 @@ export function trackingGenerationOptions(
 ): AiGatewayOptions {
   let reportedReasoning = false, reportedWriting = false;
   return {
-    taskType: "tracking_commentary", requestTimeoutMs: 300_000, signal,
-    promptCacheKey: TRACKING_COMMENTARY_PROMPT_VERSION,
-    metadata: { commentary_id: id, prompt_version: TRACKING_COMMENTARY_PROMPT_VERSION, document_count: documentCount, tags: "tracking-commentary,verbatim" },
+    taskType: "commentary", requestTimeoutMs: 300_000, signal,
+    promptCacheKey: COMMENTARY_PROMPT_VERSION,
+    metadata: { commentary_id: id, prompt_version: COMMENTARY_PROMPT_VERSION, document_count: documentCount, tags: "tracking-commentary,verbatim" },
     onAttempt(attempt) {
       reportedReasoning = false; reportedWriting = false;
       progress(attempt === "primary" ? "AI 选取原文" : "AI 重试选材");
-      console.log(JSON.stringify({ event: "tracking_commentary_attempt", commentary_id: id, attempt, document_count: documentCount }));
+      console.log(JSON.stringify({ event: "commentary_attempt", commentary_id: id, attempt, document_count: documentCount }));
     },
     // Streaming surfaces only deduplicated public summaries and phase labels.
     // Partial, unvalidated output is never sent to the browser or saved.
@@ -34,7 +34,7 @@ export function trackingGenerationOptions(
       if (!reportedWriting) { reportedWriting = true; progress("生成点评"); }
     },
     onTelemetry(metadata) {
-      console.log(JSON.stringify({ event: "tracking_commentary_response", commentary_id: id, ...metadata }));
+      console.log(JSON.stringify({ event: "commentary_response", commentary_id: id, ...metadata }));
     },
   };
 }
@@ -138,7 +138,7 @@ export function compileExtractiveCommentary(output: z.infer<typeof extractiveCom
   return { eventSummary, commentary, recommendation: output.recommendation, evidence };
 }
 
-export async function retrieveTrackingResearch(topic: string, startDate: string, endDate: string, fetcher: typeof fetch = fetch, signal?: AbortSignal) {
+export async function retrieveCommentaryResearch(topic: string, startDate: string, endDate: string, fetcher: typeof fetch = fetch, signal?: AbortSignal) {
   const period = { startDate, endDate, startMs: Date.parse(`${startDate}T00:00:00+08:00`), endMs: Date.parse(`${endDate}T23:59:59.999+08:00`) };
   const queries = [topic, `${topic} 核心观点 边际变化 债券利率 融资窗口`];
   const results = await Promise.all(queries.map(async query => {
@@ -159,21 +159,21 @@ export async function retrieveTrackingResearch(topic: string, startDate: string,
   return [...docs.values()].map((doc, i) => ({ ...doc, sourceId: `S${i + 1}` }));
 }
 
-export async function generateTrackingCommentary(
+export async function generateCommentary(
   env: Env,
   id: string,
-  input: z.infer<typeof generateTrackingSchema>,
+  input: z.infer<typeof generateCommentarySchema>,
   progress: (message: string) => void = () => {},
   signal?: AbortSignal,
   onReasoningSummary?: (summary: string) => void,
 ) {
   signal?.throwIfAborted();
-  const current = await getTrackingCommentary(env.DB, id);
+  const current = await getCommentary(env.DB, id);
   if (current.updatedAt !== input.updatedAt) throw new PolicyRepositoryError(409, "点评已更新，请重新打开");
   if (!env.CF_AIG_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) throw new PolicyRepositoryError(503, "AI Gateway 尚未配置");
-  const styleReferences = await loadTrackingStyleReferences(env.DB, id, current.type, current.commentaryDate || shanghaiDate());
+  const styleReferences = await loadCommentaryStyleReferences(env.DB, id, current.type, current.commentaryDate || shanghaiDate());
   progress("检索研报");
-  const documents = await retrieveTrackingResearch(current.eventName, input.startDate, input.endDate, fetch, signal);
+  const documents = await retrieveCommentaryResearch(current.eventName, input.startDate, input.endDate, fetch, signal);
   if (current.policyId) {
     const context = await loadCommentaryGenerationContext(env.DB, current.policyId);
     // Existing manually linked reports remain part of the policy evidence contract.
@@ -202,7 +202,7 @@ export async function generateTrackingCommentary(
     [{ role: "system", content: TRACKING_COMMENTARY_INSTRUCTIONS }, { role: "user", content: JSON.stringify({ topic: current.eventName,
       eventDate: current.eventPublishedAt, period: { startDate: input.startDate, endDate: input.endDate }, evidence: documents,
       passages: passages.map(({ id, sourceId, text }) => ({ id, sourceId, text, chars: text.length })), styleReferences }) }],
-    schema, "tracking_commentary", trackingGenerationOptions(id, documents.length, progress, signal, onReasoningSummary),
+    schema, "commentary", commentaryGenerationOptions(id, documents.length, progress, signal, onReasoningSummary),
   );
   progress("校验原文并保存");
   const compiled = compileCommentarySelection(output, passages, documents);
@@ -211,11 +211,11 @@ export async function generateTrackingCommentary(
     const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(document.text));
     item.documentHash = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2,"0")).join("");
   }
-  const draft: TrackingDraft = { type: current.type, eventName: current.eventName, eventPublishedAt: current.eventPublishedAt,
+  const draft: CommentaryDraft = { type: current.type, eventName: current.eventName, eventPublishedAt: current.eventPublishedAt,
     commentaryDate: current.commentaryDate, sources: [...new Set(compiled.evidence.map(item => item.institution))].join("、"),
     eventSummary: compiled.eventSummary, commentary: compiled.commentary, recommendation: compiled.recommendation };
   signal?.throwIfAborted();
-  return await updateTrackingCommentary(env.DB, id, draft, input.updatedAt, { model: AI_GATEWAY_MODEL,
-    promptVersion: TRACKING_COMMENTARY_PROMPT_VERSION, evidence: compiled.evidence,
+  return await updateCommentary(env.DB, id, draft, input.updatedAt, { model: AI_GATEWAY_MODEL,
+    promptVersion: COMMENTARY_PROMPT_VERSION, evidence: compiled.evidence,
     search: { startDate: input.startDate, endDate: input.endDate, query: current.eventName, references: styleReferences.map((item: {id:string;eventName:string;commentaryDate:string}) => ({id:item.id,title:item.eventName,date:item.commentaryDate})) } });
 }

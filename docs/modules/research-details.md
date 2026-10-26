@@ -6,7 +6,7 @@
 |---|---|
 | `/news/[id]` / `/api/news/[id]` | D1 已归档 `policy_news` 的 DM 正文及政策原文链接。[handler](../../src/routes/api/news/[id]/+server.ts) |
 | `/articles/[id]` / `/api/articles/[id]` | Dashboard 通过 DATA binding 获取并校验研报详情，复用 [data-news.ts](../../src/lib/server/data-news.ts)。[handler](../../src/routes/api/articles/[id]/+server.ts) |
-| `/commentaries/[id]` / `/api/commentaries/[id]` | 只读 D1 `research_commentary`。[handler](../../src/routes/api/commentaries/[id]/+server.ts) |
+| `/commentaries/[id]` / `/api/commentaries/[id]` | 读取 D1 `commentary`，与列表、修订和版本共用标准实体。[handler](../../src/routes/api/commentaries/[id]/+server.ts) |
 
 - 页面加载不生成模型内容。生成和编辑由政策模块的显式操作负责。
 - 政策原文链接与 D1 归档的 DM 正文分开表达。不能把存在外部原文链接误当作已取得原文正文。

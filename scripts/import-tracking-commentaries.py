@@ -116,9 +116,9 @@ def import_sql(records, now):
     for record in records:
         columns = ['id','commentary_type','event_name','sources','event_published_at','commentary_date','event_summary','commentary','recommendation','edited','created_at','updated_at']
         values = [record[k] for k in ('id','type','eventName','sources','eventPublishedAt','commentaryDate','eventSummary','commentary','recommendation')] + [1,now,now]
-        statements.append(f"INSERT INTO research_commentary ({','.join(columns)}) VALUES ({','.join(map(literal,values))}) ON CONFLICT(id) DO NOTHING;")
+        statements.append(f"INSERT INTO commentary ({','.join(columns)}) VALUES ({','.join(map(literal,values))}) ON CONFLICT(id) DO NOTHING;")
         data = [record['id'], 'import', record['originalText'], json.dumps(record['sourceFiles'],ensure_ascii=False), record['importKey']]
-        statements.append(f"INSERT INTO tracking_commentary_workspace(commentary_id,origin,original_text,source_files_json,import_key) VALUES ({','.join(map(literal,data))}) ON CONFLICT(commentary_id) DO NOTHING;")
+        statements.append(f"INSERT INTO commentary_workspace(commentary_id,origin,original_text,source_files_json,import_key) VALUES ({','.join(map(literal,data))}) ON CONFLICT(commentary_id) DO NOTHING;")
     return '\n'.join(statements) + '\n'
 
 

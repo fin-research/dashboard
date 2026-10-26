@@ -168,8 +168,7 @@ test("reasoning effort is fixed by task type", () => {
     generation: "xhigh",
     market_briefing: "xhigh",
     analysis: "xhigh",
-    policy_commentary: "xhigh",
-    tracking_commentary: "xhigh",
+    commentary: "xhigh",
     credit_answer: "xhigh",
     summary: "xhigh",
   });
@@ -238,10 +237,10 @@ test("policy commentary enables Responses web search with xhigh reasoning effort
       credentials,
       [{ role: "user", content: "policy" }],
       z.object({ ok: z.boolean() }).strict(),
-      "policy_commentary",
+      "commentary",
       {
         ...options,
-        taskType: "policy_commentary",
+        taskType: "commentary",
         tools: [{ type: "web_search" }],
       },
       fetcher,

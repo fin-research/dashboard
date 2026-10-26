@@ -3,12 +3,17 @@ import { createMcpHandler } from 'agents/mcp/server';
 import { McpServer } from '@modelcontextprotocol/server';
 import { parse, unflatten } from 'devalue';
 import { z } from 'zod';
-import { readSse } from '../sse.ts';
 import { CONTEXT_HEADER } from './gateway-context.ts';
 import type { SiteIdentity } from '../identity.ts';
+import { projectCommentaryResult } from './mcp-commentary.ts';
 import { mcpOperations, operationPath, type McpOperation } from './mcp-catalog.ts';
 
-const publishedOperations = mcpOperations.filter(operation => operation.name === 'credit_report');
+const publishedNames = new Set([
+  'credit_report', 'market_report', 'save_market_report', 'hotspots', 'policies', 'policy_articles',
+  'update_policy_articles', 'article', 'news', 'commentaries', 'commentary', 'commentary_revisions',
+  'create_commentary', 'update_commentary', 'economic_indicators',
+]);
+const publishedOperations = mcpOperations.filter(operation => publishedNames.has(operation.name));
 const MAX_REQUEST = 1024 * 1024;
 const MAX_RESPONSE = 8 * 1024 * 1024;
 const privateHeaders = { 'Cache-Control': 'no-store, private', Vary: 'Cookie, Authorization' };
@@ -39,17 +44,7 @@ async function policies(env: Pick<Env, 'IDENTITY'>, user: SiteIdentity) {
   if (!response.ok) throw new McpBusinessError(response.status, 'MCP 权限检查失败');
   return z.object({ allowed: z.array(z.boolean()).length(publishedOperations.length) }).parse(JSON.parse(await boundedText(response, MAX_REQUEST))).allowed;
 }
-export async function decodeBusinessResponse(response: Response, operation: Pick<McpOperation, 'format'>, signal?: AbortSignal): Promise<unknown> {
-  if (response.headers.get('Content-Type')?.includes('text/event-stream')) {
-    let result: unknown, terminal = false;
-    if (!response.body) throw new McpBusinessError(502, 'AI 响应为空');
-    await readSse(response.body, event => {
-      if (event.event === 'error') throw new McpBusinessError(502, event.data);
-      if (event.event === 'result') { result = JSON.parse(event.data); terminal = true; }
-    }, MAX_RESPONSE, { signal, shouldStop: () => terminal });
-    if (!terminal) throw new McpBusinessError(502, 'AI 响应中断，请查询历史结果后再决定是否重试');
-    return result;
-  }
+export async function decodeBusinessResponse(response: Response, operation: Pick<McpOperation, 'format'>): Promise<unknown> {
   const text = await boundedText(response, MAX_RESPONSE);
   if (!response.ok) {
     let message = `业务请求失败（HTTP ${response.status}）`;
@@ -89,7 +84,7 @@ export async function executeOperation(operation: McpOperation, input: Record<st
   const response = await env.IDENTITY.fetch(new Request('https://identity.internal/mcp/dispatch?target=' + encodeURIComponent(path), {
     method: operation.method, headers, body, signal,
   }));
-  return decodeBusinessResponse(response, operation, signal);
+  return decodeBusinessResponse(response, operation);
 }
 export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENTITY'>, user: SiteIdentity | null): Promise<Response> {
   if (!user) return Response.json({ error: '请先登录' }, { status: 401, headers: privateHeaders });
@@ -106,11 +101,11 @@ export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENT
         if (!allowed[index]) return;
         const readOnly = operation.method === 'GET' || operation.name === 'liability_report_data';
         server.registerTool(operation.name, { title: operation.title,
-          description: `${operation.title}。${operation.description ?? ''}${operation.ai ? '会调用 AI 并可能保存结果。' : ''} ${operation.method} ${operation.path}${operation.action ? '?/' + operation.action : ''}`,
-          inputSchema: operation.input, annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: readOnly, openWorldHint: Boolean(operation.ai) },
+          description: `${operation.title}。${operation.description ?? ''} ${operation.method} ${operation.path}${operation.action ? '?/' + operation.action : ''}`,
+          inputSchema: operation.input, annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: readOnly, openWorldHint: false },
         }, async (input) => {
           try {
-            const data = await executeOperation(operation, input as Record<string, unknown>, env, user, request.signal);
+            const data = projectCommentaryResult(operation.name, await executeOperation(operation, input as Record<string, unknown>, env, user, request.signal));
             const failed = Boolean(data && typeof data === 'object' && 'failed' in data && data.failed);
             return { ...(failed ? { isError: true } : {}), content: [{ type: 'text' as const, text: JSON.stringify(data) }], structuredContent: { data } };
           } catch (error) {

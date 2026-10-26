@@ -1,7 +1,7 @@
 <script lang="ts">
   import DocumentBody from "$lib/policy-tracking/DocumentBody.svelte";
-  import { commentaryTypeLabels, type TrackingDraft } from "$lib/tracking-commentary";
-  let { draft, element = $bindable() }: { draft: TrackingDraft; element?: HTMLElement } = $props();
+  import { commentaryTypeLabels, type CommentaryDraft } from "$lib/commentary";
+  let { draft, element = $bindable() }: { draft: CommentaryDraft; element?: HTMLElement } = $props();
 </script>
 <article class="commentary-report" bind:this={element}>
   <header><h1>【东财证券】资金管理部·{commentaryTypeLabels[draft.type]}</h1>

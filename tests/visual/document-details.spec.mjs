@@ -37,7 +37,7 @@ test('desktop research detail shows its body and related policies',async({page})
 
 test('desktop commentary detail wraps titles and centers standalone reports',async({page})=>{
   let attempts=0;
-  await page.route('**/api/commentaries/**',route=>route.fulfill(++attempts===1?{status:503,json:{error:'点评暂时不可用'}}:{json:{...commentaryDetailAudit,policy:route.request().url().endsWith('/standalone')?null:commentaryDetailAudit.policy}}));
+  await page.route('**/api/commentaries/**',route=>route.fulfill(++attempts===1?{status:503,json:{error:'点评暂时不可用'}}:{json:{...commentaryDetailAudit.commentary,policy:route.request().url().endsWith('/standalone')?null:commentaryDetailAudit.policy}}));
   await page.goto('/commentaries/archive-1');
   await expect(page.getByRole('alert')).toContainText('点评暂时不可用');
   await page.getByRole('button',{name:'重新读取',exact:true}).click();

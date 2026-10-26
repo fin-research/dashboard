@@ -1,11 +1,11 @@
-import type { TrackingDraft } from "./tracking-commentary.ts";
-import { commentaryTypeLabels } from "./tracking-commentary.ts";
+import type { CommentaryDraft } from "./commentary.ts";
+import { commentaryTypeLabels } from "./commentary.ts";
 
 /** A4 text PDF with the PDF-standard Simplified Chinese CID font/CMap.
  * All text is UTF-16BE hex, never interpolated as PDF operators. Original PDFs
  * are archived byte-for-byte; this renderer is for new structured drafts only.
  */
-export function renderCommentaryPdf(draft: TrackingDraft): Uint8Array<ArrayBuffer> {
+export function renderCommentaryPdf(draft: CommentaryDraft): Uint8Array<ArrayBuffer> {
   const objects: string[] = [];
   const add = (body: string) => { objects.push(body); return objects.length; };
   const catalog = add(""), pages = add("");
@@ -65,7 +65,7 @@ export function renderCommentaryPdf(draft: TrackingDraft): Uint8Array<ArrayBuffe
   return new TextEncoder().encode(pdf);
 }
 
-export function commentaryPdfKey(value: { id: string; type: TrackingDraft["type"]; updatedAt: string }): string {
+export function commentaryPdfKey(value: { id: string; type: CommentaryDraft["type"]; updatedAt: string }): string {
   const id = encodeURIComponent(value.id), version = encodeURIComponent(value.updatedAt);
   return `research-commentary/${commentaryTypeLabels[value.type]}/${id}/${version}.pdf`;
 }
