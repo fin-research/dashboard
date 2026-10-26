@@ -5,19 +5,29 @@
 ## 连接
 
 - 协议：Streamable HTTP。
-- 认证：正常 Auth0 用户登录取得的本站 API access token，以 `Authorization: Bearer <token>` 发送。ID token 不可用。
+- 认证：Auth0 OAuth 授权码 + PKCE，客户端打开正常登录页，保存并刷新本站 API access token。ID token 不可用。
 - Gateway 校验用户身份与权限，Dashboard 只接收私有入口注入的身份。
-- 当前不提供 MCP OAuth discovery 或动态客户端注册，不能仅填写 URL 自动登录。支持自定义 Bearer header 的客户端可直接连接。
+- Gateway 通过公开 `/.well-known/oauth-protected-resource/api/mcp` 和 401 `WWW-Authenticate` 提供 OAuth 发现，授权服务器为 `https://auth.hasbai.xyz/`。resource 为现有本站 API 标识 `https://eastmoney.hasbai.xyz/`。
+- 使用预注册 public client `M1a5PF3UJaFIZv1k4HO4IV06Z5fXQBHV`，无需 client secret；DCR 未开放。Auth0 限定 Eastmoney 组织，refresh token 轮换，最长30天、闲置7天。回调精确登记。
 
 Codex 配置：
 
 ```toml
 [mcp_servers.eastmoney]
 url = "https://eastmoney.hasbai.xyz/api/mcp"
-bearer_token_env_var = "EASTMONEY_ACCESS_TOKEN"
+scopes = ["openid", "profile", "email", "offline_access"]
+
+[mcp_servers.eastmoney.oauth]
+client_id = "M1a5PF3UJaFIZv1k4HO4IV06Z5fXQBHV"
+resource = "https://eastmoney.hasbai.xyz/"
+callback_port = 53682
 ```
 
-`EASTMONEY_ACCESS_TOKEN` 由客户端环境提供。不要把 token 写入配置文件或提交到仓库；过期后重新登录取得。
+配置后执行 `codex mcp login eastmoney`。当前 Codex 回调已登记为 `http://127.0.0.1:53682/callback/DOYLirtr9DIq`，不要给端点追加斜杠或查询参数；客户端据完整 URL 计算 callback ID。该配置和回调选择已由当前 CLI 授权请求核对，登录/刷新/工具读取由程序化 HTTP 实测。
+
+ChatGPT 连接选择 OAuth，填写同一 URL 和 client ID，client secret 留空。已登记固定回调 `https://chatgpt.com/connector_platform_oauth_redirect`；若管理页显示该连接专属 `/connector/oauth/...` 回调，先按该精确地址登记，再连接，不使用路径通配符。尚未验收 ChatGPT 界面连接。
+
+现有 API Bearer 调用仍按正常用户权限校验；MCP 专用 client 的 token 不能用于普通业务 REST。客户端配置参考 [OpenAI MCP](https://learn.chatgpt.com/docs/extend/mcp#configure-with-configtoml)。
 
 ## 发布范围
 
