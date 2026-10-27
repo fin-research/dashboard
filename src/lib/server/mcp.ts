@@ -5,13 +5,14 @@ import { parse, unflatten } from 'devalue';
 import { z } from 'zod';
 import { CONTEXT_HEADER } from './gateway-context.ts';
 import type { SiteIdentity } from '../identity.ts';
+import { projectBondLedgerResult } from './mcp-bond-ledger.ts';
 import { projectCommentaryResult } from './mcp-commentary.ts';
 import { mcpOperations, operationPath, type McpOperation } from './mcp-catalog.ts';
 
 const publishedNames = new Set([
   'credit_report', 'market_report', 'save_market_report', 'hotspots', 'policies', 'policy_articles',
   'update_policy_articles', 'article', 'news', 'commentaries', 'commentary', 'commentary_revisions',
-  'create_commentary', 'update_commentary', 'economic_indicators',
+  'create_commentary', 'update_commentary', 'economic_indicators', 'bond_ledger',
 ]);
 const publishedOperations = mcpOperations.filter(operation => publishedNames.has(operation.name));
 const MAX_REQUEST = 1024 * 1024;
@@ -105,7 +106,8 @@ export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENT
           inputSchema: operation.input, annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: readOnly, openWorldHint: false },
         }, async (input) => {
           try {
-            const data = projectCommentaryResult(operation.name, await executeOperation(operation, input as Record<string, unknown>, env, user, request.signal));
+            const result = await executeOperation(operation, input as Record<string, unknown>, env, user, request.signal);
+            const data = operation.name === 'bond_ledger' ? projectBondLedgerResult(input as Record<string, unknown>, result) : projectCommentaryResult(operation.name, result);
             const failed = Boolean(data && typeof data === 'object' && 'failed' in data && data.failed);
             return { ...(failed ? { isError: true } : {}), content: [{ type: 'text' as const, text: JSON.stringify(data) }], structuredContent: { data } };
           } catch (error) {

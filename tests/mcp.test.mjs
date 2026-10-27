@@ -6,7 +6,7 @@ const { handleDashboardMcp, executeOperation, decodeBusinessResponse, boundedTex
 const { mcpOperations, operationPath } = await import('../src/lib/server/mcp-catalog.ts');
 const { clientRequestPermission } = await import('../src/lib/route-permissions.ts');
 const { stringify } = await import('devalue');
-const publishedNames = ['market_report','save_market_report','hotspots','policies','policy_articles','update_policy_articles','article','news','commentaries','commentary','commentary_revisions','create_commentary','update_commentary','economic_indicators','credit_report'];
+const publishedNames = ['market_report','save_market_report','hotspots','policies','policy_articles','update_policy_articles','article','news','commentaries','commentary','commentary_revisions','create_commentary','update_commentary','economic_indicators','credit_report','bond_ledger'];
 const user = { id:'auth0|test',auth0Id:'auth0|test',email:'test@18.cn',issuedAt:1,expiresAt:9999999999,authorization:{name:'测试',picture:'',roles:[],permissions:[],mode:'enforce'} };
 function fixture(allow = () => true, response = () => Response.json({ saved:true })) {
   const calls = [];
@@ -22,7 +22,7 @@ async function rpc(f, method, params = {}, identity = user) {
   const payload = response.headers.get('Content-Type')?.includes('text/event-stream') ? text.split('\n').filter(line=>line.startsWith('data: ')).map(line=>JSON.parse(line.slice(6))).find(value=>value.id===1) : JSON.parse(text);
   return {response,payload};
 }
-test('real MCP discovery publishes only reviewed market data and credit and respects Gateway permission',async()=>{
+test('real MCP discovery publishes only reviewed market data, credit and bond ledger and respects Gateway permission',async()=>{
   const {response,payload}=await rpc(fixture(),'tools/list');
   assert.equal(response.status,200);
   assert.deepEqual(payload.result.tools.map(tool=>tool.name),publishedNames);
@@ -145,4 +145,54 @@ test('standard commentary MCP results omit originals, filenames and private arch
     assert.doesNotMatch(JSON.stringify(payload.result),/哨兵|originalText|sourceFiles|sourceKey|pdf|search|evidence/);
     assert.match(JSON.stringify(payload.result),/标准点评/);
   }
+});
+
+test('bond ledger MCP accepts only paired dates and never dispatches downloads or extra parameters', async()=>{
+  const f=fixture();
+  for(const args of [
+    {query:{start:'2026-10-01'}},{query:{end:'2026-10-27'}},
+    {query:{start:'2026-10-27',end:'2026-10-01'}},{query:{start:'2026-02-30',end:'2026-10-27'}},
+    {query:{date:'2026-10-27'}},{query:{start:'',end:''}},
+    {query:{start:'2026-10-01',end:'2026-10-27',files:true}},{body:{}},
+  ]) {
+    const {payload}=await rpc(f,'tools/call',{name:'bond_ledger',arguments:args});
+    assert.ok(payload.error||payload.result.isError,JSON.stringify(args));
+  }
+  assert.equal(f.calls.filter(request=>new URL(request.url).pathname==='/mcp/dispatch').length,0);
+});
+test('bond ledger inventory excludes file metadata while preserving empty inventories and effective dates',async()=>{
+  for(const dates of [[],['2026-10-26','2026-10-27']]) {
+    const expected={databaseDates:dates,availableStartDate:dates[0]??null,availableEndDate:dates.at(-1)??null};
+    const f=fixture(()=>true,request=>{
+      assert.equal(new URL(request.url).searchParams.get('target'),'/api/bond-ledger');
+      return Response.json({...expected,files:[{fileName:'文件哨兵.xlsx',key:'R2哨兵',uploadedAt:'审计哨兵'}]});
+    });
+    for(const args of [{},{query:{}}]) {
+      const {payload}=await rpc(f,'tools/call',{name:'bond_ledger',arguments:args});
+      assert.equal(payload.result.isError,undefined);assert.deepEqual(payload.result.structuredContent.data,expected);
+      assert.doesNotMatch(JSON.stringify(payload.result),/哨兵|files|fileName|uploadedAt/);
+    }
+  }
+});
+test('bond ledger reports project nested business fields and preserve empty, failed-audit and API-error semantics',async()=>{
+  const {emptyBondLedgerReport,buildBondLedgerAnalytics,toBondLedgerReport}=await import('../src/lib/bond-ledger/analytics.ts');
+  const date='2026-10-27';
+  const performance={date,principal:100,timeWeightedPrincipal:100,marketValue:100,leverage:1,modifiedDuration:1,dailyRevenue:1,cumulativeProfit:2,ytdAnnualizedReturn:0.02,ytdExTaxAnnualizedReturn:0.018};
+  const position={reportDate:date,rowNumber:1,team:'团队哨兵',investmentManager:'经理哨兵',account:'交易户',code:'TEST.IB',market:'银行间',name:'测试国债',category:'国债',yieldChangeBp:0,remainingYears:2,interestStartDate:'2025-10-27',maturityDate:'2028-10-27',currentQuantity:1,pledgedQuantity:0,availableQuantity:1,previousQuantity:0,buyQuantity:1,sellQuantity:0,maturityQuantity:0,couponRate:2,valuationYield:2,reportYield:2,fullPrice:100,dv01:1,marketValue:100,couponIncome:0,taxExemptIncome:0,realizedProfit:0,dailyProfit:1,ytdProfit:2,fullPriceCost:98};
+  const report=toBondLedgerReport(buildBondLedgerAnalytics([{date,performance:[performance],positions:[position]}],date,date));
+  const poison=value=>Array.isArray(value)?value.map(poison):value&&typeof value==='object'?{...Object.fromEntries(Object.entries(value).map(([key,item])=>[key,poison(item)])),team:'团队哨兵',investmentManager:'经理哨兵',storage:{key:'R2哨兵'},sourceUploadId:'导入哨兵'}:value;
+  for(const expected of [emptyBondLedgerReport(),report,{...report,auditPassed:false}]) {
+    const {payload}=await rpc(fixture(()=>true,request=>{
+      assert.equal(new URL(request.url).searchParams.get('target'),'/api/bond-ledger?start=2026-10-27&end=2026-10-27');
+      return Response.json(poison({...expected,currentPositions:[position],files:[{key:'文件哨兵'}]}));
+    }),'tools/call',{name:'bond_ledger',arguments:{query:{start:date,end:date}}});
+    assert.equal(payload.result.isError,undefined);assert.deepEqual(payload.result.structuredContent.data,expected);
+    assert.doesNotMatch(JSON.stringify(payload.result),/哨兵|team|investmentManager|storage|sourceUploadId|currentPositions|files/);
+  }
+  for(const status of [403,503]) {
+    const {payload}=await rpc(fixture(()=>true,()=>Response.json({error:'读取失败'},{status})),'tools/call',{name:'bond_ledger',arguments:{}});
+    assert.equal(payload.result.isError,true);assert.deepEqual(JSON.parse(payload.result.content[0].text),{status,detail:'读取失败'});
+  }
+  const denied=await rpc(fixture(operation=>operation.path!=='/api/bond-ledger'),'tools/list');
+  assert.ok(!denied.payload.result.tools.some(tool=>tool.name==='bond_ledger'));
 });

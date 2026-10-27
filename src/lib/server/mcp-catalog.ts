@@ -23,6 +23,9 @@ function api(name: string, title: string, path: string, method: McpOperation['me
 }
 const at = (body: z.ZodType) => z.object({ id, body }).strict();
 const body = (schema: z.ZodType) => z.object({ body: schema }).strict();
+const bondLedgerInput = z.object({ query: z.object({ start: dateSchema.optional(), end: dateSchema.optional() }).strict()
+  .refine(value => (value.start === undefined) === (value.end === undefined), '统计范围必须同时包含起止日期')
+  .refine(value => !value.start || !value.end || value.start <= value.end, '统计起始日期不能晚于结束日期').optional() }).strict();
 const query = (shape: z.ZodRawShape) => z.object({ query: z.object(shape).strict().optional() }).strict();
 function page(name: string, title: string, path: string, input: z.ZodObject = empty) { return api(name, title, path, 'GET', input, { format: 'page' }); }
 function form(name: string, title: string, path: string, action: string, fields: string, schema: z.ZodType = formValues) {
@@ -45,7 +48,7 @@ export const mcpOperations: McpOperation[] = [
   api('update_commentary', '修改标准点评', '/api/commentaries/[id]', 'PUT', at(updateCommentarySchema)),
   api('economic_indicators', '读取经济指标与趋势', '/api/economic-indicators'),
   api('credit_report', '读取脱敏授信一览表', '/api/credit?view=masked', 'GET', query(creditMaskedQuerySchema.omit({view:true}).shape)),
-  api('bond_ledger', '读取二级池台账与周报', '/api/bond-ledger', 'GET', query({ start: dateSchema.optional(), end: dateSchema.optional() })),
+  api('bond_ledger', '读取二级池台账与周报', '/api/bond-ledger', 'GET', bondLedgerInput, { description: '不传日期返回可用台账日清单；query.start 与 query.end 必须同时提供，读取现行二级池运营周报数据。金额为元；年化收益和风险指标为小数，flatStatic、reportYield、weightedYield 为原报表百分数；不下载原始文件。' }),
   api('delete_bond_ledger', '删除指定日期二级池台账', '/api/bond-ledger', 'DELETE', z.object({ query: z.object({ date: dateSchema }) }).strict()),
   api('financing_model', '读取融资择时模型报告', '/api/financing-model', 'GET', query({ run: z.string().uuid().optional() })),
   api('update_model_conclusion', '修改融资模型结论', '/api/financing-model/conclusion', 'PATCH', body(conclusionUpdateSchema)),
