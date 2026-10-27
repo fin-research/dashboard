@@ -53,6 +53,6 @@ Gateway 将 Dashboard 的15个工具与 Data 的22个只读市场查询合并，
 
 ## 验证
 
-- `node --test tests/mcp.test.mjs tests/credit-masked.test.mjs`：实际 SDK 发现/调用、精确发布白名单、所有未发布工具拒绝、输入校验、脱敏 SQL/接口与字段白名单。
+- `node --test tests/mcp.test.mjs tests/credit-masked.test.mjs`：实际 SDK 发现/调用、精确发布白名单、所有未发布工具拒绝、输入校验、脱敏 SQL/接口与字段白名单。ID 的 Unicode 校验在服务端执行，不导出需要 JavaScript Unicode 标志的 JSON Schema `pattern`；仍保留长度与路径限制。
 - 构建后 `GATEWAY_CHECKOUT=<gateway-worktree> node scripts/verify-mcp-integration.mjs`：真实 Gateway → 构建 SvelteKit → 私有授权桥接，配合 `DATA_CHECKOUT=<data-worktree>` 检查37项统一目录、Data真实处理器、未发布工具拒绝、参数校验与权限撤销；外部服务使用内存夹具。
 - 生产只读验收使用 Gateway 既有程序化正常登录，携带 API Bearer 直连本端点，核对当前权限下的37项统一候选目录并执行查询，旧名称及生成工具须拒绝。禁止浏览器权限验收。

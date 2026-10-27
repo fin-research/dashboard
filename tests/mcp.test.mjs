@@ -32,6 +32,24 @@ test('real MCP discovery publishes only reviewed market data and credit and resp
   const denied=await rpc(fixture(()=>false),'tools/list');
   assert.deepEqual(denied.payload.result.tools,[]);
 });
+test('published ID schemas omit Unicode patterns while calls retain Unicode and path validation',async()=>{
+  const {payload}=await rpc(fixture(),'tools/list');
+  const article=payload.result.tools.find(tool=>tool.name==='article');
+  assert.deepEqual(article.inputSchema.properties.id,{type:'string',minLength:1,maxLength:240});
+  for(const tool of payload.result.tools) assert.doesNotMatch(JSON.stringify(tool.inputSchema),/\\\\[pP]\{/u,tool.name);
+  for(const id of ['政策-2026','auth0|test','a_b.c-1','１２３']) {
+    const f=fixture();
+    const {payload}=await rpc(f,'tools/call',{name:'article',arguments:{id}});
+    assert.equal(payload.result.isError,undefined,id);
+    assert.equal(new URL(f.calls.at(-1).url).searchParams.get('target'),'/api/articles/'+encodeURIComponent(id));
+  }
+  for(const id of ['','.', '..','../profile','x/y','%2f','a b','😀','a'.repeat(241)]) {
+    const f=fixture();
+    const {payload}=await rpc(f,'tools/call',{name:'article',arguments:{id}});
+    assert.ok(payload.error||payload.result.isError,id);
+    assert.equal(f.calls.filter(request=>new URL(request.url).pathname==='/mcp/dispatch').length,0,id);
+  }
+});
 test('unpublished tools and prefixed aliases cannot execute or access backing services',async()=>{
   const f=fixture();
   f.env.EASTMONEY={list(){assert.fail('Unpublished materials must not be read')}};
