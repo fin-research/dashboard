@@ -9,7 +9,8 @@ import { projectCreateSchema } from '../financing/project-form.ts';
 import { DATA_ENTITIES } from '../financing/data-admin.ts';
 
 const empty = z.object({}).strict();
-const id = z.string().min(1).max(240).regex(/^[\p{L}\p{N}_|.-]+$/u).refine(v => v !== '.' && v !== '..');
+// Keep Unicode validation at runtime: JSON Schema patterns cannot carry the required /u flag.
+const id = z.string().min(1).max(240).refine(v => /^[\p{L}\p{N}_|.-]+$/u.test(v)).refine(v => v !== '.' && v !== '..');
 const dates = { startDate: dateSchema.optional(), endDate: dateSchema.optional() };
 const queryValues = z.record(z.string().max(100), z.union([z.string().max(4000), z.array(z.string().max(4000)).max(100)]));
 const formValues = queryValues.describe('与网站表单相同的字段；多值字段使用字符串数组。缺失字段不会自动补齐，更新前先读取当前记录。');
