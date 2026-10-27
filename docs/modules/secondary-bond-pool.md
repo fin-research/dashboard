@@ -10,6 +10,8 @@
 - `POST`：multipart 上传原始 Excel 与浏览器解析的 `parsed` JSON，可选 `expectedDate`。实际请求体上限 21 MB、文件上限 12 MB、解析 JSON 上限 8 MB（UTF-8 字节）。服务端校验日期、字段、重复行及质押数量守恒，归档后直接提交数据库事务，成功返回 200 和导入计数。数据库失败单独尝试登记失败审计。若审计也失败，保留原件和结构化日志供核对。
 - `DELETE ?date=YYYY-MM-DD`：删除该日数据库业务数据，保留 R2 归档。
 
+MCP 只读工具 `bond_ledger` 提供日期清单与区间周报；严格输入及逐层字段投影见 [MCP](../MCP.md#发布范围)。网站原始 Excel 下载、导入和删除不进入 MCP。
+
 ## 业务规则
 
 - 原始 Excel 是归档输入，不是页面运行时数据源。周报只查询 Neon `bond` schema。
