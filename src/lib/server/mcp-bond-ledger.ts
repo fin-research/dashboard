@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { dateSchema } from '../commentary.ts';
-import type { BondLedgerReport } from '../bond-ledger/types.ts';
+import type { BondLedgerReport, LedgerAuditCheck } from '../bond-ledger/types.ts';
+
+// Non-finite reconciliation values become null in the business API JSON wire format.
+type AuditCheckWire = { [Key in keyof LedgerAuditCheck]: LedgerAuditCheck[Key] extends number ? number | null : LedgerAuditCheck[Key] };
+type ReportWire = Omit<BondLedgerReport, 'auditChecks'> & { auditChecks: AuditCheckWire[] };
 
 const number = z.number();
 const nullableNumber = number.nullable();
@@ -37,9 +41,9 @@ export const bondLedgerReportSchema = z.object({
   metricDeltas: z.object({ marketValue: nullableNumber, leverage: nullableNumber, modifiedDuration: nullableNumber, ytdAnnualizedReturn: nullableNumber, reportedYtdAnnualizedReturn: nullableNumber, reportedYtdExTaxAnnualizedReturn: nullableNumber, annualizedVolatility: nullableNumber, rangeProfit: nullableNumber, transactionCount: nullableNumber }),
   detailMarketValue: number,
   availability: z.object({ pledgedQuantity: nullableNumber, availableQuantity: nullableNumber, pledgedMarketValue: nullableNumber, availableMarketValue: nullableNumber, pledgedFaceAmount: nullableNumber, availableFaceAmount: nullableNumber }),
-  auditChecks: z.array(z.object({ key: z.enum(['scale', 'leverage', 'profit']), label: z.string(), pass: z.boolean(), actual: number, expected: number, difference: number, tolerance: number })),
+  auditChecks: z.array(z.object({ key: z.enum(['scale', 'leverage', 'profit']), label: z.string(), pass: z.boolean(), actual: nullableNumber, expected: nullableNumber, difference: nullableNumber, tolerance: nullableNumber })),
   auditPassed: z.boolean(), effectiveStartDate: dateSchema.nullable(), effectiveEndDate: dateSchema.nullable(),
-}) satisfies z.ZodType<BondLedgerReport>;
+}) satisfies z.ZodType<ReportWire>;
 const inventory = z.object({ databaseDates: z.array(dateSchema), availableStartDate: dateSchema.nullable(), availableEndDate: dateSchema.nullable() });
 
 export function projectBondLedgerResult(input: Record<string, unknown>, value: unknown): unknown {

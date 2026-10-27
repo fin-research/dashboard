@@ -181,7 +181,9 @@ test('bond ledger reports project nested business fields and preserve empty, fai
   const position={reportDate:date,rowNumber:1,team:'团队哨兵',investmentManager:'经理哨兵',account:'交易户',code:'TEST.IB',market:'银行间',name:'测试国债',category:'国债',yieldChangeBp:0,remainingYears:2,interestStartDate:'2025-10-27',maturityDate:'2028-10-27',currentQuantity:1,pledgedQuantity:0,availableQuantity:1,previousQuantity:0,buyQuantity:1,sellQuantity:0,maturityQuantity:0,couponRate:2,valuationYield:2,reportYield:2,fullPrice:100,dv01:1,marketValue:100,couponIncome:0,taxExemptIncome:0,realizedProfit:0,dailyProfit:1,ytdProfit:2,fullPriceCost:98};
   const report=toBondLedgerReport(buildBondLedgerAnalytics([{date,performance:[performance],positions:[position]}],date,date));
   const poison=value=>Array.isArray(value)?value.map(poison):value&&typeof value==='object'?{...Object.fromEntries(Object.entries(value).map(([key,item])=>[key,poison(item)])),team:'团队哨兵',investmentManager:'经理哨兵',storage:{key:'R2哨兵'},sourceUploadId:'导入哨兵'}:value;
-  for(const expected of [emptyBondLedgerReport(),report,{...report,auditPassed:false}]) {
+  const zeroPrincipalReport=JSON.parse(JSON.stringify(toBondLedgerReport(buildBondLedgerAnalytics([{date,performance:[{...performance,principal:0}],positions:[position]}],date,date))));
+  assert.equal(zeroPrincipalReport.auditPassed,false);assert.equal(zeroPrincipalReport.auditChecks.find(check=>check.key==='leverage').actual,null);
+  for(const expected of [emptyBondLedgerReport(),report,{...report,auditPassed:false},zeroPrincipalReport]) {
     const {payload}=await rpc(fixture(()=>true,request=>{
       assert.equal(new URL(request.url).searchParams.get('target'),'/api/bond-ledger?start=2026-10-27&end=2026-10-27');
       return Response.json(poison({...expected,currentPositions:[position],files:[{key:'文件哨兵'}]}));
