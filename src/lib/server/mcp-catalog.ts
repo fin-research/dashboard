@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { researchSearchSchema } from './research-search.ts';
 import { progressPatch } from './trading-progress.ts';
 import { creditMaskedQuerySchema } from '../credit/masked.ts';
 import { conclusionUpdateSchema, timingDecisionInputSchema, sellSideSummaryUpdateSchema } from '../financing-model.ts';
@@ -16,7 +17,7 @@ const queryValues = z.record(z.string().max(100), z.union([z.string().max(4000),
 const formValues = queryValues.describe('与网站表单相同的字段；多值字段使用字符串数组。缺失字段不会自动补齐，更新前先读取当前记录。');
 export interface McpOperation {
   name: string; title: string; path: string; method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  input: z.ZodObject; format?: 'page' | 'form' | 'html'; action?: string; description?: string;
+  input: z.ZodObject; format?: 'page' | 'form' | 'html'; action?: string; description?: string; readOnly?: boolean;
 }
 function api(name: string, title: string, path: string, method: McpOperation['method'] = 'GET', input: z.ZodObject = empty, extra: Partial<McpOperation> = {}): McpOperation {
   return { name, title, path, method, input, ...extra };
@@ -38,6 +39,7 @@ export const mcpOperations: McpOperation[] = [
   api('save_market_report', '保存市场点评定稿', '/api/market-report', 'PUT', z.object({ query: z.object({ date: dateSchema }), body: z.object({ report: z.record(z.string(), z.unknown()), focusText: z.string().optional() }) }).strict()),
   api('hotspots', '读取最新市场热点快照', '/api/rag/hotspots'),
   api('policies', '查询政策时间轴', '/api/policies', 'GET', query({ ...dates, category: policyCategorySchema.optional() })),
+  api('research_search', 'AI Search 研报与政策检索', '/api/research/search', 'POST', body(researchSearchSchema), { readOnly: true, description: '返回原始检索片段、元数据及评分。published_at 使用上海时区 Unix 毫秒硬过滤；默认最近七个自然日，max_num_results 固定50。' }),
   api('policy_articles', '搜索可关联研报', '/api/policies/articles', 'GET', query({ q: z.string().max(120).optional() })),
   api('update_policy_articles', '更新政策关联研报', '/api/policies/[id]/articles', 'PUT', at(articleAssociationUpdateSchema)),
   ...['articles', 'news'].map((kind, index) => api(['article', 'news'][index]!, ['读取研报正文', '读取新闻详情'][index]!, `/api/${kind}/[id]`, 'GET', z.object({ id }).strict())),
