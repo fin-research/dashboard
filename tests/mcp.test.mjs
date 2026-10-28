@@ -6,7 +6,7 @@ const { handleDashboardMcp, executeOperation, decodeBusinessResponse, boundedTex
 const { mcpOperations, operationPath } = await import('../src/lib/server/mcp-catalog.ts');
 const { clientRequestPermission } = await import('../src/lib/route-permissions.ts');
 const { stringify } = await import('devalue');
-const publishedNames = ['market_report','save_market_report','hotspots','policies','policy_articles','update_policy_articles','article','news','commentaries','commentary','commentary_revisions','create_commentary','update_commentary','economic_indicators','credit_report','bond_ledger'];
+const publishedNames = ['market_report','save_market_report','hotspots','policies','research_search','policy_articles','update_policy_articles','article','news','commentaries','commentary','commentary_revisions','create_commentary','update_commentary','economic_indicators','credit_report','bond_ledger'];
 const user = { id:'auth0|test',auth0Id:'auth0|test',email:'test@18.cn',issuedAt:1,expiresAt:9999999999,authorization:{name:'测试',picture:'',roles:[],permissions:[],mode:'enforce'} };
 function fixture(allow = () => true, response = () => Response.json({ saved:true })) {
   const calls = [];
@@ -197,4 +197,12 @@ test('bond ledger reports project nested business fields and preserve empty, fai
   }
   const denied=await rpc(fixture(operation=>operation.path!=='/api/bond-ledger'),'tools/list');
   assert.ok(!denied.payload.result.tools.some(tool=>tool.name==='bond_ledger'));
+});
+test('research search is discoverable read-only POST and preserves request and upstream result',async()=>{
+ const found=(await rpc(fixture(),'tools/list')).payload.result.tools.find(tool=>tool.name==='research_search');
+ assert.equal(found.annotations.readOnlyHint,true);assert.equal(found.annotations.destructiveHint,false);
+ const args={body:{query:'央行',ai_search_options:{retrieval:{max_num_results:50,retrieval_type:'hybrid',filters:{published_at:{$gte:1792598400000,$lt:1793203200000},type:{$eq:'研报'}}}}}};
+ const data={success:true,result:{chunks:[{text:'a',scoring_details:{vector_score:0.8}}]}};
+ const f=fixture(()=>true,async request=>{assert.equal(new URL(request.url).searchParams.get('target'),'/api/research/search');assert.deepEqual(await request.json(),args.body);return Response.json(data);});
+ const result=await rpc(f,'tools/call',{name:'research_search',arguments:args});assert.deepEqual(result.payload.result.structuredContent.data,data);
 });

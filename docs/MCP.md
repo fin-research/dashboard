@@ -25,7 +25,7 @@ Gateway 只在 `/mcp` 接受两个已登记的官方 CIMD 客户端。MCP token 
 
 客户端配置参考 [OpenAI MCP](https://learn.chatgpt.com/docs/extend/mcp#configure-with-configtoml)。
 
-Gateway 将 Dashboard 的16个工具与 Data 的22个只读市场查询合并，当前共38项候选工具。Data 资讯列表为 `news_list`，归档新闻详情仍为 `news`，无前缀或别名。旧公网 `/api/mcp` 与 `/data/mcp` 返回410；应用内部路径保留给命名 Service Binding。
+Gateway 将 Dashboard 的17个工具与 Data 的22个只读市场查询合并，当前共39项候选工具。Data 资讯列表为 `news_list`，归档新闻详情仍为 `news`，无前缀或别名。旧公网 `/api/mcp` 与 `/data/mcp` 返回410；应用内部路径保留给命名 Service Binding。
 
 ## 发布范围
 
@@ -35,7 +35,7 @@ Gateway 将 Dashboard 的16个工具与 Data 的22个只读市场查询合并，
 {"name":"credit_report","arguments":{"query":{"date":"2026-10-26"}}}
 ```
 
-市场研究已发布：`market_report`、`save_market_report`、`hotspots`、`policies`、`policy_articles`、`update_policy_articles`、`article`、`news`、`commentaries`、`commentary`、`commentary_revisions`、`create_commentary`、`update_commentary`、`economic_indicators`。加上 `credit_report`、`bond_ledger` 共 16 个候选工具，实际目录由当前用户权限筛选。
+市场研究已发布：`market_report`、`save_market_report`、`hotspots`、`policies`、`research_search`、`policy_articles`、`update_policy_articles`、`article`、`news`、`commentaries`、`commentary`、`commentary_revisions`、`create_commentary`、`update_commentary`、`economic_indicators`。加上 `credit_report`、`bond_ledger` 共 17 个候选工具，实际目录由当前用户权限筛选。
 
 `bond_ledger` 只读现行二级池运营周报，受 `/api/bond-ledger` 的真实读取权限约束。
 
@@ -67,5 +67,13 @@ Gateway 将 Dashboard 的16个工具与 Data 的22个只读市场查询合并，
 ## 验证
 
 - `node --test tests/mcp.test.mjs tests/credit-masked.test.mjs`：实际 SDK 发现/调用、精确发布白名单、所有未发布工具拒绝、输入校验、脱敏 SQL/接口与字段白名单。ID 的 Unicode 校验在服务端执行，不导出需要 JavaScript Unicode 标志的 JSON Schema `pattern`；仍保留长度与路径限制。
-- 构建后 `GATEWAY_CHECKOUT=<gateway-worktree> node scripts/verify-mcp-integration.mjs`：真实 Gateway → 构建 SvelteKit → 私有授权桥接，配合 `DATA_CHECKOUT=<data-worktree>` 检查37项统一目录、Data真实处理器、未发布工具拒绝、参数校验与权限撤销；外部服务使用内存夹具。
-- 生产只读验收使用 Gateway 既有程序化正常登录，携带 API Bearer 直连本端点，核对当前权限下的37项统一候选目录并执行查询，旧名称及生成工具须拒绝。禁止浏览器权限验收。
+- 构建后 `GATEWAY_CHECKOUT=<gateway-worktree> node scripts/verify-mcp-integration.mjs`：真实 Gateway → 构建 SvelteKit → 私有授权桥接，配合 `DATA_CHECKOUT=<data-worktree>` 检查39项统一目录、Data真实处理器、未发布工具拒绝、参数校验与权限撤销；外部服务使用内存夹具。
+- 生产只读验收使用 Gateway 既有程序化正常登录，携带 API Bearer 直连本端点，核对当前权限下的39项统一候选目录并执行查询，旧名称及生成工具须拒绝。禁止浏览器权限验收。
+
+## AI Search 研究检索
+
+`research_search` 是只读 POST `/api/research/search`，使用现有 `research.article:read` 权限。每次工具执行仍经 IDENTITY 重新检查权限。它固定调用原研究库 `https://research.hasbai.xyz/mcp` 的 `search`，不执行生成模型、不以标题 SQL 搜索替代检索，也不转发用户凭据。
+
+输入为 `{"body":{"query":"查询","ai_search_options":{"retrieval":{"retrieval_type":"hybrid","max_num_results":50,"filters":{"type":{"$eq":"研报"},"published_at":{"$gte":1792598400000,"$lt":1793203200000}}}}}}`。保留原 RAG 的 cache、custom_metadata、query_rewrite、reranking 和 retrieval 参数；max_num_results 固定为50，缺省日期使用最近七个上海自然日。显式日期必须使用 Unix 毫秒硬过滤。type 可为研报、政策，或不设置以覆盖两类。返回上游完整 success/result（原始 chunks、metadata、评分及 hybrid_meta），不聚合、不截断正文。上游 HTTP、JSON-RPC、isError、业务失败或响应格式错误均返回工具错误。请求上限1 MiB、上游响应上限6 MiB、超时120秒，并传播取消。
+
+相关单元测试：`node --test tests/research-search.test.mjs tests/mcp.test.mjs`。

@@ -10,7 +10,7 @@ import { projectCommentaryResult } from './mcp-commentary.ts';
 import { mcpOperations, operationPath, type McpOperation } from './mcp-catalog.ts';
 
 const publishedNames = new Set([
-  'credit_report', 'market_report', 'save_market_report', 'hotspots', 'policies', 'policy_articles',
+  'credit_report', 'market_report', 'save_market_report', 'hotspots', 'policies', 'research_search', 'policy_articles',
   'update_policy_articles', 'article', 'news', 'commentaries', 'commentary', 'commentary_revisions',
   'create_commentary', 'update_commentary', 'economic_indicators', 'bond_ledger',
 ]);
@@ -100,7 +100,7 @@ export async function handleDashboardMcp(request: Request, env: Pick<Env, 'IDENT
       const allowed = await policies(env, user);
       publishedOperations.forEach((operation, index) => {
         if (!allowed[index]) return;
-        const readOnly = operation.method === 'GET' || operation.name === 'liability_report_data';
+        const readOnly = operation.readOnly === true || operation.method === 'GET' || operation.name === 'liability_report_data';
         server.registerTool(operation.name, { title: operation.title,
           description: `${operation.title}。${operation.description ?? ''} ${operation.method} ${operation.path}${operation.action ? '?/' + operation.action : ''}`,
           inputSchema: operation.input, annotations: { readOnlyHint: readOnly, destructiveHint: !readOnly, idempotentHint: readOnly, openWorldHint: false },
